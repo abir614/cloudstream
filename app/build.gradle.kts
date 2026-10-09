@@ -166,6 +166,9 @@ android {
     productFlavors {
         create("stable") {
             dimension = "state"
+            if (signingConfigs.names.contains("prerelease")) {
+                signingConfig = signingConfigs.getByName("prerelease")
+            }
         }
         create("prerelease") {
             dimension = "state"
