@@ -498,6 +498,10 @@ object DataStoreHelper {
     fun deleteAllResumeStateIds() {
         sessionPosDur.clear()
         sessionWatchState.clear()
+        val folder = "$currentAccount/$RESULT_RESUME_WATCHING"
+        getKeys(folder)?.forEach {
+            removeKey(it)
+        }
     }
 
     fun deleteBookmarkedData(id: Int?) {}
@@ -574,13 +578,6 @@ object DataStoreHelper {
     fun removeLastWatched(parentId: Int?) {
         if (parentId == null) return
         removeKey("$currentAccount/$RESULT_RESUME_WATCHING", parentId.toString())
-    }
-
-    fun deleteAllResumeStateIds() {
-        val folder = "$currentAccount/$RESULT_RESUME_WATCHING"
-        getKeys(folder)?.forEach {
-            removeKey(it)
-        }
     }
 
     fun getLastWatched(id: Int?): DownloadObjects.ResumeWatching? {
