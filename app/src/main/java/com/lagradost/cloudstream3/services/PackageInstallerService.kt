@@ -19,9 +19,11 @@ import com.lagradost.cloudstream3.utils.ApkInstaller
 import com.lagradost.cloudstream3.utils.AppContextUtils.createNotificationChannel
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
+import com.lagradost.cloudstream3.utils.UpdateSecurityGate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.File
 import kotlin.math.roundToInt
 
 class PackageInstallerService : Service() {
@@ -61,12 +63,14 @@ class PackageInstallerService : Service() {
     private suspend fun downloadUpdate(url: String): Boolean {
         try {
             Log.d("PackageInstallerService", "Downloading update: $url")
+            val appUpdateName = "CloudStream"
+            val appUpdateSuffix = "apk"
+
+            // Request ephemeral challenge from UpdateSecurityGate
+            UpdateSecurityGate.requestUpdateChallenge()
 
             // Delete all old updates
             ioSafe {
-                val appUpdateName = "CloudStream"
-                val appUpdateSuffix = "apk"
-
                 this@PackageInstallerService.cacheDir.listFiles()?.filter {
                     it.name.startsWith(appUpdateName) && it.extension == appUpdateSuffix
                 }?.forEach {
@@ -74,35 +78,65 @@ class PackageInstallerService : Service() {
                 }
             }
 
-            updateLock.withLock {
+            val stagedFile = File.createTempFile(appUpdateName, ".$appUpdateSuffix", this@PackageInstallerService.cacheDir)
+
+            val success = updateLock.withLock {
                 updateNotificationProgress(
                     0f,
                     ApkInstaller.InstallProgressStatus.Downloading
                 )
 
                 val body = app.get(url).body
-                val inputStream = body.byteStream()
-                installer = ApkInstaller(this)
                 val totalSize = body.contentLength()
-                var currentSize = 0
+                var currentSize = 0L
 
-                installer?.installApk(this, inputStream, totalSize, {
-                    currentSize += it
-                    // Prevent div 0
-                    if (totalSize == 0L) return@installApk
-
-                    val percentage = currentSize / totalSize.toFloat()
-                    updateNotificationProgress(
-                        percentage,
-                        ApkInstaller.InstallProgressStatus.Downloading
-                    )
-                }) { status ->
-                    updateNotificationProgress(0f, status)
+                stagedFile.outputStream().use { fileOut ->
+                    body.byteStream().use { netIn ->
+                        val buf = ByteArray(64 * 1024)
+                        var read: Int
+                        while (netIn.read(buf).also { read = it } != -1) {
+                            fileOut.write(buf, 0, read)
+                            currentSize += read
+                            if (totalSize > 0) {
+                                val percentage = currentSize / totalSize.toFloat()
+                                updateNotificationProgress(
+                                    percentage,
+                                    ApkInstaller.InstallProgressStatus.Downloading
+                                )
+                            }
+                        }
+                    }
                 }
+
+                val outcome = UpdateSecurityGate.verifyAndAuthorize(this@PackageInstallerService, stagedFile)
+                if (outcome !is UpdateSecurityGate.VerificationOutcome.Authorized) {
+                    val reason = (outcome as? UpdateSecurityGate.VerificationOutcome.Rejected)?.reason
+                        ?: "Update rejected by security gate"
+                    Log.e("PackageInstallerService", "Update verification failed: $reason")
+                    updateNotificationProgress(0f, ApkInstaller.InstallProgressStatus.Failed)
+                    return false
+                }
+
+                installer = ApkInstaller(this@PackageInstallerService)
+                val installSuccessful = UpdateSecurityGate.executeInstallation(
+                    this@PackageInstallerService,
+                    outcome.token
+                ) { authorizedFile ->
+                    val verifiedSize = authorizedFile.length()
+                    authorizedFile.inputStream().use { verifiedIn ->
+                        installer?.installApk(this@PackageInstallerService, verifiedIn, verifiedSize, {
+                            // Handled during download
+                        }) { status ->
+                            updateNotificationProgress(0f, status)
+                        }
+                    }
+                }
+                installSuccessful
             }
-            return true
+            return success
         } catch (e: Exception) {
             logError(e)
+            UpdateSecurityGate.lockGate()
             updateNotificationProgress(0f, ApkInstaller.InstallProgressStatus.Failed)
             return false
         }

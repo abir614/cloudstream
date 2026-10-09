@@ -37,4 +37,35 @@ object NativeCoreBridge {
      * Returns the native core version and compile architecture (ARMv7, ARMv8, etc.).
      */
     external fun getCoreInfo(): String
-}
+
+    /**
+     * Generates a cryptographically secure 256-bit ephemeral session nonce in native Rust.
+     */
+    external fun generateSessionNonce(): String?
+
+    /**
+     * Performs Z+ Zero-Trust End-to-End identity verification on an APK file in native Rust.
+     * Returns JSON containing ApkVerificationResult (is_valid, file_sha256, attestation_token, error_message).
+     */
+    external fun verifyApkIdentity(
+        apkPath: String,
+        sessionNonce: String,
+        expectedPkg: String,
+        actualPkg: String,
+        expectedCert: String,
+        actualCert: String,
+        installedVersionCode: Long,
+        apkVersionCode: Long
+    ): String?
+
+    /**
+     * Verifies an ephemeral HMAC attestation token in native Rust.
+     */
+    external fun verifyAttestationToken(
+        sessionNonce: String,
+        token: String,
+        fileHash: String,
+        pkgName: String,
+        certFingerprint: String,
+        versionCode: Long
+    ): Boolean

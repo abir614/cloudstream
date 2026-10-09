@@ -38,7 +38,7 @@ import java.io.IOException
 import java.io.InputStreamReader
 
 object InAppUpdater {
-    private const val GITHUB_USER_NAME = "recloudstream"
+    private const val GITHUB_USER_NAME = "abir614"
     private const val GITHUB_REPO = "cloudstream"
 
     private const val PRERELEASE_PACKAGE_NAME = "com.lagradost.cloudstream3.prerelease"
@@ -192,6 +192,9 @@ object InAppUpdater {
             val appUpdateName = "CloudStream"
             val appUpdateSuffix = "apk"
 
+            // Request ephemeral challenge nonce from isolated UpdateSecurityGate
+            UpdateSecurityGate.requestUpdateChallenge()
+
             // Delete all old updates
             this.cacheDir.listFiles()?.filter {
                 it.name.startsWith(appUpdateName) && it.extension == appUpdateSuffix
@@ -200,15 +203,31 @@ object InAppUpdater {
             val downloadedFile = File.createTempFile(appUpdateName, ".$appUpdateSuffix")
             val sink: BufferedSink = downloadedFile.sink().buffer()
 
-            updateLock.withLock {
+            val isInstalled = updateLock.withLock {
                 sink.writeAll(app.get(url).body.source())
                 sink.close()
-                openApk(this, Uri.fromFile(downloadedFile))
+
+                val outcome = UpdateSecurityGate.verifyAndAuthorize(this, downloadedFile)
+                when (outcome) {
+                    is UpdateSecurityGate.VerificationOutcome.Authorized -> {
+                        UpdateSecurityGate.executeInstallation(this, outcome.token) { authorizedFile ->
+                            openApk(this, Uri.fromFile(authorizedFile))
+                        }
+                    }
+                    is UpdateSecurityGate.VerificationOutcome.Rejected -> {
+                        Log.e(LOG_TAG, "Update rejected by security gate: ${outcome.reason}")
+                        runOnUiThread {
+                            showToast("Update verification failed: ${outcome.reason}", Toast.LENGTH_LONG)
+                        }
+                        false
+                    }
+                }
             }
 
-            return true
+            return isInstalled
         } catch (e: Exception) {
             logError(e)
+            UpdateSecurityGate.lockGate()
             return false
         }
     }

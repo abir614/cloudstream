@@ -15,6 +15,7 @@ import com.lagradost.cloudstream3.MainActivity.Companion.deleteFileOnExit
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.mvvm.safe
 import com.lagradost.cloudstream3.receivers.PackageInstallerStatusReceiver
+import com.lagradost.cloudstream3.utils.UpdateSecurityGate
 import com.lagradost.cloudstream4.AppSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -84,45 +85,69 @@ object ApkUpdater : AppUpdater {
         digest: DigestPair?,
         downloadProgress: (Long, Long?) -> Unit,
     ) = withContext(Dispatchers.IO) {
-        var sessionId: Int? = null
-        val packageInstaller = activity.packageManager.packageInstaller
+        UpdateSecurityGate.requestUpdateChallenge()
+        val stagedFile = File.createTempFile(APP_UPDATE_NAME, ".$APP_UPDATE_SUFFIX")
+
         try {
-            val installParams =
-                PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                installParams.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-            }
-            if (length != null) {
-                installParams.setSize(length)
+            stagedFile.outputStream().use { writeStream ->
+                transfer(writeStream, readStream, length, downloadProgress, digest)
             }
 
-            sessionId = packageInstaller.createSession(installParams)
-            val session = packageInstaller.openSession(sessionId)
+            val outcome = UpdateSecurityGate.verifyAndAuthorize(activity, stagedFile)
+            if (outcome !is UpdateSecurityGate.VerificationOutcome.Authorized) {
+                val reason = (outcome as? UpdateSecurityGate.VerificationOutcome.Rejected)?.reason
+                    ?: "Update rejected by security gate"
+                throw SecurityException(reason)
+            }
 
-            // We do not need to buffer this because transfer has large writes
-            session.openWrite(activity.packageName, 0, length ?: -1L)
-                .use { writeStream ->
-                    transfer(writeStream, readStream, length, downloadProgress, digest)
-                    session.fsync(writeStream)
+            UpdateSecurityGate.executeInstallation(activity, outcome.token) { authorizedFile ->
+                var sessionId: Int? = null
+                val packageInstaller = activity.packageManager.packageInstaller
+                try {
+                    val installParams =
+                        PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        installParams.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+                    }
+                    val fileSize = authorizedFile.length()
+                    installParams.setSize(fileSize)
+
+                    sessionId = packageInstaller.createSession(installParams)
+                    val session = packageInstaller.openSession(sessionId)
+
+                    session.openWrite(activity.packageName, 0, fileSize).use { writeStream ->
+                        authorizedFile.inputStream().use { fileIn ->
+                            fileIn.copyTo(writeStream)
+                        }
+                        session.fsync(writeStream)
+                    }
+
+                    val receiverIntent = Intent(activity, PackageInstallerStatusReceiver::class.java)
+                    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                    } else {
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                    }
+                    val receiverPendingIntent =
+                        PendingIntent.getBroadcast(activity, 0, receiverIntent, flags)
+
+                    // Avoid delayed updates, and just commit instantly
+                    session.commit(receiverPendingIntent.intentSender)
+                    session.close()
+                } catch (t: Throwable) {
+                    sessionId?.let { sessionId ->
+                        packageInstaller.abandonSession(sessionId)
+                    }
+                    throw t
+                } finally {
+                    try {
+                        authorizedFile.delete()
+                    } catch (_: Exception) {}
                 }
-
-            val receiverIntent = Intent(activity, PackageInstallerStatusReceiver::class.java)
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            } else {
-                PendingIntent.FLAG_UPDATE_CURRENT
             }
-            val receiverPendingIntent =
-                PendingIntent.getBroadcast(activity, 0, receiverIntent, flags)
-
-            // Avoid delayed updates, and just commit instantly
-            session.commit(receiverPendingIntent.intentSender)
-            session.close()
         } catch (t: Throwable) {
-            sessionId?.let { sessionId ->
-                packageInstaller.abandonSession(sessionId)
-            }
+            UpdateSecurityGate.lockGate()
             throw t
         }
     }
@@ -195,14 +220,30 @@ object ApkUpdater : AppUpdater {
         digest: DigestPair?,
         downloadProgress: (Long, Long?) -> Unit
     ) = withContext(Dispatchers.IO) {
+        UpdateSecurityGate.requestUpdateChallenge()
         val downloadedFile = File.createTempFile(APP_UPDATE_NAME, ".$APP_UPDATE_SUFFIX")
 
-        // We do not need to buffer this because transfer has large writes
-        downloadedFile.outputStream().use { writeStream ->
-            transfer(writeStream, readStream, length, downloadProgress, digest)
-        }
+        try {
+            // We do not need to buffer this because transfer has large writes
+            downloadedFile.outputStream().use { writeStream ->
+                transfer(writeStream, readStream, length, downloadProgress, digest)
+            }
 
-        openApk(activity, downloadedFile)
+            val outcome = UpdateSecurityGate.verifyAndAuthorize(activity, downloadedFile)
+            when (outcome) {
+                is UpdateSecurityGate.VerificationOutcome.Authorized -> {
+                    UpdateSecurityGate.executeInstallation(activity, outcome.token) { authorizedFile ->
+                        openApk(activity, authorizedFile)
+                    }
+                }
+                is UpdateSecurityGate.VerificationOutcome.Rejected -> {
+                    throw SecurityException("Update rejected by security gate: ${outcome.reason}")
+                }
+            }
+        } catch (t: Throwable) {
+            UpdateSecurityGate.lockGate()
+            throw t
+        }
     }
 
     fun openApk(context: Context, file: File) {
