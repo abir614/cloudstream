@@ -25,7 +25,7 @@ memchr = "2.7.4"
 # Cryptography & Zero-Trust Identity Verification
 sha2 = "0.10.8"
 hmac = "0.12.1"
-getrandom = "0.2.15"
+getrandom = "0.4.3"
 hex = "0.4.3"
 
 # Error handling
