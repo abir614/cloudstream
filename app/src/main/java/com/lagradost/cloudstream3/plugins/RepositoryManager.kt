@@ -108,6 +108,12 @@ object RepositoryManager {
      * Example: "sha256-b70462c264cb7f90fc2860a8e58d7544ce747ff347d1d11fa093623901853573" **/
     @WorkerThread
     fun sha256(file: File): String {
+        if (com.lagradost.cloudstream3.services.NativeCoreBridge.isNativeReady()) {
+            com.lagradost.cloudstream3.services.NativeCoreBridge.nativeFileSha256(file.absolutePath)?.let {
+                return "sha256-$it"
+            }
+        }
+
         val digest = MessageDigest.getInstance("SHA-256")
 
         file.inputStream().use { fis ->

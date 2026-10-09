@@ -34,6 +34,9 @@ class AnimeSkipAuth : AuthAPI() {
     override val createAccountUrl = "https://anime-skip.com/account"
     val baseClientId = "as1JgiMbW4wKfmTLWXS79iTDQFll76pk"
     fun md5(input: String): String {
+        if (com.lagradost.cloudstream3.services.NativeCoreBridge.isNativeReady()) {
+            com.lagradost.cloudstream3.services.NativeCoreBridge.nativeMd5(input)?.let { return it }
+        }
         val md = MessageDigest.getInstance("MD5")
         return BigInteger(1, md.digest(input.toByteArray())).toString(16).padStart(32, '0')
     }

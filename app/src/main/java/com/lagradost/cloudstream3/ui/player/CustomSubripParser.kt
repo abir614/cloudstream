@@ -38,6 +38,8 @@ import androidx.media3.extractor.text.SubtitleParser
 import androidx.media3.extractor.text.SubtitleParser.OutputOptions
 import com.google.common.base.Preconditions.checkNotNull
 import com.google.common.collect.ImmutableList
+import com.lagradost.cloudstream3.services.NativeCoreBridge
+import org.json.JSONArray
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.util.regex.Matcher
@@ -64,6 +66,52 @@ class CustomSubripParser : SubtitleParser {
         parsableByteArray.reset(data,  /* limit= */offset + length)
         parsableByteArray.setPosition(offset)
         val charset = detectUtfCharset(parsableByteArray)
+
+        // Ultra-fast zero-GC Rust native parser path
+        if (NativeCoreBridge.isNativeReady()) {
+            try {
+                val text = String(data, offset, length, charset)
+                val json = NativeCoreBridge.nativeParseSubtitles(text)
+                if (json != null) {
+                    val jsonArray = JSONArray(json)
+                    val cuesWithTimingBeforeRequestedStartTimeUs: MutableList<CuesWithTiming>? =
+                        if (outputOptions.startTimeUs != C.TIME_UNSET && outputOptions.outputAllCues)
+                            ArrayList()
+                        else
+                            null
+
+                    for (i in 0 until jsonArray.length()) {
+                        val obj = jsonArray.getJSONObject(i)
+                        val startUs = obj.getLong("start_us")
+                        val endUs = obj.getLong("end_us")
+                        val cueText = obj.getString("text")
+                        val alignTag = if (obj.isNull("alignment_tag")) null else obj.getString("alignment_tag")
+
+                        @Suppress("DEPRECATION")
+                        val spanned = Html.fromHtml(cueText)
+                        val cue = buildCue(spanned, alignTag)
+                        val cuesWithTiming = CuesWithTiming(
+                            ImmutableList.of(cue),
+                            startUs,
+                            endUs - startUs
+                        )
+
+                        if (outputOptions.startTimeUs == C.TIME_UNSET || endUs >= outputOptions.startTimeUs) {
+                            output.accept(cuesWithTiming)
+                        } else {
+                            cuesWithTimingBeforeRequestedStartTimeUs?.add(cuesWithTiming)
+                        }
+                    }
+
+                    cuesWithTimingBeforeRequestedStartTimeUs?.forEach {
+                        output.accept(it)
+                    }
+                    return
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Native subtitle parsing failed, falling back to JVM: ${t.message}")
+            }
+        }
 
         val cuesWithTimingBeforeRequestedStartTimeUs: MutableList<CuesWithTiming>? =
             if (outputOptions.startTimeUs != C.TIME_UNSET && outputOptions.outputAllCues)

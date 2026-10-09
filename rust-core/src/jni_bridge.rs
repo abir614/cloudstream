@@ -179,3 +179,233 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     }
 }
 
+/// JNI bridge to retrieve a cached value from the native LRU cache
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeCacheGet(
+    mut env: JNIEnv,
+    _class: JClass,
+    cache_name_input: JString,
+    key_input: JString,
+) -> jstring {
+    let cache_name: String = match env.get_string(&cache_name_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let key: String = match env.get_string(&key_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    if let Some(val) = crate::cache::cache_get(&cache_name, &key) {
+        match env.new_string(val) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        }
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// JNI bridge to put a key-value pair into the native LRU cache
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeCachePut(
+    mut env: JNIEnv,
+    _class: JClass,
+    cache_name_input: JString,
+    key_input: JString,
+    value_input: JString,
+) {
+    let cache_name: String = match env.get_string(&cache_name_input) {
+        Ok(s) => s.into(),
+        Err(_) => return,
+    };
+    let key: String = match env.get_string(&key_input) {
+        Ok(s) => s.into(),
+        Err(_) => return,
+    };
+    let value: String = match env.get_string(&value_input) {
+        Ok(s) => s.into(),
+        Err(_) => return,
+    };
+
+    crate::cache::cache_put(&cache_name, key, value);
+}
+
+/// JNI bridge to remove a key from the native LRU cache
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeCacheRemove(
+    mut env: JNIEnv,
+    _class: JClass,
+    cache_name_input: JString,
+    key_input: JString,
+) -> jboolean {
+    let cache_name: String = match env.get_string(&cache_name_input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let key: String = match env.get_string(&key_input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+
+    if crate::cache::cache_remove(&cache_name, &key) {
+        1
+    } else {
+        0
+    }
+}
+
+/// JNI bridge to clear a native LRU cache
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeCacheClear(
+    mut env: JNIEnv,
+    _class: JClass,
+    cache_name_input: JString,
+) {
+    let cache_name: String = match env.get_string(&cache_name_input) {
+        Ok(s) => s.into(),
+        Err(_) => return,
+    };
+
+    crate::cache::cache_clear(&cache_name);
+}
+
+/// JNI bridge to parse SubRip (.srt) subtitles with zero JVM GC pressure
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeParseSubtitles(
+    mut env: JNIEnv,
+    _class: JClass,
+    content_input: JString,
+) -> jstring {
+    let content: String = match env.get_string(&content_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let cues = crate::subtitles::parse_srt(&content);
+    let json = match serde_json::to_string(&cues) {
+        Ok(j) => j,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match env.new_string(json) {
+        Ok(js) => js.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to sanitize and strip tracking parameters from a URL
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeSanitizeUrl(
+    mut env: JNIEnv,
+    _class: JClass,
+    url_input: JString,
+) -> jstring {
+    let url: String = match env.get_string(&url_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let cleaned = crate::network::sanitize_url(&url);
+    match env.new_string(cleaned) {
+        Ok(js) => js.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to resolve a relative URL against a base URL
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeResolveUrl(
+    mut env: JNIEnv,
+    _class: JClass,
+    base_input: JString,
+    relative_input: JString,
+) -> jstring {
+    let base: String = match env.get_string(&base_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let relative: String = match env.get_string(&relative_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let resolved = crate::network::resolve_url(&base, &relative);
+    match env.new_string(resolved) {
+        Ok(js) => js.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to compute 64-bit fast FNV-1a hash
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeFastHash64(
+    mut env: JNIEnv,
+    _class: JClass,
+    input: JString,
+) -> jni::sys::jlong {
+    let text: String = match env.get_string(&input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    crate::crypto::fast_hash64_str(&text) as jni::sys::jlong
+}
+
+/// JNI bridge to compute SHA-256 hash in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeSha256(
+    mut env: JNIEnv,
+    _class: JClass,
+    input: JString,
+) -> jstring {
+    let text: String = match env.get_string(&input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let hash = crate::crypto::sha256_hex(text.as_bytes());
+    match env.new_string(hash) {
+        Ok(js) => js.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to compute MD5 hash in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeMd5(
+    mut env: JNIEnv,
+    _class: JClass,
+    input: JString,
+) -> jstring {
+    let text: String = match env.get_string(&input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let hash = crate::crypto::md5_hex(text.as_bytes());
+    match env.new_string(hash) {
+        Ok(js) => js.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to compute SHA-256 hash of a file directly on disk in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeFileSha256(
+    mut env: JNIEnv,
+    _class: JClass,
+    file_path_input: JString,
+) -> jstring {
+    let file_path: String = match env.get_string(&file_path_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match crate::security::apk_verifier::compute_file_sha256(&file_path) {
+        Ok(hash) => match env.new_string(hash) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+

@@ -65,5 +65,24 @@ object NativeCoreBridge {
         certFingerprint: String,
         versionCode: Long
     ): Boolean
+
+    // --- Native LRU Cache ---
+    external fun nativeCacheGet(cacheName: String, key: String): String?
+    external fun nativeCachePut(cacheName: String, key: String, value: String)
+    external fun nativeCacheRemove(cacheName: String, key: String): Boolean
+    external fun nativeCacheClear(cacheName: String)
+
+    // --- Native Subtitles ---
+    external fun nativeParseSubtitles(content: String): String?
+
+    // --- Native Network & URL Cleaning ---
+    external fun nativeSanitizeUrl(url: String): String?
+    external fun nativeResolveUrl(base: String, relative: String): String?
+
+    // --- Native Hashing & Crypto ---
+    external fun nativeFastHash64(input: String): Long
+    external fun nativeSha256(input: String): String?
+    external fun nativeMd5(input: String): String?
+    external fun nativeFileSha256(filePath: String): String?
 }
 
