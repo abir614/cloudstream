@@ -56,7 +56,7 @@ video = "1.0.0"
 workRuntimeKtx = "2.11.2"
 zipline = "1.27.0"
 composeMaterial3 = "1.12.0-alpha03"
-composeMultiplatform = "1.12.0"
+composeMultiplatform = "1.12.1"
 lifecycleViewmodelCompose = "2.11.0"
 
 # jvmTarget = "11" is needed for compose, otherwise you will get
