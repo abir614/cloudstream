@@ -33,22 +33,22 @@ compose.desktop {
     application {
         mainClass = "com.lagradost.cloudstream4.MainKt"
         nativeDistributions {
-            targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
+            targetFormats(TargetFormat.AppImage, TargetFormat.Deb, TargetFormat.Exe, TargetFormat.Msi)
             packageName = "CloudStream"
             packageVersion = "1.0.0"
 
-            val iconsRoot = project.file("desktop-icons")
+            val iconsRoot = project.file("src/desktop-icons")
             macOS {
                 // iconFile.set(iconsRoot.resolve("icon-mac.icns"))
             }
             windows {
                 iconFile.set(iconsRoot.resolve("icon-windows.ico"))
-                // menuGroup = "Compose Examples"
-                // see https://wixtoolset.org/documentation/manual/v3/howtos/general/generate_guids.html
-                // upgradeUuid = ""
+                dirChooser = true
+                perUserInstall = true
             }
             linux {
                 iconFile.set(iconsRoot.resolve("icon-linux.png"))
+                appCategory = "AudioVideo"
             }
         }
 

@@ -13,11 +13,11 @@ on:
       release_name:
         description: 'Release Title'
         required: true
-        default: 'CloudStream (Hardened & Optimized Edition)'
+        default: 'CloudStream (Hardened Multi-Platform Edition)'
       body:
         description: 'Release description / changelog'
         required: false
-        default: 'Official Stable Release featuring Z+ zero-trust sandbox isolation, native Rust core, SIMD M3U streaming, and anti-SSRF protections.'
+        default: 'Official Stable Release featuring Z+ zero-trust sandbox isolation, native Rust core, Linux AppImage, Windows live executable, and anti-SSRF protections.'
 
 concurrency:
   group: "stable-release"
@@ -27,8 +27,8 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    name: Build & Publish Stable Release
+  build-android:
+    name: Build Android APKs
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -91,6 +91,166 @@ jobs:
           MAL_KEY: ${{ secrets.MAL_KEY }}
           ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
 
+      - name: Upload Android Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-stable-artifacts
+          path: |
+            app/build/outputs/apk/stable/release/*.apk
+            app/build/libs/app-sources.jar
+            app/build/classes.jar
+
+  build-linux:
+    name: Build Linux Desktop (AppImage & Portable)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Install Linux packaging tools & appimagetool
+        run: |
+          sudo apt-get update && sudo apt-get install -y libfuse2 file fakeroot
+          mkdir -p /tmp/tools
+          wget -q "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage" -O /tmp/tools/appimagetool
+          chmod +x /tmp/tools/appimagetool
+          echo "/tmp/tools" >> $GITHUB_PATH
+          echo "APPIMAGE_EXTRACT_AND_RUN=1" >> $GITHUB_ENV
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust Native Core for Linux x86_64
+        run: |
+          cd rust-core
+          cargo build --release
+          mkdir -p ../desktopApp/build/nativeLibs
+          cp target/release/libcloudstream_core.so ../desktopApp/build/nativeLibs/
+
+      - name: Build Linux Desktop Packages
+        run: ./gradlew :desktopApp:packageAppImage :desktopApp:packageDeb :desktopApp:createDistributable || ./gradlew :desktopApp:createDistributable
+
+      - name: Assemble Linux AppImage and Portable Archive
+        run: |
+          mkdir -p /tmp/linux-dist
+          find desktopApp/build/compose/binaries -name "*.AppImage" -exec cp {} /tmp/linux-dist/CloudStream-linux-x86_64.AppImage \; || true
+          find desktopApp/build/compose/binaries -name "*.deb" -exec cp {} /tmp/linux-dist/CloudStream-linux-x86_64.deb \; || true
+
+          # Fallback generate AppImage if not generated directly by Gradle
+          if [ ! -f /tmp/linux-dist/CloudStream-linux-x86_64.AppImage ]; then
+            echo "Packaging standalone AppImage from distributable..."
+            APP_DIR=$(find desktopApp/build/compose/binaries -type d -name "CloudStream" | head -n 1)
+            if [ -d "$APP_DIR" ]; then
+              mkdir -p /tmp/AppDir/usr/bin /tmp/AppDir/usr/share/icons/hicolor/256x256/apps
+              cp -r "$APP_DIR"/* /tmp/AppDir/usr/bin/
+              cp desktopApp/src/desktop-icons/icon-linux.png /tmp/AppDir/usr/share/icons/hicolor/256x256/apps/cloudstream.png
+              cp desktopApp/src/desktop-icons/icon-linux.png /tmp/AppDir/cloudstream.png
+              cat << 'EOF' > /tmp/AppDir/cloudstream.desktop
+[Desktop Entry]
+Type=Application
+Name=CloudStream
+Exec=CloudStream
+Icon=cloudstream
+Categories=AudioVideo;Video;Player;
+EOF
+              cat << 'EOF' > /tmp/AppDir/AppRun
+#!/bin/sh
+HERE="$(dirname "$(readlink -f "${0}")")"
+exec "${HERE}/usr/bin/CloudStream" "$@"
+EOF
+              chmod +x /tmp/AppDir/AppRun
+              appimagetool /tmp/AppDir /tmp/linux-dist/CloudStream-linux-x86_64.AppImage
+            fi
+          fi
+
+          # Create portable tar.gz
+          APP_DIR=$(find desktopApp/build/compose/binaries -type d -name "CloudStream" | head -n 1)
+          if [ -d "$APP_DIR" ]; then
+            PARENT_DIR=$(dirname "$APP_DIR")
+            tar -czf /tmp/linux-dist/CloudStream-linux-x86_64-portable.tar.gz -C "$PARENT_DIR" CloudStream
+          fi
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-stable-artifacts
+          path: /tmp/linux-dist/*
+
+  build-windows:
+    name: Build Windows Desktop (Live Executable & Setup)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust Native Core for Windows x86_64
+        run: |
+          cd rust-core
+          cargo build --release
+          mkdir -p ../desktopApp/build/nativeLibs
+          cp target/release/cloudstream_core.dll ../desktopApp/build/nativeLibs/
+        shell: bash
+
+      - name: Build Windows Desktop Packages
+        run: ./gradlew.bat :desktopApp:packageMsi :desktopApp:packageExe :desktopApp:createDistributable || ./gradlew.bat :desktopApp:createDistributable
+
+      - name: Assemble Windows Live Executable Archive
+        shell: bash
+        run: |
+          mkdir -p /tmp/windows-dist
+          find desktopApp/build/compose/binaries -name "*.exe" -exec cp {} /tmp/windows-dist/CloudStream-windows-x64-Setup.exe \; || true
+          find desktopApp/build/compose/binaries -name "*.msi" -exec cp {} /tmp/windows-dist/CloudStream-windows-x64.msi \; || true
+
+          # Package standalone live executable folder with CloudStream.exe
+          APP_DIR=$(find desktopApp/build/compose/binaries -type d -name "CloudStream" | head -n 1)
+          if [ -d "$APP_DIR" ]; then
+            PARENT_DIR=$(dirname "$APP_DIR")
+            cd "$PARENT_DIR"
+            7z a /tmp/windows-dist/CloudStream-windows-x64-portable.zip CloudStream
+          fi
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-stable-artifacts
+          path: /tmp/windows-dist/*
+
+  publish-stable:
+    name: Publish Multi-Platform Stable Release
+    needs: [build-android, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/all-artifacts
+
+      - name: Consolidate Artifacts
+        run: |
+          mkdir -p /tmp/release-files
+          find /tmp/all-artifacts -type f -exec cp {} /tmp/release-files/ \;
+          echo "=== Stable Release Files Ready for Publishing ==="
+          ls -lh /tmp/release-files/
+
       - name: Determine Tag & Name
         id: release_meta
         run: |
@@ -101,8 +261,8 @@ jobs:
           else
             TAG_REF="${{ github.ref_name }}"
             echo "tag=${TAG_REF}" >> $GITHUB_OUTPUT
-            echo "title=CloudStream Hardened Edition ${TAG_REF}" >> $GITHUB_OUTPUT
-            echo "body=Official Stable Release ${TAG_REF}" >> $GITHUB_OUTPUT
+            echo "title=CloudStream Hardened Multi-Platform Edition ${TAG_REF}" >> $GITHUB_OUTPUT
+            echo "body=Official Stable Multi-Platform Release ${TAG_REF} for Android, Linux, and Windows" >> $GITHUB_OUTPUT
           fi
 
       - name: Create Stable GitHub Release
@@ -113,7 +273,4 @@ jobs:
           body: ${{ steps.release_meta.outputs.body }}
           draft: false
           prerelease: false
-          files: |
-            app/build/outputs/apk/stable/release/*.apk
-            app/build/libs/app-sources.jar
-            app/build/classes.jar
+          files: /tmp/release-files/*

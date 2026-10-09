@@ -25,9 +25,13 @@ import com.mihon.presentation.settings.widget.SwitchPreferenceWidget
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
-fun main() = application {
-    Window(
-        onCloseRequest = ::exitApplication,
+fun main() {
+    // Initialize cross-platform multi-layer security gate and moving-target-defense honeypot
+    DesktopSecurityGate.isNativeReady()
+
+    application {
+        Window(
+            onCloseRequest = ::exitApplication,
         title = stringResource(Res.string.app_name),
         icon = painterResource(Res.drawable.default_icon)
     ) {
@@ -59,4 +63,5 @@ fun main() = application {
 
         }
     }
+}
 }

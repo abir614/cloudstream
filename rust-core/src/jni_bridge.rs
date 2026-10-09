@@ -408,4 +408,97 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     }
 }
 
+/// JNI bridge to issue a cryptographic token from the native secure keyring
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeKeyringIssueToken(
+    mut env: JNIEnv,
+    _class: JClass,
+    slot: jni::sys::jint,
+    payload_input: JString,
+) -> jstring {
+    let payload: String = match env.get_string(&payload_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let key_slot = match crate::security::keyring::KeySlot::from_u32(slot as u32) {
+        Some(s) => s,
+        None => return std::ptr::null_mut(),
+    };
+
+    let token = crate::security::keyring::get_keyring_token(key_slot, payload.as_bytes());
+    match env.new_string(token) {
+        Ok(js) => js.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to verify a cryptographic token against the native secure keyring
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeKeyringVerifyToken(
+    mut env: JNIEnv,
+    _class: JClass,
+    slot: jni::sys::jint,
+    payload_input: JString,
+    token_input: JString,
+) -> jboolean {
+    let payload: String = match env.get_string(&payload_input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let token: String = match env.get_string(&token_input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let key_slot = match crate::security::keyring::KeySlot::from_u32(slot as u32) {
+        Some(s) => s,
+        None => return 0,
+    };
+
+    if crate::security::keyring::verify_keyring_token(key_slot, payload.as_bytes(), &token) {
+        1
+    } else {
+        0
+    }
+}
+
+/// JNI bridge to evaluate probe against honeypot traps and return hallucinated decoy if tripped
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeHoneypotProbe(
+    mut env: JNIEnv,
+    _class: JClass,
+    path_input: JString,
+    payload_input: JString,
+) -> jstring {
+    let path: String = match env.get_string(&path_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let payload: String = match env.get_string(&payload_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    if let Some(decoy) = crate::security::honeypot::evaluate_honeypot_probe(&path, &payload) {
+        match env.new_string(decoy) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        }
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+/// JNI bridge to get tamper-evident honeypot audit digest
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeHoneypotGetDigest(
+    env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    let digest = crate::security::honeypot::get_honeypot_audit_digest();
+    match env.new_string(digest) {
+        Ok(js) => js.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 

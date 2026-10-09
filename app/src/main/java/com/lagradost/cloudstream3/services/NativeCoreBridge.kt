@@ -84,5 +84,11 @@ object NativeCoreBridge {
     external fun nativeSha256(input: String): String?
     external fun nativeMd5(input: String): String?
     external fun nativeFileSha256(filePath: String): String?
+
+    // --- Native Keyring & Honeypot Moving-Target Defense ---
+    external fun nativeKeyringIssueToken(slot: Int, payload: String): String?
+    external fun nativeKeyringVerifyToken(slot: Int, payload: String, token: String): Boolean
+    external fun nativeHoneypotProbe(path: String, payload: String): String?
+    external fun nativeHoneypotGetDigest(): String?
 }
 
