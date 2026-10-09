@@ -116,10 +116,26 @@ object InAppUpdater {
             }
         }).toList()
 
-        val found = foundList.lastOrNull()
-        val foundAsset = found?.assets?.getOrNull(0)
-        val foundVersion = foundAsset?.name?.let { versionRegex.find(it) }
+        val found = foundList.lastOrNull() ?: return Update(false, null, null, null, null)
+        val apkAssets = found.assets.filter {
+            it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk")
+        }
 
+        if (apkAssets.isEmpty()) {
+            return Update(false, null, null, null, null)
+        }
+
+        val supportedAbis = android.os.Build.SUPPORTED_ABIS?.toList() ?: emptyList()
+        val foundAsset = when {
+            supportedAbis.any { it.contains("arm64") } ->
+                apkAssets.firstOrNull { it.name.contains("arm64-v8a") }
+            supportedAbis.any { it.contains("armeabi") } ->
+                apkAssets.firstOrNull { it.name.contains("armeabi-v7a") }
+            else -> null
+        } ?: apkAssets.firstOrNull { it.name.contains("universal") }
+          ?: apkAssets.first()
+
+        val foundVersion = versionRegex.find(foundAsset.name)
         if (foundVersion == null) {
             return Update(false, null, null, null, null)
         }
