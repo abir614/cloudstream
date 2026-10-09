@@ -31,82 +31,35 @@ abstract class AccountManager {
         val subSourceApi = SubSourceApi()
         val animeSkipApi = AnimeSkipAuth()
 
-        var cachedAccounts: MutableMap<String, Array<AuthData>>
-        var cachedAccountIds: MutableMap<String, Int>
+        var cachedAccounts: MutableMap<String, Array<AuthData>> = mutableMapOf()
+        var cachedAccountIds: MutableMap<String, Int> = mutableMapOf()
 
         const val ACCOUNT_TOKEN = "auth_tokens"
         const val ACCOUNT_IDS = "auth_ids"
 
         fun accounts(prefix: String): Array<AuthData> {
-            require(prefix != "NONE")
-            return getKey<Array<AuthData>>(
-                ACCOUNT_TOKEN,
-                "${prefix}/${DataStoreHelper.currentAccount}"
-            ) ?: arrayOf()
+            return emptyArray()
         }
 
         fun updateAccounts(prefix: String, array: Array<AuthData>) {
-            require(prefix != "NONE")
-            setKey(ACCOUNT_TOKEN, "${prefix}/${DataStoreHelper.currentAccount}", array)
-            synchronized(cachedAccounts) {
-                cachedAccounts[prefix] = array
-            }
+            // Clean Core: External account storage disabled
         }
 
         fun updateAccountsId(prefix: String, id: Int) {
-            require(prefix != "NONE")
-            setKey(ACCOUNT_IDS, "${prefix}/${DataStoreHelper.currentAccount}", id)
-            synchronized(cachedAccountIds) {
-                cachedAccountIds[prefix] = id
-            }
+            // Clean Core: External account storage disabled
         }
 
-        val allApis = arrayOf(
-            SyncRepo(malApi),
-            SyncRepo(kitsuApi),
-            SyncRepo(aniListApi),
-            SyncRepo(simklApi),
-            SyncRepo(localListApi),
-            SubtitleRepo(openSubtitlesApi),
-            SubtitleRepo(addic7ed),
-            SubtitleRepo(subDlApi),
-            PlainAuthRepo(animeSkipApi),
-            SubtitleRepo(subSourceApi)
+        val allApis: Array<AuthRepo> = arrayOf(
+            SyncRepo(localListApi)
         )
 
         fun updateAccountIds() {
-            val ids = mutableMapOf<String, Int>()
-            for (api in allApis) {
-                ids.put(
-                    api.idPrefix,
-                    getKey<Int>(
-                        ACCOUNT_IDS,
-                        "${api.idPrefix}/${DataStoreHelper.currentAccount}",
-                        NONE_ID
-                    ) ?: NONE_ID
-                )
-            }
-            synchronized(cachedAccountIds) {
-                cachedAccountIds = ids
-            }
+            // Clean Core: External account storage disabled
         }
 
         init {
-            val data = mutableMapOf<String, Array<AuthData>>()
-            val ids = mutableMapOf<String, Int>()
-            for (api in allApis) {
-                data.put(api.idPrefix, accounts(api.idPrefix))
-                ids.put(
-                    api.idPrefix,
-                    getKey<Int>(
-                        ACCOUNT_IDS,
-                        "${api.idPrefix}/${DataStoreHelper.currentAccount}",
-                        NONE_ID
-                    ) ?: NONE_ID
-                )
-            }
-            cachedAccounts = data
-            cachedAccountIds = ids
+            cachedAccounts = mutableMapOf()
+            cachedAccountIds = mutableMapOf()
         }
 
         // I do not want to place this in the init block as JVM initialization order is weird, and it may cause exceptions
@@ -118,17 +71,8 @@ abstract class AccountManager {
             LoadResponse.simklIdPrefix = simklApi.idPrefix
         }
 
-        val subtitleProviders = arrayOf(
-            SubtitleRepo(openSubtitlesApi),
-            SubtitleRepo(addic7ed),
-            SubtitleRepo(subDlApi),
-            SubtitleRepo(subSourceApi)
-        )
-        val syncApis = arrayOf(
-            SyncRepo(malApi),
-            SyncRepo(kitsuApi),
-            SyncRepo(aniListApi),
-            SyncRepo(simklApi),
+        val subtitleProviders: Array<SubtitleRepo> = emptyArray()
+        val syncApis: Array<SyncRepo> = arrayOf(
             SyncRepo(localListApi)
         )
 

@@ -147,16 +147,6 @@ object SettingsFragmentScreen : Screen {
             )
         ),
         SettingsNavigation(
-            title = R.string.category_account,
-            navigation = R.id.action_navigation_global_to_navigation_settings_account,
-            screen = SettingsAccountScreen,
-            icon = R.drawable.encrypted_24px,
-            subtitle = persistentListOf(
-                R.string.pref_category_accounts,
-                R.string.pref_category_security
-            )
-        ),
-        SettingsNavigation(
             title = R.string.pref_category_extensions,
             navigation = R.id.action_navigation_global_to_navigation_settings_extensions,
             screen = null,
@@ -213,12 +203,6 @@ object SettingsFragmentScreen : Screen {
                     modifier = Modifier
                         .fillMaxSize()
                         .focusOutline()
-                        .clickable {
-                            activity.navigate(
-                                R.id.accountSelectActivity,
-                                Bundle().apply { putBoolean("isFromMainActivity", true) }
-                            )
-                        }
                         .padding(
                             vertical = MaterialTheme.padding.large,
                             horizontal = MaterialTheme.padding.medium

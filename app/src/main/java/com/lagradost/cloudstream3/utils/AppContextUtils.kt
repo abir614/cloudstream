@@ -314,53 +314,8 @@ object AppContextUtils {
     @Throws
     @WorkerThread
     suspend fun Context.addProgramsToContinueWatching(data: List<DataStoreHelper.ResumeWatchingResult>) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val context = this
-        continueWatchingLock.withLock {
-            // A way to get all last watched timestamps
-            val timeStampHashMap = HashMap<Int, DownloadObjects.ResumeWatching>()
-            getAllResumeStateIds()?.forEach { id ->
-                val lastWatched = getLastWatched(id) ?: return@forEach
-                timeStampHashMap[lastWatched.parentId] = lastWatched
-            }
-
-            val currentProgramIds = data.mapNotNull { episodeInfo ->
-                try {
-                    val customId = "${episodeInfo.id}|${episodeInfo.apiName}|${episodeInfo.url}"
-                    val (program, id) = getWatchNextProgramByVideoId(customId, context)
-                    val nextProgram = buildWatchNextProgramUri(
-                        context,
-                        episodeInfo,
-                        timeStampHashMap[episodeInfo.id]
-                    )
-
-                    // If the program is already in the Watch Next row, update it
-                    if (program != null && id != null) {
-                        PreviewChannelHelper(context).updateWatchNextProgram(
-                            nextProgram,
-                            id,
-                        )
-                        id
-                    } else {
-                        PreviewChannelHelper(context)
-                            .publishWatchNextProgram(nextProgram)
-                    }
-                } catch (e: Exception) {
-                    logError(e)
-                    null
-                }
-            }.toSet()
-
-            val allOldPrograms = getAllWatchNextPrograms(context) - currentProgramIds
-
-            // Ensures synced watch next progress by deleting all old programs.
-            allOldPrograms.forEach {
-                context.contentResolver.delete(
-                    TvContractCompat.buildWatchNextProgramUri(it),
-                    null, null
-                )
-            }
-        }
+        // Clean Core: Persistent watch history and system TV contract publisher disabled
+        return
     }
 
     /** Sort subtitles by names */

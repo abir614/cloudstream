@@ -60,52 +60,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 class HomeViewModel : ViewModel() {
     companion object {
         suspend fun getResumeWatching(): List<DataStoreHelper.ResumeWatchingResult>? {
-            val resumeWatching = withContext(Dispatchers.IO) {
-                getAllResumeStateIds()?.mapNotNull { id ->
-                    getLastWatched(id)
-                }?.sortedBy { -it.updateTime }
-            }
-            val resumeWatchingResult = withContext(Dispatchers.IO) {
-                resumeWatching?.mapNotNull { resume ->
-                    val headerCache = getKey<DownloadObjects.DownloadHeaderCached>(
-                        DOWNLOAD_HEADER_CACHE,
-                        resume.parentId.toString()
-                    )
-
-                    val data = if (headerCache == null) {
-                        // We store resume watching data in download header cache
-                        // Because downloads automatically pruned outdated download headers we
-                        // removed resume watching data. We should restore the data for affected users.
-                        val oldData = getKey<DownloadObjects.DownloadHeaderCached>(
-                            DOWNLOAD_HEADER_CACHE_BACKUP,
-                            resume.parentId.toString()
-                        ) ?: return@mapNotNull null
-
-                        // Restore data
-                        setKey(DOWNLOAD_HEADER_CACHE, resume.parentId.toString(), oldData)
-                        oldData
-                    } else {
-                        headerCache
-                    }
-
-                    val watchPos = getViewPos(resume.episodeId)
-
-                    DataStoreHelper.ResumeWatchingResult(
-                        data.name,
-                        data.url,
-                        data.apiName,
-                        data.type,
-                        data.poster,
-                        watchPos,
-                        resume.episodeId,
-                        resume.parentId,
-                        resume.episode,
-                        resume.season,
-                        resume.isFromDownload
-                    )
-                }
-            }
-            return resumeWatchingResult
+            return emptyList()
         }
     }
 

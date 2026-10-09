@@ -178,9 +178,18 @@ object DataStoreHelper {
     }
 
     const val TAG = "data_store_helper"
-    var accounts by PreferenceDelegate("$TAG/account", arrayOf<Account>())
-    var selectedKeyIndex by PreferenceDelegate("$TAG/account_key_index", 0)
-    val currentAccount: String get() = selectedKeyIndex.toString()
+    private val guestAccount = Account(
+        keyIndex = 0,
+        name = "Guest",
+        defaultImageIndex = 0,
+    )
+    var accounts: Array<Account>
+        get() = arrayOf(guestAccount)
+        set(_) {}
+    var selectedKeyIndex: Int
+        get() = 0
+        set(_) {}
+    val currentAccount: String get() = "0"
 
     private val _selectedAccountNumberFlow = MutableStateFlow(0)
     /** What account instance we are on, this number changes whenever anything about local accounts changes */
@@ -202,50 +211,15 @@ object DataStoreHelper {
         }
 
     fun setAccount(account: Account) {
-        val homepage = currentHomePage
-        selectedKeyIndex = account.keyIndex
-        AccountManager.updateAccountIds()
-        showToast(context?.getString(R.string.logged_account, account.name) ?: account.name)
-        MainActivity.bookmarksUpdatedEvent(true)
-        MainActivity.reloadLibraryEvent(true)
-        val oldAccount = accounts.find { it.keyIndex == account.keyIndex }
-        if (oldAccount != null && currentHomePage != homepage) {
-            // This is not a new account, and the homepage has changed, reload it
-            MainActivity.reloadHomeEvent(true)
-        }
-        _selectedAccountNumberFlow.value += 1
+        // Clean Core: Multi-account switching disabled (Guest mode only)
     }
 
-    fun getDefaultAccount(context: Context): Account {
-        return accounts.let { currentAccounts ->
-            currentAccounts.getOrNull(currentAccounts.indexOfFirst { it.keyIndex == 0 }) ?: Account(
-                keyIndex = 0,
-                name = context.getString(R.string.default_account),
-                defaultImageIndex = 0,
-            )
-        }
-    }
+    fun getDefaultAccount(context: Context): Account = guestAccount
 
-    fun getAccounts(context: Context): List<Account> {
-        return accounts.toMutableList().apply {
-            val item = getDefaultAccount(context)
-            remove(item)
-            add(0, item)
-        }
-    }
+    fun getAccounts(context: Context): List<Account> = listOf(guestAccount)
 
     /** Gets the current selected account (or default), may return null if context is null and the user is using the default account */
-    fun getCurrentAccount(): Account? {
-        return (context?.let {
-            getAccounts(it)
-        } ?: accounts.toList()).firstNotNullOfOrNull { account ->
-            if (account.keyIndex == selectedKeyIndex) {
-                account
-            } else {
-                null
-            }
-        }
-    }
+    fun getCurrentAccount(): Account? = guestAccount
 
     @Serializable
     data class PosDur(
@@ -526,50 +500,24 @@ object DataStoreHelper {
         }
     }
 
+    // Ephemeral in-memory session caches for active playback (zero disk writes, zero storage bloat)
+    private val sessionPosDur = java.util.concurrent.ConcurrentHashMap<Int, PosDur>()
+    private val sessionWatchState = java.util.concurrent.ConcurrentHashMap<Int, VideoWatchState>()
+
+    fun getAllWatchStateIds(): List<Int>? = emptyList()
+
     fun deleteAllResumeStateIds() {
-        val folder = "$currentAccount/$RESULT_RESUME_WATCHING"
-        removeKeys(folder)
+        sessionPosDur.clear()
+        sessionWatchState.clear()
     }
 
-    fun deleteBookmarkedData(id: Int?) {
-        if (id == null) return
-        AccountManager.localListApi.requireLibraryRefresh = true
-        removeKey("$currentAccount/$RESULT_WATCH_STATE", id.toString())
-        removeKey("$currentAccount/$RESULT_WATCH_STATE_DATA", id.toString())
-    }
+    fun deleteBookmarkedData(id: Int?) {}
 
-    fun getAllResumeStateIds(): List<Int>? {
-        val folder = "$currentAccount/$RESULT_RESUME_WATCHING"
-        return getKeys(folder)?.mapNotNull {
-            it.removePrefix("$folder/").toIntOrNull()
-        }
-    }
+    fun getAllResumeStateIds(): List<Int>? = emptyList()
 
-    private fun getAllResumeStateIdsOld(): List<Int>? {
-        val folder = "$currentAccount/$RESULT_RESUME_WATCHING_OLD"
-        return getKeys(folder)?.mapNotNull {
-            it.removePrefix("$folder/").toIntOrNull()
-        }
-    }
+    private fun getAllResumeStateIdsOld(): List<Int>? = emptyList()
 
-    fun migrateResumeWatching() {
-        // if (getKey<Boolean>(RESULT_RESUME_WATCHING_HAS_MIGRATED, false) != true) {
-        setKey(RESULT_RESUME_WATCHING_HAS_MIGRATED, true)
-        getAllResumeStateIdsOld()?.forEach { id ->
-            getLastWatchedOld(id)?.let {
-                setLastWatched(
-                    it.parentId,
-                    null,
-                    it.episode,
-                    it.season,
-                    it.isFromDownload,
-                    it.updateTime,
-                )
-                removeLastWatchedOld(it.parentId)
-            }
-        }
-        // }
-    }
+    fun migrateResumeWatching() {}
 
     fun setLastWatched(
         parentId: Int?,
@@ -579,131 +527,51 @@ object DataStoreHelper {
         isFromDownload: Boolean = false,
         updateTime: Long? = null,
     ) {
-        if (parentId == null) return
-        setKey(
-            "$currentAccount/$RESULT_RESUME_WATCHING",
-            parentId.toString(),
-            DownloadObjects.ResumeWatching(
-                parentId,
-                episodeId,
-                episode,
-                season,
-                updateTime ?: System.currentTimeMillis(),
-                isFromDownload,
-            )
-        )
+        // Clean Core: Persistent watch history disabled
     }
 
-    private fun removeLastWatchedOld(parentId: Int?) {
-        if (parentId == null) return
-        removeKey("$currentAccount/$RESULT_RESUME_WATCHING_OLD", parentId.toString())
-    }
+    private fun removeLastWatchedOld(parentId: Int?) {}
 
-    fun removeLastWatched(parentId: Int?) {
-        if (parentId == null) return
-        removeKey("$currentAccount/$RESULT_RESUME_WATCHING", parentId.toString())
-    }
+    fun removeLastWatched(parentId: Int?) {}
 
-    fun getLastWatched(id: Int?): DownloadObjects.ResumeWatching? {
-        if (id == null) return null
-        return getKey<DownloadObjects.ResumeWatching>(
-            "$currentAccount/$RESULT_RESUME_WATCHING",
-            id.toString(),
-        )
-    }
+    fun getLastWatched(id: Int?): DownloadObjects.ResumeWatching? = null
 
-    private fun getLastWatchedOld(id: Int?): DownloadObjects.ResumeWatching? {
-        if (id == null) return null
-        return getKey<DownloadObjects.ResumeWatching>(
-            "$currentAccount/$RESULT_RESUME_WATCHING_OLD",
-            id.toString(),
-        )
-    }
+    private fun getLastWatchedOld(id: Int?): DownloadObjects.ResumeWatching? = null
 
-    fun setBookmarkedData(id: Int?, data: BookmarkedData) {
-        if (id == null) return
-        setKey("$currentAccount/$RESULT_WATCH_STATE_DATA", id.toString(), data)
-        AccountManager.localListApi.requireLibraryRefresh = true
-    }
+    fun setBookmarkedData(id: Int?, data: BookmarkedData) {}
 
-    fun getBookmarkedData(id: Int?): BookmarkedData? {
-        if (id == null) return null
-        return getKey<BookmarkedData>("$currentAccount/$RESULT_WATCH_STATE_DATA", id.toString())
-    }
+    fun getBookmarkedData(id: Int?): BookmarkedData? = null
 
-    fun getAllBookmarkedData(): List<BookmarkedData> {
-        return getKeys("$currentAccount/$RESULT_WATCH_STATE_DATA")?.mapNotNull {
-            getKey<BookmarkedData>(it)
-        } ?: emptyList()
-    }
+    fun getAllBookmarkedData(): List<BookmarkedData> = emptyList()
 
-    fun getAllSubscriptions(): List<SubscribedData> {
-        return getKeys("$currentAccount/$RESULT_SUBSCRIBED_STATE_DATA")?.mapNotNull {
-            getKey<SubscribedData>(it)
-        } ?: emptyList()
-    }
+    fun getAllSubscriptions(): List<SubscribedData> = emptyList()
 
-    fun removeSubscribedData(id: Int?) {
-        if (id == null) return
-        AccountManager.localListApi.requireLibraryRefresh = true
-        removeKey("$currentAccount/$RESULT_SUBSCRIBED_STATE_DATA", id.toString())
-    }
+    fun removeSubscribedData(id: Int?) {}
 
     /**
      * Set new seen episodes and update time
      */
-    fun updateSubscribedData(id: Int?, data: SubscribedData?, episodeResponse: EpisodeResponse?) {
-        if (id == null || data == null || episodeResponse == null) return
-        val newData = data.copy(
-            latestUpdatedTime = unixTimeMS,
-            lastSeenEpisodeCount = episodeResponse.getLatestEpisodes(),
-        )
-        setKey("$currentAccount/$RESULT_SUBSCRIBED_STATE_DATA", id.toString(), newData)
-    }
+    fun updateSubscribedData(id: Int?, data: SubscribedData?, episodeResponse: EpisodeResponse?) {}
 
-    fun setSubscribedData(id: Int?, data: SubscribedData) {
-        if (id == null) return
-        setKey("$currentAccount/$RESULT_SUBSCRIBED_STATE_DATA", id.toString(), data)
-        AccountManager.localListApi.requireLibraryRefresh = true
-    }
+    fun setSubscribedData(id: Int?, data: SubscribedData) {}
 
-    fun getSubscribedData(id: Int?): SubscribedData? {
-        if (id == null) return null
-        return getKey<SubscribedData>("$currentAccount/$RESULT_SUBSCRIBED_STATE_DATA", id.toString())
-    }
+    fun getSubscribedData(id: Int?): SubscribedData? = null
 
-    fun getAllFavorites(): List<FavoritesData> {
-        return getKeys("$currentAccount/$RESULT_FAVORITES_STATE_DATA")?.mapNotNull {
-            getKey<FavoritesData>(it)
-        } ?: emptyList()
-    }
+    fun getAllFavorites(): List<FavoritesData> = emptyList()
 
-    fun removeFavoritesData(id: Int?) {
-        if (id == null) return
-        AccountManager.localListApi.requireLibraryRefresh = true
-        removeKey("$currentAccount/$RESULT_FAVORITES_STATE_DATA", id.toString())
-    }
+    fun removeFavoritesData(id: Int?) {}
 
-    fun setFavoritesData(id: Int?, data: FavoritesData) {
-        if (id == null) return
-        setKey("$currentAccount/$RESULT_FAVORITES_STATE_DATA", id.toString(), data)
-        AccountManager.localListApi.requireLibraryRefresh = true
-    }
+    fun setFavoritesData(id: Int?, data: FavoritesData) {}
 
-    fun getFavoritesData(id: Int?): FavoritesData? {
-        if (id == null) return null
-        return getKey<FavoritesData>("$currentAccount/$RESULT_FAVORITES_STATE_DATA", id.toString())
-    }
+    fun getFavoritesData(id: Int?): FavoritesData? = null
 
     fun setViewPos(id: Int?, pos: Long, dur: Long) {
-        if (id == null) return
-        if (dur < 30_000) return // too short
-        setKey("$currentAccount/$VIDEO_POS_DUR", id.toString(), PosDur(pos, dur))
+        if (id == null || dur < 30_000) return
+        sessionPosDur[id] = PosDur(pos, dur)
     }
 
     /**
-     * Sets the position, duration, and resume data of an episode/movie,
-     * If nextEpisode is not specified it will not be able to set the next episode as resumable if progress > NEXT_WATCH_EPISODE_PERCENTAGE
+     * Sets the position, duration, and resume data of an episode/movie in memory only
      */
     fun setViewPosAndResume(id: Int?, position: Long, duration: Long, currentEpisode: Any?, nextEpisode: Any?) {
         setViewPos(id, position, duration)
@@ -716,120 +584,46 @@ object DataStoreHelper {
                 }
             }
         }
-
-        val percentage = position * 100L / duration
-        val nextEp = percentage >= NEXT_WATCH_EPISODE_PERCENTAGE
-        val resumeMeta = if (nextEp) nextEpisode else currentEpisode
-        if (resumeMeta == null && nextEp) {
-            // remove last watched as it is the last episode and you have watched too much
-            when (val newMeta = currentEpisode) {
-                is ResultEpisode -> {
-                    removeLastWatched(newMeta.parentId)
-                }
-
-                is ExtractorUri -> {
-                    removeLastWatched(newMeta.parentId)
-                }
-            }
-        } else {
-            // save resume
-            when (resumeMeta) {
-                is ResultEpisode -> {
-                    setLastWatched(
-                        resumeMeta.parentId,
-                        resumeMeta.id,
-                        resumeMeta.episode,
-                        resumeMeta.season,
-                        isFromDownload = false,
-                    )
-                }
-
-                is ExtractorUri -> {
-                    setLastWatched(
-                        resumeMeta.parentId,
-                        resumeMeta.id,
-                        resumeMeta.episode,
-                        resumeMeta.season,
-                        isFromDownload = true,
-                    )
-                }
-            }
-        }
     }
 
     fun getViewPos(id: Int?): PosDur? {
         if (id == null) return null
-        return getKey<PosDur>("$currentAccount/$VIDEO_POS_DUR", id.toString(), null)
+        return sessionPosDur[id]
     }
 
     fun getVideoWatchState(id: Int?): VideoWatchState? {
         if (id == null) return null
-        return getKey<VideoWatchState>("$currentAccount/$VIDEO_WATCH_STATE", id.toString(), null)
+        return sessionWatchState[id]
     }
 
     fun setVideoWatchState(id: Int?, watchState: VideoWatchState) {
         if (id == null) return
-        // None == No key
         if (watchState == VideoWatchState.None) {
-            removeKey("$currentAccount/$VIDEO_WATCH_STATE", id.toString())
+            sessionWatchState.remove(id)
         } else {
-            setKey("$currentAccount/$VIDEO_WATCH_STATE", id.toString(), watchState)
+            sessionWatchState[id] = watchState
         }
     }
 
-    fun getDub(id: Int): DubStatus? {
-        return DubStatus.entries
-            .getOrNull(getKey<Int>("$currentAccount/$RESULT_DUB", id.toString(), -1) ?: -1)
-    }
+    fun getDub(id: Int): DubStatus? = null
 
-    fun setDub(id: Int, status: DubStatus) {
-        setKey("$currentAccount/$RESULT_DUB", id.toString(), status.ordinal)
-    }
+    fun setDub(id: Int, status: DubStatus) {}
 
-    fun setResultWatchState(id: Int?, status: Int) {
-        if (id == null) return
-        if (status == WatchType.NONE.internalId) {
-            deleteBookmarkedData(id)
-        } else {
-            setKey("$currentAccount/$RESULT_WATCH_STATE", id.toString(), status)
-        }
-    }
+    fun setResultWatchState(id: Int?, status: Int) {}
 
-    fun getResultWatchState(id: Int): WatchType {
-        return WatchType.fromInternalId(
-            getKey<Int>(
-                "$currentAccount/$RESULT_WATCH_STATE",
-                id.toString(),
-                null,
-            )
-        )
-    }
+    fun getResultWatchState(id: Int): WatchType = WatchType.NONE
 
-    fun getResultSeason(id: Int): Int? {
-        return getKey<Int>("$currentAccount/$RESULT_SEASON", id.toString(), null)
-    }
+    fun getResultSeason(id: Int): Int? = null
 
-    fun setResultSeason(id: Int, value: Int?) {
-        setKey("$currentAccount/$RESULT_SEASON", id.toString(), value)
-    }
+    fun setResultSeason(id: Int, value: Int?) {}
 
-    fun getResultEpisode(id: Int): Int? {
-        return getKey<Int>("$currentAccount/$RESULT_EPISODE", id.toString(), null)
-    }
+    fun getResultEpisode(id: Int): Int? = null
 
-    fun setResultEpisode(id: Int, value: Int?) {
-        setKey("$currentAccount/$RESULT_EPISODE", id.toString(), value)
-    }
+    fun setResultEpisode(id: Int, value: Int?) {}
 
-    fun addSync(id: Int, idPrefix: String, url: String) {
-        setKey("${idPrefix}_sync", id.toString(), url)
-    }
+    fun addSync(id: Int, idPrefix: String, url: String) {}
 
-    fun getSync(id: Int, idPrefixes: List<String>): List<String?> {
-        return idPrefixes.map { idPrefix ->
-            getKey<String>("${idPrefix}_sync", id.toString())
-        }
-    }
+    fun getSync(id: Int, idPrefixes: List<String>): List<String?> = emptyList()
 
     var pinnedProviders: Array<String>
         get() = getKey<Array<String>>(USER_PINNED_PROVIDERS) ?: emptyArray<String>()
