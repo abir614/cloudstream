@@ -11,7 +11,6 @@ import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import torrServer.TorrServer
 import java.io.File
 import java.net.ConnectException
 import java.net.URLEncoder
@@ -199,39 +198,14 @@ object Torrent {
 
     /** Spins up the torrent server. */
     private suspend fun setup(dir: String): Boolean {
-        go.Seq.load()
-        if (echo()) {
-            return true
-        }
-        val port = TorrServer.startTorrentServer(dir, 0)
-        if (port < 0) {
-            return false
-        }
-        TORRENT_SERVER_URL = "http://127.0.0.1:$port"
-        TorrServer.addTrackers(trackers.joinToString(separator = ",\n"))
-        return echo()
+        // Clean Core: TorrServer Go engine removed to eliminate ~12.5 MB bloat
+        return false
     }
 
     /** Transforms a torrent link into a streamable link via the server */
     @Throws
     suspend fun transformLink(link: ExtractorLink): Pair<ExtractorLink, TorrentStatus> {
-        val act = CommonActivity.activity ?: throw IllegalArgumentException("No activity")
-        val defaultDirectory = "${act.cacheDir.path}/$TORRENT_SERVER_PATH"
-        File(defaultDirectory).mkdir()
-        if (!setup(defaultDirectory)) {
-            throw ErrorLoadingException("Unable to setup the torrent server")
-        }
-        val status = add(link.url)
-
-        return newExtractorLink(
-            source = link.source,
-            name = link.name,
-            url = status.streamUrl(link.url),
-            type = ExtractorLinkType.VIDEO
-        ) {
-            this.referer = ""
-            this.quality = link.quality
-        } to status
+        throw ErrorLoadingException("P2P Torrent streaming engine is stripped in Clean Core")
     }
 
     private val trackers = listOf(
