@@ -489,17 +489,6 @@ object DataStoreHelper {
         @JsonProperty("score") @SerialName("score") override var score: Score? = null,
     ) : SearchResponse
 
-    /**
-     * A datastore wide account for future implementations of a multiple account system
-     */
-
-    fun getAllWatchStateIds(): List<Int>? {
-        val folder = "$currentAccount/$RESULT_WATCH_STATE"
-        return getKeys(folder)?.mapNotNull {
-            it.removePrefix("$folder/").toIntOrNull()
-        }
-    }
-
     // Ephemeral in-memory session caches for active playback (zero disk writes, zero storage bloat)
     private val sessionPosDur = java.util.concurrent.ConcurrentHashMap<Int, PosDur>()
     private val sessionWatchState = java.util.concurrent.ConcurrentHashMap<Int, VideoWatchState>()
