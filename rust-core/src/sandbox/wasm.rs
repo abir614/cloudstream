@@ -61,14 +61,20 @@ impl WasmSandbox {
                     .and_then(|ext| ext.into_memory())
                     .ok_or_else(|| wasmi::Error::new("Failed to get linear memory"))?;
 
-                let data = memory.data(&caller);
-                let start = ptr as usize;
-                let end = start + len as usize;
+                let maybe_msg = {
+                    let data = memory.data(&caller);
+                    let start = ptr as usize;
+                    let end = start + len as usize;
 
-                if end <= data.len() {
-                    if let Ok(msg) = std::str::from_utf8(&data[start..end]) {
-                        caller.data_mut().logs.push(msg.to_string());
+                    if end <= data.len() {
+                        std::str::from_utf8(&data[start..end]).ok().map(|s| s.to_string())
+                    } else {
+                        None
                     }
+                };
+
+                if let Some(msg) = maybe_msg {
+                    caller.data_mut().logs.push(msg);
                 }
                 Ok(())
             })

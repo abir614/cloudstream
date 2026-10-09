@@ -1,5 +1,5 @@
 use jni::objects::{JClass, JString};
-use jni::sys::{jboolean, jint, jstring};
+use jni::sys::{jboolean, jstring};
 use jni::JNIEnv;
 
 use crate::iptv::m3u::M3uParser;
