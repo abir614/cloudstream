@@ -26,7 +26,7 @@ memchr = "2.7.4"
 thiserror = "2.0.11"
 
 # Android JNI integration (optional feature)
-jni = { version = "0.21.1", default-features = false }
+jni = { version = "0.22.4", default-features = false }
 
 [dev-dependencies]
 # Testing & Fuzz testing
