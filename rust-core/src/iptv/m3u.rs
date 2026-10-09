@@ -27,10 +27,8 @@ impl M3uParser {
                 continue;
             }
 
-            if trimmed.starts_with("#EXTINF:") {
+            if let Some(info_part) = trimmed.strip_prefix("#EXTINF:") {
                 // Parse attributes and name: #EXTINF:-1 tvg-id="123" tvg-logo="url" group-title="News",Channel Name
-                let info_part = &trimmed["#EXTINF:".len()..];
-                
                 // Extract channel name (everything after the last comma)
                 if let Some(comma_idx) = info_part.rfind(',') {
                     current_name = Some(info_part[comma_idx + 1..].trim().to_string());

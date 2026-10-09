@@ -20,6 +20,7 @@ pub enum SandboxError {
 
 /// Host context provided to the sandboxed WASM instance.
 pub struct HostContext {
+    #[allow(dead_code)]
     limits: StoreLimits,
     pub logs: Vec<String>,
 }
@@ -129,7 +130,7 @@ impl WasmSandbox {
             .map_err(|e| SandboxError::Instantiation(e.to_string()))?;
 
         // Optionally invoke "main" or "init" if present
-        if let Some(entry_func) = instance.get_typed_func::<(), ()>(&store, "init").ok() {
+        if let Ok(entry_func) = instance.get_typed_func::<(), ()>(&store, "init") {
             entry_func
                 .call(&mut store, ())
                 .map_err(|e| SandboxError::ExecutionTrapped(e.to_string()))?;
