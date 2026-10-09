@@ -1,0 +1,91 @@
+name: Pre-release
+
+on:
+  push:
+    branches: [ master, main ]
+    paths-ignore:
+      - '*.md'
+      - '*.json'
+      - '**/wcokey.txt'
+  workflow_dispatch:
+
+concurrency:
+  group: "pre-release"
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: 17
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Setup Keystore
+      id: fetch_keystore
+      run: |
+        TMP_KEYSTORE_FILE_PATH="${RUNNER_TEMP}"/keystore
+        mkdir -p "${TMP_KEYSTORE_FILE_PATH}"
+        if [ -n "${{ secrets.GH_APP_ID }}" ]; then
+          echo "Using upstream secrets repo..."
+          curl -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o "${TMP_KEYSTORE_FILE_PATH}/prerelease_keystore.keystore" "https://raw.githubusercontent.com/recloudstream/secrets/master/keystore.jks" || true
+          echo "key_pwd=android" >> $GITHUB_OUTPUT
+        else
+          echo "Generating self-contained release keystore for personal fork..."
+          keytool -genkey -v -keystore "${TMP_KEYSTORE_FILE_PATH}/prerelease_keystore.keystore" \
+            -alias key0 -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android \
+            -dname "CN=CloudStream, OU=Fork, O=Personal, L=City, S=State, C=US"
+          echo "key_pwd=android" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v5
+      with:
+        cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+    - name: Set up Rust & Android targets
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android, armv7-linux-androideabi
+
+    - name: Build Rust Native Core for ARMv7 and ARMv8
+      run: |
+        cargo install cargo-ndk --locked
+        cd rust-core
+        cargo ndk -t armeabi-v7a -t arm64-v8a -o ../app/src/main/jniLibs build --release
+
+    - name: Run Gradle
+      run: ./gradlew assemblePrereleaseRelease androidSourcesJar makeJar
+      env:
+        SIGNING_KEY_ALIAS: "key0"
+        SIGNING_KEY_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
+        SIGNING_STORE_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
+        SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+        SIMKL_CLIENT_SECRET: ${{ secrets.SIMKL_CLIENT_SECRET }}
+        TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+        MDL_API_KEY: ${{ secrets.MDL_API_KEY }}
+        MAL_KEY: ${{ secrets.MAL_KEY }}
+        ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
+
+    - name: Create pre-release
+      uses: marvinpinto/action-automatic-releases@latest
+      with:
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        automatic_release_tag: "pre-release"
+        prerelease: true
+        title: "Pre-release Build"
+        files: |
+          app/build/outputs/apk/prerelease/release/*.apk
+          app/build/libs/app-sources.jar
+          app/build/classes.jar

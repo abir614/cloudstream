@@ -1,0 +1,67 @@
+name: Security Audit, Fuzzing & Dependency Scan
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+  schedule:
+    # Run every Monday at midnight for automated weekly security checks
+    - cron: '0 0 * * 1'
+
+jobs:
+  rust-security-audit:
+    name: Rust Security Audit & Vulnerabilities
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run Cargo Audit
+        run: |
+          cd rust-core
+          cargo audit
+
+      - name: Run Clippy Security Lints
+        run: |
+          cd rust-core
+          cargo clippy -- -D warnings
+
+  sandbox-fuzz-tests:
+    name: Sandbox & Parser Fuzz Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Unit & Security Edge-Case Tests
+        run: |
+          cd rust-core
+          cargo test --verbose
+
+  dependency-review:
+    name: Dependency & Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
