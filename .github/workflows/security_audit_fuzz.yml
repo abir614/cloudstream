@@ -10,6 +10,9 @@ on:
     # Run every Monday at midnight for automated weekly security checks
     - cron: '0 0 * * 1'
 
+permissions:
+  contents: read
+
 jobs:
   rust-security-audit:
     name: Rust Security Audit & Vulnerabilities
