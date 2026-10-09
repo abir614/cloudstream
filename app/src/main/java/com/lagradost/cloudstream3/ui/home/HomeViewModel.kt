@@ -60,7 +60,39 @@ import java.util.concurrent.CopyOnWriteArrayList
 class HomeViewModel : ViewModel() {
     companion object {
         suspend fun getResumeWatching(): List<DataStoreHelper.ResumeWatchingResult>? {
-            return emptyList()
+            val resumeWatching = withContext(Dispatchers.IO) {
+                getAllResumeStateIds()?.mapNotNull { id ->
+                    getLastWatched(id)
+                }?.sortedBy { -it.updateTime }
+            }
+            val resumeWatchingResult = withContext(Dispatchers.IO) {
+                resumeWatching?.mapNotNull { resume ->
+                    val data = getKey<DownloadObjects.DownloadHeaderCached>(
+                        DOWNLOAD_HEADER_CACHE,
+                        resume.parentId.toString()
+                    ) ?: getKey<DownloadObjects.DownloadHeaderCached>(
+                        DOWNLOAD_HEADER_CACHE_BACKUP,
+                        resume.parentId.toString()
+                    ) ?: return@mapNotNull null
+
+                    val watchPos = getViewPos(resume.episodeId)
+
+                    DataStoreHelper.ResumeWatchingResult(
+                        data.name,
+                        data.url,
+                        data.apiName,
+                        data.type,
+                        data.poster,
+                        watchPos,
+                        resume.episodeId,
+                        resume.parentId,
+                        resume.episode,
+                        resume.season,
+                        resume.isFromDownload
+                    )
+                }
+            }
+            return resumeWatchingResult
         }
     }
 

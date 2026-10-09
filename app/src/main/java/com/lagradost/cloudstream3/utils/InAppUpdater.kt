@@ -161,11 +161,11 @@ object InAppUpdater {
 
         val found = response.lastOrNull { rel ->
             rel.prerelease || rel.tagName == "pre-release"
-        }
+        } ?: return Update(false, null, null, null, null)
 
-        val apkAssets = found?.assets?.filter { it ->
+        val apkAssets = found.assets.filter { it ->
             it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk")
-        } ?: emptyList()
+        }
 
         if (apkAssets.isEmpty()) {
             return Update(false, null, null, null, null)

@@ -502,11 +502,36 @@ object DataStoreHelper {
 
     fun deleteBookmarkedData(id: Int?) {}
 
-    fun getAllResumeStateIds(): List<Int>? = emptyList()
+    fun getAllResumeStateIds(): List<Int>? {
+        val folder = "$currentAccount/$RESULT_RESUME_WATCHING"
+        return getKeys(folder)?.mapNotNull {
+            it.removePrefix("$folder/").toIntOrNull()
+        }
+    }
 
-    private fun getAllResumeStateIdsOld(): List<Int>? = emptyList()
+    private fun getAllResumeStateIdsOld(): List<Int>? {
+        val folder = "$currentAccount/$RESULT_RESUME_WATCHING_OLD"
+        return getKeys(folder)?.mapNotNull {
+            it.removePrefix("$folder/").toIntOrNull()
+        }
+    }
 
-    fun migrateResumeWatching() {}
+    fun migrateResumeWatching() {
+        setKey(RESULT_RESUME_WATCHING_HAS_MIGRATED, true)
+        getAllResumeStateIdsOld()?.forEach { id ->
+            getLastWatchedOld(id)?.let {
+                setLastWatched(
+                    it.parentId,
+                    null,
+                    it.episode,
+                    it.season,
+                    it.isFromDownload,
+                    it.updateTime,
+                )
+                removeLastWatchedOld(it.parentId)
+            }
+        }
+    }
 
     fun setLastWatched(
         parentId: Int?,
@@ -516,16 +541,65 @@ object DataStoreHelper {
         isFromDownload: Boolean = false,
         updateTime: Long? = null,
     ) {
-        // Clean Core: Persistent watch history disabled
+        if (parentId == null) return
+        setKey(
+            "$currentAccount/$RESULT_RESUME_WATCHING",
+            parentId.toString(),
+            DownloadObjects.ResumeWatching(
+                parentId,
+                episodeId,
+                episode,
+                season,
+                updateTime ?: System.currentTimeMillis(),
+                isFromDownload,
+            )
+        )
+        // Clean bounded cache: Keep up to 50 most recent items to prevent storage bloat on low-end devices
+        try {
+            val allIds = getAllResumeStateIds() ?: emptyList()
+            if (allIds.size > 50) {
+                val oldest = allIds.mapNotNull { id ->
+                    getLastWatched(id)?.let { id to it.updateTime }
+                }.minByOrNull { it.second }
+                oldest?.let { removeLastWatched(it.first) }
+            }
+        } catch (_: Throwable) {}
     }
 
-    private fun removeLastWatchedOld(parentId: Int?) {}
+    private fun removeLastWatchedOld(parentId: Int?) {
+        if (parentId == null) return
+        removeKey("$currentAccount/$RESULT_RESUME_WATCHING_OLD", parentId.toString())
+    }
 
-    fun removeLastWatched(parentId: Int?) {}
+    fun removeLastWatched(parentId: Int?) {
+        if (parentId == null) return
+        removeKey("$currentAccount/$RESULT_RESUME_WATCHING", parentId.toString())
+    }
 
-    fun getLastWatched(id: Int?): DownloadObjects.ResumeWatching? = null
+    fun deleteAllResumeStateIds() {
+        val folder = "$currentAccount/$RESULT_RESUME_WATCHING"
+        getKeys(folder)?.forEach {
+            removeKey(it)
+        }
+    }
 
-    private fun getLastWatchedOld(id: Int?): DownloadObjects.ResumeWatching? = null
+    fun getLastWatched(id: Int?): DownloadObjects.ResumeWatching? {
+        if (id == null) return null
+        return getKey<DownloadObjects.ResumeWatching>(
+            "$currentAccount/$RESULT_RESUME_WATCHING",
+            id.toString(),
+            null
+        )
+    }
+
+    private fun getLastWatchedOld(id: Int?): DownloadObjects.ResumeWatching? {
+        if (id == null) return null
+        return getKey<DownloadObjects.ResumeWatching>(
+            "$currentAccount/$RESULT_RESUME_WATCHING_OLD",
+            id.toString(),
+            null
+        )
+    }
 
     fun setBookmarkedData(id: Int?, data: BookmarkedData) {}
 
@@ -557,19 +631,63 @@ object DataStoreHelper {
     fun setViewPos(id: Int?, pos: Long, dur: Long) {
         if (id == null || dur < 30_000) return
         sessionPosDur[id] = PosDur(pos, dur)
+        setKey("$currentAccount/$VIDEO_POS_DUR", id.toString(), PosDur(pos, dur))
     }
 
     /**
-     * Sets the position, duration, and resume data of an episode/movie in memory only
+     * Sets the position, duration, and resume data of an episode/movie with persistent local state
      */
     fun setViewPosAndResume(id: Int?, position: Long, duration: Long, currentEpisode: Any?, nextEpisode: Any?) {
         setViewPos(id, position, duration)
-        if (id != null) {
-            when (val meta = currentEpisode) {
-                is ResultEpisode -> {
-                    if (meta.videoWatchState == VideoWatchState.Watched) {
-                        setVideoWatchState(id, VideoWatchState.None)
+
+        if (currentEpisode == null) {
+            when (val pos = getViewPos(id)) {
+                null -> Unit
+                else -> {
+                    val percentage = pos.position * 100L / pos.duration
+                    if (percentage >= NEXT_WATCH_EPISODE_PERCENTAGE) {
+                        setVideoWatchState(id, VideoWatchState.Watched)
+                    } else {
+                        setVideoWatchState(id, VideoWatchState.Watching)
                     }
+                }
+            }
+            return
+        }
+
+        val percentage = position * 100L / duration
+        val nextEp = percentage >= NEXT_WATCH_EPISODE_PERCENTAGE
+        val resumeMeta = if (nextEp) nextEpisode else currentEpisode
+        if (resumeMeta == null && nextEp) {
+            when (val newMeta = currentEpisode) {
+                is ResultEpisode -> {
+                    removeLastWatched(newMeta.parentId)
+                }
+
+                is ExtractorUri -> {
+                    removeLastWatched(newMeta.parentId)
+                }
+            }
+        } else {
+            when (resumeMeta) {
+                is ResultEpisode -> {
+                    setLastWatched(
+                        resumeMeta.parentId,
+                        resumeMeta.id,
+                        resumeMeta.episode,
+                        resumeMeta.season,
+                        isFromDownload = false,
+                    )
+                }
+
+                is ExtractorUri -> {
+                    setLastWatched(
+                        resumeMeta.parentId,
+                        resumeMeta.id,
+                        resumeMeta.episode,
+                        resumeMeta.season,
+                        isFromDownload = true,
+                    )
                 }
             }
         }
@@ -577,20 +695,22 @@ object DataStoreHelper {
 
     fun getViewPos(id: Int?): PosDur? {
         if (id == null) return null
-        return sessionPosDur[id]
+        return sessionPosDur[id] ?: getKey<PosDur>("$currentAccount/$VIDEO_POS_DUR", id.toString(), null)
     }
 
     fun getVideoWatchState(id: Int?): VideoWatchState? {
         if (id == null) return null
-        return sessionWatchState[id]
+        return sessionWatchState[id] ?: getKey<VideoWatchState>("$currentAccount/$VIDEO_WATCH_STATE", id.toString(), null)
     }
 
     fun setVideoWatchState(id: Int?, watchState: VideoWatchState) {
         if (id == null) return
         if (watchState == VideoWatchState.None) {
             sessionWatchState.remove(id)
+            removeKey("$currentAccount/$VIDEO_WATCH_STATE", id.toString())
         } else {
             sessionWatchState[id] = watchState
+            setKey("$currentAccount/$VIDEO_WATCH_STATE", id.toString(), watchState)
         }
     }
 

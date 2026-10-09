@@ -1847,7 +1847,17 @@ class CS3IPlayer : IPlayer {
             val mime = when (link.type) {
                 ExtractorLinkType.M3U8 -> MimeTypes.APPLICATION_M3U8
                 ExtractorLinkType.DASH -> MimeTypes.APPLICATION_MPD
-                ExtractorLinkType.VIDEO -> MimeTypes.VIDEO_MP4
+                ExtractorLinkType.VIDEO -> {
+                    val path = try { link.url.toUri().path?.lowercase() } catch (_: Throwable) { null }
+                    when {
+                        path?.endsWith(".m3u8") == true -> MimeTypes.APPLICATION_M3U8
+                        path?.endsWith(".ts") == true -> MimeTypes.VIDEO_MP2T
+                        path?.endsWith(".mpd") == true -> MimeTypes.APPLICATION_MPD
+                        path?.endsWith(".mkv") == true -> MimeTypes.VIDEO_MATROSKA
+                        path?.endsWith(".webm") == true -> MimeTypes.VIDEO_WEBM
+                        else -> MimeTypes.VIDEO_MP4
+                    }
+                }
                 ExtractorLinkType.TORRENT, ExtractorLinkType.MAGNET -> {
                     // we check settings first, todo cleanup
                     val default = TvType.entries.toTypedArray()
@@ -1973,10 +1983,10 @@ class CS3IPlayer : IPlayer {
                 )
             }
 
-            // For DASH or HLS single streams (non-playlist), prefer the player's default
+            // For DASH, HLS, or IPTV TS live streams, prefer the player's default
             // live position instead of starting at 0. Use TIME_UNSET to let ExoPlayer pick
             // the live/default position when no explicit start position was provided.
-            if (playbackPosition == 0L && (link.type == ExtractorLinkType.M3U8 || link.type == ExtractorLinkType.DASH)) {
+            if (playbackPosition == 0L && (link.type == ExtractorLinkType.M3U8 || link.type == ExtractorLinkType.DASH || mime == MimeTypes.APPLICATION_M3U8 || mime == MimeTypes.VIDEO_MP2T)) {
                 playbackPosition = TIME_UNSET
             }
 

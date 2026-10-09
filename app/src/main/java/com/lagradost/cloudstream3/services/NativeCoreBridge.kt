@@ -29,11 +29,6 @@ object NativeCoreBridge {
     external fun validateUrlSafety(url: String): Boolean
 
     /**
-     * Parses M3U IPTV playlist content into JSON format in native Rust memory without JVM GC pressure.
-     */
-    external fun parseM3uChannels(content: String): String
-
-    /**
      * Returns the native core version and compile architecture (ARMv7, ARMv8, etc.).
      */
     external fun getCoreInfo(): String

@@ -2,7 +2,6 @@ use jni::objects::{JClass, JString};
 use jni::sys::{jboolean, jstring};
 use jni::JNIEnv;
 
-use crate::iptv::m3u::M3uParser;
 use crate::security::ssrf::validate_url_safety;
 
 /// JNI bridge to validate URL safety against SSRF and private network access.
@@ -20,27 +19,6 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     match validate_url_safety(&url_str) {
         Ok(_) => 1,
         Err(_) => 0,
-    }
-}
-
-/// JNI bridge to parse M3U IPTV playlist content into JSON with high speed and zero JVM overhead.
-#[no_mangle]
-pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_parseM3uChannels(
-    mut env: JNIEnv,
-    _class: JClass,
-    content_input: JString,
-) -> jstring {
-    let content_str: String = match env.get_string(&content_input) {
-        Ok(s) => s.into(),
-        Err(_) => return std::ptr::null_mut(),
-    };
-
-    let channels = M3uParser::parse(&content_str);
-    let json_output = serde_json::to_string(&channels).unwrap_or_else(|_| "[]".to_string());
-
-    match env.new_string(json_output) {
-        Ok(js) => js.into_raw(),
-        Err(_) => std::ptr::null_mut(),
     }
 }
 
