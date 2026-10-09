@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.json.JsonMapper
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator
 import com.fasterxml.jackson.module.kotlin.kotlinModule
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.mvvm.safe
@@ -104,7 +105,9 @@ val json = Json {
 }
 
 val mapper = JsonMapper.builder().addModule(kotlinModule())
-    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false).build()!!
+    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    .polymorphicTypeValidator(BasicPolymorphicTypeValidator.builder().build())
+    .build()!!
 
 object APIHolder {
     val unixTimeMS: Long

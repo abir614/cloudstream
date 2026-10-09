@@ -17,9 +17,11 @@ jobs:
   rust-security-audit:
     name: Rust Security Audit & Vulnerabilities
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -42,9 +44,11 @@ jobs:
   sandbox-fuzz-tests:
     name: Sandbox & Parser Fuzz Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -57,9 +61,11 @@ jobs:
   dependency-review:
     name: Dependency & Vulnerability Scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@master

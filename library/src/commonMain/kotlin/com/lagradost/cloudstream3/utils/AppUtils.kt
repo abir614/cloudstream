@@ -41,8 +41,30 @@ object AppUtils {
         }
     }
 
+    const val MAX_JSON_PAYLOAD_SIZE = 25 * 1024 * 1024 // 25 MB limit against heap exhaustion
+    const val MAX_JSON_NESTING_DEPTH = 120 // Limit against deeply-nested stack overflow DoS
+
+    fun validateJsonSafety(value: String) {
+        if (value.length > MAX_JSON_PAYLOAD_SIZE) {
+            throw IllegalArgumentException("JSON payload exceeds maximum allowed size (${value.length} bytes)")
+        }
+        var depth = 0
+        for (i in 0 until value.length) {
+            val c = value[i]
+            if (c == '{' || c == '[') {
+                depth++
+                if (depth > MAX_JSON_NESTING_DEPTH) {
+                    throw IllegalArgumentException("JSON nesting depth exceeds safety threshold ($depth > $MAX_JSON_NESTING_DEPTH)")
+                }
+            } else if (c == '}' || c == ']') {
+                if (depth > 0) depth--
+            }
+        }
+    }
+
     @InternalAPI
     fun <T : Any> parseJson(value: String, kClass: KClass<T>): T {
+        validateJsonSafety(value)
         val serializer = kClass.serializerOrNull() ?: json.serializersModule.getContextual(kClass)
         if (serializer != null) {
             try {
@@ -58,6 +80,7 @@ object AppUtils {
     // This is inlined code and can easily cause breakage in extensions!
     // Watch out when editing this to make sure stable also supports all inlined code!
     inline fun <reified T : Any> parseJson(value: String): T {
+        validateJsonSafety(value)
         // @Serializable generates a serializer at compile time; contextual serializers are
         // registered manually in serializersModule, we need both to support all cases
         val serializer = runCatching { serializer<T>() }
