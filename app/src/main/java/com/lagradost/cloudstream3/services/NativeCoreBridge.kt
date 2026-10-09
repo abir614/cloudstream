@@ -69,3 +69,5 @@ object NativeCoreBridge {
         certFingerprint: String,
         versionCode: Long
     ): Boolean
+}
+
