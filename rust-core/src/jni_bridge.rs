@@ -96,6 +96,7 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     actual_cert_input: JString,
     installed_version_code: jni::sys::jlong,
     apk_version_code: jni::sys::jlong,
+    repo_header_hex_input: JString,
 ) -> jstring {
     let apk_path: String = match env.get_string(&apk_path_input) {
         Ok(s) => s.into(),
@@ -121,6 +122,17 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Ok(s) => s.into(),
         Err(_) => return std::ptr::null_mut(),
     };
+    let repo_header_hex: Option<String> = if !repo_header_hex_input.is_null() {
+        match env.get_string(&repo_header_hex_input) {
+            Ok(s) => {
+                let str_val: String = s.into();
+                if str_val.trim().is_empty() { None } else { Some(str_val) }
+            }
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
 
     let result = crate::security::apk_verifier::verify_apk_identity(
         &apk_path,
@@ -131,6 +143,7 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         &actual_cert,
         installed_version_code,
         apk_version_code,
+        repo_header_hex.as_deref(),
     );
 
     let json_output = serde_json::to_string(&result)

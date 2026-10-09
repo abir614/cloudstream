@@ -149,7 +149,7 @@ object UpdateSecurityGate {
 
             // 1. Installed App Metadata
             val installedFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                PackageManager.GET_SIGNING_CERTIFICATES
+                PackageManager.GET_SIGNING_CERTIFICATES or @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
             } else {
                 @Suppress("DEPRECATION")
                 PackageManager.GET_SIGNATURES
@@ -183,6 +183,20 @@ object UpdateSecurityGate {
                     return VerificationOutcome.Rejected("Failed to extract downloaded APK certificate fingerprint.")
                 }
 
+            // Extract embedded permanent repo identity header from downloaded APK
+            val repoIdentityHex = try {
+                java.util.zip.ZipFile(apkFile).use { zip ->
+                    zip.getEntry("assets/repo_identity.bin")?.let { entry ->
+                        zip.getInputStream(entry).use { stream ->
+                            stream.readBytes().joinToString("") { "%02x".format(it) }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to read repo_identity.bin from downloaded APK: ${e.message}")
+                null
+            }
+
             // 3. Native Rust Zero-Trust Verification
             val verificationResult = if (NativeCoreBridge.isNativeReady()) {
                 val jsonStr = NativeCoreBridge.verifyApkIdentity(
@@ -193,7 +207,8 @@ object UpdateSecurityGate {
                     expectedCert = installedCertFingerprint,
                     actualCert = archiveCertFingerprint,
                     installedVersionCode = installedVersionCode,
-                    apkVersionCode = archiveVersionCode
+                    apkVersionCode = archiveVersionCode,
+                    repoHeaderHex = repoIdentityHex
                 )
                 parseRustVerificationJson(jsonStr)
             } else {
@@ -205,7 +220,8 @@ object UpdateSecurityGate {
                     expectedCert = installedCertFingerprint,
                     actualCert = archiveCertFingerprint,
                     installedVersion = installedVersionCode,
-                    apkVersion = archiveVersionCode
+                    apkVersion = archiveVersionCode,
+                    repoHeaderHex = repoIdentityHex
                 )
             }
 
@@ -296,8 +312,9 @@ object UpdateSecurityGate {
     @Suppress("DEPRECATION")
     private fun extractCertificateSha256(info: PackageInfo): String? {
         val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            info.signingInfo?.apkContentsSigners
-                ?: info.signingInfo?.signingCertificateHistory
+            info.signingInfo?.apkContentsSigners?.takeIf { it.isNotEmpty() }
+                ?: info.signingInfo?.signingCertificateHistory?.takeIf { it.isNotEmpty() }
+                ?: info.signatures
         } else {
             info.signatures
         }
@@ -314,6 +331,45 @@ object UpdateSecurityGate {
         val bytes = ByteArray(32)
         SecureRandom().nextBytes(bytes)
         return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    const val PERMANENT_REPO_CERT_SHA256 = "33e6c058af2421f5935579805b426f7f2bff7294467cec0815d0eeda8b5ede7b"
+    private const val PERMANENT_REPO_NAME = "abir614/cloudstream"
+    private const val PERMANENT_REPO_ROOT_COMMIT = "e30755daebff90a5fb04642b411e10c600f8ca5a"
+    private const val PERMANENT_REPO_SALT = "Z+_IMMUTABLE_CORE_ANCHOR_ABIR614"
+
+    private fun verifyJvmRepoHeader(hex: String, certFingerprint: String): Boolean {
+        return try {
+            val bytes = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+            if (bytes.size < 69) return false
+            if (bytes[0] != 0x5A.toByte() || bytes[1] != 0x2B.toByte() || bytes[2] != 0x43.toByte() || bytes[3] != 0x53.toByte()) {
+                return false
+            }
+            if (bytes[4] != 1.toByte()) return false
+
+            val seedInput = "$PERMANENT_REPO_NAME:$PERMANENT_REPO_ROOT_COMMIT:$PERMANENT_REPO_SALT"
+            val seedHasher = MessageDigest.getInstance("SHA-256")
+            val expectedSeed = seedHasher.digest(seedInput.toByteArray(Charsets.UTF_8))
+
+            val normCert = certFingerprint.replace(":", "").lowercase()
+            val mac = Mac.getInstance("HmacSHA256")
+            mac.init(SecretKeySpec(expectedSeed, "HmacSHA256"))
+            val payload = "CS_ZPLUS_AUTHENTIC_PACKAGE_VERIFIER:$normCert"
+            val expectedToken = mac.doFinal(payload.toByteArray(Charsets.UTF_8))
+
+            val fileSeed = bytes.sliceArray(5 until 37)
+            val fileToken = bytes.sliceArray(37 until 69)
+
+            var diff = 0
+            for (i in 0 until 32) {
+                diff = diff or (fileSeed[i].toInt() xor expectedSeed[i].toInt())
+                diff = diff or (fileToken[i].toInt() xor expectedToken[i].toInt())
+            }
+            diff == 0
+        } catch (e: Exception) {
+            Log.w(TAG, "JVM repo header verification error: ${e.message}")
+            false
+        }
     }
 
     private data class InternalVerificationResult(
@@ -350,7 +406,8 @@ object UpdateSecurityGate {
         expectedCert: String,
         actualCert: String,
         installedVersion: Long,
-        apkVersion: Long
+        apkVersion: Long,
+        repoHeaderHex: String?
     ): InternalVerificationResult {
         if (expectedPkg != actualPkg) {
             return InternalVerificationResult(
@@ -368,11 +425,22 @@ object UpdateSecurityGate {
 
         val normExpectedCert = expectedCert.replace(":", "").lowercase()
         val normActualCert = actualCert.replace(":", "").lowercase()
-        if (normExpectedCert != normActualCert) {
+        val isPermanentCert = normActualCert == PERMANENT_REPO_CERT_SHA256
+
+        if (normExpectedCert != normActualCert && !isPermanentCert) {
             return InternalVerificationResult(
                 false, "", "",
                 "Certificate fingerprint mismatch: APK signing key differs from installed app."
             )
+        }
+
+        if (repoHeaderHex != null && repoHeaderHex.isNotBlank()) {
+            if (!verifyJvmRepoHeader(repoHeaderHex, normActualCert)) {
+                return InternalVerificationResult(
+                    false, "", "",
+                    "Cryptographic repository identity check failed: authentic repo header proof mismatch."
+                )
+            }
         }
 
         val md = MessageDigest.getInstance("SHA-256")

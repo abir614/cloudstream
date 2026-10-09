@@ -55,7 +55,8 @@ object NativeCoreBridge {
         expectedCert: String,
         actualCert: String,
         installedVersionCode: Long,
-        apkVersionCode: Long
+        apkVersionCode: Long,
+        repoHeaderHex: String?
     ): String?
 
     /**

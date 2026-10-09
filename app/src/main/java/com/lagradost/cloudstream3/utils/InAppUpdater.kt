@@ -163,13 +163,24 @@ object InAppUpdater {
             rel.prerelease || rel.tagName == "pre-release"
         }
 
-        val foundAsset = found?.assets?.filter { it ->
-            it.contentType == "application/vnd.android.package-archive"
-        }?.getOrNull(0)
+        val apkAssets = found?.assets?.filter { it ->
+            it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk")
+        } ?: emptyList()
 
-        if (foundAsset == null) {
+        if (apkAssets.isEmpty()) {
             return Update(false, null, null, null, null)
         }
+
+        // Intelligently select best matching APK for running device architecture
+        val supportedAbis = android.os.Build.SUPPORTED_ABIS?.toList() ?: emptyList()
+        val foundAsset = when {
+            supportedAbis.any { it.contains("arm64") } ->
+                apkAssets.firstOrNull { it.name.contains("arm64-v8a") }
+            supportedAbis.any { it.contains("armeabi") } ->
+                apkAssets.firstOrNull { it.name.contains("armeabi-v7a") }
+            else -> null
+        } ?: apkAssets.firstOrNull { it.name.contains("universal") }
+          ?: apkAssets.first()
 
         val tagResponse = parseJson<GithubTag>(app.get(tagUrl, headers = headers).text)
         val updateCommitHash = tagResponse.githubObject.sha.trim().take(7)

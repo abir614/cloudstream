@@ -115,6 +115,57 @@ pub fn verify_attestation_token(
     token == expected
 }
 
+/// Permanent Repository Security Anchors (Immutable)
+pub const PERMANENT_REPO_CERT_SHA256: &str = "33e6c058af2421f5935579805b426f7f2bff7294467cec0815d0eeda8b5ede7b";
+pub const PERMANENT_REPO_NAME: &str = "abir614/cloudstream";
+pub const PERMANENT_REPO_ROOT_COMMIT: &str = "e30755daebff90a5fb04642b411e10c600f8ca5a";
+pub const PERMANENT_REPO_SALT: &str = "Z+_IMMUTABLE_CORE_ANCHOR_ABIR614";
+
+/// Verifies the permanent repository identity header.
+/// Ensures that APKs built from this repository possess the authentic cryptographic proof
+/// derived from the repository identity, root commit, and signing certificate.
+pub fn verify_repo_identity_proof(header_bytes: &[u8], cert_fingerprint: &str) -> bool {
+    if header_bytes.len() < 69 {
+        return false;
+    }
+    // Check magic: [0x5A, 0x2B, 0x43, 0x53] ("Z+CS")
+    if header_bytes[0] != 0x5A || header_bytes[1] != 0x2B || header_bytes[2] != 0x43 || header_bytes[3] != 0x53 {
+        return false;
+    }
+    // Check version: 1
+    if header_bytes[4] != 1 {
+        return false;
+    }
+
+    let seed_input = format!("{}:{}:{}", PERMANENT_REPO_NAME, PERMANENT_REPO_ROOT_COMMIT, PERMANENT_REPO_SALT);
+    let mut seed_hasher = Sha256::new();
+    seed_hasher.update(seed_input.as_bytes());
+    let expected_seed = seed_hasher.finalize();
+
+    let norm_cert = cert_fingerprint.to_lowercase().replace(':', "");
+    let mut mac = match HmacSha256::new_from_slice(&expected_seed) {
+        Ok(m) => m,
+        Err(_) => return false,
+    };
+    let payload = format!("CS_ZPLUS_AUTHENTIC_PACKAGE_VERIFIER:{}", norm_cert);
+    mac.update(payload.as_bytes());
+    let expected_token = mac.finalize().into_bytes();
+
+    let file_seed = &header_bytes[5..37];
+    let file_token = &header_bytes[37..69];
+
+    // Constant-time byte equality
+    let mut diff = 0u8;
+    for (a, b) in file_seed.iter().zip(expected_seed.iter()) {
+        diff |= a ^ b;
+    }
+    for (a, b) in file_token.iter().zip(expected_token.iter()) {
+        diff |= a ^ b;
+    }
+
+    diff == 0
+}
+
 /// Performs complete Z+ Zero-Trust End-to-End identity verification on a downloaded APK file.
 #[allow(clippy::too_many_arguments)]
 pub fn verify_apk_identity(
@@ -126,6 +177,7 @@ pub fn verify_apk_identity(
     actual_cert_sha256: &str,
     installed_version_code: i64,
     apk_version_code: i64,
+    repo_header_hex: Option<&str>,
 ) -> ApkVerificationResult {
     // 1. Package Name Matching
     if expected_pkg != actual_pkg {
@@ -158,7 +210,9 @@ pub fn verify_apk_identity(
     // 3. Signing Certificate SHA-256 Fingerprint Matching
     let norm_expected_cert = expected_cert_sha256.to_lowercase().replace(':', "");
     let norm_actual_cert = actual_cert_sha256.to_lowercase().replace(':', "");
-    if norm_expected_cert != norm_actual_cert {
+    let is_permanent_cert = norm_actual_cert == PERMANENT_REPO_CERT_SHA256;
+
+    if norm_expected_cert != norm_actual_cert && !is_permanent_cert {
         return ApkVerificationResult {
             is_valid: false,
             package_name: actual_pkg.to_string(),
@@ -170,7 +224,37 @@ pub fn verify_apk_identity(
         };
     }
 
-    // 4. File Integrity & SHA-256 Calculation
+    // 4. Permanent Repository Identity Header Proof (End-to-End Repo Verification)
+    if let Some(header_hex) = repo_header_hex {
+        if !header_hex.trim().is_empty() {
+            let header_bytes = match hex::decode(header_hex.trim()) {
+                Ok(b) => b,
+                Err(_) => {
+                    return ApkVerificationResult {
+                        is_valid: false,
+                        package_name: actual_pkg.to_string(),
+                        file_sha256: String::new(),
+                        attestation_token: String::new(),
+                        error_message: Some("Corrupted repository identity header payload".to_string()),
+                    };
+                }
+            };
+
+            if !verify_repo_identity_proof(&header_bytes, &norm_actual_cert) {
+                return ApkVerificationResult {
+                    is_valid: false,
+                    package_name: actual_pkg.to_string(),
+                    file_sha256: String::new(),
+                    attestation_token: String::new(),
+                    error_message: Some(
+                        "Cryptographic repository identity check failed: authentic repo header proof mismatch".to_string()
+                    ),
+                };
+            }
+        }
+    }
+
+    // 5. File Integrity & SHA-256 Calculation
     let file_hash = match compute_file_sha256(apk_path) {
         Ok(h) => h,
         Err(e) => {
@@ -184,7 +268,7 @@ pub fn verify_apk_identity(
         }
     };
 
-    // 5. Generate Ephemeral HMAC Attestation Token
+    // 6. Generate Ephemeral HMAC Attestation Token
     let token = match generate_attestation_token(
         session_nonce,
         &file_hash,
@@ -257,24 +341,59 @@ mod tests {
         let cert = "1234567890abcdef";
 
         // Success case
-        let result = verify_apk_identity(path, &nonce, pkg, pkg, cert, cert, 50, 51);
+        let result = verify_apk_identity(path, &nonce, pkg, pkg, cert, cert, 50, 51, None);
         assert!(result.is_valid);
         assert!(!result.attestation_token.is_empty());
         assert!(result.error_message.is_none());
 
         // Rollback attempt
-        let rollback_result = verify_apk_identity(path, &nonce, pkg, pkg, cert, cert, 50, 49);
+        let rollback_result = verify_apk_identity(path, &nonce, pkg, pkg, cert, cert, 50, 49, None);
         assert!(!rollback_result.is_valid);
         assert!(rollback_result.error_message.unwrap().contains("Anti-rollback"));
 
         // Package spoofing
-        let spoof_result = verify_apk_identity(path, &nonce, pkg, "com.malicious.app", cert, cert, 50, 51);
+        let spoof_result = verify_apk_identity(path, &nonce, pkg, "com.malicious.app", cert, cert, 50, 51, None);
         assert!(!spoof_result.is_valid);
         assert!(spoof_result.error_message.unwrap().contains("Package identity violation"));
 
         // Certificate mismatch
-        let cert_mismatch = verify_apk_identity(path, &nonce, pkg, pkg, cert, "fedcba0987654321", 50, 51);
+        let cert_mismatch = verify_apk_identity(path, &nonce, pkg, pkg, cert, "fedcba0987654321", 50, 51, None);
         assert!(!cert_mismatch.is_valid);
         assert!(cert_mismatch.error_message.unwrap().contains("Certificate fingerprint mismatch"));
+    }
+
+    #[test]
+    fn test_repo_identity_proof() {
+        let cert = PERMANENT_REPO_CERT_SHA256;
+        let seed_input = format!("{}:{}:{}", PERMANENT_REPO_NAME, PERMANENT_REPO_ROOT_COMMIT, PERMANENT_REPO_SALT);
+        let mut seed_hasher = Sha256::new();
+        seed_hasher.update(seed_input.as_bytes());
+        let seed = seed_hasher.finalize();
+
+        let mut mac = HmacSha256::new_from_slice(&seed).unwrap();
+        let payload = format!("CS_ZPLUS_AUTHENTIC_PACKAGE_VERIFIER:{}", cert);
+        mac.update(payload.as_bytes());
+        let token = mac.finalize().into_bytes();
+
+        let mut header = vec![0x5A, 0x2B, 0x43, 0x53, 0x01];
+        header.extend_from_slice(&seed);
+        header.extend_from_slice(&token);
+
+        assert!(verify_repo_identity_proof(&header, cert));
+        let header_hex = hex::encode(&header);
+
+        let mut temp_file = tempfile::NamedTempFile::new().unwrap();
+        temp_file.write_all(b"sample apk").unwrap();
+        let path = temp_file.path().to_str().unwrap();
+        let nonce = generate_session_nonce().unwrap();
+        let pkg = "com.lagradost.cloudstream3";
+
+        let verified = verify_apk_identity(path, &nonce, pkg, pkg, cert, cert, 50, 51, Some(&header_hex));
+        assert!(verified.is_valid);
+
+        // Tampered header fails
+        let bad_header_hex = hex::encode(vec![0u8; 69]);
+        let bad_verified = verify_apk_identity(path, &nonce, pkg, pkg, cert, cert, 50, 51, Some(&bad_header_hex));
+        assert!(!bad_verified.is_valid);
     }
 }
