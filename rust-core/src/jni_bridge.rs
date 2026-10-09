@@ -129,8 +129,8 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         &actual_pkg,
         &expected_cert,
         &actual_cert,
-        installed_version_code as i64,
-        apk_version_code as i64,
+        installed_version_code,
+        apk_version_code,
     );
 
     let json_output = serde_json::to_string(&result)
@@ -180,7 +180,7 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         &file_hash,
         &pkg_name,
         &cert_fingerprint,
-        version_code as i64,
+        version_code,
     ) {
         1
     } else {

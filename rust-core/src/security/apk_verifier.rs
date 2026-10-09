@@ -116,6 +116,7 @@ pub fn verify_attestation_token(
 }
 
 /// Performs complete Z+ Zero-Trust End-to-End identity verification on a downloaded APK file.
+#[allow(clippy::too_many_arguments)]
 pub fn verify_apk_identity(
     apk_path: &str,
     session_nonce: &str,
