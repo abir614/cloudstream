@@ -636,20 +636,14 @@ object DataStoreHelper {
      */
     fun setViewPosAndResume(id: Int?, position: Long, duration: Long, currentEpisode: Any?, nextEpisode: Any?) {
         setViewPos(id, position, duration)
-
-        if (currentEpisode == null) {
-            when (val pos = getViewPos(id)) {
-                null -> Unit
-                else -> {
-                    val percentage = pos.position * 100L / pos.duration
-                    if (percentage >= NEXT_WATCH_EPISODE_PERCENTAGE) {
-                        setVideoWatchState(id, VideoWatchState.Watched)
-                    } else {
-                        setVideoWatchState(id, VideoWatchState.Watching)
+        if (id != null) {
+            when (val meta = currentEpisode) {
+                is ResultEpisode -> {
+                    if (meta.videoWatchState == VideoWatchState.Watched) {
+                        setVideoWatchState(id, VideoWatchState.None)
                     }
                 }
             }
-            return
         }
 
         val percentage = position * 100L / duration
