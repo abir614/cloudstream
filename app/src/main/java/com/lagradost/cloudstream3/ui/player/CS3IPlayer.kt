@@ -1093,25 +1093,39 @@ class CS3IPlayer : IPlayer {
         /** External audio tracks to merge with the video */
         audioSources: List<MediaSource> = emptyList()
     ): ExoPlayer {
-        // Adaptive LoadControl for low RAM (e.g. 512MB RAM TV boxes)
+        // Hardware Adaptive LoadControl: queries real physical device RAM from Linux kernel
         val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        val isLowRam = try {
+        val totalRamBytes = try {
             val memInfo = ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }
-            activityManager?.isLowRamDevice == true || (memInfo.totalMem in 1..805306368L) // <= 768MB
+            memInfo.totalMem
         } catch (_: Throwable) {
-            false
+            0L
         }
+        val isLowRamFlag = activityManager?.isLowRamDevice == true
+
+        val isPotatoDevice = isLowRamFlag || (totalRamBytes in 1..805306368L) // <= 768MB
+        val isMidRamDevice = totalRamBytes in 805306369L..1610612736L // 1GB - 1.5GB
 
         val targetBufferBytes = when {
             cacheSize > 0 -> if (cacheSize > Int.MAX_VALUE) Int.MAX_VALUE else cacheSize.toInt()
-            isLowRam -> 16 * 1024 * 1024 // 16 MB buffer on <=768MB/512MB RAM TV boxes
-            else -> DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES // 144 MB
+            isPotatoDevice -> 16 * 1024 * 1024 // 16 MB on <= 768MB potato devices
+            isMidRamDevice -> 48 * 1024 * 1024 // 48 MB on 1GB - 1.5GB TV sticks
+            else -> DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES // 144 MB on standard 2GB, 4GB, 8GB+ devices
         }
-        val backBufferMs = if (isLowRam) 5000 else 30000
-        val minBufferMs = if (isLowRam) 10000 else DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
+        val backBufferMs = when {
+            isPotatoDevice -> 5000
+            isMidRamDevice -> 15000
+            else -> 30000
+        }
+        val minBufferMs = when {
+            isPotatoDevice -> 10000
+            isMidRamDevice -> 20000
+            else -> DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
+        }
         val maxBufferMs = when {
             videoBufferMs > 0 -> videoBufferMs.toInt()
-            isLowRam -> 20000 // 20s max buffer on low RAM
+            isPotatoDevice -> 20000
+            isMidRamDevice -> 35000
             else -> DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
         }
 
