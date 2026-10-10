@@ -110,16 +110,14 @@ class ApkInstaller(private val service: PackageInstallerService) {
                     inputStream.close()
                 }
 
-            // We must create an explicit intent or it will fail on Android 15+
-            val installIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { 
-                Intent(service, PackageInstallerService::class.java)
-                    .setAction(INSTALL_ACTION) 
-            } else Intent(INSTALL_ACTION) 
+            val installIntent = Intent(INSTALL_ACTION).apply {
+                setPackage(service.packageName)
+            }
 
-            val installFlags = when {
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> PendingIntent.FLAG_MUTABLE
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> PendingIntent.FLAG_IMMUTABLE
-                else -> 0
+            val installFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_MUTABLE
+            } else {
+                0
             }
 
             val intentSender = PendingIntent.getBroadcast(
@@ -145,7 +143,7 @@ class ApkInstaller(private val service: PackageInstallerService) {
         } catch (e: Exception) {
             logError(e)
 
-            service.unregisterReceiver(installActionReceiver)
+            unregisterInstallActionReceiver()
             installProgressStatus.invoke(InstallProgressStatus.Failed)
 
             activeSession?.let { sessionId ->
@@ -155,7 +153,6 @@ class ApkInstaller(private val service: PackageInstallerService) {
     }
 
     init {
-        // Might be dangerous
         registerInstallActionReceiver()
     }
 
@@ -165,8 +162,20 @@ class ApkInstaller(private val service: PackageInstallerService) {
                 addAction(INSTALL_ACTION)
             }
             Log.d(TAG, "Registering install action event receiver")
-            context?.registerBroadcastReceiver(installActionReceiver, intentFilter)
-            isReceiverRegistered = true
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    service.registerReceiver(
+                        installActionReceiver,
+                        intentFilter,
+                        Context.RECEIVER_EXPORTED
+                    )
+                } else {
+                    service.registerReceiver(installActionReceiver, intentFilter)
+                }
+                isReceiverRegistered = true
+            } catch (e: Exception) {
+                logError(e)
+            }
         }
     }
 
@@ -174,7 +183,7 @@ class ApkInstaller(private val service: PackageInstallerService) {
         if (isReceiverRegistered) {
             Log.d(TAG, "Unregistering install action event receiver")
             try {
-                context?.unregisterReceiver(installActionReceiver)
+                service.unregisterReceiver(installActionReceiver)
             } catch (e: Exception) {
                 logError(e)
             }

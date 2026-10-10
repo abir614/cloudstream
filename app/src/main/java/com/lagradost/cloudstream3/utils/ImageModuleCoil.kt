@@ -35,36 +35,48 @@ import java.io.File
 import java.nio.ByteBuffer
 
 object ImageLoader {
-    private const val TAG = "CoilImgLoader"
+    private fun isLowRamDevice(context: PlatformContext): Boolean {
+        val actManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+        if (actManager?.isLowRamDevice == true) return true
+        val memInfo = android.app.ActivityManager.MemoryInfo()
+        actManager?.getMemoryInfo(memInfo)
+        return memInfo.totalMem > 0 && memInfo.totalMem <= 1024L * 1024L * 1024L // <= 1GB
+    }
+
     internal fun buildImageLoader(context: PlatformContext): ImageLoader {
         val isBrokenHardware = hasPotentialBrokenHardware()
+        val isLowRam = isLowRamDevice(context)
         return ImageLoader.Builder(context)
-            .crossfade(200)
-            .allowHardware(SDK_INT >= 28 && !isBrokenHardware)
+            .crossfade(if (isLowRam) 0 else 200)
+            .allowHardware(SDK_INT >= 28 && !isBrokenHardware && !isLowRam)
             .diskCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
             .memoryCache {
-                MemoryCache.Builder().maxSizePercent(context, 0.1)//10 % of heap for mem-cache
+                MemoryCache.Builder()
+                    .maxSizePercent(context, if (isLowRam) 0.05 else 0.10)
                     .strongReferencesEnabled(false)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(context.cacheDir.resolve("cs3_image_cache").toOkioPath())
-                    .maxSizeBytes(512L * 1024 * 1024) // 512 MB
-                    .maxSizePercent(0.04) // max 4% of storage for disk caching
+                    .maxSizeBytes(if (isLowRam) 128L * 1024 * 1024 else 512L * 1024 * 1024)
+                    .maxSizePercent(if (isLowRam) 0.02 else 0.04)
                     .build()
             }
             /** Pass interceptors with care, unnecessary passing tokens to servers
             or image hosting services causes unauthorized exceptions **/
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { buildDefaultClient(context) }))
-                if (isBrokenHardware) {
+                if (isBrokenHardware || isLowRam) {
                     add(BitmapFactoryDecoder.Factory())
                 } // sw decoder
             }
             .apply {
-                if (isBrokenHardware) { // coil will auto choose optimal config on modern device
+                if (isLowRam) {
+                    // Cuts memory consumption per decoded image by 50% (2 bytes vs 4 bytes per pixel)
+                    bitmapConfig(Bitmap.Config.RGB_565)
+                } else if (isBrokenHardware) {
                     bitmapConfig(Bitmap.Config.ARGB_8888)
                 }
                 setupCoilLogger()

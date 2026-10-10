@@ -96,6 +96,33 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         return buildImageLoader(applicationContext)
     }
 
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        try {
+            val memCache = SingletonImageLoader.get(this).memoryCache
+            if (memCache != null) {
+                if (level >= TRIM_MEMORY_RUNNING_LOW || level >= TRIM_MEMORY_MODERATE) {
+                    memCache.clear()
+                } else if (level >= TRIM_MEMORY_BACKGROUND) {
+                    memCache.trimToSize(memCache.size / 2)
+                }
+            }
+            if (level >= TRIM_MEMORY_RUNNING_CRITICAL) {
+                System.gc()
+            }
+        } catch (_: Throwable) {
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        try {
+            SingletonImageLoader.get(this).memoryCache?.clear()
+            System.gc()
+        } catch (_: Throwable) {
+        }
+    }
+
     companion object {
         var exceptionHandler: ExceptionHandler? = null
 

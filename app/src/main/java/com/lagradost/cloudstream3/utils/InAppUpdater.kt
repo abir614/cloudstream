@@ -227,18 +227,18 @@ object InAppUpdater {
                 it.name.startsWith(appUpdateName) && it.extension == appUpdateSuffix
             }?.forEach { deleteFileOnExit(it) }
 
-            val downloadedFile = File.createTempFile(appUpdateName, ".$appUpdateSuffix")
-            val sink: BufferedSink = downloadedFile.sink().buffer()
+            val downloadedFile = File.createTempFile(appUpdateName, ".$appUpdateSuffix", this.cacheDir)
 
             val isInstalled = updateLock.withLock {
-                sink.writeAll(app.get(url).body.source())
-                sink.close()
+                downloadedFile.sink().buffer().use { sink ->
+                    sink.writeAll(app.get(url).body.source())
+                }
 
                 val outcome = UpdateSecurityGate.verifyAndAuthorize(this, downloadedFile)
                 when (outcome) {
                     is UpdateSecurityGate.VerificationOutcome.Authorized -> {
                         UpdateSecurityGate.executeInstallation(this, outcome.token) { authorizedFile ->
-                            openApk(this, Uri.fromFile(authorizedFile))
+                            openApk(this, authorizedFile)
                         }
                     }
                     is UpdateSecurityGate.VerificationOutcome.Rejected -> {
@@ -259,16 +259,16 @@ object InAppUpdater {
         }
     }
 
-    private fun openApk(context: Context, uri: Uri) = safe {
-        val path = uri.path ?: return@safe
+    private fun openApk(context: Context, file: File) = safe {
         val contentUri = FileProvider.getUriForFile(
-            context, BuildConfig.APPLICATION_ID + ".provider", File(path)
+            context, BuildConfig.APPLICATION_ID + ".provider", file
         )
         val installIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(contentUri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-            data = contentUri
         }
         context.startActivity(installIntent)
     }

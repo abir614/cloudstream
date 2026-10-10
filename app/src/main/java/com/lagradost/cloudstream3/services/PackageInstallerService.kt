@@ -193,7 +193,6 @@ class PackageInstallerService : Service() {
     override fun onDestroy() {
         installer?.unregisterInstallActionReceiver()
         installer = null
-        this.stopSelf()
         super.onDestroy()
     }
 
