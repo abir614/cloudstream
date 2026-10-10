@@ -22,6 +22,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 
 class APIRepository(val api: MainAPI) {
@@ -59,6 +60,15 @@ class APIRepository(val api: MainAPI) {
         private var cacheIndex: Int = 0
         const val CACHE_SIZE = 20
 
+        data class SavedMainPageResponse(
+            val unixTime: Long,
+            val response: List<HomePageResponse?>,
+            val key: Pair<String, Int>
+        )
+
+        private val mainPageCache = atomicListOf<SavedMainPageResponse>()
+        const val MAIN_PAGE_CACHE_SIZE = 10
+
         fun getTimeout(desired: Long?): Long {
             return (desired ?: DEFAULT_TIMEOUT).coerceIn(MIN_TIMEOUT, MAX_TIMEOUT)
         }
@@ -67,6 +77,7 @@ class APIRepository(val api: MainAPI) {
     private fun afterPluginsLoaded(forceReload: Boolean) {
         if (forceReload) {
             cache.clear()
+            mainPageCache.clear()
         }
     }
 
@@ -153,43 +164,92 @@ class APIRepository(val api: MainAPI) {
         delay(delta)
     }
 
-    suspend fun getMainPage(page: Int, nameIndex: Int? = null): Resource<List<HomePageResponse?>> {
+    suspend fun getMainPage(
+        page: Int,
+        nameIndex: Int? = null,
+        forceReload: Boolean = false
+    ): Resource<List<HomePageResponse?>> {
         return safeApiCall {
             withTimeout(getTimeout(api.getMainPageTimeoutMs)) {
                 api.lastHomepageRequest = unixTimeMS
 
                 nameIndex?.let { api.mainPage.getOrNull(it) }?.let { data ->
                     listOf(
-                        api.getMainPage(
-                            page,
-                            MainPageRequest(data.name, data.data, data.horizontalImages)
-                        )
+                        try {
+                            api.getMainPage(
+                                page,
+                                MainPageRequest(data.name, data.data, data.horizontalImages)
+                            )
+                        } catch (t: Throwable) {
+                            logError(t)
+                            null
+                        }
                     )
                 } ?: run {
-                    if (api.sequentialMainPage) {
+                    val cacheKey = Pair(api.name, page)
+                    if (!forceReload) {
+                        val cached = mainPageCache.withLock {
+                            mainPageCache.firstOrNull {
+                                it.key == cacheKey && (unixTime - it.unixTime) < 300 // 5-minute TTL
+                            }?.response
+                        }
+                        if (cached != null) return@withTimeout cached
+                    }
+
+                    val results = if (api.sequentialMainPage) {
                         var first = true
                         api.mainPage.map { data ->
                             if (!first) // dont want to sleep on first request
                                 delay(api.sequentialMainPageDelay)
                             first = false
 
-                            api.getMainPage(
-                                page,
-                                MainPageRequest(data.name, data.data, data.horizontalImages)
-                            )
+                            try {
+                                api.getMainPage(
+                                    page,
+                                    MainPageRequest(data.name, data.data, data.horizontalImages)
+                                )
+                            } catch (t: Throwable) {
+                                logError(t)
+                                null
+                            }
                         }
                     } else {
-                        with(CoroutineScope(coroutineContext)) {
+                        supervisorScope {
                             api.mainPage.map { data ->
                                 async {
-                                    api.getMainPage(
-                                        page,
-                                        MainPageRequest(data.name, data.data, data.horizontalImages)
-                                    )
+                                    try {
+                                        api.getMainPage(
+                                            page,
+                                            MainPageRequest(data.name, data.data, data.horizontalImages)
+                                        )
+                                    } catch (t: Throwable) {
+                                        logError(t)
+                                        null
+                                    }
                                 }
-                            }.map { it.await() }
+                            }.map {
+                                try {
+                                    it.await()
+                                } catch (t: Throwable) {
+                                    logError(t)
+                                    null
+                                }
+                            }
                         }
                     }
+
+                    if (results.any { it != null }) {
+                        val entry = SavedMainPageResponse(unixTime, results, cacheKey)
+                        mainPageCache.withLock {
+                            mainPageCache.removeAll { it.key == cacheKey }
+                            if (mainPageCache.size >= MAIN_PAGE_CACHE_SIZE) {
+                                mainPageCache.removeAt(0)
+                            }
+                            mainPageCache.add(entry)
+                        }
+                    }
+
+                    results
                 }
             }
         }
