@@ -1,7 +1,9 @@
 package com.lagradost.cloudstream3.plugins
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.WorkerThread
+import java.util.zip.ZipFile
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.context
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.getKey
@@ -209,39 +211,63 @@ object RepositoryManager {
             // Prevent corrupting the plugin file if the operation fails
             val tempFile = File.createTempFile(file.name, ".tmp", context.cacheDir)
 
-            val body = app.get(convertRawGitUrl(pluginUrl)).okhttpResponse.body
-
-            body.byteStream().use { body ->
-                tempFile.outputStream().use { fileSteam ->
-                    body.copyTo(fileSteam)
-                }
-            }
-
-            if (expectedFileHash != null) {
-                val downloadHash = sha256(tempFile)
-                if (expectedFileHash != downloadHash) {
-                    tempFile.delete()
-                    throw IllegalStateException("Extension hash mismatch when validating '${file.name}'! Expected: '$expectedFileHash', got: '$downloadHash'.")
-                }
-            }
-
-            // We prefer the operation to be atomic
             try {
-                Files.move(
-                    tempFile.toPath(),
-                    file.toPath(),
-                    StandardCopyOption.REPLACE_EXISTING,
-                    StandardCopyOption.ATOMIC_MOVE
-                )
-            } catch (_: AtomicMoveNotSupportedException) {
-                Files.move(
-                    tempFile.toPath(),
-                    file.toPath(),
-                    StandardCopyOption.REPLACE_EXISTING
-                )
-            }
+                val response = app.get(convertRawGitUrl(pluginUrl))
+                if (!response.isSuccessful) {
+                    tempFile.delete()
+                    Log.w("RepositoryManager", "Failed downloading plugin from $pluginUrl: HTTP ${response.code}")
+                    return@safeAsync null
+                }
 
-            file
+                val body = response.okhttpResponse.body ?: run {
+                    tempFile.delete()
+                    return@safeAsync null
+                }
+
+                body.byteStream().use { stream ->
+                    tempFile.outputStream().use { fileStream ->
+                        stream.copyTo(fileStream)
+                    }
+                }
+
+                if (expectedFileHash != null) {
+                    val downloadHash = sha256(tempFile)
+                    if (expectedFileHash != downloadHash) {
+                        tempFile.delete()
+                        throw IllegalStateException("Extension hash mismatch when validating '${file.name}'! Expected: '$expectedFileHash', got: '$downloadHash'.")
+                    }
+                }
+
+                // Verify file integrity: Must be a valid ZIP archive containing manifest.json
+                ZipFile(tempFile).use { zip ->
+                    val manifest = zip.getEntry("manifest.json")
+                    if (manifest == null) {
+                        tempFile.delete()
+                        throw IllegalStateException("Downloaded plugin '${file.name}' is missing manifest.json")
+                    }
+                }
+
+                // We prefer the operation to be atomic
+                try {
+                    Files.move(
+                        tempFile.toPath(),
+                        file.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE
+                    )
+                } catch (_: AtomicMoveNotSupportedException) {
+                    Files.move(
+                        tempFile.toPath(),
+                        file.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING
+                    )
+                }
+
+                file
+            } catch (t: Throwable) {
+                tempFile.delete()
+                throw t
+            }
         }
     }
 

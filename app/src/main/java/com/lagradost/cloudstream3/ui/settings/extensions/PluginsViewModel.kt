@@ -24,6 +24,8 @@ import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.Coroutines.main
 import com.lagradost.cloudstream3.utils.Coroutines.runOnMainThread
 import com.lagradost.cloudstream3.utils.Levenshtein
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.io.File
 
 /**
@@ -61,6 +63,7 @@ class PluginsViewModel : ViewModel() {
 
     companion object {
         private val repositoryCache: MutableMap<String, List<PluginWrapper>> = mutableMapOf()
+        private val batchDownloadSemaphore = Semaphore(3)
         const val TAG = "PLG"
 
         private fun isDownloaded(
@@ -124,14 +127,16 @@ class PluginsViewModel : ViewModel() {
                         )
                     }
                 }.amap { (_, repo, metadata) ->
-                    PluginManager.downloadPlugin(
-                        activity,
-                        metadata.url,
-                        metadata.fileHash,
-                        metadata.internalName,
-                        repo.url,
-                        metadata.status != PROVIDER_STATUS_DOWN
-                    )
+                    batchDownloadSemaphore.withPermit {
+                        PluginManager.downloadPlugin(
+                            activity,
+                            metadata.url,
+                            metadata.fileHash,
+                            metadata.internalName,
+                            repo.url,
+                            metadata.status != PROVIDER_STATUS_DOWN
+                        )
+                    }
                 }.main { list ->
                     if (list.any { it }) {
                         showToast(

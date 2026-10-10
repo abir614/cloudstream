@@ -149,12 +149,27 @@ class GeneratorPlayer : FullScreenPlayer() {
         const val STOP_ACTION = "stopcs3"
 
         private val generators = ConcurrentHashMap<String, VideoGenerator<*>>()
+        private const val MAX_CACHED_GENERATORS = 4
+
+        fun cleanupGenerator(uuid: String?) {
+            if (uuid != null) {
+                generators.remove(uuid)
+            }
+        }
+
         fun newInstance(
             generator: VideoGenerator<*>,
             index: Int,
             syncData: HashMap<String, String>? = null
         ): Bundle {
             Log.i(TAG, "newInstance = $syncData")
+            // Prune oldest generator if map exceeds capacity
+            if (generators.size >= MAX_CACHED_GENERATORS) {
+                val oldestKey = generators.keys().toList().firstOrNull()
+                if (oldestKey != null) {
+                    generators.remove(oldestKey)
+                }
+            }
             val uuid = UUID.randomUUID().toString()
             generators[uuid] = generator
             return Bundle().apply {
@@ -191,6 +206,7 @@ class GeneratorPlayer : FullScreenPlayer() {
 
     private var preferredAutoSelectSubtitles: String? = null // null means do nothing, "" means none
     private var hasAutoSelectedSubtitlesForCurrentPlayback: Boolean = false
+    private var playerUuid: String? = null
     private val allMeta: List<ResultEpisode>?
         get() = viewModel.state.generatorState?.allMeta?.filterIsInstance<ResultEpisode>()
             ?.map { episode ->
@@ -1844,6 +1860,9 @@ class GeneratorPlayer : FullScreenPlayer() {
         flushCurrentPositionToDisk()
         ResultFragment.updateUI()
         currentVerifyLink?.cancel()
+        if (activity?.isChangingConfigurations != true) {
+            cleanupGenerator(playerUuid)
+        }
         super.onDestroy()
     }
 
@@ -2368,6 +2387,7 @@ class GeneratorPlayer : FullScreenPlayer() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("index", viewModel.episodeIndex)
+        playerUuid?.let { outState.putString("uuid", it) }
         super.onSaveInstanceState(outState)
     }
 
@@ -2376,6 +2396,7 @@ class GeneratorPlayer : FullScreenPlayer() {
         sync = ViewModelProvider(this)[SyncViewModel::class.java]
 
         val uuid = savedInstanceState?.getString("uuid") ?: arguments?.getString("uuid")
+        playerUuid = uuid
         val index = savedInstanceState?.getInt("index") ?: arguments?.getInt("index")
         val generator = generators[uuid]
 

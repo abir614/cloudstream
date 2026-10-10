@@ -60,7 +60,9 @@ import com.lagradost.cloudstream3.utils.extractorApis
 import com.lagradost.cloudstream3.utils.txt
 import dalvik.system.PathClassLoader
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -302,21 +304,27 @@ object PluginManager {
 
         val updatedPlugins = mutableListOf<String>()
 
+        val updateSemaphore = Semaphore(3)
         outdatedPlugins.amap { pluginData ->
-            if (pluginData.isDisabled) {
-                //updatedPlugins.add(activity.getString(R.string.single_plugin_disabled, pluginData.onlineData.second.name))
-                unloadPlugin(pluginData.savedData.filePath)
-            } else if (pluginData.isOutdated) {
-                downloadPlugin(
-                    activity,
-                    pluginData.onlineData.plugin.url,
-                    pluginData.onlineData.plugin.fileHash,
-                    pluginData.savedData.internalName,
-                    File(pluginData.savedData.filePath),
-                    true
-                ).let { success ->
-                    if (success)
-                        updatedPlugins.add(pluginData.onlineData.plugin.name)
+            updateSemaphore.withPermit {
+                if (pluginData.isDisabled) {
+                    //updatedPlugins.add(activity.getString(R.string.single_plugin_disabled, pluginData.onlineData.second.name))
+                    unloadPlugin(pluginData.savedData.filePath)
+                } else if (pluginData.isOutdated) {
+                    downloadPlugin(
+                        activity,
+                        pluginData.onlineData.plugin.url,
+                        pluginData.onlineData.plugin.fileHash,
+                        pluginData.savedData.internalName,
+                        File(pluginData.savedData.filePath),
+                        true
+                    ).let { success ->
+                        if (success) {
+                            synchronized(updatedPlugins) {
+                                updatedPlugins.add(pluginData.onlineData.plugin.name)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -418,17 +426,23 @@ object PluginManager {
         }
         //Log.i(TAG, "notDownloadedPlugins => ${notDownloadedPlugins.toJson()}")
 
+        val downloadSemaphore = Semaphore(3)
         notDownloadedPlugins.amap { pluginData ->
-            downloadPlugin(
-                activity,
-                pluginData.onlineData.plugin.url,
-                pluginData.onlineData.plugin.fileHash,
-                pluginData.savedData.internalName,
-                pluginData.onlineData.repositoryData.url,
-                !pluginData.isDisabled
-            ).let { success ->
-                if (success)
-                    newDownloadPlugins.add(pluginData.onlineData.plugin.name)
+            downloadSemaphore.withPermit {
+                downloadPlugin(
+                    activity,
+                    pluginData.onlineData.plugin.url,
+                    pluginData.onlineData.plugin.fileHash,
+                    pluginData.savedData.internalName,
+                    pluginData.onlineData.repositoryData.url,
+                    !pluginData.isDisabled
+                ).let { success ->
+                    if (success) {
+                        synchronized(newDownloadPlugins) {
+                            newDownloadPlugins.add(pluginData.onlineData.plugin.name)
+                        }
+                    }
+                }
             }
         }
 
