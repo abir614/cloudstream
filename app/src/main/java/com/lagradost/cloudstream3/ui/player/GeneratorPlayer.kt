@@ -1599,7 +1599,7 @@ class GeneratorPlayer : FullScreenPlayer() {
                 context?.getString(R.string.switching_to_next_mirror)
             } ?: "Source failed. Switching to next mirror…"
             showToast(message, Toast.LENGTH_SHORT)
-            loadLink(nextLink.link, sameEpisode = true, resumePosition = lastPos)
+            nextMirror()
             return
         }
 
@@ -1645,9 +1645,9 @@ class GeneratorPlayer : FullScreenPlayer() {
         }
 
         val links = viewModel.state.sortLinks(currentQualityProfile)
+        val availableLinks = links.filter { it.shouldUseLink && !viewModel.state.erroredLinks.contains(it.link) }
 
-        val firstAvailableLink = links.firstOrNull { it.shouldUseLink }?.link
-        if (firstAvailableLink == null) {
+        if (availableLinks.isEmpty()) {
             noLinksFound()
             return
         }
@@ -1655,8 +1655,30 @@ class GeneratorPlayer : FullScreenPlayer() {
         if (!isPlayerActive.compareAndSet(false, true)) {
             return
         }
-        loadLink(firstAvailableLink, false)
-        showPlayerMetadata()
+
+        if (availableLinks.size == 1) {
+            loadLink(availableLinks.first().link, false)
+            showPlayerMetadata()
+            return
+        }
+
+        // Parallel mirror health & latency probe for fastest start
+        ioSafe {
+            val candidateVideoLinks = availableLinks.map { it.link }
+            val (bestLink, deadLinks) = StreamHealthProber.selectBestLinkWithDeadList(candidateVideoLinks)
+
+            if (deadLinks.isNotEmpty()) {
+                viewModel.modifyState {
+                    deadLinks.fold(this) { state, dead -> state.addError(dead) }
+                }
+            }
+
+            runOnMainThread {
+                val winningLink = bestLink ?: availableLinks.first().link
+                loadLink(winningLink, false)
+                showPlayerMetadata()
+            }
+        }
     }
 
     private fun showPlayerMetadata() {
@@ -1763,7 +1785,29 @@ class GeneratorPlayer : FullScreenPlayer() {
         }
 
         val resumePos = player.getPosition()?.takeIf { it > 0L } ?: getPos()
-        loadLink(nextLink.link, sameEpisode = true, resumePosition = resumePos)
+
+        val errored = viewModel.state.erroredLinks
+        val links = viewModel.state.sortLinks(currentQualityProfile)
+        val remainingUsable = links.filter { it.shouldUseLink && !errored.contains(it.link) && it.link != currentSelectedLink }
+
+        if (remainingUsable.size <= 1) {
+            loadLink(nextLink.link, sameEpisode = true, resumePosition = resumePos)
+            return
+        }
+
+        ioSafe {
+            val candidateVideoLinks = remainingUsable.map { it.link }
+            val (bestLink, deadLinks) = StreamHealthProber.selectBestLinkWithDeadList(candidateVideoLinks)
+            if (deadLinks.isNotEmpty()) {
+                viewModel.modifyState {
+                    deadLinks.fold(this) { state, dead -> state.addError(dead) }
+                }
+            }
+            runOnMainThread {
+                val winner = bestLink ?: nextLink.link
+                loadLink(winner, sameEpisode = true, resumePosition = resumePos)
+            }
+        }
     }
 
     override fun onDestroy() {
