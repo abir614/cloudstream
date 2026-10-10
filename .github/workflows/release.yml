@@ -82,26 +82,28 @@ jobs:
 
       - name: Determine Tag & Name
         id: release_meta
+        env:
+          INPUT_TAG_NAME: ${{ inputs.tag_name }}
+          INPUT_RELEASE_NAME: ${{ inputs.release_name }}
+          INPUT_BODY: ${{ inputs.body }}
         run: |
           COUNT=$(git rev-list --count HEAD)
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag_name }}" ]; then
-            TAG="${{ inputs.tag_name }}"
-            TITLE="${{ inputs.release_name }}"
-            [ -z "$TITLE" ] && TITLE="CloudStream Hardened Edition ${TAG}"
-            BODY="${{ inputs.body }}"
-            [ -z "$BODY" ] && BODY="Official Stable Release ${TAG} featuring Z+ zero-trust sandbox isolation, native Rust core, and cryptographic update verification."
-          elif [ "${{ github.ref_type }}" = "tag" ]; then
-            TAG="${{ github.ref_name }}"
-            TITLE="CloudStream Hardened Edition ${TAG}"
-            BODY="Official Stable Release ${TAG}"
-          else
-            TAG="v${COUNT}"
-            TITLE="CloudStream Hardened Edition v${COUNT}"
-            BODY="Official Stable Release v${COUNT} featuring Z+ zero-trust sandbox isolation, native Rust core, and cryptographic update verification."
-          fi
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          echo "title=${TITLE}" >> $GITHUB_OUTPUT
-          echo "body=${BODY}" >> $GITHUB_OUTPUT
+          TAG="${INPUT_TAG_NAME}"
+          [ -z "$TAG" ] && [ "${GITHUB_REF_TYPE}" = "tag" ] && TAG="${GITHUB_REF_NAME}"
+          [ -z "$TAG" ] && TAG="v${COUNT}"
+
+          TITLE="${INPUT_RELEASE_NAME}"
+          [ -z "$TITLE" ] && TITLE="CloudStream Hardened Edition ${TAG}"
+
+          BODY="${INPUT_BODY}"
+          [ -z "$BODY" ] && BODY="Official Stable Release ${TAG} featuring Z+ zero-trust sandbox isolation, native Rust core, and cryptographic update verification."
+
+          DELIMITER=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "title=${TITLE}" >> "$GITHUB_OUTPUT"
+          echo "body<<${DELIMITER}" >> "$GITHUB_OUTPUT"
+          echo "${BODY}" >> "$GITHUB_OUTPUT"
+          echo "${DELIMITER}" >> "$GITHUB_OUTPUT"
 
       - name: Run Gradle (Assemble Stable Release)
         run: ./gradlew assembleStableRelease androidSourcesJar makeJar
@@ -123,11 +125,13 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ steps.release_meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: ${{ steps.release_meta.outputs.title }}
           body: ${{ steps.release_meta.outputs.body }}
           draft: false
           prerelease: false
           make_latest: true
+          fail_on_unmatched_files: false
           files: |
             app/build/outputs/apk/stable/release/*.apk
             app/build/libs/app-sources.jar

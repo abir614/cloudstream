@@ -128,9 +128,12 @@ object InAppUpdater {
         val foundList = response.filter { rel ->
             !rel.prerelease
         }.sortedWith(compareBy { release ->
-            release.assets.firstOrNull { it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk") }?.name?.let { fileName ->
-                parseVersionScore(extractVersionFromFileName(fileName))
-            } ?: 0L
+            val tagScore = parseVersionScore(release.tagName)
+            if (tagScore > 0L) tagScore else {
+                release.assets.firstOrNull { it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk") }?.name?.let { fileName ->
+                    parseVersionScore(extractVersionFromFileName(fileName))
+                } ?: 0L
+            }
         }).toList()
 
         val found = foundList.lastOrNull() ?: return Update(false, null, null, null, null)
@@ -152,7 +155,11 @@ object InAppUpdater {
         } ?: apkAssets.firstOrNull { it.name.contains("universal") }
           ?: apkAssets.first()
 
-        val remoteVersionStr = extractVersionFromFileName(foundAsset.name)
+        val remoteVersionStr = if (parseVersionScore(found.tagName) > 0L) {
+            found.tagName
+        } else {
+            extractVersionFromFileName(foundAsset.name)
+        }
         val remoteScore = parseVersionScore(remoteVersionStr)
 
         val currentVersion = packageName?.let {
