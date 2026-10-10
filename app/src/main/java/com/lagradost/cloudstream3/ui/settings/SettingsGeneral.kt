@@ -342,7 +342,7 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
             val prefValues = resources.getIntArray(R.array.dns_pref_values)
 
             val currentDns =
-                settingsManager.getInt(getString(R.string.dns_key), 0)
+                settingsManager.getInt(getString(R.string.dns_key), 10)
 
             activity?.showBottomDialog(
                 prefNames.toList(),

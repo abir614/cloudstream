@@ -190,6 +190,7 @@ class GeneratorPlayer : FullScreenPlayer() {
     private var savedResumePosition: Long? = null
 
     private var preferredAutoSelectSubtitles: String? = null // null means do nothing, "" means none
+    private var hasAutoSelectedSubtitlesForCurrentPlayback: Boolean = false
     private val allMeta: List<ResultEpisode>?
         get() = viewModel.state.generatorState?.allMeta?.filterIsInstance<ResultEpisode>()
             ?.map { episode ->
@@ -200,6 +201,9 @@ class GeneratorPlayer : FullScreenPlayer() {
             }
 
     private fun setSubtitles(subtitle: SubtitleData?, userInitiated: Boolean): Boolean {
+        if (userInitiated) {
+            hasAutoSelectedSubtitlesForCurrentPlayback = true
+        }
         // If subtitle is changed and user initiated -> Save the language
         if (subtitle != currentSelectedSubtitles && userInitiated) {
             val subtitleLanguageTagIETF = if (subtitle == null) {
@@ -521,8 +525,10 @@ class GeneratorPlayer : FullScreenPlayer() {
         //  setEpisodes(viewModel.getAllMeta() ?: emptyList())
         setPlayerDimen(null)
         setTitle()
-        if (!sameEpisode)
+        if (!sameEpisode) {
             hasRequestedStamps = false
+            hasAutoSelectedSubtitlesForCurrentPlayback = false
+        }
 
         loadExtractorJob(link.first)
         // load player
@@ -534,6 +540,13 @@ class GeneratorPlayer : FullScreenPlayer() {
             } else {
                 if (isNextEpisode) 0L else getPos()
             }
+            val initialSub = (if (sameEpisode) currentSelectedSubtitles else null) ?: getAutoSelectSubtitle(
+                subtitles, settings = true, downloads = true
+            )
+            if (initialSub != null) {
+                currentSelectedSubtitles = initialSub
+                hasAutoSelectedSubtitlesForCurrentPlayback = true
+            }
             player.loadPlayer(
                 ctx,
                 sameEpisode,
@@ -541,9 +554,7 @@ class GeneratorPlayer : FullScreenPlayer() {
                 uri,
                 startPosition = targetStartPos,
                 subtitles,
-                (if (sameEpisode) currentSelectedSubtitles else null) ?: getAutoSelectSubtitle(
-                    subtitles, settings = true, downloads = true
-                ),
+                initialSub,
                 autoPlay = if (sameEpisode) true else null,
                 preview = true
             )
@@ -1947,8 +1958,8 @@ class GeneratorPlayer : FullScreenPlayer() {
                     player.saveData()
                     player.reloadPlayer(ctx)
                     player.handleEvent(CSPlayerEvent.Play)
-                    return true
                 }
+                return true
             } else if (!langCode.isNullOrEmpty()) {
                 getAutoSelectSubtitle(
                     viewModel.state.subtitles, settings = true, downloads = false
@@ -1957,35 +1968,38 @@ class GeneratorPlayer : FullScreenPlayer() {
                         player.saveData()
                         player.reloadPlayer(ctx)
                         player.handleEvent(CSPlayerEvent.Play)
-                        return true
                     }
+                    return true
                 }
             }
         }
         return false
     }
 
-    private fun autoSelectFromDownloads() {
+    private fun autoSelectFromDownloads(): Boolean {
         if (player.getCurrentPreferredSubtitle() != null) {
-            return
+            return false
         }
         val sub =
             getAutoSelectSubtitle(viewModel.state.subtitles, settings = false, downloads = true)
-                ?: return
-        val ctx = context ?: return
+                ?: return false
+        val ctx = context ?: return false
         if (!setSubtitles(sub, false)) {
-            return
+            return false
         }
         player.saveData()
         player.reloadPlayer(ctx)
         player.handleEvent(CSPlayerEvent.Play)
+        return true
     }
 
     private fun autoSelectSubtitles() {
-        //Log.i(TAG, "autoSelectSubtitles")
+        if (hasAutoSelectedSubtitlesForCurrentPlayback) return
         safe {
-            if (!autoSelectFromSettings()) {
-                autoSelectFromDownloads()
+            if (autoSelectFromSettings()) {
+                hasAutoSelectedSubtitlesForCurrentPlayback = true
+            } else if (autoSelectFromDownloads()) {
+                hasAutoSelectedSubtitlesForCurrentPlayback = true
             }
         }
     }
@@ -2337,6 +2351,7 @@ class GeneratorPlayer : FullScreenPlayer() {
     fun releasePlayer() {
         player.release()
         currentSelectedSubtitles = null
+        hasAutoSelectedSubtitlesForCurrentPlayback = false
         currentSelectedLink = null
         isPlayerActive.set(false)
         binding?.overlayLoadingSkipButton?.isVisible = false

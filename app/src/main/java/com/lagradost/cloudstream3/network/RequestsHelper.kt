@@ -41,7 +41,7 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
     safe { Security.insertProviderAt(Conscrypt.newProvider(), 1) }
 
     val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
-    val dns = settingsManager.getInt(context.getString(R.string.dns_key), 0)
+    val dns = settingsManager.getInt(context.getString(R.string.dns_key), 10)
 
     val maxHeap = Runtime.getRuntime().maxMemory()
     val isPotato = maxHeap <= 192 * 1024 * 1024L

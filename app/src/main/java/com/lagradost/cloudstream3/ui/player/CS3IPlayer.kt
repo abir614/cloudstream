@@ -771,7 +771,7 @@ class CS3IPlayer : IPlayer {
             // Returning null forces ExoPlayer to route through OkHttpDataSource(app.baseClient),
             // strictly honoring the user's configured DoH provider.
             val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
-            val dns = settingsManager.getInt(context.getString(R.string.dns_key), 0)
+            val dns = settingsManager.getInt(context.getString(R.string.dns_key), 10)
             if (dns != 0) {
                 if (cronetEngine != null) {
                     try {
@@ -1619,11 +1619,10 @@ class CS3IPlayer : IPlayer {
                         else -> false
                     }
 
-                    // If a transient network glitch occurs mid-playback (duration is known), retry in place
-                    // up to 3 times before abandoning mirror. This absorbs momentary packet drops.
+                    // If a transient network glitch occurs during handshake or mid-playback, retry in place
+                    // up to 3 times before abandoning mirror. This absorbs momentary packet drops and initial socket timeouts.
                     when {
                         isTransientNetworkError
-                                && exoPlayer?.duration != TIME_UNSET
                                 && networkRetryCount < 3 -> {
                             networkRetryCount++
                             Log.w(TAG, "Transient network error ($networkRetryCount/3), auto-recovering playback: ${error.message}")
