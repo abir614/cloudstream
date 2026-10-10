@@ -1579,6 +1579,7 @@ class GeneratorPlayer : FullScreenPlayer() {
         val referer = currentSelectedLink?.first?.referer ?: "none"
         val lastPos = player.getPosition()?.takeIf { it > 0L } ?: getPos()
         savedResumePosition = lastPos
+        flushCurrentPositionToDisk()
         Log.e(
             TAG,
             "playerError: $currentSelectedLink, " +
@@ -1810,7 +1811,30 @@ class GeneratorPlayer : FullScreenPlayer() {
         }
     }
 
+    private var lastViewPosDiskSaveMs: Long = 0L
+
+    private fun flushCurrentPositionToDisk() {
+        val pos = player.getPosition()?.takeIf { it > 0L } ?: getPos()
+        val dur = player.getDuration()?.takeIf { it > 0L } ?: 0L
+        if (dur > 0L) {
+            DataStoreHelper.setViewPosAndResume(
+                viewModel.state.generatorState?.id,
+                pos,
+                dur,
+                currentMeta,
+                nextMeta,
+                writeToDisk = true
+            )
+        }
+    }
+
+    override fun onStop() {
+        flushCurrentPositionToDisk()
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        flushCurrentPositionToDisk()
         ResultFragment.updateUI()
         currentVerifyLink?.cancel()
         super.onDestroy()
@@ -1841,12 +1865,19 @@ class GeneratorPlayer : FullScreenPlayer() {
 
         val percentage = position * 100L / duration
 
+        val now = System.currentTimeMillis()
+        val shouldSaveToDisk = (now - lastViewPosDiskSaveMs >= 5000L)
+        if (shouldSaveToDisk) {
+            lastViewPosDiskSaveMs = now
+        }
+
         DataStoreHelper.setViewPosAndResume(
             viewModel.state.generatorState?.id,
             position,
             duration,
             currentMeta,
-            nextMeta
+            nextMeta,
+            writeToDisk = shouldSaveToDisk
         )
 
         var isOpVisible = false

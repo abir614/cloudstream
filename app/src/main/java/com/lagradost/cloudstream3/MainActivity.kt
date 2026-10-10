@@ -1664,6 +1664,38 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         SearchResultBuilder.updateCache(this)
 
         ioSafe {
+            // Cold-Boot Zombie Storage Purge:
+            // Cleans up orphaned files left behind by prior sessions where onDestroy was bypassed by LMK/swipe.
+            try {
+                val pendingDelete = filesToDelete
+                if (pendingDelete.isNotEmpty()) {
+                    filesToDelete = emptySet()
+                    pendingDelete.forEach { path ->
+                        try {
+                            val file = File(path)
+                            if (file.exists()) {
+                                file.deleteRecursively()
+                                Log.d(TAG, "Cold-boot purged orphaned file: $path")
+                            }
+                        } catch (t: Throwable) {
+                            Log.w(TAG, "Failed to purge orphaned file: $path", t)
+                        }
+                    }
+                }
+
+                // Also auto-purge abandoned .tmp and .apk update files in cacheDir older than 24h
+                val now = System.currentTimeMillis()
+                val oneDayMs = 24 * 60 * 60 * 1000L
+                cacheDir.listFiles()?.forEach { file ->
+                    if (file.isFile && (file.extension == "tmp" || file.extension == "apk")) {
+                        if (now - file.lastModified() > oneDayMs) {
+                            file.delete()
+                            Log.d(TAG, "Cold-boot purged stale temporary file: ${file.name}")
+                        }
+                    }
+                }
+            } catch (_: Throwable) {}
+
             initAll()
             // No duplicates (which can happen by registerMainAPI)
             apis = allProviders.distinctBy { it }

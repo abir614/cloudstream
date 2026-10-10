@@ -157,18 +157,27 @@ object APIHolder {
 
     fun getApiFromNameNull(apiName: String?): MainAPI? {
         if (apiName == null) return null
-        return allProviders.withLock {
-            initMap()
-            apis.withLock {
-                apiMap?.get(apiName)?.let { apis.getOrNull(it) }
-                // Leave the ?. null check, it can crash regardless
-                ?: allProviders.firstOrNull { it.name == apiName }
+        // 1. Check apis under apis lock
+        apis.withLock {
+            if (apiMap == null) {
+                apiMap = apis.mapIndexed { index, api -> api.name to index }.toMap()
             }
+            apiMap?.get(apiName)?.let { apis.getOrNull(it) }
+                ?: apis.firstOrNull { it.name == apiName }
+        }?.let { return it }
+
+        // 2. Decoupled fallback to allProviders under allProviders lock (no nested locking)
+        return allProviders.withLock {
+            allProviders.firstOrNull { it.name == apiName }
         }
     }
 
     fun getApiFromUrlNull(url: String?): MainAPI? {
         if (url == null) return null
+        apis.withLock {
+            apis.firstOrNull { url.startsWith(it.mainUrl) }
+        }?.let { return it }
+
         return allProviders.withLock {
             allProviders.firstOrNull { url.startsWith(it.mainUrl) }
         }

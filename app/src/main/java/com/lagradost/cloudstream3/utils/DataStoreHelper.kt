@@ -625,17 +625,27 @@ object DataStoreHelper {
 
     fun getFavoritesData(id: Int?): FavoritesData? = null
 
-    fun setViewPos(id: Int?, pos: Long, dur: Long) {
+    fun setViewPos(id: Int?, pos: Long, dur: Long, writeToDisk: Boolean = true) {
         if (id == null || dur < 30_000) return
         sessionPosDur[id] = PosDur(pos, dur)
-        setKey("$currentAccount/$VIDEO_POS_DUR", id.toString(), PosDur(pos, dur))
+        if (writeToDisk) {
+            setKey("$currentAccount/$VIDEO_POS_DUR", id.toString(), PosDur(pos, dur))
+        }
     }
 
     /**
      * Sets the position, duration, and resume data of an episode/movie with persistent local state
      */
-    fun setViewPosAndResume(id: Int?, position: Long, duration: Long, currentEpisode: Any?, nextEpisode: Any?) {
-        setViewPos(id, position, duration)
+    fun setViewPosAndResume(
+        id: Int?,
+        position: Long,
+        duration: Long,
+        currentEpisode: Any?,
+        nextEpisode: Any?,
+        writeToDisk: Boolean = true
+    ) {
+        setViewPos(id, position, duration, writeToDisk)
+        if (!writeToDisk) return
         if (id != null) {
             when (val meta = currentEpisode) {
                 is ResultEpisode -> {
