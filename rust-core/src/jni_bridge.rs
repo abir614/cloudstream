@@ -408,4 +408,186 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     }
 }
 
+/// JNI bridge to parse HLS Master Playlists into structured JSON in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeParseM3u8Master(
+    mut env: JNIEnv,
+    _class: JClass,
+    content_input: JString,
+    base_url_input: JString,
+) -> jstring {
+    let content: String = match env.get_string(&content_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let base_url: Option<String> = if !base_url_input.is_null() {
+        env.get_string(&base_url_input).ok().map(|s| s.into())
+    } else {
+        None
+    };
+
+    let streams = crate::media::m3u8::parse_master_playlist(&content, base_url.as_deref());
+    match serde_json::to_string(&streams) {
+        Ok(json) => match env.new_string(json) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to parse IPTV M3U/M3U8 playlists into structured JSON in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeParseIptv(
+    mut env: JNIEnv,
+    _class: JClass,
+    content_input: JString,
+) -> jstring {
+    let content: String = match env.get_string(&content_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let channels = crate::media::m3u8::parse_iptv_playlist(&content);
+    match serde_json::to_string(&channels) {
+        Ok(json) => match env.new_string(json) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to unpack Dean Edwards packed JavaScript in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeUnpackJs(
+    mut env: JNIEnv,
+    _class: JClass,
+    script_input: JString,
+) -> jstring {
+    let script: String = match env.get_string(&script_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match crate::extractors::unpacker::unpack_dean_edwards(&script) {
+        Some(unpacked) => match env.new_string(unpacked) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        None => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to extract video stream URLs from raw strings in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeExtractStreamUrls(
+    mut env: JNIEnv,
+    _class: JClass,
+    content_input: JString,
+) -> jstring {
+    let content: String = match env.get_string(&content_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let urls = crate::extractors::unpacker::extract_stream_urls(&content);
+    match serde_json::to_string(&urls) {
+        Ok(json) => match env.new_string(json) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to extract media links (<iframe src>, <video src>, <source src>) from HTML in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeExtractMediaLinks(
+    mut env: JNIEnv,
+    _class: JClass,
+    html_input: JString,
+) -> jstring {
+    let html: String = match env.get_string(&html_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let links = crate::extractors::html::extract_media_links(&html);
+    match serde_json::to_string(&links) {
+        Ok(json) => match env.new_string(json) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to extract script JSON variables from HTML in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeExtractScriptJson(
+    mut env: JNIEnv,
+    _class: JClass,
+    html_input: JString,
+    variable_input: JString,
+) -> jstring {
+    let html: String = match env.get_string(&html_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let variable: String = match env.get_string(&variable_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match crate::extractors::html::extract_script_json(&html, &variable) {
+        Some(json) => match env.new_string(json) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        None => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to calculate Levenshtein fuzzy similarity score (0 to 100) in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeFuzzyRatio(
+    mut env: JNIEnv,
+    _class: JClass,
+    s1_input: JString,
+    s2_input: JString,
+) -> jni::sys::jint {
+    let s1: String = match env.get_string(&s1_input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let s2: String = match env.get_string(&s2_input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+
+    crate::search::levenshtein::fuzzy_ratio(&s1, &s2) as jni::sys::jint
+}
+
+/// JNI bridge to calculate exact Levenshtein edit distance in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeLevenshtein(
+    mut env: JNIEnv,
+    _class: JClass,
+    s1_input: JString,
+    s2_input: JString,
+) -> jni::sys::jint {
+    let s1: String = match env.get_string(&s1_input) {
+        Ok(s) => s.into(),
+        Err(_) => return -1,
+    };
+    let s2: String = match env.get_string(&s2_input) {
+        Ok(s) => s.into(),
+        Err(_) => return -1,
+    };
+
+    crate::search::levenshtein::levenshtein_distance(&s1, &s2) as jni::sys::jint
+}
+
+
 

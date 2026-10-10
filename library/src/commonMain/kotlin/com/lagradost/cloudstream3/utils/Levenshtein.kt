@@ -29,9 +29,12 @@ import kotlin.math.round
 
 // Taken from https://github.com/terrakok/FuzzyKot/blob/f794d43/fuzzykot/src/commonMain/kotlin/com/github/terrakok/fuzzykot/Levenshtein.kt
 object Levenshtein {
+    var nativeFuzzyRatioProvider: ((String, String) -> Int?)? = null
+
     fun ratio(s1: String, s2: String, processor: (String) -> String = { it }): Int {
         val p1 = processor(s1)
         val p2 = processor(s2)
+        nativeFuzzyRatioProvider?.invoke(p1, p2)?.let { return it }
         return round(100 * basicRatio(p1, p2)).toInt()
     }
 

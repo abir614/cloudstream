@@ -40,6 +40,7 @@ class M3u8Helper {
 
 object M3u8Helper2 {
     private val TAG = "M3u8Helper"
+    var nativeM3u8Parser: ((String, String?) -> List<M3u8Helper.M3u8Stream>?)? = null
 
     private val aesCbc = CryptographyProvider.Default.get(AES.CBC)
 
@@ -137,6 +138,15 @@ object M3u8Helper2 {
     ): List<M3u8Helper.M3u8Stream> {
         val list = mutableListOf<M3u8Helper.M3u8Stream>()
         val response = app.get(m3u8.streamUrl, headers = m3u8.headers, verify = false).text
+
+        // Ultra-fast native Rust M3U8 Master parser
+        val nativeStreams = nativeM3u8Parser?.invoke(response, m3u8.streamUrl)
+        if (!nativeStreams.isNullOrEmpty()) {
+            list.addAll(nativeStreams)
+            if (returnThis) list += m3u8
+            return list
+        }
+
         val parsed = HlsPlaylistParser.parse(m3u8.streamUrl, response)
 
         var anyFound = false

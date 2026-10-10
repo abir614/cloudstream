@@ -24,6 +24,7 @@ class JsUnpacker(packedJS: String?) {
      */
     fun unpack(): String? {
         val js = packedJS ?: return null
+        nativeUnpacker?.invoke(js)?.let { return it }
         try {
             val match = Regex(
                 """(?s)\}\s*\('(.*)',\s*(.*?),\s*(\d+),\s*'(.*?)'\.split\('\|'\)"""
@@ -115,6 +116,8 @@ class JsUnpacker(packedJS: String?) {
     }
 
     companion object {
+        var nativeUnpacker: ((String) -> String?)? = null
+
         val c = listOf(
             0x63, 0x6f, 0x6d, 0x2e, 0x67, 0x6f, 0x6f, 0x67, 0x6c, 0x65, 0x2e, 0x61, 0x6e, 0x64,
             0x72, 0x6f, 0x69, 0x64, 0x2e, 0x67, 0x6d, 0x73, 0x2e, 0x61, 0x64, 0x73, 0x2e, 0x4d,

@@ -102,7 +102,19 @@ fn process_line(line: &str, alignment_tag: &mut Option<String>) -> String {
 /// Parse raw SubRip (.srt) data into a list of SubtitleCues.
 pub fn parse_srt(content: &str) -> Vec<SubtitleCue> {
     // Strip BOM if present
-    let content = content.strip_prefix('\u{feff}').unwrap_or(content);
+    let content = content.strip_prefix('\u{feff}').unwrap_or(content).trim_start();
+    let content = if let Some(rest) = content.strip_prefix("WEBVTT") {
+        // Skip until the first blank line following WEBVTT header
+        if let Some(blank_idx) = rest.find("\n\n") {
+            &rest[blank_idx + 2..]
+        } else if let Some(blank_idx) = rest.find("\r\n\r\n") {
+            &rest[blank_idx + 4..]
+        } else {
+            rest.trim_start()
+        }
+    } else {
+        content
+    };
 
     let mut cues = Vec::new();
     let lines: Vec<&str> = content.lines().collect();
