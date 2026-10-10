@@ -19,11 +19,19 @@ import com.lagradost.cloudstream3.ui.APIRepository
 import com.lagradost.cloudstream3.ui.home.HomeViewModel
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.DataStoreHelper.currentAccount
+import com.lagradost.cloudstream3.utils.Levenshtein
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 
 data class ExpandableSearchList(
@@ -62,7 +70,7 @@ class SearchViewModel : ViewModel() {
     /** Save which providers can searched again and which search result page they are on.
      * Maps provider name to search list.
      * @see [HomeViewModel.expandable] */
-    private val expandableSearches: MutableMap<String, ExpandableSearchList> = mutableMapOf()
+    private val expandableSearches: MutableMap<String, ExpandableSearchList> = ConcurrentHashMap()
 
     private var currentSearchIndex = 0
     private var onGoingSearch: Job? = null
@@ -155,8 +163,8 @@ class SearchViewModel : ViewModel() {
                 current.hasNext = false
             }
 
-            _searchResponse.postValue(Resource.Success(bundleSearch(expandableSearches)))
-            _currentSearch.postValue(expandableSearches)
+            _searchResponse.postValue(Resource.Success(bundleSearch(expandableSearches.toMap(), query)))
+            _currentSearch.postValue(expandableSearches.toMap())
         }
 
         lock -= name
@@ -169,16 +177,50 @@ class SearchViewModel : ViewModel() {
         )
     }
 
-    private fun bundleSearch(lists: MutableMap<String, ExpandableSearchList>): ExpandableSearchList {
-        if (lists.size == 1) {
+    private fun calculateRelevance(title: String, query: String): Int {
+        val cleanTitle = title.trim().lowercase()
+        val cleanQuery = query.trim().lowercase()
+        if (cleanTitle == cleanQuery) return 1000
+
+        val normTitle = cleanTitle.filter { it.isLetterOrDigit() }
+        val normQuery = cleanQuery.filter { it.isLetterOrDigit() }
+        if (normTitle.isNotEmpty() && normTitle == normQuery) return 950
+
+        if (cleanTitle.startsWith(cleanQuery)) {
+            val lengthRatio = (cleanQuery.length.toFloat() / cleanTitle.length.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+            return 800 + (lengthRatio * 100).toInt()
+        }
+
+        if (cleanTitle.contains(cleanQuery)) {
+            val lengthRatio = (cleanQuery.length.toFloat() / cleanTitle.length.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+            return 600 + (lengthRatio * 100).toInt()
+        }
+
+        val queryWords = cleanQuery.split(" ").filter { it.isNotBlank() }
+        if (queryWords.size > 1 && queryWords.all { cleanTitle.contains(it) }) {
+            return 500
+        }
+
+        // Fuzzy similarity via Levenshtein (accelerated by native Rust core if loaded)
+        val fuzzyScore = Levenshtein.ratio(cleanQuery, cleanTitle)
+        return (fuzzyScore * 4).coerceAtMost(400)
+    }
+
+    private fun bundleSearch(
+        lists: Map<String, ExpandableSearchList>,
+        query: String? = lastQuery
+    ): ExpandableSearchList {
+        if (lists.isEmpty()) {
+            return ExpandableSearchList(emptyList(), 1, false)
+        }
+        if (lists.size == 1 && query.isNullOrBlank()) {
             return lists.values.first()
         }
 
         val list = ArrayList<SearchResponse>()
-        val nestedList =
-            lists.map { it.value.list }
+        val nestedList = lists.values.map { it.list }
 
-        // I do it this way to move the relevant search results to the top
+        // Interleave across providers to ensure fair provider distribution
         var index = 0
         while (true) {
             var added = 0
@@ -192,7 +234,17 @@ class SearchViewModel : ViewModel() {
             index++
         }
 
-        return ExpandableSearchList(list, 1, false)
+        if (query.isNullOrBlank()) {
+            return ExpandableSearchList(list, 1, false)
+        }
+
+        // Rank by multi-tier relevance score descending, breaking ties by shorter title
+        val sortedList = list.sortedWith(
+            compareByDescending<SearchResponse> { calculateRelevance(it.name, query) }
+                .thenBy { it.name.length }
+        )
+
+        return ExpandableSearchList(sortedList, 1, false)
     }
 
     private fun search(
@@ -229,26 +281,55 @@ class SearchViewModel : ViewModel() {
             lastQuery = query
 
             withContext(Dispatchers.IO) { // This interrupts UI otherwise
-                repos.filter { a ->
-                    (ignoreSettings || (providersActive.isEmpty() || providersActive.contains(a.name))) && (!isQuickSearch || a.hasQuickSearch)
-                }.amap { a -> // Parallel
-                    val search = if (isQuickSearch) a.quickSearch(query) else a.search(query, 1)
-                    if (currentSearchIndex != currentIndex) return@amap
-                    if (search is Resource.Success) {
-                        val searchValue = search.value
-                        expandableSearches[a.name] =
-                            ExpandableSearchList(searchValue.items, 1, searchValue.hasNext)
-                    }
+                // Adaptive hardware concurrency gate based on available device JVM heap RAM
+                val maxConcurrent = when {
+                    Runtime.getRuntime().maxMemory() <= 192 * 1024 * 1024L -> 4 // <= 192MB JVM heap (1GB RAM potato devices)
+                    Runtime.getRuntime().maxMemory() <= 384 * 1024 * 1024L -> 6 // mid-tier TV sticks / phones
+                    else -> 10 // modern high-end devices
+                }
+                val semaphore = Semaphore(maxConcurrent)
 
-                    _currentSearch.postValue(expandableSearches)
+                val targets = repos.filter { a ->
+                    (ignoreSettings || (providersActive.isEmpty() || providersActive.contains(a.name))) && (!isQuickSearch || a.hasQuickSearch)
+                }
+
+                var lastProgressivePostMs = 0L
+
+                coroutineScope {
+                    targets.map { a ->
+                        async {
+                            semaphore.withPermit {
+                                if (currentSearchIndex != currentIndex || !isActive) return@async
+                                val search = if (isQuickSearch) a.quickSearch(query) else a.search(query, 1)
+                                if (currentSearchIndex != currentIndex || !isActive) return@async
+                                if (search is Resource.Success) {
+                                    val searchValue = search.value
+                                    expandableSearches[a.name] =
+                                        ExpandableSearchList(searchValue.items, 1, searchValue.hasNext)
+
+                                    val snapshot = expandableSearches.toMap()
+                                    _currentSearch.postValue(snapshot)
+
+                                    // Progressive batch update for search grid (debounced every 350ms)
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastProgressivePostMs >= 350L) {
+                                        lastProgressivePostMs = now
+                                        val partialList = bundleSearch(snapshot, query)
+                                        _searchResponse.postValue(Resource.Success(partialList))
+                                    }
+                                }
+                            }
+                        }
+                    }.awaitAll()
                 }
 
                 if (currentSearchIndex != currentIndex) return@withContext // this should prevent rewrite of existing data bug
 
-                _currentSearch.postValue(expandableSearches)
-                val list = bundleSearch(expandableSearches)
+                val finalSnapshot = expandableSearches.toMap()
+                _currentSearch.postValue(finalSnapshot)
+                val finalList = bundleSearch(finalSnapshot, query)
 
-                _searchResponse.postValue(Resource.Success(list))
+                _searchResponse.postValue(Resource.Success(finalList))
             }
         }
 }
