@@ -156,6 +156,7 @@ class ApkInstaller(private val service: PackageInstallerService) {
         registerInstallActionReceiver()
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private fun registerInstallActionReceiver() {
         if (!isReceiverRegistered) {
             val intentFilter = IntentFilter().apply {
