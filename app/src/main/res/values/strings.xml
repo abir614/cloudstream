@@ -810,4 +810,6 @@
         <item quantity="other">%d downloads queued</item>
     </plurals>
     <string name="player_is_live">Live</string>
+    <string name="switching_to_next_mirror">Source failed. Switching to next mirror&#8230;</string>
+    <string name="switching_to_mirror_format">Source failed. Switching to %s&#8230;</string>
 </resources>

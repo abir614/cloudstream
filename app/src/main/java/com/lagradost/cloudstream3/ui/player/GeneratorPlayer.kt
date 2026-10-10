@@ -186,6 +186,8 @@ class GeneratorPlayer : FullScreenPlayer() {
 
     private var isPlayerActive: AtomicBoolean = AtomicBoolean(false)
     private var isNextEpisode: Boolean = false // this is used to reset the watch time
+    private var isWaitingForMirror: Boolean = false
+    private var savedResumePosition: Long? = null
 
     private var preferredAutoSelectSubtitles: String? = null // null means do nothing, "" means none
     private val allMeta: List<ResultEpisode>?
@@ -497,7 +499,7 @@ class GeneratorPlayer : FullScreenPlayer() {
         }
     }
 
-    private fun loadLink(link: VideoLink?, sameEpisode: Boolean) {
+    private fun loadLink(link: VideoLink?, sameEpisode: Boolean, resumePosition: Long? = null) {
         if (link == null) return
         isPlayerActive.set(true)
         // manage UI
@@ -527,18 +529,22 @@ class GeneratorPlayer : FullScreenPlayer() {
         context?.let { ctx ->
             val (url, uri) = link
             val subtitles = viewModel.state.subtitles
+            val targetStartPos = resumePosition ?: if (sameEpisode) {
+                player.getPosition()?.takeIf { it > 0L } ?: getPos()
+            } else {
+                if (isNextEpisode) 0L else getPos()
+            }
             player.loadPlayer(
                 ctx,
                 sameEpisode,
                 url,
                 uri,
-                startPosition = if (sameEpisode) null else {
-                    if (isNextEpisode) 0L else getPos()
-                },
+                startPosition = targetStartPos,
                 subtitles,
                 (if (sameEpisode) currentSelectedSubtitles else null) ?: getAutoSelectSubtitle(
                     subtitles, settings = true, downloads = true
                 ),
+                autoPlay = if (sameEpisode) true else null,
                 preview = true
             )
         }
@@ -1571,15 +1577,39 @@ class GeneratorPlayer : FullScreenPlayer() {
             currentSelectedLink?.let { it.first?.url ?: it.second?.uri?.toString() } ?: "unknown"
         val headers = currentSelectedLink?.first?.headers?.toString() ?: "none"
         val referer = currentSelectedLink?.first?.referer ?: "none"
+        val lastPos = player.getPosition()?.takeIf { it > 0L } ?: getPos()
+        savedResumePosition = lastPos
         Log.e(
             TAG,
             "playerError: $currentSelectedLink, " +
                     "type=${exception::class.qualifiedName}, " +
                     "message=${exception.message}, url=$currentUrl, headers=$headers, " +
-                    "referer=$referer, position=${player.getPosition() ?: "unknown"}, " +
+                    "referer=$referer, position=$lastPos, " +
                     "duration=${player.getDuration() ?: "unknown"}, " +
                     "isPlaying=${player.getIsPlaying()}", exception
         )
+
+        val nextLink = getNextLink()
+        if (nextLink != null) {
+            Log.i(TAG, "Zero-Stall Auto-Failover: Switching to next mirror -> ${nextLink.link.first?.name ?: nextLink.link.first?.url}")
+            val mirrorName = nextLink.link.first?.name
+            val message = if (!mirrorName.isNullOrBlank()) {
+                context?.getString(R.string.switching_to_mirror_format, mirrorName)
+            } else {
+                context?.getString(R.string.switching_to_next_mirror)
+            } ?: "Source failed. Switching to next mirror…"
+            showToast(message, Toast.LENGTH_SHORT)
+            loadLink(nextLink.link, sameEpisode = true, resumePosition = lastPos)
+            return
+        }
+
+        // If no mirror is available right now, but scraping is still ongoing:
+        if (viewModel.state.loading is Resource.Loading) {
+            Log.i(TAG, "Zero-Stall Auto-Failover: All current mirrors failed, waiting for background extraction...")
+            isWaitingForMirror = true
+            binding?.playerLoadingOverlay?.isVisible = true
+            return
+        }
 
         if (!hasNextMirror()) {
             viewModel.forceClearCache = true
@@ -1677,6 +1707,8 @@ class GeneratorPlayer : FullScreenPlayer() {
     }
 
     override fun nextEpisode() {
+        isWaitingForMirror = false
+        savedResumePosition = null
         if (viewModel.hasNextEpisode() == true) {
             isNextEpisode = true
             releasePlayer()
@@ -1685,6 +1717,8 @@ class GeneratorPlayer : FullScreenPlayer() {
     }
 
     override fun prevEpisode() {
+        isWaitingForMirror = false
+        savedResumePosition = null
         if (viewModel.hasPrevEpisode() == true) {
             isNextEpisode = true
             releasePlayer()
@@ -1693,11 +1727,28 @@ class GeneratorPlayer : FullScreenPlayer() {
     }
 
     private fun getNextLink(): DisplayLink? {
+        val errored = viewModel.state.erroredLinks
         val links = viewModel.state.sortLinks(currentQualityProfile)
         val currentIndex = links.indexOfFirst { it.link == currentSelectedLink }
-        val nextPotentialLink =
-            links.withIndex().firstOrNull { it.index > currentIndex && it.value.shouldUseLink }
-        return nextPotentialLink?.value
+
+        // 1. Try next links appearing after current selection that haven't errored
+        if (currentIndex != -1) {
+            val forwardMatch = links.withIndex().firstOrNull {
+                it.index > currentIndex && it.value.shouldUseLink && !errored.contains(it.value.link)
+            }
+            if (forwardMatch != null) return forwardMatch.value
+
+            // 2. Wrap-around: try previous links before current selection that haven't errored
+            val backwardMatch = links.withIndex().firstOrNull {
+                it.index < currentIndex && it.value.shouldUseLink && !errored.contains(it.value.link)
+            }
+            if (backwardMatch != null) return backwardMatch.value
+        }
+
+        // 3. Fallback: Any link that is usable, hasn't errored, and isn't the currently failing link
+        return links.firstOrNull {
+            it.shouldUseLink && !errored.contains(it.link) && it.link != currentSelectedLink
+        }
     }
 
     override fun hasNextMirror(): Boolean {
@@ -1711,7 +1762,8 @@ class GeneratorPlayer : FullScreenPlayer() {
             return
         }
 
-        loadLink(nextLink.link, true)
+        val resumePos = player.getPosition()?.takeIf { it > 0L } ?: getPos()
+        loadLink(nextLink.link, sameEpisode = true, resumePosition = resumePos)
     }
 
     override fun onDestroy() {
@@ -2344,22 +2396,58 @@ class GeneratorPlayer : FullScreenPlayer() {
                 }
 
                 is Resource.Success -> {
-                    // provider returned false
-                    //if (it.value != true) {
-                    //    showToast(activity, R.string.unexpected_error, Toast.LENGTH_SHORT)
-                    //}
-                    startPlayer()
+                    if (isWaitingForMirror) {
+                        isWaitingForMirror = false
+                        val next = getNextLink()
+                        if (next != null) {
+                            loadLink(next.link, sameEpisode = true, resumePosition = savedResumePosition)
+                        } else {
+                            noLinksFound()
+                        }
+                    } else {
+                        startPlayer()
+                    }
                 }
 
                 is Resource.Failure -> {
                     showToast(loading.errorString, Toast.LENGTH_LONG)
-                    startPlayer()
+                    if (isWaitingForMirror) {
+                        isWaitingForMirror = false
+                        val next = getNextLink()
+                        if (next != null) {
+                            loadLink(next.link, sameEpisode = true, resumePosition = savedResumePosition)
+                        } else {
+                            noLinksFound()
+                        }
+                    } else {
+                        startPlayer()
+                    }
                 }
             }
         }
 
         observe(viewModel.currentLinks) { (_, instance) ->
             if (instance != viewModel.state.instance) return@observe // Outdated observe
+
+            if (isWaitingForMirror) {
+                val next = getNextLink()
+                if (next != null) {
+                    isWaitingForMirror = false
+                    binding.playerLoadingOverlay.isVisible = false
+                    Log.i(TAG, "Zero-Stall Auto-Failover: Resuming playback on new mirror -> ${next.link.first?.name ?: next.link.first?.url}")
+                    context?.let { ctx ->
+                        val mirrorName = next.link.first?.name
+                        val msg = if (!mirrorName.isNullOrBlank()) {
+                            ctx.getString(R.string.switching_to_mirror_format, mirrorName)
+                        } else {
+                            ctx.getString(R.string.switching_to_next_mirror)
+                        }
+                        showToast(msg, Toast.LENGTH_SHORT)
+                    }
+                    loadLink(next.link, sameEpisode = true, resumePosition = savedResumePosition)
+                    return@observe
+                }
+            }
 
             val sortedLinks = viewModel.state.sortLinks(currentQualityProfile)
             val usableLinks = sortedLinks.count { link -> link.shouldUseLink }
