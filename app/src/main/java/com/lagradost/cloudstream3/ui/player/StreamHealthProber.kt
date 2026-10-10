@@ -6,7 +6,6 @@ import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
-import com.lagradost.cloudstream3.utils.VideoLink
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -107,12 +106,12 @@ object StreamHealthProber {
                 } ?: run {
                     val latency = System.currentTimeMillis() - startTime
                     Log.d(TAG, "Probe timed out for ${extractorLink.name} (${extractorLink.url}) after ${latency}ms")
-                    ProbeResult(videoLink, isAlive = false, latency = latency, statusCode = 408)
+                    ProbeResult(videoLink, isAlive = false, latencyMs = latency, statusCode = 408)
                 }
             } catch (t: Throwable) {
                 val latency = System.currentTimeMillis() - startTime
                 Log.d(TAG, "Probe failed for ${extractorLink.name} (${extractorLink.url}): ${t.message} (${latency}ms)")
-                ProbeResult(videoLink, isAlive = false, latency = latency, statusCode = -1)
+                ProbeResult(videoLink, isAlive = false, latencyMs = latency, statusCode = -1)
             }
         }
 

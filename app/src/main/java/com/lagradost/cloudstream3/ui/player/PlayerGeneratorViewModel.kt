@@ -352,7 +352,7 @@ class PlayerGeneratorViewModel : ViewModel() {
                     }
                 )
                 Unit
-            } ?: Resource.Failure(false, null, null, "Failed preloading next episode")
+            } ?: Resource.Failure(false, "Failed preloading next episode")
 
             if (isActive) {
                 // Pre-filter candidate mirrors in background so next episode starts instantly on a healthy mirror
