@@ -105,6 +105,7 @@ import kotlinx.coroutines.withContext
 import java.io.Closeable
 import java.io.IOException
 import java.io.OutputStream
+import java.util.concurrent.ConcurrentHashMap
 
 const val DOWNLOAD_CHANNEL_ID = "cloudstream3.general"
 const val DOWNLOAD_CHANNEL_NAME = "Downloads"
@@ -124,6 +125,23 @@ object VideoDownloadManager {
 
     const val TAG = "VDM"
     private const val DOWNLOAD_NOTIFICATION_TAG = "FROM_DOWNLOADER"
+
+    /**
+     * Hardware-adaptive in-memory pending download ceiling:
+     * - <= 192MB JVM heap (potato devices, 1GB RAM): 10MB limit (prevents OOM crashes)
+     * - <= 384MB JVM heap (mid-range phones/TV sticks): 25MB limit
+     * - <= 512MB JVM heap (standard devices): 50MB limit
+     * - > 512MB JVM heap (flagships, 8-16GB RAM): 80MB limit (saturates Gigabit Wi-Fi 6 / 5G)
+     */
+    val maxPendingBytesLimit: Long by lazy {
+        val maxHeap = Runtime.getRuntime().maxMemory()
+        when {
+            maxHeap <= 192 * 1024 * 1024L -> 10_000_000L
+            maxHeap <= 384 * 1024 * 1024L -> 25_000_000L
+            maxHeap <= 512 * 1024 * 1024L -> 50_000_000L
+            else -> 80_000_000L
+        }
+    }
 
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"
@@ -203,7 +221,7 @@ object VideoDownloadManager {
     const val KEY_RESUME_IN_QUEUE = "download_resume_queue_key"
 //    private const val KEY_RESUME_QUEUE_PACKAGES = "download_q_resume"
 
-    val downloadStatus = HashMap<Int, DownloadType>()
+    val downloadStatus = ConcurrentHashMap<Int, DownloadType>()
     val downloadStatusEvent = Event<Pair<Int, DownloadType>>()
     val downloadDeleteEvent = Event<Int>()
     val downloadEvent = Event<Pair<Int, DownloadActionType>>()
@@ -849,10 +867,10 @@ object VideoDownloadManager {
             return@withContext currentByte
         }
 
-        /** retries the resolve n times and returns true if successful */
+        /** retries the resolve up to n times with exponential backoff and returns true if successful */
         suspend fun resolveSafe(
             index: Int,
-            retries: Int = 3,
+            retries: Int = 5,
             buffer: ByteArray,
             callback: (suspend CoroutineScope.(LazyStreamDownloadResponse) -> Unit)
         ): Boolean {
@@ -865,14 +883,24 @@ object VideoDownloadManager {
                     start = resolve(start, end, buffer, callback)
                     // no end defined, so we don't care exactly where it ended
                     if (end == null) return true
-                    // we have download more or exactly what we needed
+                    // we have downloaded more or exactly what we needed
                     if (start >= end) return true
+
+                    // If resolve returned without reaching end (e.g. stream closed prematurely), back off before resuming from start offset
+                    if (i < retries - 1) {
+                        val backoffMs = minOf(8000L, 500L * (1L shl i)) + (50L..250L).random()
+                        delay(backoffMs)
+                    }
                 } catch (_: IllegalStateException) {
                     return false
                 } catch (_: CancellationException) {
                     return false
-                } catch (_: Throwable) {
-                    continue
+                } catch (t: Throwable) {
+                    logError(t)
+                    if (i < retries - 1) {
+                        val backoffMs = minOf(8000L, 500L * (1L shl i)) + (50L..250L).random()
+                        delay(backoffMs)
+                    }
                 }
             }
             return false
@@ -1173,14 +1201,14 @@ object VideoDownloadManager {
                             ) return@launch
 
                             // Limit RAM usage by throttling if too much data is downloaded but not yet written to disk
-                            // 50MB limit
-                            if (metadata.bytesDownloaded - metadata.bytesWritten > 50_000_000) {
+                            // Hardware-adaptive limit (10MB on potato, up to 80MB on flagships)
+                            if (metadata.bytesDownloaded - metadata.bytesWritten > maxPendingBytesLimit) {
                                 isTooFarAhead = true
                             }
                         }
 
                         if (isTooFarAhead) {
-                            delay(500)
+                            delay(250)
                             continue
                         }
 
@@ -1238,6 +1266,7 @@ object VideoDownloadManager {
                 return@withContext DOWNLOAD_INVALID_INPUT
             }
 
+            runCatching { fileStream.flush() }
             metadata.type = DownloadType.IsDone
             return@withContext DOWNLOAD_SUCCESS
         } catch (e: IOException) {
@@ -1358,14 +1387,14 @@ object VideoDownloadManager {
                             ) return@launch
 
                             // Limit RAM usage by throttling if too much data is downloaded but not yet written to disk
-                            // 50MB limit
-                            if (metadata.bytesDownloaded - metadata.bytesWritten > 50_000_000) {
+                            // Hardware-adaptive limit (10MB on potato, up to 80MB on flagships)
+                            if (metadata.bytesDownloaded - metadata.bytesWritten > maxPendingBytesLimit) {
                                 isTooFarAhead = true
                             }
                         }
 
                         if (isTooFarAhead) {
-                            delay(500)
+                            delay(250)
                             continue
                         }
 
@@ -1375,9 +1404,27 @@ object VideoDownloadManager {
                             current.nextInt()
                         }
 
+                        // Resilient segment download with exponential backoff
+                        var bytes: ByteArray? = null
+                        val segmentRetries = 3
+                        for (attempt in 0..segmentRetries) {
+                            if (!isActive) return@launch
+                            bytes = items.resolveLinkSafe(index)
+                            if (bytes != null) break
+
+                            fileMutex.withLock {
+                                if (metadata.type == DownloadType.IsStopped) return@launch
+                            }
+
+                            if (attempt < segmentRetries) {
+                                val delayMs = 1000L * (attempt + 1) + (50L..200L).random()
+                                delay(delayMs)
+                            }
+                        }
+
                         // in case something has gone wrong set to failed if the fail is not caused by
                         // user cancellation
-                        val bytes = items.resolveLinkSafe(index) ?: run {
+                        val resolvedBytes = bytes ?: run {
                             fileMutex.withLock {
                                 if (metadata.type != DownloadType.IsStopped) {
                                     metadata.type = DownloadType.IsFailed
@@ -1393,19 +1440,19 @@ object VideoDownloadManager {
                                 // if stopped then break to delete
                                 if (metadata.type == DownloadType.IsStopped || metadata.type == DownloadType.IsFailed || !isActive) return@launch
 
-                                val segmentLength = bytes.size.toLong()
+                                val segmentLength = resolvedBytes.size.toLong()
                                 // send notification, no matter the actual write order
                                 metadata.addSegment(segmentLength)
 
                                 // directly write the bytes if you are first
                                 if (metadata.hlsWrittenProgress == index) {
-                                    fileStream.write(bytes)
+                                    fileStream.write(resolvedBytes)
 
                                     metadata.addBytesWritten(segmentLength)
                                     metadata.setWrittenSegment(index)
                                 } else {
                                     // no need to clone as there will be no modification of this bytearray
-                                    pendingData[index] = bytes
+                                    pendingData[index] = resolvedBytes
                                 }
 
                                 // write the cached bytes submitted by other threads
@@ -1455,6 +1502,7 @@ object VideoDownloadManager {
                 return@withContext DOWNLOAD_STOPPED
             }
 
+            runCatching { fileStream.flush() }
             metadata.type = DownloadType.IsDone
             return@withContext DOWNLOAD_SUCCESS
         } catch (t: Throwable) {
