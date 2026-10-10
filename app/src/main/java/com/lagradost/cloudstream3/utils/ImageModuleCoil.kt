@@ -35,6 +35,8 @@ import java.io.File
 import java.nio.ByteBuffer
 
 object ImageLoader {
+    private const val TAG = "CoilImgLoader"
+
     enum class DeviceTier {
         POTATO,   // <= 768MB RAM or isLowRamDevice: 500MB TV box, low-ram stick
         STANDARD, // 1GB - 2.5GB: standard TV sticks, budget phones
