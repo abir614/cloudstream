@@ -3,6 +3,7 @@
 package com.lagradost.cloudstream3.ui.player
 
 import android.annotation.SuppressLint
+import android.app.ActivityManager
 import android.content.Context
 import android.content.DialogInterface
 import android.graphics.Bitmap
@@ -1092,6 +1093,28 @@ class CS3IPlayer : IPlayer {
         /** External audio tracks to merge with the video */
         audioSources: List<MediaSource> = emptyList()
     ): ExoPlayer {
+        // Adaptive LoadControl for low RAM (e.g. 512MB RAM TV boxes)
+        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val isLowRam = try {
+            val memInfo = ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }
+            activityManager?.isLowRamDevice == true || (memInfo.totalMem in 1..805306368L) // <= 768MB
+        } catch (_: Throwable) {
+            false
+        }
+
+        val targetBufferBytes = when {
+            cacheSize > 0 -> if (cacheSize > Int.MAX_VALUE) Int.MAX_VALUE else cacheSize.toInt()
+            isLowRam -> 16 * 1024 * 1024 // 16 MB buffer on <=768MB/512MB RAM TV boxes
+            else -> DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES // 144 MB
+        }
+        val backBufferMs = if (isLowRam) 5000 else 30000
+        val minBufferMs = if (isLowRam) 10000 else DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
+        val maxBufferMs = when {
+            videoBufferMs > 0 -> videoBufferMs.toInt()
+            isLowRam -> 20000 // 20s max buffer on low RAM
+            else -> DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
+        }
+
         val exoPlayerBuilder =
             ExoPlayer.Builder(context)
                 .setMediaSourceFactory(
@@ -1261,24 +1284,14 @@ class CS3IPlayer : IPlayer {
                 .setSeekParameters(SeekParameters(toleranceBeforeUs, toleranceAfterUs))
                 .setLoadControl(
                     DefaultLoadControl.Builder()
-                        .setTargetBufferBytes(
-                            if (cacheSize <= 0) {
-                                DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES
-                            } else {
-                                if (cacheSize > Int.MAX_VALUE) Int.MAX_VALUE else cacheSize.toInt()
-                            }
-                        )
+                        .setTargetBufferBytes(targetBufferBytes)
                         .setBackBuffer(
-                            30000,
+                            backBufferMs,
                             true
                         )
                         .setBufferDurationsMs(
-                            DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
-                            if (videoBufferMs <= 0) {
-                                DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
-                            } else {
-                                videoBufferMs.toInt()
-                            },
+                            minBufferMs,
+                            maxBufferMs,
                             DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
                             DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
                         ).build()
