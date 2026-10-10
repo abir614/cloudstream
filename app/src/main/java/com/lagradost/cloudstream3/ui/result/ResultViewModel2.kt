@@ -145,6 +145,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.TimeUnit
 
 /** This starts at 1 */
@@ -457,8 +458,15 @@ class ResultViewModel2 : ViewModel() {
     private var currentResponse: LoadResponse? = null
     var EPISODE_RANGE_SIZE: Int = 20
     fun clear() {
+        currentLoadPageJob?.cancel()
         currentResponse = null
         _page.postValue(null)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        currentLoadPageJob?.cancel()
+        currentLoadLinkJob?.cancel()
     }
 
     data class EpisodeIndexer(
@@ -2609,6 +2617,8 @@ class ResultViewModel2 : ViewModel() {
         )
     }
 
+    private var currentLoadPageJob: Job? = null
+
     fun load(
         activity: Activity?,
         url: String,
@@ -2619,6 +2629,9 @@ class ResultViewModel2 : ViewModel() {
         loadTrailers: Boolean = true,
     ) =
         ioSafe {
+            currentLoadPageJob?.cancel()
+            currentLoadPageJob = coroutineContext.job
+
             _page.postValue(Resource.Loading(url))
             _episodes.postValue(Resource.Loading())
 
@@ -2665,11 +2678,8 @@ class ResultViewModel2 : ViewModel() {
 
                 is Resource.Success -> {
                     if (!isActive) return@ioSafe
-                    val loadResponse = ioWork {
-                        applyMeta(data.value, currentMeta, currentSync).first
-                    }
-                    if (!isActive) return@ioSafe
-                    val mainId = loadResponse.getId()
+                    val rawResponse = data.value
+                    val mainId = rawResponse.getId()
 
                     preferDubStatus = getDub(mainId) ?: preferDubStatus
                     preferStartEpisode = getResultEpisode(mainId)
@@ -2681,24 +2691,63 @@ class ResultViewModel2 : ViewModel() {
                         DownloadObjects.DownloadHeaderCached(
                             apiName = apiName,
                             url = validUrl,
-                            type = loadResponse.type,
-                            name = loadResponse.name,
-                            poster = loadResponse.posterUrl,
+                            type = rawResponse.type,
+                            name = rawResponse.name,
+                            poster = rawResponse.posterUrl,
                             id = mainId,
                             cacheTime = System.currentTimeMillis(),
                         )
                     )
-                    if (loadTrailers)
-                        loadTrailers(data.value)
+
+                    // 1. Instant UI presentation: render scraped details and episodes immediately (<150ms)
                     postSuccessful(
-                        data.value,
+                        rawResponse,
                         mainId,
                         updateEpisodes = true,
-                        updateFillers = showFillers,
+                        updateFillers = false,
                         apiRepository = repo
                     )
                     if (!isActive) return@ioSafe
                     handleAutoStart(activity, autostart)
+
+                    // 2. Asynchronous filler episode check (non-blocking, never freezes episode render)
+                    if (showFillers && rawResponse.type == TvType.Anime) {
+                        ioSafe {
+                            val fillerSet = ioWorkSafe {
+                                FillerEpisodeCheck.getFillerEpisodes(rawResponse)
+                            }
+                            if (isActive && currentId == mainId && !fillerSet.isNullOrEmpty()) {
+                                fillers = fillerSet
+                                currentEpisodes = currentEpisodes.mapValues { (_, eps) ->
+                                    eps.map { ep -> ep.copy(isFiller = fillers.contains(ep.episode)) }
+                                }
+                                reloadEpisodes()
+                            }
+                        }
+                    }
+
+                    // 3. Asynchronous trailer loading (deferred so it doesn't steal network bandwidth)
+                    if (loadTrailers) {
+                        loadTrailers(rawResponse)
+                    }
+
+                    // 4. Asynchronous progressive metadata enrichment (AniList / Kitsu trackers)
+                    // Isolated with a strict 4-second timeout so tracker outages never block the app
+                    ioSafe {
+                        val (enrichedResponse, updateEpisodes) = ioWorkSafe {
+                            withTimeoutOrNull(4000L) {
+                                applyMeta(rawResponse, currentMeta, currentSync)
+                            }
+                        } ?: (null to false)
+
+                        if (isActive && currentId == mainId && enrichedResponse != null) {
+                            currentResponse = enrichedResponse
+                            postPage(enrichedResponse, repo)
+                            if (updateEpisodes) {
+                                postEpisodes(enrichedResponse, mainId, updateFillers = false)
+                            }
+                        }
+                    }
                 }
 
                 is Resource.Loading -> {
