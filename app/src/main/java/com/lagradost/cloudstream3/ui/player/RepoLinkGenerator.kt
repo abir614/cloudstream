@@ -27,8 +27,15 @@ class RepoLinkGenerator(
 ) : VideoGenerator<ResultEpisode>(episodes) {
     companion object {
         const val TAG = "RepoLink"
-        val cache: HashMap<Pair<String, Int>, Cache> =
-            hashMapOf()
+        private const val MAX_CACHE_SIZE = 50
+
+        // Bounded LRU cache: automatically evicts least recently watched episode link caches
+        val cache: MutableMap<Pair<String, Int>, Cache> =
+            object : LinkedHashMap<Pair<String, Int>, Cache>(MAX_CACHE_SIZE, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Pair<String, Int>, Cache>?): Boolean {
+                    return size > MAX_CACHE_SIZE
+                }
+            }
     }
 
     override val hasCache = true

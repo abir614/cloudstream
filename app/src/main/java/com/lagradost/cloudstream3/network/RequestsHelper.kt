@@ -9,12 +9,16 @@ import com.lagradost.cloudstream3.mvvm.safe
 import com.lagradost.nicehttp.Requests
 import com.lagradost.nicehttp.ignoreAllSSLErrors
 import okhttp3.Cache
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.Headers
 import okhttp3.Headers.Companion.toHeaders
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import org.conscrypt.Conscrypt
 import java.io.File
 import java.security.Security
+import java.util.concurrent.TimeUnit
 
 // Backwards compatible constructor, mark as deprecated later
 fun Requests.initClient(context: Context) {
@@ -35,10 +39,31 @@ fun buildDefaultClient(context: Context): OkHttpClient {
 /** Only use ignoreSSL if you know what you are doing*/
 fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClient {
     safe { Security.insertProviderAt(Conscrypt.newProvider(), 1) }
-    
+
     val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
     val dns = settingsManager.getInt(context.getString(R.string.dns_key), 0)
+
+    val maxHeap = Runtime.getRuntime().maxMemory()
+    val isPotato = maxHeap <= 192 * 1024 * 1024L
+
+    val dispatcher = Dispatcher().apply {
+        maxRequests = if (isPotato) 64 else 128
+        maxRequestsPerHost = if (isPotato) 12 else 20
+    }
+
+    val connectionPool = ConnectionPool(
+        maxIdleConnections = if (isPotato) 16 else 32,
+        keepAliveDuration = if (isPotato) 2 else 3,
+        timeUnit = TimeUnit.MINUTES
+    )
+
     val baseClient = OkHttpClient.Builder()
+        .dispatcher(dispatcher)
+        .connectionPool(connectionPool)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .writeTimeout(20, TimeUnit.SECONDS)
+        .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
         .followRedirects(true)
         .followSslRedirects(true)
         .apply {

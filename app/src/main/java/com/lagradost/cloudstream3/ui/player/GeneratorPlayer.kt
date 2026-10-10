@@ -951,8 +951,7 @@ class GeneratorPlayer : FullScreenPlayer() {
      * so only use from a user click and not a background process */
     private fun addFirstSub(query: SubtitleSearch) =
         viewModel.viewModelScope.launch {
-            // async should not have a race condition if they are on the same group
-            var hasSelectASubtitle = false
+            val hasSelectedSubtitle = AtomicBoolean(false)
 
             // first come first served with these subtitles
             // we might want to change it to prefer different sources when used multiple times,
@@ -964,10 +963,8 @@ class GeneratorPlayer : FullScreenPlayer() {
                     )
                 )) {
                     is Resource.Failure -> {
-                        // scope might cancel, so we do an extra check
-                        if (this.isActive) {
-                            showToast("${provider.idPrefix}${result.errorString}")
-                        }
+                        // Avoid spamming error toasts for optional secondary providers
+                        Log.d(TAG, "Subtitle search failed for ${provider.idPrefix}: ${result.errorString}")
                         return@amap
                     }
 
@@ -983,7 +980,7 @@ class GeneratorPlayer : FullScreenPlayer() {
 
                 // try to add every subtitle until we have added a new subtitle file
                 for (subtitleEntry in success) {
-                    if (hasSelectASubtitle || !this.isActive) {
+                    if (hasSelectedSubtitle.get() || !this.isActive) {
                         break
                     }
 
@@ -1002,8 +999,7 @@ class GeneratorPlayer : FullScreenPlayer() {
                     }
 
                     // checks for both a race condition and if any of the subs generated is new
-                    if (this.isActive && !viewModel.state.subtitles.containsAll(subtitles) && !hasSelectASubtitle) {
-                        hasSelectASubtitle = true
+                    if (this.isActive && !viewModel.state.subtitles.containsAll(subtitles) && hasSelectedSubtitle.compareAndSet(false, true)) {
                         runOnMainThread {
                             addAndSelectSubtitles(*subtitles.toTypedArray())
                         }
@@ -1012,7 +1008,7 @@ class GeneratorPlayer : FullScreenPlayer() {
                 }
             }
             // maybe better error here?
-            if (!hasSelectASubtitle && this.isActive) {
+            if (!hasSelectedSubtitle.get() && this.isActive) {
                 showToast(R.string.no_subtitles)
             }
         }
