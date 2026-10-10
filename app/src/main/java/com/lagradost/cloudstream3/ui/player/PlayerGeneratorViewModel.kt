@@ -25,6 +25,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -243,10 +244,17 @@ class PlayerGeneratorViewModel : ViewModel() {
     private val _currentSubtitleYear = MutableLiveData<Int?>(null)
     val currentSubtitleYear: LiveData<Int?> = _currentSubtitleYear
 
-    /**
-     * Save the Episode ID to prevent starting multiple link loading Jobs when preloading links.
-     */
-    private var currentLoadingEpisodeId: Int? = null
+    data class PreloadedEpisode(
+        val index: Int,
+        val id: Int?,
+        val links: Set<VideoLink>,
+        val subtitles: Set<SubtitleData>,
+        val loading: Resource<Unit>,
+        val generatorState: GeneratorState?
+    )
+
+    private var preloadedEpisode: PreloadedEpisode? = null
+    private var preloadJob: Job? = null
 
     var forceClearCache = false
 
@@ -257,7 +265,7 @@ class PlayerGeneratorViewModel : ViewModel() {
     fun loadLinksPrev() {
         Log.i(TAG, "loadLinksPrev")
         if (generator?.hasPrev(episodeIndex) == true) {
-            episodeIndex += 1
+            episodeIndex -= 1
             loadLinks()
         }
     }
@@ -278,35 +286,97 @@ class PlayerGeneratorViewModel : ViewModel() {
         return generator?.hasPrev(episodeIndex)
     }
 
+    /**
+     * Seamless Background Pre-Scraper for the upcoming episode.
+     * Runs quietly in Dispatchers.IO when current episode reaches 85% progress.
+     * Caches links and subtitles so transitioning to the next episode occurs in 0.0s.
+     */
     fun preLoadNextLinks() {
-        val id = generator?.getId(episodeIndex)
-        // Do not preload if already loading
-        if (id == currentLoadingEpisodeId) return
+        val nextIndex = episodeIndex + 1
+        if (generator?.hasNext(episodeIndex) != true) return
+        val nextId = generator?.getId(nextIndex)
 
-        Log.i(TAG, "preLoadNextLinks")
-        currentJob?.cancel()
-        currentLoadingEpisodeId = id
+        // Do not preload if already loading or already preloaded for nextIndex
+        if (preloadedEpisode?.index == nextIndex && (preloadedEpisode?.links?.isNotEmpty() == true || preloadJob?.isActive == true)) {
+            return
+        }
 
-        currentJob = viewModelScope.launch {
-            try {
-                if (generator?.hasCache == true && generator?.hasNext(episodeIndex) == true) {
-                    safeApiCall {
-                        generator?.generateLinks(
-                            sourceTypes = LOADTYPE_INAPP,
-                            clearCache = false,
-                            isCasting = false,
-                            callback = {},
-                            subtitleCallback = {},
-                            offset = episodeIndex + 1
-                        )
+        Log.i(TAG, "preLoadNextLinks started for nextIndex=$nextIndex, nextId=$nextId")
+        preloadJob?.cancel()
+
+        val preloadedLinks = ConcurrentHashMap.newKeySet<VideoLink>()
+        val preloadedSubs = ConcurrentHashMap.newKeySet<SubtitleData>()
+
+        preloadJob = viewModelScope.launch(Dispatchers.IO) {
+            val genState = generator?.let { gen ->
+                GeneratorState(
+                    meta = gen.videos.getOrNull(nextIndex),
+                    nextMeta = gen.videos.getOrNull(nextIndex + 1),
+                    id = nextId,
+                    response = (gen as? RepoLinkGenerator)?.page,
+                    index = nextIndex,
+                    allMeta = gen.videos
+                )
+            }
+
+            preloadedEpisode = PreloadedEpisode(
+                index = nextIndex,
+                id = nextId,
+                links = preloadedLinks,
+                subtitles = preloadedSubs,
+                loading = Resource.Loading(),
+                generatorState = genState
+            )
+
+            val loadingState = safeApiCall {
+                generator?.generateLinks(
+                    sourceTypes = LOADTYPE_INAPP,
+                    clearCache = false,
+                    isCasting = false,
+                    callback = { link ->
+                        if (isActive) {
+                            preloadedLinks.add(link)
+                            if (episodeIndex == nextIndex) {
+                                modifyState { add(link) }
+                            }
+                        }
+                    },
+                    offset = nextIndex,
+                    subtitleCallback = { sub ->
+                        if (isActive && isValidSubtitle(sub)) {
+                            preloadedSubs.add(sub)
+                            if (episodeIndex == nextIndex) {
+                                modifyState { add(sub) }
+                            }
+                        }
+                    }
+                )
+                Unit
+            } ?: Resource.Failure(false, null, null, "Failed preloading next episode")
+
+            if (isActive) {
+                // Pre-filter candidate mirrors in background so next episode starts instantly on a healthy mirror
+                val deadSet = if (preloadedLinks.size > 1) {
+                    val (_, dead) = StreamHealthProber.selectBestLinkWithDeadList(preloadedLinks.toList())
+                    dead.toSet()
+                } else emptySet()
+
+                val healthyLinks = preloadedLinks.filter { !deadSet.contains(it) }.ifEmpty { preloadedLinks.toList() }.toSet()
+
+                preloadedEpisode = preloadedEpisode?.copy(
+                    links = healthyLinks,
+                    subtitles = preloadedSubs.toSet(),
+                    loading = loadingState
+                )
+                if (episodeIndex == nextIndex) {
+                    modifyState {
+                        when (loading) {
+                            is Resource.Loading -> copy(loading = loadingState)
+                            else -> this
+                        }
                     }
                 }
-            } catch (t: Throwable) {
-                logError(t)
-            } finally {
-                if (currentLoadingEpisodeId == id) {
-                    currentLoadingEpisodeId = null
-                }
+                Log.i(TAG, "Preload completed for nextIndex=$nextIndex: ${healthyLinks.size} healthy links (filtered ${deadSet.size} dead), ${preloadedSubs.size} subs")
             }
         }
     }
@@ -320,6 +390,9 @@ class PlayerGeneratorViewModel : ViewModel() {
         Log.i(TAG, "attachGenerator with generator=$newGenerator and index=$index")
         generator = newGenerator
         episodeIndex = index
+        preloadJob?.cancel()
+        preloadJob = null
+        preloadedEpisode = null
     }
 
     /**
@@ -385,6 +458,24 @@ class PlayerGeneratorViewModel : ViewModel() {
         Log.i(TAG, "loadLinks with generator=$generator and index=$episodeIndex")
         currentJob?.cancel()
         val index = episodeIndex
+
+        // Instant Binge Transition: Check if next episode was preloaded into memory
+        val preloaded = preloadedEpisode
+        if (preloaded != null && preloaded.index == index && preloaded.links.isNotEmpty()) {
+            Log.i(TAG, "Instant Binge Transition: Using ${preloaded.links.size} preloaded links for index=$index")
+            preloadedEpisode = null
+
+            modifyState {
+                VideoState(
+                    links = preloaded.links.toPersistentSet(),
+                    subtitles = preloaded.subtitles.toPersistentSet(),
+                    loading = preloaded.loading,
+                    generatorState = preloaded.generatorState,
+                    instance = instance + 1
+                )
+            }
+            return
+        }
 
         // Clear old data and reset the state
         modifyState {
