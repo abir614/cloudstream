@@ -763,6 +763,23 @@ class CS3IPlayer : IPlayer {
         }
 
         fun tryCreateEngine(context: Context, diskCacheSize: Long): CronetEngine? {
+            // When custom DNS (DoH) is selected, bypass Cronet.
+            // Cronet relies on OS-level DNS resolution and does not support in-app DoH,
+            // which can leak video stream DNS queries to the ISP or cause ISP blocking.
+            // Returning null forces ExoPlayer to route through OkHttpDataSource(app.baseClient),
+            // strictly honoring the user's configured DoH provider.
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+            val dns = settingsManager.getInt(context.getString(R.string.dns_key), 0)
+            if (dns != 0) {
+                if (cronetEngine != null) {
+                    try {
+                        cronetEngine?.shutdown()
+                    } catch (_: Throwable) {}
+                    cronetEngine = null
+                }
+                return null
+            }
+
             // Fast case, no need to recreate it
             cronetEngine?.let {
                 return it

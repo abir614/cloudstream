@@ -247,7 +247,7 @@ object CommonActivity {
         componentActivity.updateLocale()
         componentActivity.updateTv()
         AccountManager.initMainAPI()
-        NewPipe.init(DownloaderTestImpl.getInstance())
+        NewPipe.init(DownloaderTestImpl.init(app.baseClient.newBuilder()) ?: DownloaderTestImpl.getInstance())
 
         MainActivity.activityResultLauncher =
             componentActivity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
