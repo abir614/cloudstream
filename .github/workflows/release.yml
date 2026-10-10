@@ -34,6 +34,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
@@ -78,19 +80,6 @@ jobs:
           cd rust-core
           cargo ndk -t armeabi-v7a -t arm64-v8a -o ../app/src/main/jniLibs build --release
 
-      - name: Run Gradle (Assemble Stable Release)
-        run: ./gradlew assembleStableRelease androidSourcesJar makeJar
-        env:
-          SIGNING_KEY_ALIAS: "key0"
-          SIGNING_KEY_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
-          SIGNING_STORE_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
-          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
-          SIMKL_CLIENT_SECRET: ${{ secrets.SIMKL_CLIENT_SECRET }}
-          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
-          MDL_API_KEY: ${{ secrets.MDL_API_KEY }}
-          MAL_KEY: ${{ secrets.MAL_KEY }}
-          ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
-
       - name: Determine Tag & Name
         id: release_meta
         run: |
@@ -114,14 +103,31 @@ jobs:
           echo "title=${TITLE}" >> $GITHUB_OUTPUT
           echo "body=${BODY}" >> $GITHUB_OUTPUT
 
+      - name: Run Gradle (Assemble Stable Release)
+        run: ./gradlew assembleStableRelease androidSourcesJar makeJar
+        env:
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
+          APP_VERSION_NAME: ${{ steps.release_meta.outputs.tag }}
+          SIGNING_KEY_ALIAS: "key0"
+          SIGNING_KEY_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
+          SIGNING_STORE_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
+          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          SIMKL_CLIENT_SECRET: ${{ secrets.SIMKL_CLIENT_SECRET }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          MDL_API_KEY: ${{ secrets.MDL_API_KEY }}
+          MAL_KEY: ${{ secrets.MAL_KEY }}
+          ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
+
       - name: Create Stable GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ steps.release_meta.outputs.tag }}
           name: ${{ steps.release_meta.outputs.title }}
           body: ${{ steps.release_meta.outputs.body }}
           draft: false
           prerelease: false
+          make_latest: true
           files: |
             app/build/outputs/apk/stable/release/*.apk
             app/build/libs/app-sources.jar
