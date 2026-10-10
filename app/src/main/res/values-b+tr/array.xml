@@ -24,6 +24,8 @@
         <item>Quad9</item>
         <item>DNS.SB</item>
         <item>Canadian Shield</item>
+        <item>Mullvad</item>
+        <item>Resilient Multi-Tier (Mullvad+Quad9 -> CF+Google)</item>
     </array>
     <array name="dns_pref_values">
         <item>0</item>
@@ -35,6 +37,8 @@
         <item>6</item>
         <item>7</item>
         <item>8</item>
+        <item>9</item>
+        <item>10</item>
     </array>
 
     <array name="title_info_pref_names">
