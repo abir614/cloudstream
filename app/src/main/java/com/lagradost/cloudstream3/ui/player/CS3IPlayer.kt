@@ -1104,28 +1104,33 @@ class CS3IPlayer : IPlayer {
         val isLowRamFlag = activityManager?.isLowRamDevice == true
 
         val isPotatoDevice = isLowRamFlag || (totalRamBytes in 1..805306368L) // <= 768MB
-        val isMidRamDevice = totalRamBytes in 805306369L..1610612736L // 1GB - 1.5GB
+        val isMidRamDevice = totalRamBytes in 805306369L..2147483648L // ~1GB - 2GB
+        val isHighEndDevice = totalRamBytes > 2147483648L // > 2GB (Shield TV, modern smartphones, high-end boxes)
 
         val targetBufferBytes = when {
             cacheSize > 0 -> if (cacheSize > Int.MAX_VALUE) Int.MAX_VALUE else cacheSize.toInt()
             isPotatoDevice -> 16 * 1024 * 1024 // 16 MB on <= 768MB potato devices
-            isMidRamDevice -> 48 * 1024 * 1024 // 48 MB on 1GB - 1.5GB TV sticks
-            else -> DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES // 144 MB on standard 2GB, 4GB, 8GB+ devices
+            isMidRamDevice -> 48 * 1024 * 1024 // 48 MB on 1GB - 2GB TV sticks
+            isHighEndDevice -> 256 * 1024 * 1024 // 256 MB on high-end 3GB+ devices (4K HDR / REMUX streaming headroom)
+            else -> DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES // 144 MB fallback
         }
         val backBufferMs = when {
             isPotatoDevice -> 5000
             isMidRamDevice -> 15000
+            isHighEndDevice -> 60000 // 60s instant rewind
             else -> 30000
         }
         val minBufferMs = when {
             isPotatoDevice -> 10000
             isMidRamDevice -> 20000
+            isHighEndDevice -> 30000
             else -> DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
         }
         val maxBufferMs = when {
             videoBufferMs > 0 -> videoBufferMs.toInt()
             isPotatoDevice -> 20000
             isMidRamDevice -> 35000
+            isHighEndDevice -> 120000 // 2 minutes forward buffer
             else -> DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
         }
 

@@ -35,49 +35,87 @@ import java.io.File
 import java.nio.ByteBuffer
 
 object ImageLoader {
-    private fun isLowRamDevice(context: PlatformContext): Boolean {
+    enum class DeviceTier {
+        POTATO,   // <= 768MB RAM or isLowRamDevice: 500MB TV box, low-ram stick
+        STANDARD, // 1GB - 2.5GB: standard TV sticks, budget phones
+        HIGH_END  // >= 3GB: Shield TV Pro, Fire TV Cube 3, modern phones (4GB - 16GB RAM)
+    }
+
+    private fun getDeviceTier(context: PlatformContext): DeviceTier {
         val actManager = context.getSystemService(android.content.Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
-        if (actManager?.isLowRamDevice == true) return true
+        if (actManager?.isLowRamDevice == true) return DeviceTier.POTATO
+
         val memInfo = android.app.ActivityManager.MemoryInfo()
         actManager?.getMemoryInfo(memInfo)
-        return memInfo.totalMem > 0 && memInfo.totalMem <= 1024L * 1024L * 1024L // <= 1GB
+        val ram = memInfo.totalMem
+
+        return when {
+            ram in 1..805306368L -> DeviceTier.POTATO // <= 768MB
+            ram in 805306369L..2684354560L -> DeviceTier.STANDARD // ~1GB - 2.5GB
+            else -> DeviceTier.HIGH_END // >= 3GB (Shield TV, modern smartphones, high-end TV boxes)
+        }
     }
 
     internal fun buildImageLoader(context: PlatformContext): ImageLoader {
         val isBrokenHardware = hasPotentialBrokenHardware()
-        val isLowRam = isLowRamDevice(context)
+        val tier = getDeviceTier(context)
         return ImageLoader.Builder(context)
-            .crossfade(if (isLowRam) 0 else 200)
-            .allowHardware(SDK_INT >= 28 && !isBrokenHardware && !isLowRam)
+            .crossfade(
+                when (tier) {
+                    DeviceTier.POTATO -> 0
+                    DeviceTier.STANDARD -> 150
+                    DeviceTier.HIGH_END -> 250
+                }
+            )
+            .allowHardware(SDK_INT >= 28 && !isBrokenHardware && tier != DeviceTier.POTATO)
             .diskCachePolicy(CachePolicy.ENABLED)
             .networkCachePolicy(CachePolicy.ENABLED)
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizePercent(context, if (isLowRam) 0.05 else 0.10)
-                    .strongReferencesEnabled(false)
+                    .maxSizePercent(
+                        context,
+                        when (tier) {
+                            DeviceTier.POTATO -> 0.05
+                            DeviceTier.STANDARD -> 0.12
+                            DeviceTier.HIGH_END -> 0.22
+                        }
+                    )
+                    .strongReferencesEnabled(tier == DeviceTier.HIGH_END)
                     .build()
             }
             .diskCache {
                 DiskCache.Builder()
                     .directory(context.cacheDir.resolve("cs3_image_cache").toOkioPath())
-                    .maxSizeBytes(if (isLowRam) 128L * 1024 * 1024 else 512L * 1024 * 1024)
-                    .maxSizePercent(if (isLowRam) 0.02 else 0.04)
+                    .maxSizeBytes(
+                        when (tier) {
+                            DeviceTier.POTATO -> 128L * 1024 * 1024 // 128 MB
+                            DeviceTier.STANDARD -> 512L * 1024 * 1024 // 512 MB
+                            DeviceTier.HIGH_END -> 1024L * 1024 * 1024 // 1 GB on fast UFS/NVMe
+                        }
+                    )
+                    .maxSizePercent(if (tier == DeviceTier.POTATO) 0.02 else 0.05)
                     .build()
             }
             /** Pass interceptors with care, unnecessary passing tokens to servers
             or image hosting services causes unauthorized exceptions **/
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { buildDefaultClient(context) }))
-                if (isBrokenHardware || isLowRam) {
+                if (isBrokenHardware || tier == DeviceTier.POTATO) {
                     add(BitmapFactoryDecoder.Factory())
                 } // sw decoder
             }
             .apply {
-                if (isLowRam) {
-                    // Cuts memory consumption per decoded image by 50% (2 bytes vs 4 bytes per pixel)
-                    bitmapConfig(Bitmap.Config.RGB_565)
-                } else if (isBrokenHardware) {
-                    bitmapConfig(Bitmap.Config.ARGB_8888)
+                when (tier) {
+                    DeviceTier.POTATO -> {
+                        // 50% RAM savings for ultra-low devices
+                        bitmapConfig(Bitmap.Config.RGB_565)
+                    }
+                    DeviceTier.STANDARD, DeviceTier.HIGH_END -> {
+                        // Pristine 32-bit ARGB_8888 TrueColor for rich OLED/4K displays
+                        if (isBrokenHardware) {
+                            bitmapConfig(Bitmap.Config.ARGB_8888)
+                        }
+                    }
                 }
                 setupCoilLogger()
             }
