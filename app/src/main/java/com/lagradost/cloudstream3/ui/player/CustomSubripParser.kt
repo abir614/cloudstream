@@ -40,6 +40,7 @@ import com.google.common.base.Preconditions.checkNotNull
 import com.google.common.collect.ImmutableList
 import com.lagradost.cloudstream3.services.NativeCoreBridge
 import org.json.JSONArray
+import org.mozilla.universalchardet.UniversalDetector
 import java.nio.charset.Charset
 import java.nio.charset.StandardCharsets
 import java.util.regex.Matcher
@@ -65,7 +66,7 @@ class CustomSubripParser : SubtitleParser {
     ) {
         parsableByteArray.reset(data,  /* limit= */offset + length)
         parsableByteArray.setPosition(offset)
-        val charset = detectUtfCharset(parsableByteArray)
+        val charset = detectUtfCharset(data, offset, length)
 
         // Ultra-fast zero-GC Rust native parser path
         if (NativeCoreBridge.isNativeReady()) {
@@ -199,13 +200,30 @@ class CustomSubripParser : SubtitleParser {
     }
 
     /**
-     * Determine UTF encoding of the byte array from a byte order mark (BOM), defaulting to UTF-8 if
-     * no BOM is found.
+     * Determine charset of the byte array from a BOM, or via universal character
+     * detector (supporting Windows-1256 Arabic, Windows-1251 Cyrillic, ISO-8859-1 Latin-1, etc.),
+     * defaulting to UTF-8.
      */
-    private fun detectUtfCharset(data: ParsableByteArray): Charset {
-        val charset = data.readUtfCharsetFromBom()
-        return charset ?: StandardCharsets.UTF_8
-    }
+     private fun detectUtfCharset(data: ByteArray, offset: Int, length: Int): Charset {
+         val bomCharset = parsableByteArray.readUtfCharsetFromBom()
+         if (bomCharset != null) {
+             return bomCharset
+         }
+
+         return try {
+             val detector = UniversalDetector()
+             detector.handleData(data, offset, length)
+             detector.dataEnd()
+             val detected = detector.detectedCharset
+             if (detected != null) {
+                 Charset.forName(detected)
+             } else {
+                 StandardCharsets.UTF_8
+             }
+         } catch (_: Throwable) {
+             StandardCharsets.UTF_8
+         }
+     }
 
     /**
      * Trims and removes tags from the given line. The removed tags are added to `tags`.

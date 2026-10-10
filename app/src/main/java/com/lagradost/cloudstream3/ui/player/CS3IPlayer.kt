@@ -176,6 +176,7 @@ class CS3IPlayer : IPlayer {
     private var currentLink: ExtractorLink? = null
     private var currentDownloadedFile: ExtractorUri? = null
     private var hasUsedFirstRender = false
+    private var networkRetryCount = 0
 
     private var currentWindow: Int = 0
     private var playbackPosition: Long = 0
@@ -290,6 +291,7 @@ class CS3IPlayer : IPlayer {
         preview: Boolean,
     ) {
         Log.i(TAG, "loadPlayer")
+        networkRetryCount = 0
         if (sameEpisode) {
             saveData()
         } else {
@@ -1171,7 +1173,9 @@ class CS3IPlayer : IPlayer {
                         val activeCompressor = compressor
                         if (activeCompressor == null) {
                             // no nextlib = EXTENSION_RENDERER_MODE_OFF, no compressor = fully default sink
-                            DefaultRenderersFactory(context)
+                            DefaultRenderersFactory(context).apply {
+                                setEnableDecoderFallback(true)
+                            }
                         } else {
                             object : DefaultRenderersFactory(context) {
                                 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -1184,6 +1188,8 @@ class CS3IPlayer : IPlayer {
                                     .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
                                     .setAudioProcessors(arrayOf<AudioProcessor>(activeCompressor))
                                     .build()
+                            }.apply {
+                                setEnableDecoderFallback(true)
                             }
                         }
                     }
@@ -1307,18 +1313,23 @@ class CS3IPlayer : IPlayer {
         val extractorFactor = UpdatedDefaultExtractorsFactory()
             .setFragmentedMp4ExtractorFlags(FragmentedMp4Extractor.FLAG_MERGE_FRAGMENTED_SIDX)
 
-        // Create an online connection with cache for all online sources
+        // Create an online connection with disk cache only when disk cache size is explicitly configured (> 0)
+        // Bypassing CacheDataSource when simpleCacheSize <= 0 prevents SQLite locking and disk thrashing on potato devices
         val dataSourceFactory = if (onlineSource == null) {
             null
         } else {
-            if (simpleCache == null)
-                simpleCache = getCache(context, simpleCacheSize)
+            if (simpleCacheSize > 0) {
+                if (simpleCache == null)
+                    simpleCache = getCache(context, simpleCacheSize)
 
-            val cacheFactory = CacheDataSource.Factory().apply {
-                simpleCache?.let { setCache(it) }
-                setUpstreamDataSourceFactory(onlineSource)
+                val cacheFactory = CacheDataSource.Factory().apply {
+                    simpleCache?.let { setCache(it) }
+                    setUpstreamDataSourceFactory(onlineSource)
+                }
+                cacheFactory
+            } else {
+                onlineSource
             }
-            cacheFactory
         }
 
         val defaultMediaSourceFactory = if (dataSourceFactory != null) {
@@ -1599,12 +1610,23 @@ class CS3IPlayer : IPlayer {
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
-                    // If the Network fails then ignore the exception if the duration is set.
-                    // This is to switch mirrors automatically if the stream has not been fetched, but
-                    // allow playing the buffer without internet as then the duration is fetched.
+                    val isTransientNetworkError = when (error.errorCode) {
+                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+                        PlaybackException.ERROR_CODE_TIMEOUT -> true
+                        PlaybackException.ERROR_CODE_IO_UNSPECIFIED ->
+                            error.cause is java.io.IOException || error.cause is java.net.SocketTimeoutException
+                        else -> false
+                    }
+
+                    // If a transient network glitch occurs mid-playback (duration is known), retry in place
+                    // up to 3 times before abandoning mirror. This absorbs momentary packet drops.
                     when {
-                        error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
-                                && exoPlayer?.duration != TIME_UNSET -> {
+                        isTransientNetworkError
+                                && exoPlayer?.duration != TIME_UNSET
+                                && networkRetryCount < 3 -> {
+                            networkRetryCount++
+                            Log.w(TAG, "Transient network error ($networkRetryCount/3), auto-recovering playback: ${error.message}")
                             exoPlayer?.prepare()
                         }
 
@@ -1630,7 +1652,6 @@ class CS3IPlayer : IPlayer {
                             exoPlayer?.prepare()
                         }
 
-
                         else -> {
                             event(ErrorEvent(error))
                         }
@@ -1646,6 +1667,7 @@ class CS3IPlayer : IPlayer {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     super.onIsPlayingChanged(isPlaying)
                     if (isPlaying) {
+                        networkRetryCount = 0
                         event(RequestAudioFocusEvent())
                         onRenderFirst()
                     }
@@ -1655,7 +1677,7 @@ class CS3IPlayer : IPlayer {
                     super.onPlaybackStateChanged(playbackState)
                     when (playbackState) {
                         Player.STATE_READY -> {
-
+                            networkRetryCount = 0
                         }
 
                         Player.STATE_ENDED -> {

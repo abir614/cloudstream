@@ -240,7 +240,7 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
         //https://github.com/LagradOst/CloudStream-2/blob/ddd774ee66810137ff7bd65dae70bcf3ba2d2489/CloudStreamForms/CloudStreamForms/Script/MainChrome.cs#L388
         val subtitleParser = when {
             // "WEBVTT" can be hidden behind invisible characters not filtered by trim
-            trimmedText.substring(0, 10).contains("WEBVTT", ignoreCase = true) -> WebvttParser()
+            trimmedText.take(10).contains("WEBVTT", ignoreCase = true) -> WebvttParser()
             trimmedText.startsWith("<?xml version=\"", ignoreCase = true) -> TtmlParser()
             (trimmedText.startsWith(
                 "[Script Info]",
@@ -317,7 +317,7 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
         Log.i(TAG, "Parse subtitle, current parser: $realDecoder")
         try {
             val inputString = getStr(data).first
-            Log.i(TAG, "Subtitle preview: ${inputString.substring(0, 30)}")
+            Log.i(TAG, "Subtitle preview: ${inputString.take(30)}")
             if (inputString.isNotBlank()) {
                 var str: String = trimStr(inputString)
                 realDecoder = realDecoder ?: getSubtitleParser(inputString)
@@ -339,8 +339,8 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
                 val array = str.toByteArray()
                 realDecoder?.parse(
                     array,
-                    minOf(array.size, offset),
-                    minOf(array.size, length),
+                    0,
+                    array.size,
                     outputOptions,
                     customOutput
                 )
