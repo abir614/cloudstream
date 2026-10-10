@@ -97,6 +97,27 @@ object InAppUpdater {
         }
     }
 
+    private fun parseVersionScore(versionStr: String?): Long {
+        if (versionStr.isNullOrBlank()) return 0L
+        val clean = versionStr.removePrefix("v").substringBefore("-").trim()
+        val parts = clean.split('.').mapNotNull { it.toLongOrNull() }
+        return when (parts.size) {
+            0 -> clean.filter { it.isDigit() }.toLongOrNull() ?: 0L
+            1 -> parts[0] * 100_000_000L
+            2 -> parts[0] * 100_000_000L + parts[1] * 10_000L
+            else -> parts[0] * 100_000_000L + parts[1] * 10_000L + parts[2]
+        }
+    }
+
+    private fun extractVersionFromFileName(fileName: String): String {
+        val semver = Regex("""(\d+\.\d+\.\d+)""").find(fileName)?.value
+        if (semver != null) return semver
+        val count = Regex("""(?:v|r|-)(\d+)(?:\.apk|-)""").find(fileName)?.groupValues?.getOrNull(1)
+        if (count != null) return count
+        val intMatch = Regex("""(\d+)""").find(fileName)?.value
+        return intMatch ?: fileName
+    }
+
     private suspend fun Activity.getReleaseUpdate(): Update {
         val url = "https://api.github.com/repos/$GITHUB_USER_NAME/$GITHUB_REPO/releases"
         val headers = mapOf("Accept" to "application/vnd.github.v3+json")
@@ -104,16 +125,12 @@ object InAppUpdater {
             app.get(url, headers = headers).text
         ).toList()
 
-        val versionRegex = Regex("""(.*?((\d+)\.(\d+)\.(\d+))\.apk)""")
-        val versionRegexLocal = Regex("""(.*?((\d+)\.(\d+)\.(\d+)).*)""")
         val foundList = response.filter { rel ->
             !rel.prerelease
         }.sortedWith(compareBy { release ->
-            release.assets.firstOrNull { it.contentType == "application/vnd.android.package-archive" }?.name?.let { it1 ->
-                versionRegex.find(it1)?.groupValues?.let {
-                    it[3].toInt() * 100_000_000 + it[4].toInt() * 10_000 + it[5].toInt()
-                }
-            }
+            release.assets.firstOrNull { it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk") }?.name?.let { fileName ->
+                parseVersionScore(extractVersionFromFileName(fileName))
+            } ?: 0L
         }).toList()
 
         val found = foundList.lastOrNull() ?: return Update(false, null, null, null, null)
@@ -135,32 +152,24 @@ object InAppUpdater {
         } ?: apkAssets.firstOrNull { it.name.contains("universal") }
           ?: apkAssets.first()
 
-        val foundVersion = versionRegex.find(foundAsset.name)
-        if (foundVersion == null) {
-            return Update(false, null, null, null, null)
-        }
+        val remoteVersionStr = extractVersionFromFileName(foundAsset.name)
+        val remoteScore = parseVersionScore(remoteVersionStr)
 
         val currentVersion = packageName?.let {
             packageManager.getPackageInfo(it, 0)
         }
+        val currentScore = parseVersionScore(currentVersion?.versionName)
 
-        val shouldUpdate = if (foundAsset.browserDownloadUrl.isBlank()) {
+        val shouldUpdate = if (foundAsset.browserDownloadUrl.isBlank() || remoteScore <= 0L) {
             false
         } else {
-            currentVersion?.versionName?.let { versionName ->
-                versionRegexLocal.find(versionName)?.groupValues?.let {
-                    it[3].toInt() * 100_000_000 + it[4].toInt() * 10_000 + it[5].toInt()
-                }
-            }?.compareTo(
-                foundVersion.groupValues.let {
-                    it[3].toInt() * 100_000_000 + it[4].toInt() * 10_000 + it[5].toInt()
-                })!! < 0
+            currentScore < remoteScore
         }
 
         return Update(
             shouldUpdate,
             foundAsset.browserDownloadUrl,
-            foundVersion.groupValues[2],
+            remoteVersionStr,
             found.body,
             found.nodeId
         )

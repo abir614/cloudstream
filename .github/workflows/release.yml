@@ -94,6 +94,7 @@ jobs:
       - name: Determine Tag & Name
         id: release_meta
         run: |
+          COUNT=$(git rev-list --count HEAD)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag_name }}" ]; then
             TAG="${{ inputs.tag_name }}"
             TITLE="${{ inputs.release_name }}"
@@ -105,11 +106,9 @@ jobs:
             TITLE="CloudStream Hardened Edition ${TAG}"
             BODY="Official Stable Release ${TAG}"
           else
-            LATEST_TAG=$(git tag -l "v*" --sort=-v:refname | head -n 1)
-            [ -z "$LATEST_TAG" ] && LATEST_TAG="v4.8.0"
-            TAG="${LATEST_TAG}"
-            TITLE="CloudStream Hardened Edition ${TAG}"
-            BODY="Official Stable Release ${TAG} featuring Z+ zero-trust sandbox isolation, native Rust core, and cryptographic update verification."
+            TAG="v${COUNT}"
+            TITLE="CloudStream Hardened Edition v${COUNT}"
+            BODY="Official Stable Release v${COUNT} featuring Z+ zero-trust sandbox isolation, native Rust core, and cryptographic update verification."
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "title=${TITLE}" >> $GITHUB_OUTPUT

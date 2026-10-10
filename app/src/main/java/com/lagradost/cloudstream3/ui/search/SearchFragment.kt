@@ -201,18 +201,69 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
     // Null if defined as a variable
     // This needs to be run after view created
 
+    private fun getAvailableTypesForSources(selected: Set<String>, allValid: List<MainAPI>): List<TvType> {
+        val activeApis = if (selected.isNotEmpty()) {
+            selected.mapNotNull { getApiFromNameNull(it) }.ifEmpty { allValid }
+        } else {
+            allValid
+        }
+        return activeApis.flatMap { it.supportedTypes }.distinct()
+    }
+
+    private fun filterSearchResults(results: List<SearchResponse>): List<SearchResponse> {
+        val categoryFiltered = if (selectedSearchTypes.isNotEmpty()) {
+            results.filter { item -> item.type == null || selectedSearchTypes.contains(item.type) }
+        } else {
+            results
+        }
+        return categoryFiltered.filterSearchResponse()
+    }
+
+    private fun reapplySearchResultFilters() {
+        val currentResource = searchViewModel.searchResponse.value
+        if (currentResource is Resource.Success) {
+            val fullList = currentResource.value.list
+            val filtered = filterSearchResults(fullList)
+            (binding?.searchAutofitResults?.adapter as? SearchAdapter)?.submitList(filtered)
+        }
+
+        val currentGrouped = searchViewModel.currentSearch.value
+        if (!currentGrouped.isNullOrEmpty()) {
+            val pinnedOrder = DataStoreHelper.pinnedProviders.reversedArray()
+            val sortedList = currentGrouped.toList().sortedWith(compareBy { (providerName, _) ->
+                val index = pinnedOrder.indexOf(providerName)
+                if (index == -1) Int.MAX_VALUE else index
+            })
+            val newItems = sortedList.map { (providerName, providerData) ->
+                val dataList = providerData.list
+                val dataListFiltered = filterSearchResults(
+                    context?.filterSearchResultByFilmQuality(dataList) ?: dataList
+                )
+                val homePageList = HomePageList(providerName, dataListFiltered)
+                HomeViewModel.ExpandableHomepageList(
+                    homePageList,
+                    providerData.currentPage,
+                    providerData.hasNext
+                )
+            }
+            (binding?.searchMasterRecycler?.adapter as? ParentItemAdapter)?.submitList(newItems)
+        }
+    }
+
     private fun reloadRepos(success: Boolean = false) = main {
         searchViewModel.reloadRepos()
         context?.filterProviderByPreferredMedia()?.let { validAPIs ->
+            val sourceTypes = getAvailableTypesForSources(selectedApis, validAPIs)
             bindChips(
                 binding?.tvtypesChipsScroll?.tvtypesChips,
                 selectedSearchTypes,
-                validAPIs.flatMap { api -> api.supportedTypes }.distinct()
+                sourceTypes
             ) { list ->
                 if (selectedSearchTypes.toSet() != list.toSet()) {
                     DataStoreHelper.searchPreferenceTags = list
                     selectedSearchTypes.clear()
                     selectedSearchTypes.addAll(list)
+                    reapplySearchResultFilters()
                     search(binding?.mainSearch?.query?.toString())
                 }
             }
@@ -319,6 +370,16 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                     listView?.adapter = arrayAdapter
                     listView?.choiceMode = AbsListView.CHOICE_MODE_MULTIPLE
 
+                    fun updateAvailableCategories() {
+                        val availableTypes = getAvailableTypesForSources(currentSelectedApis, validAPIs)
+                        validateChips(selectMainpageBinding.tvtypesChipsScroll.tvtypesChips, availableTypes)
+                        val invalidTypes = selectedSearchTypes.filterNot { availableTypes.contains(it) }
+                        if (invalidTypes.isNotEmpty()) {
+                            selectedSearchTypes.removeAll(invalidTypes.toSet())
+                            updateChips(selectMainpageBinding.tvtypesChipsScroll.tvtypesChips, selectedSearchTypes)
+                        }
+                    }
+
                     listView?.setOnItemClickListener { _, _, i, _ ->
                         if (currentValidApis.isNotEmpty()) {
                             val api = currentValidApis[i].name
@@ -329,6 +390,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                                 listView.setItemChecked(i, true)
                                 currentSelectedApis += api
                             }
+                            updateAvailableCategories()
                         }
                     }
 
@@ -358,10 +420,11 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                         arrayAdapter.notifyDataSetChanged()
                     }
 
+                    val initialAvailableTypes = getAvailableTypesForSources(currentSelectedApis, validAPIs)
                     bindChips(
                         selectMainpageBinding.tvtypesChipsScroll.tvtypesChips,
                         selectedSearchTypes,
-                        validAPIs.flatMap { api -> api.supportedTypes }.distinct()
+                        initialAvailableTypes
                     ) { list ->
                         updateList(list)
 
@@ -373,13 +436,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                                 binding.tvtypesChipsScroll.tvtypesChips,
                                 selectedSearchTypes
                             )
-
                         }
-                    }
-
-
-                    cancelBtt?.setOnClickListener {
-                        dialog.dismissSafe()
                     }
 
                     cancelBtt?.setOnClickListener {
@@ -387,15 +444,32 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                     }
 
                     applyBtt?.setOnClickListener {
-                        //if (currentApiName != selectedApiName) {
-                        //    currentApiName?.let(callback)
-                        //}
                         dialog.dismissSafe()
                     }
 
                     dialog.setOnDismissListener {
                         DataStoreHelper.searchPreferenceProviders = currentSelectedApis.toList()
                         selectedApis = currentSelectedApis
+
+                        // Update main screen chips to reflect the categories available in the newly selected source(s)
+                        context?.filterProviderByPreferredMedia()?.let { vApis ->
+                            val sourceTypes = getAvailableTypesForSources(selectedApis, vApis)
+                            bindChips(
+                                binding.tvtypesChipsScroll.tvtypesChips,
+                                selectedSearchTypes,
+                                sourceTypes
+                            ) { list ->
+                                if (selectedSearchTypes.toSet() != list.toSet()) {
+                                    DataStoreHelper.searchPreferenceTags = list
+                                    selectedSearchTypes.clear()
+                                    selectedSearchTypes.addAll(list)
+                                    reapplySearchResultFilters()
+                                    search(binding.mainSearch.query.toString())
+                                }
+                            }
+                        }
+
+                        reapplySearchResultFilters()
 
                         // run search when dialog is close
                         if (previousSelectedApis != selectedApis.toSet() || previousSelectedSearchTypes != selectedSearchTypes.toSet()) {
@@ -469,10 +543,14 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             when (it) {
                 is Resource.Success -> {
                     it.value.let { data ->
-                        val list = data.list
+                        val list = filterSearchResults(data.list)
                         if (list.isNotEmpty()) {
                             (binding.searchAutofitResults.adapter as? SearchAdapter)?.submitList(
                                 list
+                            )
+                        } else {
+                            (binding.searchAutofitResults.adapter as? SearchAdapter)?.submitList(
+                                emptyList()
                             )
                         }
                     }
@@ -509,8 +587,9 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                 (binding.searchMasterRecycler.adapter as? ParentItemAdapter)?.apply {
                     val newItems = sortedList.map { (providerName, providerData) ->
                         val dataList = providerData.list
-                        val dataListFiltered =
+                        val dataListFiltered = filterSearchResults(
                             context?.filterSearchResultByFilmQuality(dataList) ?: dataList
+                        )
 
                         val homePageList = HomePageList(
                             providerName,

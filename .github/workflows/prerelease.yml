@@ -80,13 +80,19 @@ jobs:
         MAL_KEY: ${{ secrets.MAL_KEY }}
         ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
 
+    - name: Compute Build Count
+      id: build_count
+      run: |
+        COUNT=$(git rev-list --count HEAD)
+        echo "count=${COUNT}" >> $GITHUB_OUTPUT
+
     - name: Create pre-release
       uses: marvinpinto/action-automatic-releases@latest
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
         automatic_release_tag: "pre-release"
         prerelease: true
-        title: "Pre-release Build"
+        title: "Pre-release Build #${{ steps.build_count.outputs.count }}"
         files: |
           app/build/outputs/apk/prerelease/release/*.apk
           app/build/libs/app-sources.jar

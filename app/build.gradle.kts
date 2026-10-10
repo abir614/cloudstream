@@ -61,6 +61,18 @@ val generateGitHash = tasks.register<GenerateGitHashTask>("generateGitHash") {
     outputDir.set(layout.buildDirectory.dir("generated/git"))
 }
 
+fun getCommitCount(): Int {
+    try {
+        val out = providers.exec {
+            commandLine("git", "rev-list", "--count", "HEAD")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim()
+        val count = out.toIntOrNull()
+        if (count != null && count > 0) return count
+    } catch (_: Throwable) {}
+    return 1
+}
+
 fun getAutoVersionName(): String {
     val env = providers.environmentVariable("APP_VERSION_NAME").orNull
         ?: providers.environmentVariable("RELEASE_TAG").orNull
@@ -71,33 +83,24 @@ fun getAutoVersionName(): String {
 
     try {
         val out = providers.exec {
-            commandLine("git", "describe", "--tags", "--always")
+            commandLine("git", "describe", "--tags", "--exact-match")
             isIgnoreExitValue = true
         }.standardOutput.asText.get().trim()
         val clean = out.removePrefix("v")
-        if (clean.matches(Regex("""\d+\.\d+.*"""))) {
+        if (clean.isNotBlank()) {
             return clean
         }
     } catch (_: Throwable) {}
 
-    try {
-        val out = providers.exec {
-            commandLine("git", "tag", "-l", "v*", "--sort=-v:refname")
-            isIgnoreExitValue = true
-        }.standardOutput.asText.get().trim()
-        val tag = out.lines().firstOrNull { it.isNotBlank() }?.removePrefix("v")?.trim()
-        if (!tag.isNullOrBlank()) {
-            return tag
-        }
-    } catch (_: Throwable) {}
-
-    return libs.versions.versionName.getOrElse("4.8.0")
+    // Normal sequential counting based on git commit count
+    return getCommitCount().toString()
 }
 
 fun getAutoVersionCode(): Int {
     val envCode = providers.environmentVariable("APP_VERSION_CODE").orNull?.toIntOrNull()
     if (envCode != null && envCode > 0) return envCode
-    return (System.currentTimeMillis() / 60000).toInt()
+    // Monotonic sequential counting per commit; base 1000 ensures clean upgrade path over legacy releases
+    return 1000 + getCommitCount()
 }
 
 android {
