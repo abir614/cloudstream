@@ -18,20 +18,20 @@ plugins {
 val javaTarget = JvmTarget.fromTarget(libs.versions.jvmTarget.get())
 
 fun getAutoVersionName(): String {
-    val env = System.getenv("APP_VERSION_NAME")
-        ?: System.getenv("RELEASE_TAG")
-        ?: System.getenv("GITHUB_REF_NAME")?.takeIf { it.startsWith("v") || it.contains(".") }
+    val env = providers.environmentVariable("APP_VERSION_NAME").orNull
+        ?: providers.environmentVariable("RELEASE_TAG").orNull
+        ?: providers.environmentVariable("GITHUB_REF_NAME").orNull?.takeIf { it.startsWith("v") || it.contains(".") }
     if (!env.isNullOrBlank()) {
         return env.removePrefix("v").trim()
     }
     try {
-        val process = ProcessBuilder("git", "tag", "-l", "v*", "--sort=-v:refname")
-            .directory(rootDir)
-            .redirectErrorStream(true)
-            .start()
-        val output = process.inputStream.bufferedReader().lineSequence().firstOrNull { it.isNotBlank() }
-        if (process.waitFor() == 0 && !output.isNullOrBlank()) {
-            return output.removePrefix("v").trim()
+        val out = providers.exec {
+            commandLine("git", "tag", "-l", "v*", "--sort=-v:refname")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim()
+        val tag = out.lines().firstOrNull { it.isNotBlank() }?.removePrefix("v")?.trim()
+        if (!tag.isNullOrBlank()) {
+            return tag
         }
     } catch (_: Throwable) {}
     return "1.0.1"

@@ -84,7 +84,7 @@ jobs:
       - name: Build Android Kotlin Sources
         run: |
           chmod +x gradlew
-          ./gradlew compilePrereleaseDebugSources -x lint -x test --no-daemon
+          ./gradlew compilePrereleaseDebugSources -x lint -x test --no-daemon --no-configuration-cache
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
