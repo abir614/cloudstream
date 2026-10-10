@@ -7,17 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release Tag Name (e.g. v4.8.0-hardened or v1.0.0)'
-        required: true
-        default: 'v4.8.0-hardened'
+        description: 'Release Tag Name (leave empty for automatic detection)'
+        required: false
+        default: ''
       release_name:
-        description: 'Release Title'
-        required: true
-        default: 'CloudStream (Hardened & Optimized Edition)'
+        description: 'Release Title (leave empty for automatic detection)'
+        required: false
+        default: ''
       body:
         description: 'Release description / changelog'
         required: false
-        default: 'Official Stable Release featuring Z+ zero-trust sandbox isolation, native Rust core, SIMD M3U streaming, and anti-SSRF protections.'
+        default: ''
 
 concurrency:
   group: "stable-release"
@@ -94,16 +94,26 @@ jobs:
       - name: Determine Tag & Name
         id: release_meta
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
-            echo "title=${{ inputs.release_name }}" >> $GITHUB_OUTPUT
-            echo "body=${{ inputs.body }}" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.tag_name }}" ]; then
+            TAG="${{ inputs.tag_name }}"
+            TITLE="${{ inputs.release_name }}"
+            [ -z "$TITLE" ] && TITLE="CloudStream Hardened Edition ${TAG}"
+            BODY="${{ inputs.body }}"
+            [ -z "$BODY" ] && BODY="Official Stable Release ${TAG} featuring Z+ zero-trust sandbox isolation, native Rust core, and cryptographic update verification."
+          elif [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG="${{ github.ref_name }}"
+            TITLE="CloudStream Hardened Edition ${TAG}"
+            BODY="Official Stable Release ${TAG}"
           else
-            TAG_REF="${{ github.ref_name }}"
-            echo "tag=${TAG_REF}" >> $GITHUB_OUTPUT
-            echo "title=CloudStream Hardened Edition ${TAG_REF}" >> $GITHUB_OUTPUT
-            echo "body=Official Stable Release ${TAG_REF}" >> $GITHUB_OUTPUT
+            LATEST_TAG=$(git tag -l "v*" --sort=-v:refname | head -n 1)
+            [ -z "$LATEST_TAG" ] && LATEST_TAG="v4.8.0"
+            TAG="${LATEST_TAG}"
+            TITLE="CloudStream Hardened Edition ${TAG}"
+            BODY="Official Stable Release ${TAG} featuring Z+ zero-trust sandbox isolation, native Rust core, and cryptographic update verification."
           fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "title=${TITLE}" >> $GITHUB_OUTPUT
+          echo "body=${BODY}" >> $GITHUB_OUTPUT
 
       - name: Create Stable GitHub Release
         uses: softprops/action-gh-release@v2

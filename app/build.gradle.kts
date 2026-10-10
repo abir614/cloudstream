@@ -61,6 +61,48 @@ val generateGitHash = tasks.register<GenerateGitHashTask>("generateGitHash") {
     outputDir.set(layout.buildDirectory.dir("generated/git"))
 }
 
+fun getAutoVersionName(): String {
+    val env = System.getenv("APP_VERSION_NAME")
+        ?: System.getenv("RELEASE_TAG")
+        ?: System.getenv("GITHUB_REF_NAME")?.takeIf { it.startsWith("v") || it.contains(".") }
+    if (!env.isNullOrBlank()) {
+        return env.removePrefix("v").trim()
+    }
+
+    try {
+        val process = ProcessBuilder("git", "describe", "--tags", "--always")
+            .directory(rootDir)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText().trim()
+        if (process.waitFor() == 0 && output.isNotBlank()) {
+            val clean = output.removePrefix("v")
+            if (clean.matches(Regex("""\d+\.\d+.*"""))) {
+                return clean
+            }
+        }
+    } catch (_: Throwable) {}
+
+    try {
+        val process = ProcessBuilder("git", "tag", "-l", "v*", "--sort=-v:refname")
+            .directory(rootDir)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().lineSequence().firstOrNull { it.isNotBlank() }
+        if (process.waitFor() == 0 && !output.isNullOrBlank()) {
+            return output.removePrefix("v").trim()
+        }
+    } catch (_: Throwable) {}
+
+    return libs.versions.versionName.getOrElse("4.8.0")
+}
+
+fun getAutoVersionCode(): Int {
+    val envCode = System.getenv("APP_VERSION_CODE")?.toIntOrNull()
+    if (envCode != null && envCode > 0) return envCode
+    return (System.currentTimeMillis() / 60000).toInt()
+}
+
 android {
     @Suppress("UnstableApiUsage")
     testOptions {
@@ -112,8 +154,8 @@ android {
         applicationId = "com.lagradost.cloudstream3"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = libs.versions.versionCode.get().toInt()
-        versionName = libs.versions.versionName.get()
+        versionCode = getAutoVersionCode()
+        versionName = getAutoVersionName()
 
         manifestPlaceholders["target_sdk_version"] = libs.versions.targetSdk.get()
 
@@ -185,7 +227,6 @@ android {
                 logger.warn("No prerelease signing config!")
             }
             versionNameSuffix = "-PRE"
-            versionCode = (System.currentTimeMillis() / 60000).toInt()
         }
     }
 
