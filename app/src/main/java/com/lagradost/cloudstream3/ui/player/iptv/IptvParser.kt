@@ -4,6 +4,9 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 
+import com.lagradost.cloudstream3.services.NativeCoreBridge
+import org.json.JSONArray
+
 data class IptvChannel(
     val name: String,
     val streamUrl: String,
@@ -52,6 +55,30 @@ object IptvParser {
     }
 
     fun parse(content: String): List<IptvChannel> {
+        if (NativeCoreBridge.isNativeReady()) {
+            try {
+                val json = NativeCoreBridge.nativeParseIptv(content)
+                if (json != null) {
+                    val arr = JSONArray(json)
+                    val channels = ArrayList<IptvChannel>(arr.length())
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        channels.add(
+                            IptvChannel(
+                                name = obj.getString("name"),
+                                streamUrl = obj.getString("url"),
+                                logo = if (obj.isNull("logo")) null else obj.getString("logo"),
+                                group = if (obj.isNull("group")) null else obj.getString("group"),
+                                tvgId = if (obj.isNull("tvg_id")) null else obj.getString("tvg_id"),
+                            )
+                        )
+                    }
+                    return channels
+                }
+            } catch (_: Throwable) {
+            }
+        }
+
         val channels = ArrayList<IptvChannel>()
         var currentName: String? = null
         var currentLogo: String? = null

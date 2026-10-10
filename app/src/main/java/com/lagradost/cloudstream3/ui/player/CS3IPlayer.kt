@@ -5,7 +5,6 @@ package com.lagradost.cloudstream3.ui.player
 import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.content.Context
-import android.content.DialogInterface
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Handler
@@ -16,7 +15,6 @@ import android.widget.FrameLayout
 import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.OptIn
-import androidx.appcompat.app.AlertDialog
 import androidx.core.net.toUri
 import androidx.media3.common.C.TIME_UNSET
 import androidx.media3.common.C.TRACK_TYPE_AUDIO
@@ -1044,34 +1042,6 @@ class CS3IPlayer : IPlayer {
         }
     }
 
-    // we want to push metadata when loading torrents, so we just set up a looper that loops until
-    // the index changes, this way only 1 looper is active at a time, and modifying eventLooperIndex
-    // will kill any active loopers
-    private var eventLooperIndex = 0
-    private fun torrentEventLooper(hash: String) = ioSafe {
-        eventLooperIndex += 2
-        // very shitty, but should work fine
-        // release player is called once for the new link
-        val currentIndex = eventLooperIndex + 1
-        while (eventLooperIndex <= currentIndex && eventHandler != null) {
-            try {
-                val status = Torrent.get(hash)
-                event(
-                    DownloadEvent(
-                        connections = status.activePeers,
-                        downloadSpeed = status.downloadSpeed?.toLong()!!,
-                        totalBytes = status.torrentSize!!,
-                        downloadedBytes = status.bytesRead!!,
-                    )
-                )
-            } catch (_: NullPointerException) {
-            } catch (t: Throwable) {
-                logError(t)
-            }
-            delay(1000)
-        }
-    }
-
     private fun buildExoPlayer(
         context: Context,
         mediaItemSlices: List<MediaItemSlice>,
@@ -1846,31 +1816,6 @@ class CS3IPlayer : IPlayer {
         return exoPlayer != null
     }
 
-    @MainThread
-    private fun loadTorrent(context: Context, link: ExtractorLink) {
-        ioSafe {
-            // we check exoPlayer a lot here, and that is because we don't want to load exo after
-            // the user has left the player, in the case that the user click back when this is
-            // happening
-            try {
-                if (exoPlayer == null) return@ioSafe
-                val (newLink, status) = Torrent.transformLink(link)
-                val hash = status.hash
-                if (exoPlayer == null) return@ioSafe
-                runOnMainThread {
-                    if (exoPlayer == null) return@runOnMainThread
-                    releasePlayer()
-                    if (hash != null) {
-                        torrentEventLooper(hash)
-                    }
-                    loadOnlinePlayer(context, newLink)
-                }
-            } catch (t: Throwable) {
-                event(ErrorEvent(t))
-            }
-        }
-    }
-
     @SuppressLint("UnsafeOptInUsageError")
     @MainThread
     private fun loadOnlinePlayer(context: Context, link: ExtractorLink, retry: Boolean = false) {
@@ -1891,84 +1836,8 @@ class CS3IPlayer : IPlayer {
                     }
                 }
                 ExtractorLinkType.TORRENT, ExtractorLinkType.MAGNET -> {
-                    // we check settings first, todo cleanup
-                    val default = TvType.entries.toTypedArray()
-                        .sorted()
-                        .filter { it != TvType.NSFW }
-                        .map { it.ordinal }
-
-                    val defaultSet = default.map { it.toString() }.toSet()
-                    val currentPrefMedia = try {
-                        PreferenceManager.getDefaultSharedPreferences(context)
-                            .getStringSet(
-                                context.getString(R.string.prefer_media_type_key),
-                                defaultSet
-                            )
-                            ?.mapNotNull { it.toIntOrNull() ?: return@mapNotNull null }
-                    } catch (_: Throwable) {
-                        null
-                    } ?: default
-
-                    if (!currentPrefMedia.contains(TvType.Torrent.ordinal)) {
-                        val errorMessage = context.getString(R.string.torrent_preferred_media)
-                        event(ErrorEvent(ErrorLoadingException(errorMessage)))
-                        return
-                    }
-
-                    if (Torrent.hasAcceptedTorrentForThisSession == false) {
-                        val errorMessage = context.getString(R.string.torrent_not_accepted)
-                        event(ErrorEvent(ErrorLoadingException(errorMessage)))
-                        return
-                    }
-                    // load the initial UI, we require an exoPlayer to be alive
-                    if (!retry) {
-                        // this causes a *bug* that restarts all torrents from 0
-                        // but I would call this a feature
-                        releasePlayer()
-                        loadExo(context, listOf(), listOf())
-                    }
-                    event(
-                        StatusEvent(
-                            wasPlaying = CSPlayerLoading.IsPlaying,
-                            isPlaying = CSPlayerLoading.IsBuffering
-                        )
-                    )
-
-                    if (Torrent.hasAcceptedTorrentForThisSession == true) {
-                        loadTorrent(context, link)
-                        return
-                    }
-
-                    val builder: AlertDialog.Builder = AlertDialog.Builder(context)
-
-                    val dialogClickListener =
-                        DialogInterface.OnClickListener { _, which ->
-                            when (which) {
-                                DialogInterface.BUTTON_POSITIVE -> {
-                                    Torrent.hasAcceptedTorrentForThisSession = true
-                                    loadTorrent(context, link)
-                                }
-
-                                DialogInterface.BUTTON_NEGATIVE -> {
-                                    Torrent.hasAcceptedTorrentForThisSession = false
-                                    val errorMessage =
-                                        context.getString(R.string.torrent_not_accepted)
-                                    event(ErrorEvent(ErrorLoadingException(errorMessage)))
-                                }
-                            }
-                        }
-
-                    builder.setTitle(R.string.play_torrent_button)
-                        .setMessage(R.string.torrent_info)
-                        // Ensure that the user will not accidentally start a torrent session.
-                        .setCancelable(false).setOnCancelListener {
-                            val errorMessage = context.getString(R.string.torrent_not_accepted)
-                            event(ErrorEvent(ErrorLoadingException(errorMessage)))
-                        }
-                        .setPositiveButton(R.string.ok, dialogClickListener)
-                        .setNegativeButton(R.string.go_back, dialogClickListener)
-                        .show().setDefaultFocus()
-
+                    val errorMessage = context.getString(R.string.torrent_info)
+                    event(ErrorEvent(ErrorLoadingException(errorMessage)))
                     return
                 }
             }

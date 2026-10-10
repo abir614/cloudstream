@@ -42,7 +42,6 @@ import com.lagradost.cloudstream3.syncproviders.AccountManager
 import com.lagradost.cloudstream3.ui.home.HomeChildItemAdapter
 import com.lagradost.cloudstream3.ui.home.ParentItemAdapter
 import com.lagradost.cloudstream3.ui.player.PlayerPipHelper.isPIPPossible
-import com.lagradost.cloudstream3.ui.player.Torrent
 import com.lagradost.cloudstream3.ui.result.ActorAdaptor
 import com.lagradost.cloudstream3.ui.result.EpisodeAdapter
 import com.lagradost.cloudstream3.ui.result.ImageAdapter
@@ -243,7 +242,6 @@ object CommonActivity {
 
     fun init(act: Activity) {
         setActivityInstance(act)
-        ioSafe { Torrent.deleteAllFiles() }
         val componentActivity = activity as? ComponentActivity ?: return
 
         componentActivity.updateLocale()
