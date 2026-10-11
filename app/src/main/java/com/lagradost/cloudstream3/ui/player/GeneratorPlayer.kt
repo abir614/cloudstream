@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Bundle
 import android.text.Spanned
 import android.util.Log
+import com.lagradost.cloudstream3.BuildConfig
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -1969,7 +1970,7 @@ class GeneratorPlayer : FullScreenPlayer() {
         // auto select subtitle based on settings
         val langCode = preferredAutoSelectSubtitles
         val current = player.getCurrentPreferredSubtitle()
-        Log.i(TAG, "autoSelectFromSettings = $current")
+        if (BuildConfig.DEBUG) Log.d(TAG, "autoSelectFromSettings = $current")
         context?.let { ctx ->
             // Only use the player preferred subtitle if it matches the available language
             if (current != null && (langCode == null || current.matchesLanguageCode(langCode))) {
@@ -2203,7 +2204,7 @@ class GeneratorPlayer : FullScreenPlayer() {
     }
 
     private fun unwrapBundle(savedInstanceState: Bundle?) {
-        Log.i(TAG, "unwrapBundle = $savedInstanceState")
+        if (BuildConfig.DEBUG) Log.d(TAG, "unwrapBundle = $savedInstanceState")
         savedInstanceState?.let { bundle ->
             sync.addSyncs(bundle.getSafeSerializable<HashMap<String, String>>("syncData"))
         }

@@ -16,6 +16,7 @@ import android.os.Looper
 import android.text.format.DateUtils
 import android.util.AttributeSet
 import android.util.Log
+import com.lagradost.cloudstream3.BuildConfig
 import android.view.View
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -737,8 +738,8 @@ class PlayerView @JvmOverloads constructor(
      */
     @MainThread
     fun mainCallback(event: PlayerEvent) {
-        // We don't want to spam DownloadEvent.
-        if (event !is DownloadEvent) Log.i(TAG, "Handle event: $event")
+        // We don't want to spam DownloadEvent, and strip from release builds to prevent UI stalls.
+        if (BuildConfig.DEBUG && event !is DownloadEvent) Log.d(TAG, "Handle event: $event")
         when (event) {
             is DownloadEvent -> callbacks?.onDownload(event)
             is ResizedEvent -> {

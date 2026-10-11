@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.core.graphics.scale
 import androidx.preference.PreferenceManager
+import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.mvvm.logError
@@ -428,10 +429,10 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
     override fun getPreviewImage(fraction: Float): Bitmap? {
         synchronized(images) {
             if (loadedLod < MIN_LOD) {
-                Log.i(TAG, "Requesting preview for $fraction but $loadedLod < $MIN_LOD")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Requesting preview for $fraction but $loadedLod < $MIN_LOD")
                 return null
             }
-            Log.i(TAG, "Requesting preview for $fraction")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Requesting preview for $fraction")
 
             var bestIdx = 0
             var bestDiff = 0.5f.minus(fraction).absoluteValue
@@ -456,7 +457,7 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
                     }
                 }
             }
-            Log.i(TAG, "Best diff found at ${bestDiff * 100}% diff (${bestIdx})")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Best diff found at ${bestDiff * 100}% diff (${bestIdx})")
             return images[bestIdx]
         }
     }
@@ -481,7 +482,7 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
     fun load(url: String, headers: Map<String, String>) {
         currentJob?.cancel()
         currentJob = ioSafe {
-            Log.i(TAG, "Loading with url = $url headers = $headers")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Loading with url = $url headers = $headers")
             clear(true)
             retriever.setDataSource(url, headers)
             start(this)
@@ -491,7 +492,7 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
     fun load(keepCache: Boolean, context: Context, uri: Uri) {
         currentJob?.cancel()
         currentJob = ioSafe {
-            Log.i(TAG, "Loading with uri = $uri")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Loading with uri = $uri")
             clear(keepCache)
             retriever.setDataSource(context, uri)
             start(this)
@@ -508,7 +509,7 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
     @Throws
     @WorkerThread
     private fun start(scope: CoroutineScope) {
-        Log.i(TAG, "Started loading preview")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Started loading preview")
 
         val durationMs =
             retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong()
@@ -527,7 +528,7 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
                 val idx = items - 1 + i // as sum(prev) = cur-1
                 // frame = 100 / 2^lod + i * 100 / 2^(lod-1) = duration % where lod is one indexed
                 val fraction = (1.0f.div((1 shl l).toFloat()) + i * 1.0f.div(items.toFloat()))
-                Log.i(TAG, "Generating preview for ${fraction * 100}%")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Generating preview for ${fraction * 100}%")
                 val frame = durationUs * fraction
                 val img = retriever.image(frame.toLong(), params)
                 if (!scope.isActive) return

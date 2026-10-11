@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.ui.player
 
 import android.util.Log
+import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.APIHolder.getApiFromNameNull
 import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
@@ -101,16 +102,16 @@ object StreamHealthProber {
                     response.close()
 
                     val isAlive = code in 200..399
-                    Log.d(TAG, "Probed ${extractorLink.name} (${extractorLink.url}): code=$code, latency=${latency}ms, alive=$isAlive")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Probed ${extractorLink.name} (${extractorLink.url}): code=$code, latency=${latency}ms, alive=$isAlive")
                     ProbeResult(videoLink, isAlive, latency, code)
                 } ?: run {
                     val latency = System.currentTimeMillis() - startTime
-                    Log.d(TAG, "Probe timed out for ${extractorLink.name} (${extractorLink.url}) after ${latency}ms")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "Probe timed out for ${extractorLink.name} (${extractorLink.url}) after ${latency}ms")
                     ProbeResult(videoLink, isAlive = false, latencyMs = latency, statusCode = 408)
                 }
             } catch (t: Throwable) {
                 val latency = System.currentTimeMillis() - startTime
-                Log.d(TAG, "Probe failed for ${extractorLink.name} (${extractorLink.url}): ${t.message} (${latency}ms)")
+                if (BuildConfig.DEBUG) Log.d(TAG, "Probe failed for ${extractorLink.name} (${extractorLink.url}): ${t.message} (${latency}ms)")
                 ProbeResult(videoLink, isAlive = false, latencyMs = latency, statusCode = -1)
             }
         }
@@ -144,7 +145,7 @@ object StreamHealthProber {
         val aliveResults = results.filter { it.isAlive }.sortedBy { it.latencyMs }
         val bestLink = aliveResults.firstOrNull()?.link ?: candidates.firstOrNull { !deadLinks.contains(it) } ?: candidates.first()
 
-        Log.i(TAG, "Probed ${toProbe.size} links in parallel -> Winner: ${bestLink.first?.name ?: bestLink.first?.url}, Dead count: ${deadLinks.size}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "Probed ${toProbe.size} links in parallel -> Winner: ${bestLink.first?.name ?: bestLink.first?.url}, Dead count: ${deadLinks.size}")
         ProbedSelection(bestLink, deadLinks)
     }
 }

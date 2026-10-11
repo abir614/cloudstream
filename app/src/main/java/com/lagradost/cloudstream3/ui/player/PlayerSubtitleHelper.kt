@@ -2,6 +2,7 @@ package com.lagradost.cloudstream3.ui.player
 
 import android.util.Log
 import android.util.TypedValue
+import com.lagradost.cloudstream3.BuildConfig
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
@@ -132,7 +133,7 @@ class PlayerSubtitleHelper {
     }
 
     fun setSubStyle(style: SaveCaptionStyle) {
-        Log.i(TAG, "SET STYLE = $style")
+        if (BuildConfig.DEBUG) Log.d(TAG, "SET STYLE = $style")
         subtitleView?.translationY = -style.elevation.toPx.toFloat()
         setSubtitleViewStyle(subtitleView, style, true)
     }

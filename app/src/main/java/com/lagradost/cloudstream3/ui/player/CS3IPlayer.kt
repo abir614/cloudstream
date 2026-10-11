@@ -75,6 +75,7 @@ import androidx.media3.ui.SubtitleView
 import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.APIHolder.getApiFromNameNull
 import com.lagradost.cloudstream3.AudioFile
+import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.getKey
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.setKey
 import com.lagradost.cloudstream3.CommonActivity.activity
@@ -290,7 +291,7 @@ class CS3IPlayer : IPlayer {
         autoPlay: Boolean?,
         preview: Boolean,
     ) {
-        Log.i(TAG, "loadPlayer")
+        if (BuildConfig.DEBUG) Log.d(TAG, "loadPlayer")
         networkRetryCount = 0
         if (sameEpisode) {
             saveData()
@@ -590,7 +591,7 @@ class CS3IPlayer : IPlayer {
     }
 
     override fun saveData() {
-        Log.i(TAG, "saveData")
+        if (BuildConfig.DEBUG) Log.d(TAG, "saveData")
         updatedTime()
 
         exoPlayer?.let { exo ->
@@ -601,7 +602,7 @@ class CS3IPlayer : IPlayer {
     }
 
     private fun releasePlayer(saveTime: Boolean = true) {
-        Log.i(TAG, "releasePlayer")
+        if (BuildConfig.DEBUG) Log.d(TAG, "releasePlayer")
         if (saveTime)
             updatedTime()
 
@@ -634,7 +635,7 @@ class CS3IPlayer : IPlayer {
     }
 
     override fun onStop() {
-        Log.i(TAG, "onStop")
+        if (BuildConfig.DEBUG) Log.d(TAG, "onStop")
 
         saveData()
         if (!isAudioOnlyBackground) {
@@ -644,7 +645,7 @@ class CS3IPlayer : IPlayer {
     }
 
     override fun onPause() {
-        Log.i(TAG, "onPause")
+        if (BuildConfig.DEBUG) Log.d(TAG, "onPause")
         saveData()
         if (!isAudioOnlyBackground) {
             handleEvent(CSPlayerEvent.Pause, PlayerEventSource.Player)
@@ -967,7 +968,7 @@ class CS3IPlayer : IPlayer {
     }
 
     override fun handleEvent(event: CSPlayerEvent, source: PlayerEventSource) {
-        Log.i(TAG, "handleEvent ${event.name}")
+        if (BuildConfig.DEBUG) Log.d(TAG, "handleEvent ${event.name}")
         try {
             exoPlayer?.apply {
                 when (event) {
@@ -1968,7 +1969,7 @@ class CS3IPlayer : IPlayer {
     }
 
     override fun reloadPlayer(context: Context) {
-        Log.i(TAG, "reloadPlayer")
+        if (BuildConfig.DEBUG) Log.d(TAG, "reloadPlayer")
 
         releasePlayer(false)
         currentLink?.let {

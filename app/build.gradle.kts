@@ -217,6 +217,7 @@ android {
             if (signingConfigs.names.contains("prerelease")) {
                 signingConfig = signingConfigs.getByName("prerelease")
             }
+            buildConfigField("boolean", "IS_STABLE_BUILD", "true")
         }
         create("prerelease") {
             dimension = "state"
@@ -227,6 +228,7 @@ android {
                 logger.warn("No prerelease signing config!")
             }
             versionNameSuffix = "-PRE"
+            buildConfigField("boolean", "IS_STABLE_BUILD", "false")
         }
     }
 

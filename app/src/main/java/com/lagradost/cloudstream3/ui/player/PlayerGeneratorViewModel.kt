@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.ui.player
 
 import android.util.Log
+import com.lagradost.cloudstream3.BuildConfig
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -263,7 +264,7 @@ class PlayerGeneratorViewModel : ViewModel() {
     }
 
     fun loadLinksPrev() {
-        Log.i(TAG, "loadLinksPrev")
+        if (BuildConfig.DEBUG) Log.d(TAG, "loadLinksPrev")
         if (generator?.hasPrev(episodeIndex) == true) {
             episodeIndex -= 1
             loadLinks()
@@ -271,7 +272,7 @@ class PlayerGeneratorViewModel : ViewModel() {
     }
 
     fun loadLinksNext() {
-        Log.i(TAG, "loadLinksNext")
+        if (BuildConfig.DEBUG) Log.d(TAG, "loadLinksNext")
         if (generator?.hasNext(episodeIndex) == true) {
             episodeIndex += 1
             loadLinks()
@@ -301,7 +302,7 @@ class PlayerGeneratorViewModel : ViewModel() {
             return
         }
 
-        Log.i(TAG, "preLoadNextLinks started for nextIndex=$nextIndex, nextId=$nextId")
+        if (BuildConfig.DEBUG) Log.d(TAG, "preLoadNextLinks started for nextIndex=$nextIndex, nextId=$nextId")
         preloadJob?.cancel()
 
         val preloadedLinks = ConcurrentHashMap.newKeySet<VideoLink>()
@@ -387,7 +388,7 @@ class PlayerGeneratorViewModel : ViewModel() {
     }
 
     fun attachGenerator(newGenerator: VideoGenerator<*>, index: Int) {
-        Log.i(TAG, "attachGenerator with generator=$newGenerator and index=$index")
+        if (BuildConfig.DEBUG) Log.d(TAG, "attachGenerator with generator=$newGenerator and index=$index")
         generator = newGenerator
         episodeIndex = index
         preloadJob?.cancel()
@@ -455,14 +456,14 @@ class PlayerGeneratorViewModel : ViewModel() {
     }
 
     fun loadLinks(sourceTypes: Set<ExtractorLinkType> = LOADTYPE_INAPP) {
-        Log.i(TAG, "loadLinks with generator=$generator and index=$episodeIndex")
+        if (BuildConfig.DEBUG) Log.d(TAG, "loadLinks with generator=$generator and index=$episodeIndex")
         currentJob?.cancel()
         val index = episodeIndex
 
         // Instant Binge Transition: Check if next episode was preloaded into memory
         val preloaded = preloadedEpisode
         if (preloaded != null && preloaded.index == index && preloaded.links.isNotEmpty()) {
-            Log.i(TAG, "Instant Binge Transition: Using ${preloaded.links.size} preloaded links for index=$index")
+            if (BuildConfig.DEBUG) Log.d(TAG, "Instant Binge Transition: Using ${preloaded.links.size} preloaded links for index=$index")
             preloadedEpisode = null
 
             modifyState {
