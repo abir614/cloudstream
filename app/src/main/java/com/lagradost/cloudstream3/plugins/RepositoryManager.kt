@@ -169,16 +169,28 @@ object RepositoryManager {
     suspend fun parseRepository(url: String): Repository? {
         return safeAsync {
             // Take manifestVersion and such into account later
-            app.get(convertRawGitUrl(url), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
-                .parsedSafe<Repository>()
+            val res = app.get(convertRawGitUrl(url), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
+            if (!res.isSuccessful) return@safeAsync null
+            val text = res.text.trim()
+            if (!text.startsWith("{")) {
+                Log.w("RepositoryManager", "Repository response from $url is not JSON object (starts with '${text.take(20)}')")
+                return@safeAsync null
+            }
+            res.parsedSafe<Repository>()
         }
     }
 
     private suspend fun parsePlugins(pluginUrls: String): List<SitePlugin> {
         // Take manifestVersion and such into account later
         return try {
-            app.get(convertRawGitUrl(pluginUrls), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
-                .parsed<Array<SitePlugin>>().toList()
+            val res = app.get(convertRawGitUrl(pluginUrls), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
+            if (!res.isSuccessful) return emptyList()
+            val text = res.text.trim()
+            if (!text.startsWith("[")) {
+                Log.w("RepositoryManager", "Plugin list response from $pluginUrls is not JSON array (starts with '${text.take(20)}')")
+                return emptyList()
+            }
+            res.parsed<Array<SitePlugin>>().toList()
         } catch (t: Throwable) {
             logError(t)
             emptyList()
