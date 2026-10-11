@@ -112,6 +112,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         return buildImageLoader(applicationContext)
     }
 
+    @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         try {

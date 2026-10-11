@@ -113,7 +113,7 @@ class ResumePlaybackUseCase(
      */
     fun getSavedPosition(episodeId: Int, durationMs: Long): Long {
         val key = "$KEY_PREFIX_RESUME$episodeId"
-        val saved = repository.get(key, java.lang.Long::class.java)?.toLong() ?: return 0L
+        val saved = repository.get(key, Long::class.javaObjectType)?.toLong() ?: return 0L
         val progress = evaluateProgress(saved, durationMs)
         return if (progress.shouldResume) progress.positionMs else 0L
     }

@@ -1639,7 +1639,7 @@ class CS3IPlayer : IPlayer {
                 override fun onPlayerError(error: PlaybackException) {
                     val position = exoPlayer?.currentPosition ?: exoPlayer?.duration ?: 0L
                     val duration = exoPlayer?.duration ?: 0L
-                    val aheadOfLive = LiveHelper.getLiveManager(exoPlayer)?.getTimeAheadOfLive(position)?.toLong()
+                    val aheadOfLive = LiveHelper.getLiveManager(exoPlayer)?.getTimeAheadOfLive(position)
 
                     when (val decision = failoverEngine.handlePlaybackError(
                         errorCode = error.errorCode,

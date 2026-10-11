@@ -92,7 +92,7 @@ class SqliteDataRepository(
 
         if (jsonValue != null) {
             return try {
-                parseJson(jsonValue!!, clazz.kotlin)
+                parseJson(jsonValue, clazz.kotlin)
             } catch (t: Throwable) {
                 Log.w(TAG, "Failed to parse SQLite JSON for key '$key': ${t.message}")
                 null
