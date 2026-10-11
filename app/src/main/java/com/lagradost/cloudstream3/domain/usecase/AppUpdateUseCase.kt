@@ -31,10 +31,9 @@ class AppUpdateUseCase(
      */
     fun verifyUpdateBinary(
         context: Context,
-        apkFile: File,
-        repoCertHex: String? = null
+        apkFile: File
     ): UpdateSecurityGate.VerificationOutcome {
-        return securityGate.verifyDownloadedApk(context, apkFile, repoCertHex)
+        return securityGate.verifyAndAuthorize(context, apkFile)
     }
 
     /**
@@ -44,7 +43,7 @@ class AppUpdateUseCase(
         activity: Activity,
         token: UpdateSecurityGate.GateAuthorizationToken
     ): Boolean {
-        return securityGate.launchAuthorizedInstall(activity, token.authorizedFile, token)
+        return securityGate.executeInstallation(activity, token.authorizedFile, token)
     }
 
     /**

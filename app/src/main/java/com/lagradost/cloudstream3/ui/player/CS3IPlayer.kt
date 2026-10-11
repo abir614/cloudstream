@@ -1504,7 +1504,7 @@ class CS3IPlayer : IPlayer {
                 cacheSize = cacheSize,
                 videoBufferMs = videoBufferMs,
                 playWhenReady = playWhenReady,
-                subtitleOffset = currentSubtitleOffset,
+                subtitleOffset = subtitleSyncEngine.getOffset(),
                 maxVideoHeight = maxVideoHeight,
                 audioSources = audioSources,
                 onlineSource = onlineSource,

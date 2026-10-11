@@ -24,8 +24,8 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object ServiceLocator {
 
-    private val dependencies = ConcurrentHashMap<Class<*>, Any>()
-    private val factories = ConcurrentHashMap<Class<*>, () -> Any>()
+    @PublishedApi internal val dependencies = ConcurrentHashMap<Class<*>, Any>()
+    @PublishedApi internal val factories = ConcurrentHashMap<Class<*>, () -> Any>()
 
     init {
         registerDefaults()
@@ -66,7 +66,12 @@ object ServiceLocator {
      * Registers a factory for creating transient or on-demand instances.
      */
     inline fun <reified T : Any> registerFactory(noinline factory: () -> T) {
-        factories[T::class.java] = factory
+        registerFactory(T::class.java, factory)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun <T : Any> registerFactory(clazz: Class<T>, factory: () -> T) {
+        factories[clazz] = factory as () -> Any
     }
 
     /**
