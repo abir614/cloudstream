@@ -57,6 +57,8 @@ class TrackSelectionUseCase {
      */
     fun matchesLanguage(subtitle: SubtitleData, targetLang: String): Boolean {
         val target = targetLang.trim().lowercase()
+        if (target.isBlank()) return false
+
         val ietf = subtitle.getIETF_tag()?.lowercase()
         if (ietf != null) {
             if (ietf == target || ietf.startsWith("$target-") || target.startsWith("$ietf-")) {
@@ -69,8 +71,11 @@ class TrackSelectionUseCase {
             return true
         }
 
-        val origName = subtitle.originalName.lowercase()
-        return origName.contains(target)
+        val cleanOrig = subtitle.originalName.trim().lowercase()
+        if (cleanOrig == target) return true
+
+        val words = cleanOrig.split(Regex("[^a-zA-Z0-9]")).filter { it.isNotBlank() }
+        return words.any { it == target }
     }
 
     /**
