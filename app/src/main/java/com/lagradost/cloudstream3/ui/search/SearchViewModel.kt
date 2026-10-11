@@ -177,7 +177,7 @@ class SearchViewModel : ViewModel() {
         )
     }
 
-    private fun calculateRelevance(title: String, query: String): Int {
+    internal fun calculateRelevance(title: String, query: String): Int {
         val cleanTitle = title.trim().lowercase()
         val cleanQuery = query.trim().lowercase()
         if (cleanTitle == cleanQuery) return 1000

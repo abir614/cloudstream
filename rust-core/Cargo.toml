@@ -33,6 +33,7 @@ thiserror = "2.0.11"
 
 # Android JNI integration (optional feature)
 jni = { version = "0.21.1", default-features = false }
+miniz_oxide = "0.9.1"
 
 [dev-dependencies]
 # Testing & Fuzz testing

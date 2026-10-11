@@ -1,12 +1,49 @@
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Mutex, OnceLock};
+use crate::compression::{compress_string, decompress_string};
+
+/// Threshold in bytes beyond which cache entries are compressed in memory
+/// using fast DEFLATE to eliminate heap footprint on 512MB/1GB TV devices.
+const COMPRESSION_THRESHOLD_BYTES: usize = 256;
+
+#[derive(Clone, Debug)]
+enum CacheEntry {
+    Raw(String),
+    Compressed(Vec<u8>),
+}
+
+impl CacheEntry {
+    fn new(val: String) -> Self {
+        if val.len() >= COMPRESSION_THRESHOLD_BYTES {
+            let compressed = compress_string(&val);
+            if compressed.len() < val.len() {
+                return CacheEntry::Compressed(compressed);
+            }
+        }
+        CacheEntry::Raw(val)
+    }
+
+    fn to_string(&self) -> Option<String> {
+        match self {
+            CacheEntry::Raw(s) => Some(s.clone()),
+            CacheEntry::Compressed(bytes) => decompress_string(bytes).ok(),
+        }
+    }
+
+    fn memory_size(&self) -> usize {
+        match self {
+            CacheEntry::Raw(s) => s.len(),
+            CacheEntry::Compressed(b) => b.len(),
+        }
+    }
+}
 
 /// Thread-safe, memory-efficient LRU Cache implemented in native Rust.
 /// Holds cache entries directly on the native heap, completely eliminating JVM GC pauses
 /// and object header fragmentation on low-end Android devices.
 pub struct LruCache {
     capacity: usize,
-    map: HashMap<String, String>,
+    map: HashMap<String, CacheEntry>,
     order: VecDeque<String>,
 }
 
@@ -20,22 +57,24 @@ impl LruCache {
     }
 
     pub fn get(&mut self, key: &str) -> Option<String> {
-        if let Some(val) = self.map.get(key) {
+        if let Some(entry) = self.map.get(key) {
+            let val = entry.to_string();
             // Move key to back (most recently used)
             if let Some(pos) = self.order.iter().position(|k| k == key) {
                 self.order.remove(pos);
                 self.order.push_back(key.to_string());
             }
-            Some(val.clone())
+            val
         } else {
             None
         }
     }
 
     pub fn put(&mut self, key: String, value: String) {
+        let entry = CacheEntry::new(value);
         if self.map.contains_key(&key) {
             // Update existing
-            self.map.insert(key.clone(), value);
+            self.map.insert(key.clone(), entry);
             if let Some(pos) = self.order.iter().position(|k| k == &key) {
                 self.order.remove(pos);
             }
@@ -48,7 +87,7 @@ impl LruCache {
                 }
             }
             self.order.push_back(key.clone());
-            self.map.insert(key, value);
+            self.map.insert(key, entry);
         }
     }
 
@@ -74,6 +113,11 @@ impl LruCache {
 
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
+    }
+
+    /// Returns the approximate memory consumption in bytes of stored values.
+    pub fn memory_usage_bytes(&self) -> usize {
+        self.map.values().map(|e| e.memory_size()).sum()
     }
 }
 
@@ -138,5 +182,22 @@ mod tests {
         assert_eq!(cache_get("test_cache", "hello"), Some("world".to_string()));
         assert!(cache_remove("test_cache", "hello"));
         assert_eq!(cache_get("test_cache", "hello"), None);
+    }
+
+    #[test]
+    fn test_adaptive_compression_reduces_ram() {
+        let mut cache = LruCache::new(10);
+        let large_payload = "#EXTINF:-1 tvg-id=\"Stream1\", Channel Name\nhttps://example.com/hls/live.m3u8\n".repeat(50);
+        let raw_len = large_payload.len();
+
+        cache.put("playlist".to_string(), large_payload.clone());
+
+        // Verify transparent decompression on retrieval
+        let retrieved = cache.get("playlist").expect("must retrieve payload");
+        assert_eq!(retrieved, large_payload);
+
+        // Verify stored bytes are significantly less than raw bytes
+        let mem_usage = cache.memory_usage_bytes();
+        assert!(mem_usage < raw_len / 3, "Memory usage should be compressed to < 1/3 of raw payload");
     }
 }

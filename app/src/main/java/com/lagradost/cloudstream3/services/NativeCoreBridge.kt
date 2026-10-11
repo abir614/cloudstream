@@ -128,5 +128,59 @@ object NativeCoreBridge {
     // --- Native Levenshtein & Fuzzy Search ---
     external fun nativeFuzzyRatio(s1: String, s2: String): Int
     external fun nativeLevenshtein(s1: String, s2: String): Int
-}
 
+    // --- Native Fast In-Memory DEFLATE Compression ---
+    external fun nativeCompressString(text: String): ByteArray?
+    external fun nativeDecompressString(bytes: ByteArray): String?
+
+    fun compressString(text: String): ByteArray? {
+        return if (isLoaded) nativeCompressString(text) else null
+    }
+
+    fun decompressString(bytes: ByteArray): String? {
+        return if (isLoaded) nativeDecompressString(bytes) else null
+    }
+
+    // --- Native Capability-Gated WebAssembly Sandbox Execution ---
+    external fun nativeRunWasmExtension(
+        wasmBytes: ByteArray,
+        initialFuel: Long,
+        maxMemoryBytes: Long
+    ): String?
+
+    data class WasmExecutionResult(
+        val success: Boolean,
+        val logs: List<String>,
+        val error: String?
+    )
+
+    fun runWasmExtension(
+        wasmBytes: ByteArray,
+        initialFuel: Long = 500_000L,
+        maxMemoryBytes: Long = 16 * 1024 * 1024L
+    ): WasmExecutionResult {
+        if (!isLoaded) {
+            return WasmExecutionResult(false, emptyList(), "Native core library is not loaded")
+        }
+        return try {
+            val json = nativeRunWasmExtension(wasmBytes, initialFuel, maxMemoryBytes)
+            if (json != null) {
+                val obj = org.json.JSONObject(json)
+                val success = obj.optBoolean("success", false)
+                val error = if (obj.isNull("error")) null else obj.optString("error")
+                val logsArr = obj.optJSONArray("logs")
+                val logs = ArrayList<String>()
+                if (logsArr != null) {
+                    for (i in 0 until logsArr.length()) {
+                        logs.add(logsArr.getString(i))
+                    }
+                }
+                WasmExecutionResult(success, logs, error)
+            } else {
+                WasmExecutionResult(false, emptyList(), "Null response from native runtime")
+            }
+        } catch (t: Throwable) {
+            WasmExecutionResult(false, emptyList(), t.message ?: "Unknown WASM execution error")
+        }
+    }
+}

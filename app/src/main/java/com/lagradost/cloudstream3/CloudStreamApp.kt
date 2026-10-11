@@ -52,10 +52,15 @@ class ExceptionHandler(
                 thread.id
             }
 
-            PrintStream(errorFile).use { ps ->
-                ps.println("Currently loading extension: ${PluginManager.currentlyLoading ?: "none"}")
-                ps.println("Fatal exception on thread ${thread.name} ($threadId)")
-                error.printStackTrace(ps)
+            try {
+                com.lagradost.cloudstream3.di.ServiceLocator.telemetry.captureCrash(error, errorFile)
+            } catch (_: Throwable) {
+                // Fallback to basic printstream if telemetry fails
+                PrintStream(errorFile).use { ps ->
+                    ps.println("Currently loading extension: ${PluginManager.currentlyLoading ?: "none"}")
+                    ps.println("Fatal exception on thread ${thread.name} ($threadId)")
+                    error.printStackTrace(ps)
+                }
             }
         } catch (_: FileNotFoundException) {
         }
@@ -84,6 +89,17 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         }
 
         AppDebug.isDebug = BuildConfig.DEBUG
+
+        // Warm up isolated ExtensionSandboxService and register core application context & SQLite persistence
+        try {
+            com.lagradost.cloudstream3.di.ServiceLocator.register<Application>(this)
+            val sqliteRepo = com.lagradost.cloudstream3.utils.persistence.SqliteDataRepository(this)
+            com.lagradost.cloudstream3.di.ServiceLocator.register<com.lagradost.cloudstream3.utils.persistence.DataRepository>(sqliteRepo)
+            com.lagradost.cloudstream3.di.ServiceLocator.register(com.lagradost.cloudstream3.domain.usecase.ResumePlaybackUseCase(sqliteRepo))
+            com.lagradost.cloudstream3.services.ExtensionSandboxClient.bind(this)
+            com.lagradost.cloudstream3.di.ServiceLocator.telemetry.recordBreadcrumb("App", "Application initialized successfully")
+        } catch (_: Throwable) {
+        }
     }
 
     override fun attachBaseContext(base: Context?) {
@@ -99,6 +115,11 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         try {
+            com.lagradost.cloudstream3.di.ServiceLocator.telemetry.recordBreadcrumb(
+                "Memory",
+                "TrimMemory level=$level",
+                com.lagradost.cloudstream3.utils.telemetry.TelemetryService.Level.WARN
+            )
             val memCache = SingletonImageLoader.get(this).memoryCache
             if (memCache != null) {
                 if (level >= TRIM_MEMORY_RUNNING_LOW || level >= TRIM_MEMORY_MODERATE) {
@@ -117,6 +138,11 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
     override fun onLowMemory() {
         super.onLowMemory()
         try {
+            com.lagradost.cloudstream3.di.ServiceLocator.telemetry.recordBreadcrumb(
+                "Memory",
+                "onLowMemory triggered",
+                com.lagradost.cloudstream3.utils.telemetry.TelemetryService.Level.FATAL
+            )
             SingletonImageLoader.get(this).memoryCache?.clear()
             System.gc()
         } catch (_: Throwable) {

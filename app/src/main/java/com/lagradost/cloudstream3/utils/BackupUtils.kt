@@ -213,11 +213,14 @@ object BackupUtils {
             val date = SimpleDateFormat("yyyy_MM_dd_HH_mm", Locale.getDefault()).format(Date(currentTimeMillis()))
             val displayName = "CS3_Backup_${date}"
             val backupFile = getBackup(context)
-            val stream = setupBackupStream(context, displayName)
+            val stream = setupBackupStream(context, displayName, ext = "csbackup")
 
             fileStream = stream.openNew()
-            printStream = PrintWriter(fileStream)
+            val gzipStream = java.util.zip.GZIPOutputStream(fileStream)
+            printStream = PrintWriter(java.io.OutputStreamWriter(gzipStream, java.nio.charset.StandardCharsets.UTF_8))
             printStream.print(backupFile.toJson())
+            printStream.flush()
+            gzipStream.finish()
             showToast(R.string.backup_success, Toast.LENGTH_LONG)
         } catch (e: Exception) {
             logError(e)
@@ -236,7 +239,7 @@ object BackupUtils {
     }
 
     @Throws(IOException::class)
-    private fun setupBackupStream(context: Context, name: String, ext: String = "txt"): DownloadObjects.StreamData {
+    private fun setupBackupStream(context: Context, name: String, ext: String = "csbackup"): DownloadObjects.StreamData {
         return setupStream(
             baseFile = getCurrentBackupDir(context).first ?: getDefaultBackupDir(context)
             ?: throw IOException("Bad config"),
@@ -255,10 +258,24 @@ object BackupUtils {
                     val activity = this
                     ioSafe {
                         try {
-                            val input = activity.contentResolver.openInputStream(uri)
+                            val rawInput = activity.contentResolver.openInputStream(uri)
                                 ?: return@ioSafe
 
-                            val text = input.bufferedReader().readText()
+                            val buffered = if (rawInput.markSupported()) rawInput else java.io.BufferedInputStream(rawInput)
+                            buffered.mark(2)
+                            val header = ByteArray(2)
+                            val bytesRead = buffered.read(header)
+                            buffered.reset()
+
+                            // Auto-detect GZIP magic header (0x1f, 0x8b) for compressed .csbackup,
+                            // while maintaining 100% backwards compatibility with legacy uncompressed .txt backups
+                            val decompressedStream = if (bytesRead == 2 && header[0] == 0x1f.toByte() && header[1] == 0x8b.toByte()) {
+                                java.util.zip.GZIPInputStream(buffered)
+                            } else {
+                                buffered
+                            }
+
+                            val text = decompressedStream.bufferedReader(Charsets.UTF_8).readText()
                             val restoredValue = parseJson<BackupFile>(text)
 
                             restore(
@@ -288,13 +305,16 @@ object BackupUtils {
             try {
                 restoreFileSelector?.launch(
                     arrayOf(
+                        "*/*",
+                        "application/gzip",
+                        "application/x-gzip",
+                        "application/octet-stream",
                         "text/plain",
                         "text/str",
                         "text/x-unknown",
                         "application/json",
                         "unknown/unknown",
                         "content/unknown",
-                        "application/octet-stream",
                     )
                 )
             } catch (e: Exception) {

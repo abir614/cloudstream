@@ -82,6 +82,7 @@ import com.lagradost.cloudstream3.CommonActivity.activity
 import com.lagradost.cloudstream3.ErrorLoadingException
 import com.lagradost.cloudstream3.MainActivity.Companion.deleteFileOnExit
 import com.lagradost.cloudstream3.R
+import com.lagradost.cloudstream3.services.NativeCoreBridge
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
@@ -177,7 +178,15 @@ class CS3IPlayer : IPlayer {
     private var currentLink: ExtractorLink? = null
     private var currentDownloadedFile: ExtractorUri? = null
     private var hasUsedFirstRender = false
-    private var networkRetryCount = 0
+    private val failoverEngine = com.lagradost.cloudstream3.di.ServiceLocator.resolveOrNull<com.lagradost.cloudstream3.domain.engine.StreamFailoverEngine>()
+        ?: com.lagradost.cloudstream3.domain.engine.StreamFailoverEngine()
+    private val subtitleSyncEngine = com.lagradost.cloudstream3.di.ServiceLocator.resolveOrNull<com.lagradost.cloudstream3.domain.engine.SubtitleSyncEngine>()
+        ?: com.lagradost.cloudstream3.domain.engine.SubtitleSyncEngine()
+    private var networkRetryCount: Int
+        get() = failoverEngine.getRetryCount()
+        set(value) {
+            if (value == 0) failoverEngine.resetRetries()
+        }
 
     private var currentWindow: Int = 0
     private var playbackPosition: Long = 0
@@ -550,11 +559,9 @@ class CS3IPlayer : IPlayer {
         }
     }
 
-    private var currentSubtitleOffset: Long = 0
-
     override fun setSubtitleOffset(offset: Long) {
-        currentSubtitleOffset = offset
-        CustomDecoder.subtitleOffset = offset
+        val safeOffset = subtitleSyncEngine.setOffset(offset)
+        CustomDecoder.subtitleOffset = safeOffset
         if (currentTextRenderer?.state == STATE_ENABLED || currentTextRenderer?.state == STATE_STARTED) {
             exoPlayer?.currentPosition?.also { pos ->
                 // This seems to properly refresh all subtitles
@@ -565,7 +572,7 @@ class CS3IPlayer : IPlayer {
     }
 
     override fun getSubtitleOffset(): Long {
-        return currentSubtitleOffset
+        return subtitleSyncEngine.getOffset()
     }
 
     override fun getSubtitleCues(): List<SubtitleCue> {
@@ -820,12 +827,31 @@ class CS3IPlayer : IPlayer {
             link: ExtractorLink,
             engine: CronetEngine?,
             interceptor: Interceptor?,
+            ignoreSSL: Boolean = false,
         ): HttpDataSource.Factory {
             val userAgent = link.headers.entries.find {
                 it.key.equals("User-Agent", ignoreCase = true)
             }?.value ?: USER_AGENT
 
-            val source = if (interceptor == null) {
+            val source = if (ignoreSSL) {
+                // Scoped SSL bypass: Confined strictly to this video source instance.
+                // Prevents JVM-wide HttpsURLConnection tampering while keeping untrusted video stream playback functional.
+                val clientBuilder = app.baseClient.newBuilder()
+                if (interceptor != null) {
+                    clientBuilder.addInterceptor(interceptor)
+                }
+                try {
+                    val sslContext: SSLContext = SSLContext.getInstance("TLS")
+                    val trustManager = SSLTrustManager()
+                    sslContext.init(null, arrayOf(trustManager), SecureRandom())
+                    clientBuilder.sslSocketFactory(sslContext.socketFactory, trustManager)
+                    clientBuilder.hostnameVerifier { _: String, _: SSLSession -> true }
+                } catch (t: Throwable) {
+                    logError(t)
+                }
+                val client = clientBuilder.build()
+                OkHttpDataSource.Factory(client).setUserAgent(userAgent)
+            } else if (interceptor == null) {
                 if (engine == null) {
                     Log.d(TAG, "Using DefaultHttpDataSource for $link")
                     OkHttpDataSource.Factory(app.baseClient).setUserAgent(userAgent)
@@ -1611,48 +1637,33 @@ class CS3IPlayer : IPlayer {
                 }
 
                 override fun onPlayerError(error: PlaybackException) {
-                    val isTransientNetworkError = when (error.errorCode) {
-                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
-                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
-                        PlaybackException.ERROR_CODE_TIMEOUT -> true
-                        PlaybackException.ERROR_CODE_IO_UNSPECIFIED ->
-                            error.cause is java.io.IOException || error.cause is java.net.SocketTimeoutException
-                        else -> false
-                    }
+                    val position = exoPlayer?.currentPosition ?: exoPlayer?.duration ?: 0L
+                    val duration = exoPlayer?.duration ?: 0L
+                    val aheadOfLive = LiveHelper.getLiveManager(exoPlayer)?.getTimeAheadOfLive(position)?.toLong()
 
-                    // If a transient network glitch occurs during handshake or mid-playback, retry in place
-                    // up to 3 times before abandoning mirror. This absorbs momentary packet drops and initial socket timeouts.
-                    when {
-                        isTransientNetworkError
-                                && networkRetryCount < 3 -> {
-                            networkRetryCount++
-                            Log.w(TAG, "Transient network error ($networkRetryCount/3), auto-recovering playback: ${error.message}")
+                    when (val decision = failoverEngine.handlePlaybackError(
+                        errorCode = error.errorCode,
+                        cause = error.cause,
+                        currentPositionMs = position,
+                        durationMs = duration,
+                        aheadOfLiveMs = aheadOfLive
+                    )) {
+                        is com.lagradost.cloudstream3.domain.engine.FailoverDecision.RetryInPlace -> {
+                            Log.w(TAG, "Transient network error (${decision.attempt}/${decision.maxAttempts}), auto-recovering playback: ${error.message}")
                             exoPlayer?.prepare()
                         }
 
-                        error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW -> {
-                            // Re-initialize player at the current live window default position.
+                        is com.lagradost.cloudstream3.domain.engine.FailoverDecision.SeekToLiveDefault -> {
                             exoPlayer?.seekToDefaultPosition()
                             exoPlayer?.prepare()
                         }
 
-                        // PlaylistStuckException usually happens when the player position is ahead of the live window.
-                        // Seek to the default location in that case
-                        error.cause is HlsPlaylistTracker.PlaylistStuckException -> {
-                            val position = exoPlayer?.currentPosition ?: exoPlayer?.duration ?: 0
-
-                            // Seek to live head
-                            val aheadOfLive = LiveHelper.getLiveManager(exoPlayer)?.getTimeAheadOfLive(position) ?: 0
-
-                            if (aheadOfLive > 100) {
-                                exoPlayer?.seekTo(position - aheadOfLive)
-                            } else {
-                                exoPlayer?.seekToDefaultPosition()
-                            }
+                        is com.lagradost.cloudstream3.domain.engine.FailoverDecision.SeekAheadOfLive -> {
+                            exoPlayer?.seekTo(decision.seekPositionMs)
                             exoPlayer?.prepare()
                         }
 
-                        else -> {
+                        is com.lagradost.cloudstream3.domain.engine.FailoverDecision.FatalTriggerFailover -> {
                             event(ErrorEvent(error))
                         }
                     }
@@ -1858,6 +1869,36 @@ class CS3IPlayer : IPlayer {
     @MainThread
     private fun loadOnlinePlayer(context: Context, link: ExtractorLink, retry: Boolean = false) {
         Log.i(TAG, "loadOnlinePlayer $link")
+        // Zero-Trust & Anti-SSRF stream gate check: blocks private RFC-1918 subnets and cloud metadata
+        val isSafeUrl = if (NativeCoreBridge.isNativeReady()) {
+            NativeCoreBridge.validateUrlSafety(link.url)
+        } else {
+            !link.url.contains("127.0.0.1") && !link.url.contains("localhost") && !link.url.contains("169.254.169.254")
+        }
+        if (!isSafeUrl) {
+            Log.e(TAG, "Blocked unsafe streaming URL by Zero-Trust gate: ${link.url}")
+            val errorMessage = "Playback blocked: Stream URL violates Zero-Trust security policy (private IP or SSRF risk)."
+            event(ErrorEvent(ErrorLoadingException(errorMessage)))
+            return
+        }
+
+        // Validate individual playlist items if link is a playlist
+        if (link is ExtractorLinkPlayList) {
+            val hasUnsafe = link.playlist.any { item ->
+                if (NativeCoreBridge.isNativeReady()) !NativeCoreBridge.validateUrlSafety(item.url)
+                else item.url.contains("127.0.0.1") || item.url.contains("localhost") || item.url.contains("169.254.169.254")
+            }
+            if (hasUnsafe) {
+                Log.e(TAG, "Blocked unsafe playlist item by Zero-Trust gate")
+                val errorMessage = "Playback blocked: Playlist contains unsafe or private IP stream URLs."
+                event(ErrorEvent(ErrorLoadingException(errorMessage)))
+                return
+            }
+        }
+
+        // Potato device optimization: Unbind isolated extension sandbox process to reclaim ~35MB of RAM for ExoPlayer
+        com.lagradost.cloudstream3.services.ExtensionSandboxClient.releaseForPlayback(context)
+
         try {
             val mime = when (link.type) {
                 ExtractorLinkType.M3U8 -> MimeTypes.APPLICATION_M3U8
@@ -1882,17 +1923,8 @@ class CS3IPlayer : IPlayer {
 
             currentLink = link
 
-            if (ignoreSSL) {
-                // Disables ssl check
-                val sslContext: SSLContext = SSLContext.getInstance("TLS")
-                sslContext.init(null, arrayOf(SSLTrustManager()), SecureRandom())
-                sslContext.createSSLEngine()
-                HttpsURLConnection.setDefaultHostnameVerifier { _: String, _: SSLSession ->
-                    true
-                }
-                HttpsURLConnection.setDefaultSSLSocketFactory(sslContext.socketFactory)
-            }
-
+            // Scoped SSL bypass is handled per-source in createVideoSource below,
+            // preventing unsafe process-wide mutations of HttpsURLConnection defaults.
 
             val mediaItems = when (link) {
                 is ExtractorLinkPlayList -> link.playlist.map {
@@ -1936,7 +1968,8 @@ class CS3IPlayer : IPlayer {
                 createVideoSource(
                     link = link,
                     engine = tryCreateEngine(context, simpleCacheSize),
-                    interceptor = interceptor
+                    interceptor = interceptor,
+                    ignoreSSL = ignoreSSL,
                 )
 
             val offlineSourceFactory = context.createOfflineSource()

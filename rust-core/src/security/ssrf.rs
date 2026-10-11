@@ -38,9 +38,11 @@ pub fn validate_url_safety(raw_url: &str) -> Result<Url, NetworkSecurityError> {
         return Err(NetworkSecurityError::PrivateNetworkBlocked(lower_host));
     }
 
-    // Rule 4: If host parses as IP address, enforce strict IP safety
-    if let Ok(ip) = host_str.parse::<IpAddr>() {
-        validate_ip_safety(&ip)?;
+    // Rule 4: If host is an IP address, enforce strict IP safety
+    match parsed.host() {
+        Some(url::Host::Ipv4(ip)) => validate_ip_safety(&IpAddr::V4(ip))?,
+        Some(url::Host::Ipv6(ip)) => validate_ip_safety(&IpAddr::V6(ip))?,
+        Some(url::Host::Domain(_)) | None => {}
     }
 
     Ok(parsed)
@@ -123,5 +125,17 @@ mod tests {
             validate_url_safety("http://169.254.169.254/latest/meta-data/"),
             Err(NetworkSecurityError::CloudMetadataBlocked("169.254.169.254".to_string()))
         );
+    }
+
+    #[test]
+    fn test_blocked_ipv6_loopback_and_link_local() {
+        assert!(validate_url_safety("http://[::1]:8080/api").is_err());
+        assert!(validate_url_safety("http://[fe80::1]/service").is_err());
+    }
+
+    #[test]
+    fn test_userinfo_loopback_blocked() {
+        assert!(validate_url_safety("http://admin:secret@127.0.0.1:8080/data").is_err());
+        assert!(validate_url_safety("https://user:pass@192.168.1.1/router").is_err());
     }
 }

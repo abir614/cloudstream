@@ -61,13 +61,13 @@ jobs:
     - name: Set up Rust & Android targets
       uses: dtolnay/rust-toolchain@stable
       with:
-        targets: aarch64-linux-android, armv7-linux-androideabi
+        targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android, i686-linux-android
 
-    - name: Build Rust Native Core for ARMv7 and ARMv8
+    - name: Build Rust Native Core for ARM and x86 Architectures
       run: |
         cargo install cargo-ndk --locked
         cd rust-core
-        cargo ndk -t armeabi-v7a -t arm64-v8a -o ../app/src/main/jniLibs build --release
+        cargo ndk -t armeabi-v7a -t arm64-v8a -t x86 -t x86_64 -o ../app/src/main/jniLibs build --release
 
     - name: Run Gradle
       run: ./gradlew assemblePrereleaseRelease androidSourcesJar makeJar

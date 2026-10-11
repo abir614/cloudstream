@@ -149,4 +149,12 @@ mod tests {
         let sandbox = WasmSandbox::new();
         assert!(sandbox.is_ok());
     }
+
+    #[test]
+    fn test_invalid_wasm_bytes() {
+        let sandbox = WasmSandbox::new().unwrap();
+        let invalid = [0u8, 1, 2, 3];
+        let res = sandbox.run_extension(&invalid, 1000, 1024 * 1024);
+        assert!(res.is_err());
+    }
 }

@@ -230,20 +230,20 @@ object RepositoryManager {
                     }
                 }
 
-                if (expectedFileHash != null) {
-                    val downloadHash = sha256(tempFile)
-                    if (expectedFileHash != downloadHash) {
-                        tempFile.delete()
-                        throw IllegalStateException("Extension hash mismatch when validating '${file.name}'! Expected: '$expectedFileHash', got: '$downloadHash'.")
-                    }
-                }
+                val integrityEngine = com.lagradost.cloudstream3.di.ServiceLocator.resolveOrNull<com.lagradost.cloudstream3.domain.engine.PluginArchiveIntegrityEngine>()
+                    ?: com.lagradost.cloudstream3.domain.engine.PluginArchiveIntegrityEngine()
 
-                // Verify file integrity: Must be a valid ZIP archive containing manifest.json
-                ZipFile(tempFile).use { zip ->
-                    val manifest = zip.getEntry("manifest.json")
-                    if (manifest == null) {
+                when (val validation = integrityEngine.validateArchive(tempFile, expectedFileHash)) {
+                    is com.lagradost.cloudstream3.domain.engine.ArchiveValidationResult.Valid -> {
+                        // Integrity verified: hash matched, Zip-Slip safe, manifest valid, within size bounds
+                    }
+                    is com.lagradost.cloudstream3.domain.engine.ArchiveValidationResult.SecurityViolation -> {
                         tempFile.delete()
-                        throw IllegalStateException("Downloaded plugin '${file.name}' is missing manifest.json")
+                        throw SecurityException("Plugin archive security violation for '${file.name}': ${validation.reason}")
+                    }
+                    is com.lagradost.cloudstream3.domain.engine.ArchiveValidationResult.Corrupted -> {
+                        tempFile.delete()
+                        throw IllegalStateException("Plugin archive corruption for '${file.name}': ${validation.reason}")
                     }
                 }
 

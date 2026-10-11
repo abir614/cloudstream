@@ -1,4 +1,5 @@
 pub mod cache;
+pub mod compression;
 pub mod crypto;
 pub mod extractors;
 pub mod jni_bridge;
@@ -9,6 +10,7 @@ pub mod search;
 pub mod security;
 pub mod subtitles;
 
+pub use compression::{compress_deflate, compress_string, compress_zlib, decompress_deflate, decompress_string, decompress_zlib, CompressionError};
 pub use cache::{cache_clear, cache_get, cache_put, cache_remove, LruCache};
 pub use crypto::{fast_hash32, fast_hash64, fast_hash64_str, md5_hex, sha256_hex};
 pub use extractors::html::{extract_media_links, extract_script_json, ExtractedMediaLink};

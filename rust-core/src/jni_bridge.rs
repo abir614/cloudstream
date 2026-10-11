@@ -1,4 +1,4 @@
-use jni::objects::{JClass, JString};
+use jni::objects::{JByteArray, JClass, JString};
 use jni::sys::{jboolean, jstring};
 use jni::JNIEnv;
 
@@ -589,5 +589,105 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     crate::search::levenshtein::levenshtein_distance(&s1, &s2) as jni::sys::jint
 }
 
+/// JNI bridge to run a capability-gated WebAssembly extension in native Rust.
+/// Returns a JSON string with format:
+/// {"success": bool, "logs": [String], "error": String?}
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeRunWasmExtension(
+    env: JNIEnv,
+    _class: JClass,
+    wasm_bytes_input: JByteArray,
+    initial_fuel: jni::sys::jlong,
+    max_memory_bytes: jni::sys::jlong,
+) -> jstring {
+    let bytes: Vec<u8> = match env.convert_byte_array(&wasm_bytes_input) {
+        Ok(b) => b,
+        Err(e) => {
+            let res = serde_json::json!({
+                "success": false,
+                "logs": Vec::<String>::new(),
+                "error": format!("JNI convert_byte_array failed: {}", e)
+            });
+            return match env.new_string(res.to_string()) {
+                Ok(js) => js.into_raw(),
+                Err(_) => std::ptr::null_mut(),
+            };
+        }
+    };
 
+    let sandbox = match crate::sandbox::wasm::WasmSandbox::new() {
+        Ok(s) => s,
+        Err(e) => {
+            let res = serde_json::json!({
+                "success": false,
+                "logs": Vec::<String>::new(),
+                "error": format!("WasmSandbox initialization failed: {}", e)
+            });
+            return match env.new_string(res.to_string()) {
+                Ok(js) => js.into_raw(),
+                Err(_) => std::ptr::null_mut(),
+            };
+        }
+    };
 
+    let fuel = if initial_fuel <= 0 { 500_000 } else { initial_fuel as u64 };
+    let max_mem = if max_memory_bytes <= 0 { 16 * 1024 * 1024 } else { max_memory_bytes as usize };
+
+    let res = match sandbox.run_extension(&bytes, fuel, max_mem) {
+        Ok(logs) => serde_json::json!({
+            "success": true,
+            "logs": logs,
+            "error": null
+        }),
+        Err(e) => serde_json::json!({
+            "success": false,
+            "logs": Vec::<String>::new(),
+            "error": e.to_string()
+        }),
+    };
+
+    match env.new_string(res.to_string()) {
+        Ok(js) => js.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to compress a UTF-8 string into DEFLATE bytes with zero-copy efficiency
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeCompressString(
+    mut env: JNIEnv,
+    _class: JClass,
+    text_input: JString,
+) -> jni::sys::jbyteArray {
+    let text: String = match env.get_string(&text_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let compressed = crate::compression::compress_string(&text);
+    match env.byte_array_from_slice(&compressed) {
+        Ok(arr) => arr.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to decompress DEFLATE bytes back into a UTF-8 string
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeDecompressString(
+    env: JNIEnv,
+    _class: JClass,
+    bytes_input: jni::objects::JByteArray,
+) -> jstring {
+    let bytes: Vec<u8> = match env.convert_byte_array(&bytes_input) {
+        Ok(b) => b,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    match crate::compression::decompress_string(&bytes) {
+        Ok(restored) => match env.new_string(restored) {
+            Ok(js) => js.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
