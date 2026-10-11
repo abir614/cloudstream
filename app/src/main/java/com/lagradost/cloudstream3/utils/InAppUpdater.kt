@@ -36,6 +36,7 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
 import java.io.InputStreamReader
+import java.util.concurrent.TimeUnit
 
 object InAppUpdater {
     private const val GITHUB_USER_NAME = "abir614"
@@ -121,9 +122,18 @@ object InAppUpdater {
     private suspend fun Activity.getReleaseUpdate(): Update {
         val url = "https://api.github.com/repos/$GITHUB_USER_NAME/$GITHUB_REPO/releases"
         val headers = mapOf("Accept" to "application/vnd.github.v3+json")
-        val response = parseJson<Array<GithubRelease>>(
-            app.get(url, headers = headers).text
-        ).toList()
+        val releaseHttp = app.get(url, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+
+        if (releaseHttp.code == 403 || releaseHttp.code == 429) {
+            Log.w(LOG_TAG, "GitHub API rate limit exceeded (HTTP ${releaseHttp.code}). Skipping release update check.")
+            return Update(false, null, null, null, null)
+        }
+        if (!releaseHttp.isSuccessful) {
+            Log.w(LOG_TAG, "GitHub API releases request failed with HTTP ${releaseHttp.code}")
+            return Update(false, null, null, null, null)
+        }
+
+        val response = parseJson<Array<GithubRelease>>(releaseHttp.text).toList()
 
         val foundList = response.filter { rel ->
             !rel.prerelease
@@ -187,9 +197,18 @@ object InAppUpdater {
             "https://api.github.com/repos/$GITHUB_USER_NAME/$GITHUB_REPO/git/ref/tags/pre-release"
         val releaseUrl = "https://api.github.com/repos/$GITHUB_USER_NAME/$GITHUB_REPO/releases"
         val headers = mapOf("Accept" to "application/vnd.github.v3+json")
-        val response = parseJson<Array<GithubRelease>>(
-            app.get(releaseUrl, headers = headers).text
-        ).toList()
+        val releaseHttp = app.get(releaseUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+
+        if (releaseHttp.code == 403 || releaseHttp.code == 429) {
+            Log.w(LOG_TAG, "GitHub API rate limit exceeded (HTTP ${releaseHttp.code}). Skipping pre-release update check.")
+            return Update(false, null, null, null, null)
+        }
+        if (!releaseHttp.isSuccessful) {
+            Log.w(LOG_TAG, "GitHub API pre-release request failed with HTTP ${releaseHttp.code}")
+            return Update(false, null, null, null, null)
+        }
+
+        val response = parseJson<Array<GithubRelease>>(releaseHttp.text).toList()
 
         val found = response.lastOrNull { rel ->
             rel.prerelease || rel.tagName == "pre-release"
@@ -214,8 +233,19 @@ object InAppUpdater {
         } ?: apkAssets.firstOrNull { it.name.contains("universal") }
           ?: apkAssets.first()
 
-        val tagResponse = parseJson<GithubTag>(app.get(tagUrl, headers = headers).text)
-        val updateCommitHash = tagResponse.githubObject.sha.trim().take(7)
+        val tagHttp = app.get(tagUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+        val updateCommitHash = if (tagHttp.isSuccessful) {
+            try {
+                val tagResponse = parseJson<GithubTag>(tagHttp.text)
+                tagResponse.githubObject.sha.trim().take(7)
+            } catch (_: Throwable) {
+                null
+            }
+        } else {
+            Log.w(LOG_TAG, "GitHub pre-release tag request returned HTTP ${tagHttp.code}")
+            null
+        } ?: found.targetCommitish.take(7)
+
         Log.d(LOG_TAG, "Fetched GitHub tag: $updateCommitHash")
 
         return Update(
