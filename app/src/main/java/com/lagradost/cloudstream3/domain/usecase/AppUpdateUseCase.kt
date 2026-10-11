@@ -40,10 +40,11 @@ class AppUpdateUseCase(
      * Dispatches package installation for an authorized staging binary.
      */
     fun installVerifiedUpdate(
-        activity: Activity,
-        token: UpdateSecurityGate.GateAuthorizationToken
+        context: Context,
+        token: UpdateSecurityGate.GateAuthorizationToken,
+        onExecuteInstall: (File) -> Unit = {}
     ): Boolean {
-        return securityGate.executeInstallation(activity, token.authorizedFile, token)
+        return securityGate.executeInstallation(context, token, onExecuteInstall)
     }
 
     /**
