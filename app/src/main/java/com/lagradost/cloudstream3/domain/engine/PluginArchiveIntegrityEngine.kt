@@ -28,6 +28,95 @@ class PluginArchiveIntegrityEngine(
 ) {
     companion object {
         const val MANIFEST_FILE_NAME = "manifest.json"
+
+        /**
+         * Parses and normalizes an expected hash string from plugin metadata.
+         * Handles prefixes (e.g. "sha256-", "sha256:", "sha-256-", "SHA256-", "sha512-")
+         * and normalizes to (algorithm, hexHash).
+         * Returns null if raw string is empty, null, or indicates no hash.
+         */
+        fun parseExpectedHash(raw: String?): Pair<String, String>? {
+            if (raw.isNullOrBlank()) return null
+            val trimmed = raw.trim()
+            if (trimmed.equals("null", ignoreCase = true) || trimmed.equals("none", ignoreCase = true)) {
+                return null
+            }
+
+            val (algo, hashPart) = when {
+                trimmed.startsWith("sha256-", ignoreCase = true) -> "SHA-256" to trimmed.substring(7)
+                trimmed.startsWith("sha256:", ignoreCase = true) -> "SHA-256" to trimmed.substring(7)
+                trimmed.startsWith("sha-256-", ignoreCase = true) -> "SHA-256" to trimmed.substring(8)
+                trimmed.startsWith("sha-256:", ignoreCase = true) -> "SHA-256" to trimmed.substring(8)
+                trimmed.startsWith("sha512-", ignoreCase = true) -> "SHA-512" to trimmed.substring(7)
+                trimmed.startsWith("sha512:", ignoreCase = true) -> "SHA-512" to trimmed.substring(7)
+                trimmed.startsWith("sha-512-", ignoreCase = true) -> "SHA-512" to trimmed.substring(8)
+                trimmed.startsWith("sha-512:", ignoreCase = true) -> "SHA-512" to trimmed.substring(8)
+                trimmed.startsWith("sha384-", ignoreCase = true) -> "SHA-384" to trimmed.substring(7)
+                trimmed.startsWith("sha384:", ignoreCase = true) -> "SHA-384" to trimmed.substring(7)
+                trimmed.startsWith("sha1-", ignoreCase = true) -> "SHA-1" to trimmed.substring(5)
+                trimmed.startsWith("sha1:", ignoreCase = true) -> "SHA-1" to trimmed.substring(5)
+                trimmed.startsWith("md5-", ignoreCase = true) -> "MD5" to trimmed.substring(4)
+                trimmed.startsWith("md5:", ignoreCase = true) -> "MD5" to trimmed.substring(4)
+                trimmed.contains(':') -> {
+                    val prefix = trimmed.substringBefore(':').uppercase()
+                    val algoCandidate = when (prefix) {
+                        "SHA-256", "SHA256" -> "SHA-256"
+                        "SHA-512", "SHA512" -> "SHA-512"
+                        "SHA-384", "SHA384" -> "SHA-384"
+                        "SHA-1", "SHA1" -> "SHA-1"
+                        "MD5" -> "MD5"
+                        else -> null
+                    }
+                    if (algoCandidate != null) algoCandidate to trimmed.substringAfter(':') else null to trimmed
+                }
+                trimmed.contains('-') && (trimmed.startsWith("sha", ignoreCase = true) || trimmed.startsWith("md", ignoreCase = true)) -> {
+                    val prefix = trimmed.substringBefore('-').uppercase()
+                    val algoCandidate = when (prefix) {
+                        "SHA-256", "SHA256" -> "SHA-256"
+                        "SHA-512", "SHA512" -> "SHA-512"
+                        "SHA-384", "SHA384" -> "SHA-384"
+                        "SHA-1", "SHA1" -> "SHA-1"
+                        "MD5" -> "MD5"
+                        else -> null
+                    }
+                    if (algoCandidate != null) algoCandidate to trimmed.substringAfter('-') else null to trimmed
+                }
+                else -> null to trimmed
+            }
+
+            val cleanHash = hashPart.trim().lowercase()
+            if (cleanHash.isEmpty()) return null
+
+            // Determine algorithm if not explicitly specified
+            val finalAlgo = algo ?: when (cleanHash.length) {
+                64 -> "SHA-256"
+                128 -> "SHA-512"
+                96 -> "SHA-384"
+                40 -> "SHA-1"
+                32 -> "MD5"
+                else -> "SHA-256"
+            }
+
+            // Check if hex or base64
+            val isHex = cleanHash.all { it in '0'..'9' || it in 'a'..'f' }
+            val hexHash = if (isHex) {
+                cleanHash
+            } else {
+                try {
+                    val decoded = java.util.Base64.getDecoder().decode(cleanHash)
+                    decoded.joinToString("") { "%02x".format(it) }
+                } catch (_: Throwable) {
+                    try {
+                        val decoded = android.util.Base64.decode(cleanHash, android.util.Base64.DEFAULT)
+                        decoded.joinToString("") { "%02x".format(it) }
+                    } catch (_: Throwable) {
+                        cleanHash
+                    }
+                }
+            }
+
+            return finalAlgo to hexHash
+        }
     }
 
     /**
@@ -62,10 +151,10 @@ class PluginArchiveIntegrityEngine(
     }
 
     /**
-     * Computes the SHA-256 hash of a file on disk.
+     * Computes the cryptographic hash of a file on disk for a given algorithm.
      */
-    fun computeFileSha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
+    fun computeFileDigest(file: File, algorithm: String = "SHA-256"): String {
+        val digest = MessageDigest.getInstance(algorithm)
         val buffer = ByteArray(64 * 1024)
         FileInputStream(file).use { fis ->
             var bytesRead = fis.read(buffer)
@@ -76,6 +165,11 @@ class PluginArchiveIntegrityEngine(
         }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
+
+    /**
+     * Computes the SHA-256 hash of a file on disk.
+     */
+    fun computeFileSha256(file: File): String = computeFileDigest(file, "SHA-256")
 
     /**
      * Validates a plugin archive file on disk.
@@ -90,11 +184,13 @@ class PluginArchiveIntegrityEngine(
         }
 
         // 1. Verify cryptographic checksum if provided
-        if (expectedSha256 != null && expectedSha256.isNotBlank()) {
-            val actualHash = computeFileSha256(file)
-            if (!actualHash.equals(expectedSha256.trim(), ignoreCase = true)) {
+        val parsedHash = parseExpectedHash(expectedSha256)
+        if (parsedHash != null) {
+            val (algo, expectedHex) = parsedHash
+            val actualHash = computeFileDigest(file, algo)
+            if (!actualHash.equals(expectedHex, ignoreCase = true)) {
                 return ArchiveValidationResult.SecurityViolation(
-                    "SHA-256 checksum mismatch. Expected: $expectedSha256, Actual: $actualHash"
+                    "Cryptographic checksum mismatch for algorithm $algo. Expected: $expectedSha256, Actual: $actualHash"
                 )
             }
         }
@@ -134,9 +230,19 @@ class PluginArchiveIntegrityEngine(
                         }
                     }
 
-                    if (entry.name == MANIFEST_FILE_NAME && !entry.isDirectory) {
+                    val cleanName = entry.name.replace('\\', '/').removePrefix("./").trimStart('/')
+                    if (cleanName.equals(MANIFEST_FILE_NAME, ignoreCase = true) && !entry.isDirectory) {
                         if (entry.size > 0 || entry.size == -1L) {
                             hasManifest = true
+                        } else {
+                            try {
+                                zip.getInputStream(entry).use { stream ->
+                                    if (stream.read() != -1) {
+                                        hasManifest = true
+                                    }
+                                }
+                            } catch (_: Throwable) {
+                            }
                         }
                     }
                 }

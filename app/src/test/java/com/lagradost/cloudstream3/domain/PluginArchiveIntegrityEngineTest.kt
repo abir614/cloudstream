@@ -123,8 +123,72 @@ class PluginArchiveIntegrityEngineTest {
         val validResult = engine.validateArchive(zipFile, expectedSha256 = correctHash)
         assertTrue(validResult is ArchiveValidationResult.Valid)
 
+        // Standard Cloudstream extension format: sha256-<hash>
+        val prefixedResult = engine.validateArchive(zipFile, expectedSha256 = "sha256-$correctHash")
+        assertTrue(prefixedResult is ArchiveValidationResult.Valid)
+
+        // Colon format and case insensitivity
+        val colonResult = engine.validateArchive(zipFile, expectedSha256 = "sha256:$correctHash")
+        assertTrue(colonResult is ArchiveValidationResult.Valid)
+
+        val upperResult = engine.validateArchive(zipFile, expectedSha256 = "SHA256:${correctHash.uppercase()}")
+        assertTrue(upperResult is ArchiveValidationResult.Valid)
+
+        val hyphenResult = engine.validateArchive(zipFile, expectedSha256 = "sha-256-$correctHash")
+        assertTrue(hyphenResult is ArchiveValidationResult.Valid)
+
+        // Null and blank strings should skip verification and remain valid
+        val nullResult = engine.validateArchive(zipFile, expectedSha256 = null)
+        assertTrue(nullResult is ArchiveValidationResult.Valid)
+
+        val blankResult = engine.validateArchive(zipFile, expectedSha256 = "   ")
+        assertTrue(blankResult is ArchiveValidationResult.Valid)
+
+        val nullStrResult = engine.validateArchive(zipFile, expectedSha256 = "null")
+        assertTrue(nullStrResult is ArchiveValidationResult.Valid)
+
         val invalidResult = engine.validateArchive(zipFile, expectedSha256 = "0000000000000000000000000000000000000000000000000000000000000000")
         assertTrue(invalidResult is ArchiveValidationResult.SecurityViolation)
+
+        val invalidPrefixed = engine.validateArchive(zipFile, expectedSha256 = "sha256-0000000000000000000000000000000000000000000000000000000000000000")
+        assertTrue(invalidPrefixed is ArchiveValidationResult.SecurityViolation)
+    }
+
+    @Test
+    fun `test parseExpectedHash normalizes various hash formats correctly`() {
+        val testSha256 = "742a29f499669c954b8993f283ce3b45b562f29bf9156486e2bb6e36e871ac9b"
+
+        assertEquals("SHA-256" to testSha256, PluginArchiveIntegrityEngine.parseExpectedHash(testSha256))
+        assertEquals("SHA-256" to testSha256, PluginArchiveIntegrityEngine.parseExpectedHash("sha256-$testSha256"))
+        assertEquals("SHA-256" to testSha256, PluginArchiveIntegrityEngine.parseExpectedHash("sha256:$testSha256"))
+        assertEquals("SHA-256" to testSha256, PluginArchiveIntegrityEngine.parseExpectedHash("sha-256-$testSha256"))
+        assertEquals("SHA-256" to testSha256, PluginArchiveIntegrityEngine.parseExpectedHash("SHA256:${testSha256.uppercase()}"))
+
+        val testMd5 = "d41d8cd98f00b204e9800998ecf8427e"
+        assertEquals("MD5" to testMd5, PluginArchiveIntegrityEngine.parseExpectedHash("md5:$testMd5"))
+        assertEquals("MD5" to testMd5, PluginArchiveIntegrityEngine.parseExpectedHash("md5-$testMd5"))
+        assertEquals("MD5" to testMd5, PluginArchiveIntegrityEngine.parseExpectedHash(testMd5))
+
+        assertEquals(null, PluginArchiveIntegrityEngine.parseExpectedHash(null))
+        assertEquals(null, PluginArchiveIntegrityEngine.parseExpectedHash(""))
+        assertEquals(null, PluginArchiveIntegrityEngine.parseExpectedHash("   "))
+        assertEquals(null, PluginArchiveIntegrityEngine.parseExpectedHash("null"))
+        assertEquals(null, PluginArchiveIntegrityEngine.parseExpectedHash("none"))
+    }
+
+    @Test
+    fun `test validateArchive passes archive with relative path prefix for manifest`() {
+        val zipFile = tempFolder.newFile("relative_manifest.cs3")
+        createZip(
+            zipFile,
+            mapOf(
+                "./manifest.json" to "{\"name\":\"TestRelative\",\"version\":1}",
+                "classes.dex" to "fake dex bytes"
+            )
+        )
+
+        val result = engine.validateArchive(zipFile)
+        assertTrue(result is ArchiveValidationResult.Valid)
     }
 
     @Test
