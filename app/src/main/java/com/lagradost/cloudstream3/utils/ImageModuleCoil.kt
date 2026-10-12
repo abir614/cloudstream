@@ -66,6 +66,13 @@ object ImageLoader {
         imageHttpClient = null
     }
 
+    internal fun evictConnections() {
+        try {
+            imageHttpClient?.connectionPool?.evictAll()
+        } catch (_: Throwable) {
+        }
+    }
+
     private fun buildImageHttpClient(context: PlatformContext): OkHttpClient {
         val tier = DeviceProfile.tier(context)
         val dispatcher = Dispatcher().apply {

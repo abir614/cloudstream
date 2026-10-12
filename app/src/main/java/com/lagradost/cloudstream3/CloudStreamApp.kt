@@ -132,6 +132,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             if (level >= TRIM_MEMORY_RUNNING_LOW || level >= TRIM_MEMORY_MODERATE) {
                 try {
                     com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
+                    com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
                 } catch (_: Throwable) {
                 }
             }
@@ -153,6 +154,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             SingletonImageLoader.get(this).memoryCache?.clear()
             try {
                 com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
+                com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
             } catch (_: Throwable) {
             }
             System.gc()
