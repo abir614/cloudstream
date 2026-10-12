@@ -43,26 +43,25 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
     val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
     val dns = settingsManager.getInt(context.getString(R.string.dns_key), 10)
 
-    val maxHeap = Runtime.getRuntime().maxMemory()
-    val isPotato = maxHeap <= 192 * 1024 * 1024L
+    val netConfig = com.lagradost.cloudstream3.utils.DeviceProfile.getNetworkConfig(context)
 
     val dispatcher = Dispatcher().apply {
-        maxRequests = if (isPotato) 64 else 128
-        maxRequestsPerHost = if (isPotato) 12 else 20
+        maxRequests = netConfig.maxRequests
+        maxRequestsPerHost = netConfig.maxRequestsPerHost
     }
 
     val connectionPool = ConnectionPool(
-        maxIdleConnections = if (isPotato) 16 else 32,
-        keepAliveDuration = if (isPotato) 2 else 3,
+        maxIdleConnections = netConfig.maxIdleConnections,
+        keepAliveDuration = netConfig.keepAliveDurationMinutes,
         timeUnit = TimeUnit.MINUTES
     )
 
     val baseClient = OkHttpClient.Builder()
         .dispatcher(dispatcher)
         .connectionPool(connectionPool)
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .writeTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(netConfig.connectTimeoutSeconds, TimeUnit.SECONDS)
+        .readTimeout(netConfig.readTimeoutSeconds, TimeUnit.SECONDS)
+        .writeTimeout(netConfig.readTimeoutSeconds, TimeUnit.SECONDS)
         .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
         .followRedirects(true)
         .followSslRedirects(true)
@@ -80,6 +79,7 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
             )
         ).apply {
             when (dns) {
+                0 -> dns(SafeDns(Dns.SYSTEM))
                 1 -> addGoogleDns()
                 2 -> addCloudFlareDns()
 //                3 -> addOpenDns()
@@ -90,8 +90,10 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
                 8 -> addCanadianShieldDns()
                 9 -> addMullvadDns()
                 10 -> addResilientMultiTierDns()
+                else -> dns(SafeDns(Dns.SYSTEM))
             }
         }
+
         // Needs to be build as otherwise the other builders will change this object
         .build()
     return baseClient

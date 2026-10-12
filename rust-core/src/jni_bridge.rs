@@ -11,16 +11,24 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     _class: JClass,
     url_input: JString,
 ) -> jboolean {
+    if url_input.is_null() {
+        return 0;
+    }
     let url_str: String = match env.get_string(&url_input) {
         Ok(s) => s.into(),
         Err(_) => return 0,
     };
 
-    match validate_url_safety(&url_str) {
-        Ok(_) => 1,
-        Err(_) => 0,
+    let safe_res = std::panic::catch_unwind(|| {
+        validate_url_safety(&url_str)
+    });
+
+    match safe_res {
+        Ok(Ok(_)) => 1,
+        _ => 0,
     }
 }
+
 
 /// Get native core version and architecture
 #[no_mangle]
@@ -557,6 +565,9 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     s1_input: JString,
     s2_input: JString,
 ) -> jni::sys::jint {
+    if s1_input.is_null() || s2_input.is_null() {
+        return 0;
+    }
     let s1: String = match env.get_string(&s1_input) {
         Ok(s) => s.into(),
         Err(_) => return 0,
@@ -566,7 +577,10 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Err(_) => return 0,
     };
 
-    crate::search::levenshtein::fuzzy_ratio(&s1, &s2) as jni::sys::jint
+    let res = std::panic::catch_unwind(|| {
+        crate::search::levenshtein::fuzzy_ratio(&s1, &s2) as jni::sys::jint
+    });
+    res.unwrap_or(0)
 }
 
 /// JNI bridge to calculate exact Levenshtein edit distance in native Rust
@@ -577,6 +591,9 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     s1_input: JString,
     s2_input: JString,
 ) -> jni::sys::jint {
+    if s1_input.is_null() || s2_input.is_null() {
+        return -1;
+    }
     let s1: String = match env.get_string(&s1_input) {
         Ok(s) => s.into(),
         Err(_) => return -1,
@@ -586,8 +603,12 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Err(_) => return -1,
     };
 
-    crate::search::levenshtein::levenshtein_distance(&s1, &s2) as jni::sys::jint
+    let res = std::panic::catch_unwind(|| {
+        crate::search::levenshtein::levenshtein_distance(&s1, &s2) as jni::sys::jint
+    });
+    res.unwrap_or(-1)
 }
+
 
 /// JNI bridge to run a capability-gated WebAssembly extension in native Rust.
 /// Returns a JSON string with format:
@@ -659,12 +680,21 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     _class: JClass,
     text_input: JString,
 ) -> jni::sys::jbyteArray {
+    if text_input.is_null() {
+        return std::ptr::null_mut();
+    }
     let text: String = match env.get_string(&text_input) {
         Ok(s) => s.into(),
         Err(_) => return std::ptr::null_mut(),
     };
 
-    let compressed = crate::compression::compress_string(&text);
+    let compressed = match std::panic::catch_unwind(|| {
+        crate::compression::compress_string(&text)
+    }) {
+        Ok(c) => c,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
     match env.byte_array_from_slice(&compressed) {
         Ok(arr) => arr.into_raw(),
         Err(_) => std::ptr::null_mut(),
@@ -678,16 +708,23 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     _class: JClass,
     bytes_input: jni::objects::JByteArray,
 ) -> jstring {
+    if bytes_input.is_null() {
+        return std::ptr::null_mut();
+    }
     let bytes: Vec<u8> = match env.convert_byte_array(&bytes_input) {
         Ok(b) => b,
         Err(_) => return std::ptr::null_mut(),
     };
 
-    match crate::compression::decompress_string(&bytes) {
-        Ok(restored) => match env.new_string(restored) {
-            Ok(js) => js.into_raw(),
-            Err(_) => std::ptr::null_mut(),
-        },
+    let restored = match std::panic::catch_unwind(|| {
+        crate::compression::decompress_string(&bytes)
+    }) {
+        Ok(Ok(s)) => s,
+        _ => return std::ptr::null_mut(),
+    };
+
+    match env.new_string(restored) {
+        Ok(js) => js.into_raw(),
         Err(_) => std::ptr::null_mut(),
     }
 }
@@ -701,13 +738,15 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     url_input: JString,
     tags_input: JString,
 ) -> jboolean {
-    let title: String = match env.get_string(&title_input) {
-        Ok(s) => s.into(),
-        Err(_) => String::new(),
+    let title: String = if !title_input.is_null() {
+        env.get_string(&title_input).ok().map(|s| s.into()).unwrap_or_default()
+    } else {
+        String::new()
     };
-    let url: String = match env.get_string(&url_input) {
-        Ok(s) => s.into(),
-        Err(_) => String::new(),
+    let url: String = if !url_input.is_null() {
+        env.get_string(&url_input).ok().map(|s| s.into()).unwrap_or_default()
+    } else {
+        String::new()
     };
     let tags: Option<String> = if !tags_input.is_null() {
         env.get_string(&tags_input).ok().map(|s| s.into())
@@ -715,10 +754,14 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         None
     };
 
-    if crate::security::nsfw_classifier::is_nsfw_text(&title, &url, tags.as_deref()) {
-        1
-    } else {
-        0
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::security::nsfw_classifier::is_nsfw_text(&title, &url, tags.as_deref())
+    });
+
+    match safe_res {
+        Ok(true) => 1,
+        _ => 0,
     }
 }
+
 

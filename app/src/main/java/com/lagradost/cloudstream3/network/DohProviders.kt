@@ -191,6 +191,8 @@ class ResilientFallbackDns(
             return listOf(InetAddress.getByName(hostname))
         }
 
+        val deadline = System.currentTimeMillis() + 2000L
+
         // 1. Primary DoH: Mullvad -> Quad9
         try {
             return mullvadDoh.lookup(hostname)
@@ -199,29 +201,38 @@ class ResilientFallbackDns(
             return quad9Doh.lookup(hostname)
         } catch (_: Throwable) {}
 
-        // 2. Secondary DoH: Cloudflare -> Google
-        try {
-            return cloudflareDoh.lookup(hostname)
-        } catch (_: Throwable) {}
-        try {
-            return googleDoh.lookup(hostname)
-        } catch (_: Throwable) {}
-
-        // 3. Primary Plain DNS (UDP 53): Mullvad -> Quad9
-        for (ip in primaryPlainIps) {
-            val res = queryUdpDns(hostname, ip)
-            if (!res.isNullOrEmpty()) return res
+        if (System.currentTimeMillis() < deadline) {
+            // 2. Secondary DoH: Cloudflare -> Google
+            try {
+                return cloudflareDoh.lookup(hostname)
+            } catch (_: Throwable) {}
+            try {
+                return googleDoh.lookup(hostname)
+            } catch (_: Throwable) {}
         }
 
-        // 4. Secondary Plain DNS (UDP 53): Cloudflare -> Google
-        for (ip in secondaryPlainIps) {
-            val res = queryUdpDns(hostname, ip)
-            if (!res.isNullOrEmpty()) return res
+        if (System.currentTimeMillis() < deadline) {
+            // 3. Primary Plain DNS (UDP 53): Mullvad -> Quad9
+            for (ip in primaryPlainIps) {
+                val res = queryUdpDns(hostname, ip)
+                if (!res.isNullOrEmpty()) return res
+                if (System.currentTimeMillis() >= deadline) break
+            }
+        }
+
+        if (System.currentTimeMillis() < deadline) {
+            // 4. Secondary Plain DNS (UDP 53): Cloudflare -> Google
+            for (ip in secondaryPlainIps) {
+                val res = queryUdpDns(hostname, ip)
+                if (!res.isNullOrEmpty()) return res
+                if (System.currentTimeMillis() >= deadline) break
+            }
         }
 
         // 5. Final Fallback to Android System DNS
         return Dns.SYSTEM.lookup(hostname)
     }
+
 
     companion object {
         private val IP_REGEX = Regex("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$")
@@ -276,38 +287,45 @@ class CachedDns(
 }
 
 fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>) = dns(
-    CachedDns(
-        object : Dns {
-            private val doh by lazy {
-                DnsOverHttps
-                    .Builder()
-                    .client(build())
-                    .url(url.toHttpUrl())
-                    .bootstrapDnsHosts(ips.map { InetAddress.getByName(it) })
-                    .build()
-            }
-
-            override fun lookup(hostname: String): List<InetAddress> {
-                try {
-                    return doh.lookup(hostname)
-                } catch (_: Throwable) {}
-
-                // Plain DNS fallback using the provider's bootstrap IPs
-                for (ip in ips) {
-                    val res = queryUdpDns(hostname, ip)
-                    if (!res.isNullOrEmpty()) return res
+    SafeDns(
+        CachedDns(
+            object : Dns {
+                private val doh by lazy {
+                    DnsOverHttps
+                        .Builder()
+                        .client(build())
+                        .url(url.toHttpUrl())
+                        .bootstrapDnsHosts(ips.map { InetAddress.getByName(it) })
+                        .build()
                 }
 
-                // Final fallback to System DNS
-                return Dns.SYSTEM.lookup(hostname)
+                override fun lookup(hostname: String): List<InetAddress> {
+                    val deadline = System.currentTimeMillis() + 2000L
+                    try {
+                        return doh.lookup(hostname)
+                    } catch (_: Throwable) {}
+
+                    if (System.currentTimeMillis() < deadline) {
+                        // Plain DNS fallback using the provider's bootstrap IPs
+                        for (ip in ips) {
+                            val res = queryUdpDns(hostname, ip)
+                            if (!res.isNullOrEmpty()) return res
+                            if (System.currentTimeMillis() >= deadline) break
+                        }
+                    }
+
+                    // Final fallback to System DNS
+                    return Dns.SYSTEM.lookup(hostname)
+                }
             }
-        }
+        )
     )
 )
 
 fun OkHttpClient.Builder.addResilientMultiTierDns() = dns(
-    CachedDns(ResilientFallbackDns(build()))
+    SafeDns(CachedDns(ResilientFallbackDns(build())))
 )
+
 
 fun OkHttpClient.Builder.addMullvadDns() = (
     addGenericDns(

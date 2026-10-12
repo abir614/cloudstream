@@ -132,21 +132,20 @@ android {
 
     signingConfigs {
         create("prerelease") {
-            val rootKeystore = rootProject.file("keystore/release.keystore")
+            val keystorePath = System.getenv("CS_KEYSTORE_PATH") ?: System.getenv("SIGNING_STORE_PATH")
             val runnerTempKeystore = File(System.getProperty("user.home") + "/work/_temp/keystore/").listFiles()?.firstOrNull()
 
-            storeFile = if (rootKeystore.exists()) {
-                rootKeystore
-            } else if (runnerTempKeystore != null) {
-                runnerTempKeystore
-            } else {
-                null
+            storeFile = when {
+                !keystorePath.isNullOrBlank() && file(keystorePath).exists() -> file(keystorePath)
+                runnerTempKeystore != null && runnerTempKeystore.exists() -> runnerTempKeystore
+                else -> null
             }
-            storePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: "android"
-            keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "key0"
-            keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: "android"
+            storePassword = System.getenv("CS_KEYSTORE_PASSWORD") ?: System.getenv("SIGNING_STORE_PASSWORD")
+            keyAlias = System.getenv("CS_KEY_ALIAS") ?: System.getenv("SIGNING_KEY_ALIAS")
+            keyPassword = System.getenv("CS_KEY_PASSWORD") ?: System.getenv("SIGNING_KEY_PASSWORD")
         }
     }
+
 
     compileSdk = libs.versions.compileSdk.get().toInt()
 
@@ -215,7 +214,7 @@ android {
         create("stable") {
             dimension = "state"
             if (signingConfigs.names.contains("prerelease")) {
-                signingConfig = signingConfigs.getByName("prerelease")
+                signingConfig = signingConfigs.getByName("prerelease").takeIf { it.storeFile != null }
             }
             buildConfigField("boolean", "IS_STABLE_BUILD", "true")
         }
@@ -223,10 +222,11 @@ android {
             dimension = "state"
             applicationIdSuffix = ".prerelease"
             if (signingConfigs.names.contains("prerelease")) {
-                signingConfig = signingConfigs.getByName("prerelease")
+                signingConfig = signingConfigs.getByName("prerelease").takeIf { it.storeFile != null }
             } else {
                 logger.warn("No prerelease signing config!")
             }
+
             versionNameSuffix = "-PRE"
             buildConfigField("boolean", "IS_STABLE_BUILD", "false")
         }
