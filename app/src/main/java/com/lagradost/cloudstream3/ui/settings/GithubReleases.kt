@@ -3,7 +3,6 @@ package com.lagradost.cloudstream3.ui.settings
 import androidx.compose.runtime.Immutable
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.mvvm.safe
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.jvm.Throws
@@ -124,12 +123,14 @@ object GithubReleases {
             it.name.equals("SHA256SUMS", ignoreCase = true) || it.name.equals("SHA256SUMS.txt", ignoreCase = true)
         }
         val digest = sumsAsset?.let { asset ->
-            safe {
+            try {
                 val sumsText = app.get(asset.browserDownloadUrl).text
                 val hash = sumsText.lines().firstOrNull { line ->
                     line.contains(foundAsset.name)
                 }?.split("""\s+""".toRegex())?.firstOrNull()?.trim()?.lowercase()
                 if (!hash.isNullOrBlank()) "sha256:$hash" else null
+            } catch (_: Throwable) {
+                null
             }
         } ?: foundAsset.digest
 
