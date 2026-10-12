@@ -227,6 +227,7 @@ object SettingsGeneralScreen : SearchableSettings {
                                 app.initClient(ctx, ignoreSSL = false)
                                 @OptIn(UnsafeSSL::class)
                                 insecureApp.initClient(ctx, ignoreSSL = true)
+                                com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
                             }
                             return@ListPreference true
                         },

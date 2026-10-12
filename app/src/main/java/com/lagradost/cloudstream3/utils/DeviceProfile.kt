@@ -57,25 +57,25 @@ object DeviceProfile {
     fun getNetworkConfig(ctx: Context): NetworkTierConfig {
         return when (tier(ctx)) {
             DeviceTier.LOW -> NetworkTierConfig(
-                maxRequests = 24,
-                maxRequestsPerHost = 4,
-                maxIdleConnections = 3,
-                keepAliveDurationMinutes = 1L,
+                maxRequests = 32,
+                maxRequestsPerHost = 10,
+                maxIdleConnections = 6,
+                keepAliveDurationMinutes = 2L,
                 connectTimeoutSeconds = 15L,
                 readTimeoutSeconds = 25L
             )
             DeviceTier.MID -> NetworkTierConfig(
-                maxRequests = 48,
-                maxRequestsPerHost = 5,
-                maxIdleConnections = 5,
-                keepAliveDurationMinutes = 3L,
+                maxRequests = 64,
+                maxRequestsPerHost = 16,
+                maxIdleConnections = 12,
+                keepAliveDurationMinutes = 4L,
                 connectTimeoutSeconds = 12L,
                 readTimeoutSeconds = 20L
             )
             DeviceTier.HIGH -> NetworkTierConfig(
-                maxRequests = 64,
-                maxRequestsPerHost = 6,
-                maxIdleConnections = 8,
+                maxRequests = 96,
+                maxRequestsPerHost = 24,
+                maxIdleConnections = 20,
                 keepAliveDurationMinutes = 5L,
                 connectTimeoutSeconds = 10L,
                 readTimeoutSeconds = 20L

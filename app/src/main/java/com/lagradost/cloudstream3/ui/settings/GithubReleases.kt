@@ -3,6 +3,7 @@ package com.lagradost.cloudstream3.ui.settings
 import androidx.compose.runtime.Immutable
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.mvvm.safe
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.jvm.Throws
@@ -96,19 +97,46 @@ object GithubReleases {
             headers = defaultHeaders
         ).parsed<GithubRelease>()
 
-        // Find the first correct asset, given that we might have other binaries we release in the same version
-        val foundAsset = latestRelease.assets.firstOrNull { asset ->
-            asset.contentType == contentType
+        val apkAssets = latestRelease.assets.filter { asset ->
+            asset.contentType == contentType || asset.name.endsWith(".apk")
         }
 
-        if (foundAsset == null) {
+        if (apkAssets.isEmpty()) {
             return null
         }
 
+        // Intelligently select best matching APK for running device architecture
+        val supportedAbis = android.os.Build.SUPPORTED_ABIS?.toList() ?: emptyList()
+        val foundAsset = when {
+            supportedAbis.any { it.contains("arm64") } ->
+                apkAssets.firstOrNull { it.name.contains("arm64-v8a") }
+            supportedAbis.any { it.contains("armeabi") } ->
+                apkAssets.firstOrNull { it.name.contains("armeabi-v7a") }
+            supportedAbis.any { it.contains("x86_64") } ->
+                apkAssets.firstOrNull { it.name.contains("x86_64") }
+            supportedAbis.any { it.contains("x86") } ->
+                apkAssets.firstOrNull { it.name.contains("x86") }
+            else -> null
+        } ?: apkAssets.firstOrNull { it.name.contains("universal") }
+          ?: apkAssets.first()
+
+        val sumsAsset = latestRelease.assets.firstOrNull {
+            it.name.equals("SHA256SUMS", ignoreCase = true) || it.name.equals("SHA256SUMS.txt", ignoreCase = true)
+        }
+        val digest = sumsAsset?.let { asset ->
+            safe {
+                val sumsText = app.get(asset.browserDownloadUrl).text
+                val hash = sumsText.lines().firstOrNull { line ->
+                    line.contains(foundAsset.name)
+                }?.split("""\s+""".toRegex())?.firstOrNull()?.trim()?.lowercase()
+                if (!hash.isNullOrBlank()) "sha256:$hash" else null
+            }
+        } ?: foundAsset.digest
+
         return GithubFile(
-            digest = foundAsset.digest,
+            digest = digest,
             downloadUrl = foundAsset.browserDownloadUrl,
-            displayName = foundAsset.name.substringBeforeLast("."),
+            displayName = latestRelease.tagName,
             changeLog = latestRelease.body,
             tagName = latestRelease.tagName,
             nodeId = latestRelease.nodeId

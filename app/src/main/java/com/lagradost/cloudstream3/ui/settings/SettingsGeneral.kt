@@ -351,7 +351,10 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
                 true,
                 {}) {
                 settingsManager.edit { putInt(getString(R.string.dns_key), prefValues[it]) }
-                (context ?: CloudStreamApp.context)?.let { ctx -> app.initClient(ctx) }
+                (context ?: CloudStreamApp.context)?.let { ctx ->
+                    app.initClient(ctx)
+                    com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+                }
             }
             return@setOnPreferenceClickListener true
         }

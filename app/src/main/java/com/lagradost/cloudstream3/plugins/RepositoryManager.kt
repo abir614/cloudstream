@@ -170,7 +170,10 @@ object RepositoryManager {
         return safeAsync {
             // Take manifestVersion and such into account later
             val res = app.get(convertRawGitUrl(url), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
-            if (!res.isSuccessful) return@safeAsync null
+            if (!res.isSuccessful) {
+                res.okhttpResponse.close()
+                return@safeAsync null
+            }
             val text = res.text.trim()
             if (!text.startsWith("{")) {
                 Log.w("RepositoryManager", "Repository response from $url is not JSON object (starts with '${text.take(20)}')")
@@ -184,7 +187,10 @@ object RepositoryManager {
         // Take manifestVersion and such into account later
         return try {
             val res = app.get(convertRawGitUrl(pluginUrls), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
-            if (!res.isSuccessful) return emptyList()
+            if (!res.isSuccessful) {
+                res.okhttpResponse.close()
+                return emptyList()
+            }
             val text = res.text.trim()
             if (!text.startsWith("[")) {
                 Log.w("RepositoryManager", "Plugin list response from $pluginUrls is not JSON array (starts with '${text.take(20)}')")
@@ -227,12 +233,14 @@ object RepositoryManager {
                 val response = app.get(convertRawGitUrl(pluginUrl))
                 if (!response.isSuccessful) {
                     tempFile.delete()
+                    response.okhttpResponse.close()
                     Log.w("RepositoryManager", "Failed downloading plugin from $pluginUrl: HTTP ${response.code}")
                     return@safeAsync null
                 }
 
                 val body = response.okhttpResponse.body ?: run {
                     tempFile.delete()
+                    response.okhttpResponse.close()
                     return@safeAsync null
                 }
 

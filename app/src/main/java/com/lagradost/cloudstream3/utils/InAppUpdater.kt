@@ -133,7 +133,7 @@ object InAppUpdater {
         }
     }
 
-    private fun parseVersionScore(versionStr: String?): Long {
+    fun parseVersionScore(versionStr: String?): Long {
         if (versionStr.isNullOrBlank()) return 0L
         val clean = versionStr.removePrefix("v").substringBefore("-").trim()
         val parts = clean.split('.').mapNotNull { it.toLongOrNull() }

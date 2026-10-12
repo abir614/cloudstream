@@ -27,20 +27,109 @@ import coil3.request.allowHardware
 import coil3.request.bitmapConfig
 import coil3.request.crossfade
 import coil3.util.DebugLogger
+import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.BuildConfig
+import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.USER_AGENT
-import com.lagradost.cloudstream3.network.buildDefaultClient
+import com.lagradost.cloudstream3.network.SafeDns
+import com.lagradost.cloudstream3.network.addAdGuardDns
+import com.lagradost.cloudstream3.network.addCanadianShieldDns
+import com.lagradost.cloudstream3.network.addCloudFlareDns
+import com.lagradost.cloudstream3.network.addDNSWatchDns
+import com.lagradost.cloudstream3.network.addDnsSbDns
+import com.lagradost.cloudstream3.network.addGoogleDns
+import com.lagradost.cloudstream3.network.addMullvadDns
+import com.lagradost.cloudstream3.network.addQuad9Dns
+import com.lagradost.cloudstream3.network.addResilientMultiTierDns
+import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
+import okhttp3.Dns
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okio.Path.Companion.toOkioPath
 import java.io.File
 import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
 
 object ImageLoader {
     private const val TAG = "CoilImgLoader"
+
+    @Volatile
+    private var imageHttpClient: OkHttpClient? = null
+
+    internal fun getImageHttpClient(context: PlatformContext): OkHttpClient =
+        imageHttpClient ?: synchronized(this) {
+            imageHttpClient ?: buildImageHttpClient(context).also { imageHttpClient = it }
+        }
+
+    internal fun resetImageClient() {
+        imageHttpClient = null
+    }
+
+    private fun buildImageHttpClient(context: PlatformContext): OkHttpClient {
+        val tier = DeviceProfile.tier(context)
+        val dispatcher = Dispatcher().apply {
+            when (tier) {
+                DeviceTier.LOW -> {
+                    maxRequests = 32
+                    maxRequestsPerHost = 12
+                }
+                DeviceTier.MID -> {
+                    maxRequests = 64
+                    maxRequestsPerHost = 20
+                }
+                DeviceTier.HIGH -> {
+                    maxRequests = 96
+                    maxRequestsPerHost = 32
+                }
+            }
+        }
+
+        val connectionPool = ConnectionPool(
+            maxIdleConnections = when (tier) {
+                DeviceTier.LOW -> 8
+                DeviceTier.MID -> 16
+                DeviceTier.HIGH -> 32
+            },
+            keepAliveDuration = 5L,
+            timeUnit = TimeUnit.MINUTES
+        )
+
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+        val dns = settingsManager.getInt(context.getString(R.string.dns_key), 10)
+
+        return OkHttpClient.Builder()
+            .dispatcher(dispatcher)
+            .connectionPool(connectionPool)
+            .connectTimeout(10L, TimeUnit.SECONDS)
+            .readTimeout(15L, TimeUnit.SECONDS)
+            .writeTimeout(15L, TimeUnit.SECONDS)
+            .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .apply {
+                when (dns) {
+                    0 -> dns(SafeDns(Dns.SYSTEM))
+                    1 -> addGoogleDns()
+                    2 -> addCloudFlareDns()
+                    4 -> addAdGuardDns()
+                    5 -> addDNSWatchDns()
+                    6 -> addQuad9Dns()
+                    7 -> addDnsSbDns()
+                    8 -> addCanadianShieldDns()
+                    9 -> addMullvadDns()
+                    10 -> addResilientMultiTierDns()
+                    else -> dns(SafeDns(Dns.SYSTEM))
+                }
+            }
+            .build()
+    }
 
     internal fun buildImageLoader(context: PlatformContext): ImageLoader {
         val isBrokenHardware = hasPotentialBrokenHardware()
         val tier = DeviceProfile.tier(context)
         val config = DeviceProfile.getCoilConfig(context)
+        val httpClient = getImageHttpClient(context)
 
         return ImageLoader.Builder(context)
             .crossfade(config.crossfadeMs)
@@ -50,7 +139,7 @@ object ImageLoader {
             .memoryCache {
                 MemoryCache.Builder()
                     .maxSizePercent(context, config.memoryCachePercent)
-                    .strongReferencesEnabled(tier == DeviceTier.HIGH)
+                    .strongReferencesEnabled(true)
                     .build()
             }
             .diskCache {
@@ -60,13 +149,11 @@ object ImageLoader {
                     .maxSizePercent(if (tier == DeviceTier.LOW) 0.02 else 0.05)
                     .build()
             }
-            /** Pass interceptors with care, unnecessary passing tokens to servers
-            or image hosting services causes unauthorized exceptions **/
             .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = { buildDefaultClient(context) }))
+                add(OkHttpNetworkFetcherFactory(callFactory = { httpClient }))
                 if (isBrokenHardware || tier == DeviceTier.LOW) {
                     add(BitmapFactoryDecoder.Factory())
-                } // sw decoder
+                }
             }
             .apply {
                 if (config.useRgb565) {
@@ -129,10 +216,17 @@ object ImageLoader {
         val board = Build.BOARD?.lowercase() ?: ""
         val model = Build.MODEL?.lowercase() ?: ""
         val manufacturer = Build.MANUFACTURER?.lowercase() ?: ""
-        val allwinnerPatterns = listOf("sun50iw9", "h713", "allwinner", "sunxi")
-        val problematicModels =
-            listOf("hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box")
-        return allwinnerPatterns.any { it in hardware || it in board || it in manufacturer } ||
+        val soc = if (SDK_INT >= 31) {
+            Build.SOC_MODEL?.lowercase() ?: ""
+        } else ""
+        val allwinnerPatterns = listOf(
+            "sun50iw9", "sun50i", "sunxi", "allwinner", "h313", "h616", "h713", "h6", "h3",
+            "mali-g31", "dolphin", "petrel"
+        )
+        val problematicModels = listOf(
+            "hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box", "x96", "tanix"
+        )
+        return allwinnerPatterns.any { it in hardware || it in board || it in manufacturer || (soc.isNotEmpty() && it in soc) } ||
                 problematicModels.any { it in model }
     }
 

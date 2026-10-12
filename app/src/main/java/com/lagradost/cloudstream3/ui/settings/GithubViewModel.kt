@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lagradost.cloudstream3.mvvm.safe
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
+import com.lagradost.cloudstream3.utils.InAppUpdater
 import com.lagradost.cloudstream4.AppSettings
 import com.lagradost.cloudstream4.state.ActionHandler
 import com.lagradost.cloudstream4.state.DefaultStateContainer
@@ -250,12 +251,25 @@ class GithubViewModel(
 
         val release = getRelease(prerelease)
 
-        // If on stable, only check that the display name matches
-        if (!prerelease && release.displayName == versionName) {
-            updateState {
-                copy(dialog = baseDialog.copy(state = GithubUpdateDialogState.NoUpdateFound))
+        // If on stable, check whether remote version is strictly newer than installed version
+        if (!prerelease) {
+            val remoteScore = InAppUpdater.parseVersionScore(release.tagName)
+            val localScore = InAppUpdater.parseVersionScore(versionName)
+
+            val hasUpdate = if (remoteScore > 0L && localScore > 0L) {
+                remoteScore > localScore
+            } else {
+                val cleanRemote = release.tagName.removePrefix("v").trim()
+                val cleanLocal = versionName.removePrefix("v").trim()
+                cleanRemote.isNotBlank() && cleanRemote != cleanLocal
             }
-            return@dispatchUpdate
+
+            if (!hasUpdate) {
+                updateState {
+                    copy(dialog = baseDialog.copy(state = GithubUpdateDialogState.NoUpdateFound))
+                }
+                return@dispatchUpdate
+            }
         }
 
         // If this was automated, and we have pressed "skip this update" then check the node-id

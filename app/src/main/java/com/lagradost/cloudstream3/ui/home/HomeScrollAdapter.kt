@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.isGone
 import com.lagradost.cloudstream3.LoadResponse
+import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.databinding.HomeScrollViewBinding
 import com.lagradost.cloudstream3.databinding.HomeScrollViewTvBinding
 import com.lagradost.cloudstream3.ui.BaseDiffCallback
@@ -16,6 +17,7 @@ import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.AppContextUtils.html
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
+import com.lagradost.cloudstream3.utils.getImageFromDrawable
 
 class HomeScrollAdapter(
     val callback: ((View, Int, LoadResponse) -> Unit)
@@ -58,7 +60,10 @@ class HomeScrollAdapter(
 
         when (binding) {
             is HomeScrollViewBinding -> {
-                binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders)
+                binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
+                    placeholder { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                    error { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                }
                 binding.homeScrollPreviewTags.apply {
                     text = item.tags?.joinToString(" • ") ?: ""
                     isGone = item.tags.isNullOrEmpty()
@@ -79,7 +84,10 @@ class HomeScrollAdapter(
                 binding.homeScrollPreview.setOnClickListener { view ->
                     callback.invoke(view ?: return@setOnClickListener, position, item)
                 }
-                binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders)
+                binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
+                    placeholder { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                    error { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                }
             }
         }
     }
