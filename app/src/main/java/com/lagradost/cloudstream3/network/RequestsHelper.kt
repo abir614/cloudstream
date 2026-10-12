@@ -25,10 +25,21 @@ fun Requests.initClient(context: Context) {
     this.baseClient = buildDefaultClient(context)
 }
 
-/** Only use ignoreSSL if you know what you are doing*/
+/** Only use ignoreSSL if you know what you are doing. Shares connection pool and dispatcher via newBuilder(). */
 fun Requests.initClient(context: Context, ignoreSSL: Boolean = false) {
-    this.baseClient = buildDefaultClient(context, ignoreSSL)
+    this.baseClient = if (ignoreSSL) {
+        try {
+            com.lagradost.cloudstream3.app.baseClient.newBuilder().apply {
+                ignoreAllSSLErrors()
+            }.build()
+        } catch (_: Throwable) {
+            buildDefaultClient(context, true)
+        }
+    } else {
+        buildDefaultClient(context, false)
+    }
 }
+
 
 
 // Backwards compatible constructor, mark as deprecated later

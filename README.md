@@ -45,7 +45,12 @@
   - Dynamically classifies hardware into tiers (`LOW`, `MID`, `HIGH`) based on device RAM, Android Go status, and 64-bit ABI support.
   - Tiers OkHttp networking (`LOW`: 24 requests / 4 per host / 3 idle connections; `MID`: 48/5/5; `HIGH`: 64/6/8) to avoid CPU exhaustion and rate-limiting on weak TV sticks.
 
-#### 6. Plugin Execution & Transparency
+#### 6. Scoped Permissive SSL & Clean Core
+- **Scoped Insecure Client (§2.6)**: Permissive [`SSLTrustManager`](file:///home/x/Projects/CS/cloudstream/app/src/main/java/com/lagradost/cloudstream3/ui/player/SSLTrustManager.kt) is strictly isolated to playback instances and `insecureApp` via `app.baseClient.newBuilder().ignoreAllSSLErrors().build()`. Process-wide `HttpsURLConnection` defaults are never altered.
+- **Clean Core Details (§6.5)**: Bundled third-party account sync providers (MAL, Kitsu, AniList, Simkl) and subtitle scrapers (OpenSubtitles, SubDL, etc.) are trimmed to minimize background resource drain.
+- **Detailed Diff Log**: See [`FORK_CHANGES.md`](file:///home/x/Projects/CS/cloudstream/FORK_CHANGES.md) for a comprehensive itemized log of all differences against upstream.
+
+#### 7. Plugin Execution & Transparency
 - **Plugin Architecture Notice**: Plugins currently execute in-process via `PathClassLoader` (same as upstream CloudStream). An isolated-process IPC host model for data-only scrapers is on the roadmap.
 - **Release Signing**: Release keystores are strictly excluded from git history. Release builds are signed only via CI environment secrets (`CS_KEYSTORE_PATH`).
 
@@ -54,3 +59,4 @@
 ### License
 
 This project is licensed under the [GNU General Public License v3.0](LICENSE) in accordance with the upstream CloudStream project.
+
