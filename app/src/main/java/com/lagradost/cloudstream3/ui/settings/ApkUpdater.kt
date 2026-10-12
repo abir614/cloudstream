@@ -86,7 +86,7 @@ object ApkUpdater : AppUpdater {
         downloadProgress: (Long, Long?) -> Unit,
     ) = withContext(Dispatchers.IO) {
         UpdateSecurityGate.requestUpdateChallenge()
-        val stagedFile = File.createTempFile(APP_UPDATE_NAME, ".$APP_UPDATE_SUFFIX")
+        val stagedFile = File.createTempFile(APP_UPDATE_NAME, ".$APP_UPDATE_SUFFIX", activity.cacheDir)
 
         try {
             stagedFile.outputStream().use { writeStream ->
@@ -224,7 +224,7 @@ object ApkUpdater : AppUpdater {
         downloadProgress: (Long, Long?) -> Unit
     ) = withContext(Dispatchers.IO) {
         UpdateSecurityGate.requestUpdateChallenge()
-        val downloadedFile = File.createTempFile(APP_UPDATE_NAME, ".$APP_UPDATE_SUFFIX")
+        val downloadedFile = File.createTempFile(APP_UPDATE_NAME, ".$APP_UPDATE_SUFFIX", activity.cacheDir)
 
         try {
             // We do not need to buffer this because transfer has large writes
@@ -263,6 +263,11 @@ object ApkUpdater : AppUpdater {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
         }
-        context.startActivity(installIntent)
+        val act = (context as? Activity) ?: CommonActivity.activity
+        if (act != null && !act.isFinishing && !act.isDestroyed) {
+            act.startActivity(installIntent)
+        } else {
+            context.startActivity(installIntent)
+        }
     }
 }

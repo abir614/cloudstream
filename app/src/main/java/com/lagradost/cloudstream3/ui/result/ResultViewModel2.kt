@@ -2548,7 +2548,8 @@ class ResultViewModel2 : ViewModel() {
                     handleAction(
                         EpisodeClickEvent(
                             getPlayerAction(activity),
-                            episode
+                            episode,
+                            isResume = true
                         )
                     )
                 }

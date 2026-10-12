@@ -268,11 +268,13 @@ object DeviceProfile {
                 Build.BOARD ?: "Generic"
             }
             val tierLabel = when (currentTier) {
-                DeviceTier.LOW -> "Low-End (Potato / Saver)"
-                DeviceTier.MID -> "Balanced / Standard (Common)"
-                DeviceTier.HIGH -> "High Performance / Flagship"
+                DeviceTier.LOW -> "Power Safe"
+                DeviceTier.MID -> "Balanced / Standard"
+                DeviceTier.HIGH -> "High Performance / Boosted"
             }
-            "$tierLabel • ${totalMb} MB RAM • $cores Cores • SoC: $soc"
+            val isBatteryUnrestricted = !BatteryOptimizationChecker.isAppRestricted(ctx)
+            val batteryLabel = if (isBatteryUnrestricted) "Unrestricted (Boosted)" else "Optimized (Balanced)"
+            "$tierLabel • ${totalMb} MB RAM • $cores Cores • Battery: $batteryLabel • SoC: $soc"
         } catch (_: Throwable) {
             "Standard Profile"
         }
@@ -283,7 +285,6 @@ object DeviceProfile {
             val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
             val override = prefs.getString("performance_profile_override_key", "auto")
             when (override) {
-                "low" -> return DeviceTier.LOW
                 "mid" -> return DeviceTier.MID
                 "high" -> return DeviceTier.HIGH
             }
@@ -315,33 +316,24 @@ object DeviceProfile {
             val has64Bit = Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()
             val cores = Runtime.getRuntime().availableProcessors()
 
-            // 1. Extreme low-end / broken GPU chips (Allwinner H313, RK3128, S905W, Mali-G31, etc.)
-            val matchesLowChip = KNOWN_LOW_CHIPS.any { it in socIdentifier }
-            if (matchesLowChip && (totalMb <= 3072 || isLowRam || cores <= 4)) {
-                return DeviceTier.LOW
-            }
+            // Check if battery optimization is disabled ("Disable Battery Optimization" activated)
+            val isBatteryOptimizationDisabled = !BatteryOptimizationChecker.isAppRestricted(ctx)
 
-            // 2. High-end Flagships (Snapdragon 8 Elite/Gen 1/2/3, Dimensity 9000+, Tensor, Exynos 2xxx)
-            val matchesFlagshipChip = KNOWN_FLAGSHIP_CHIPS.any { it in socIdentifier }
-            if (matchesFlagshipChip && totalMb >= 3500) {
-                return DeviceTier.HIGH
-            }
-
-            // 3. Modern Midrange & Upper-Midrange (Helio G100 Ultimate, G99, Dimensity 7xxx/6xxx, Snapdragon 7/6)
-            val matchesMidChip = KNOWN_MID_CHIPS.any { it in socIdentifier }
-            if (matchesMidChip) {
-                return if (totalMb >= 5500 && cores >= 8) {
+            if (isBatteryOptimizationDisabled) {
+                // When "Disable battery optimization" is activated, boost performance!
+                // Capable devices (including MediaTek Helio G100 Ultimate, Dimensity, Snapdragon, Tensor, Exynos) get boosted to HIGH
+                if (isLowRam || totalMb <= 1500) {
+                    DeviceTier.MID
+                } else {
                     DeviceTier.HIGH
+                }
+            } else {
+                // Otherwise keep balanced / standard so users don't report high battery consumption
+                if (isLowRam || totalMb <= 1500 || !has64Bit) {
+                    DeviceTier.LOW
                 } else {
                     DeviceTier.MID
                 }
-            }
-
-            // 4. Universal Hardware Heuristic (for unlisted SoCs)
-            when {
-                isLowRam || totalMb <= 2200 || !has64Bit || cores <= 4 -> DeviceTier.LOW
-                totalMb >= 5800 && cores >= 8 -> DeviceTier.HIGH
-                else -> DeviceTier.MID
             }
         } catch (_: Throwable) {
             DeviceTier.MID

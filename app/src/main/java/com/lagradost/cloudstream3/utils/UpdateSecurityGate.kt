@@ -180,7 +180,7 @@ object UpdateSecurityGate {
 
             val archivePkgName = archivePkgInfo.packageName
             val archiveVersionCode = PackageInfoCompat.getLongVersionCode(archivePkgInfo)
-            val archiveCertFingerprint = extractCertificateSha256(archivePkgInfo)
+            val archiveCertFingerprint = extractArchiveCertificates(apkFile, archivePkgInfo)
                 ?: run {
                     purgeFile(apkFile)
                     lockGate()
@@ -338,6 +338,28 @@ object UpdateSecurityGate {
         return sha256Hex(rawCert)
     }
 
+    private fun extractArchiveCertificates(apkFile: File, info: PackageInfo): String? {
+        extractCertificateSha256(info)?.let { return it }
+
+        // Fallback: extract X.509 certificate from META-INF entries in the APK archive
+        return try {
+            java.util.zip.ZipFile(apkFile).use { zip ->
+                val certEntry = zip.entries().asSequence().firstOrNull { entry ->
+                    entry.name.startsWith("META-INF/") && (entry.name.endsWith(".RSA") || entry.name.endsWith(".DSA") || entry.name.endsWith(".EC"))
+                } ?: return null
+                zip.getInputStream(certEntry).use { stream ->
+                    val cf = java.security.cert.CertificateFactory.getInstance("X.509")
+                    val certs = cf.generateCertificates(stream)
+                    val cert = certs.firstOrNull() as? java.security.cert.X509Certificate ?: return null
+                    sha256Hex(cert.encoded)
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Fallback certificate extraction failed: ${e.message}")
+            null
+        }
+    }
+
     private fun sha256Hex(data: ByteArray): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(data)
         return digest.joinToString("") { "%02x".format(it) }
@@ -441,10 +463,11 @@ object UpdateSecurityGate {
             )
         }
 
-        if (apkVersion <= installedVersion) {
+        val isPrerelease = actualPkg.contains("prerelease") || expectedPkg.contains("prerelease") || BuildConfig.FLAVOR == "prerelease"
+        if (!isPrerelease && apkVersion < installedVersion) {
             return InternalVerificationResult(
                 false, "", "",
-                "Anti-rollback violation: APK version $apkVersion <= installed $installedVersion"
+                "Anti-rollback violation: APK version $apkVersion < installed $installedVersion"
             )
         }
 

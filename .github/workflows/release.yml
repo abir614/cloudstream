@@ -131,10 +131,25 @@ jobs:
           MAL_KEY: ${{ secrets.MAL_KEY }}
           ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
 
-      - name: Generate SHA256SUMS Checksums
+      - name: Tag Release Files with Version Tag
         run: |
+          TAG="${{ steps.release_meta.outputs.tag }}"
           cd app/build/outputs/apk/stable/release/
+          for apk in *.apk; do
+            if [ -f "$apk" ]; then
+              abi=$(echo "$apk" | sed -E 's/app-stable-(.*)-release\.apk/\1/')
+              tagged="CloudStream-${TAG}-${abi}.apk"
+              cp "$apk" "$tagged"
+            fi
+          done
           sha256sum *.apk > SHA256SUMS
+          cd ../../../../../
+          if [ -f "app/build/libs/app-sources.jar" ]; then
+            cp "app/build/libs/app-sources.jar" "app/build/libs/app-sources-${TAG}.jar"
+          fi
+          if [ -f "app/build/classes.jar" ]; then
+            cp "app/build/classes.jar" "app/build/classes-${TAG}.jar"
+          fi
 
       - name: Create Stable GitHub Release
         uses: softprops/action-gh-release@v2
@@ -151,5 +166,5 @@ jobs:
           files: |
             app/build/outputs/apk/stable/release/*.apk
             app/build/outputs/apk/stable/release/SHA256SUMS*
-            app/build/libs/app-sources.jar
-            app/build/classes.jar
+            app/build/libs/*.jar
+            app/build/classes*.jar

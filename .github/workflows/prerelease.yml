@@ -93,16 +93,32 @@ jobs:
         MAL_KEY: ${{ secrets.MAL_KEY }}
         ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
 
-    - name: Generate SHA256SUMS Checksums
-      run: |
-        cd app/build/outputs/apk/prerelease/release/
-        sha256sum *.apk > SHA256SUMS
-
     - name: Compute Build Count
       id: build_count
       run: |
         COUNT=$(git rev-list --count HEAD)
         echo "count=${COUNT}" >> $GITHUB_OUTPUT
+
+    - name: Tag Release Files with Version Tag
+      run: |
+        COUNT="${{ steps.build_count.outputs.count }}"
+        TAG="v${COUNT}"
+        cd app/build/outputs/apk/prerelease/release/
+        for apk in *.apk; do
+          if [ -f "$apk" ]; then
+            abi=$(echo "$apk" | sed -E 's/app-prerelease-(.*)-release\.apk/\1/')
+            tagged="CloudStream-prerelease-${TAG}-${abi}.apk"
+            cp "$apk" "$tagged"
+          fi
+        done
+        sha256sum *.apk > SHA256SUMS
+        cd ../../../../../
+        if [ -f "app/build/libs/app-sources.jar" ]; then
+          cp "app/build/libs/app-sources.jar" "app/build/libs/app-sources-${TAG}.jar"
+        fi
+        if [ -f "app/build/classes.jar" ]; then
+          cp "app/build/classes.jar" "app/build/classes-${TAG}.jar"
+        fi
 
     - name: Create pre-release
       uses: marvinpinto/action-automatic-releases@latest
@@ -114,5 +130,5 @@ jobs:
         files: |
           app/build/outputs/apk/prerelease/release/*.apk
           app/build/outputs/apk/prerelease/release/SHA256SUMS*
-          app/build/libs/app-sources.jar
-          app/build/classes.jar
+          app/build/libs/*.jar
+          app/build/classes*.jar

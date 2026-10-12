@@ -11,9 +11,22 @@ class PackageInstallerStatusReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, -1)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
-                intent.getSafeParcelableExtra<Intent>(Intent.EXTRA_INTENT)?.let { userAction->
+                intent.getSafeParcelableExtra<Intent>(Intent.EXTRA_INTENT)?.let { userAction ->
                     userAction.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    context.startActivity(userAction)
+                    val act = com.lagradost.cloudstream3.CommonActivity.activity
+                    if (act != null && !act.isFinishing && !act.isDestroyed) {
+                        try {
+                            act.startActivity(userAction)
+                            return
+                        } catch (t: Throwable) {
+                            com.lagradost.cloudstream3.mvvm.logError(t)
+                        }
+                    }
+                    try {
+                        context.startActivity(userAction)
+                    } catch (t: Throwable) {
+                        com.lagradost.cloudstream3.mvvm.logError(t)
+                    }
                 }
             }
             PackageInstaller.STATUS_SUCCESS -> {

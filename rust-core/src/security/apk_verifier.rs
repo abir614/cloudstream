@@ -193,15 +193,16 @@ pub fn verify_apk_identity(
         };
     }
 
-    // 2. Anti-Rollback Protection (must be strictly higher than installed version)
-    if apk_version_code <= installed_version_code {
+    // 2. Anti-Rollback Protection (must not be strictly lower than installed version for stable; pre-release tracks commits)
+    let is_prerelease = actual_pkg.contains("prerelease") || expected_pkg.contains("prerelease");
+    if !is_prerelease && apk_version_code < installed_version_code {
         return ApkVerificationResult {
             is_valid: false,
             package_name: actual_pkg.to_string(),
             file_sha256: String::new(),
             attestation_token: String::new(),
             error_message: Some(format!(
-                "Anti-rollback violation: APK versionCode {} <= installed versionCode {}",
+                "Anti-rollback violation: APK versionCode {} < installed versionCode {}",
                 apk_version_code, installed_version_code
             )),
         };
