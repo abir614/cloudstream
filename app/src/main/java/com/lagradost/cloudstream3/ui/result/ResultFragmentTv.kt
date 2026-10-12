@@ -530,7 +530,8 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                     viewModel.handleAction(
                         EpisodeClickEvent(
                             storedData.playerAction, //?: ACTION_PLAY_EPISODE_IN_PLAYER,
-                            resume.result
+                            resume.result,
+                            isResume = true
                         )
                     )
                 }

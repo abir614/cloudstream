@@ -66,8 +66,14 @@ const val ACTION_MARK_AS_WATCHED = 18
 const val TV_EP_SIZE = 400
 const val ACTION_MARK_WATCHED_UP_TO_THIS_EPISODE = 19
 
-data class EpisodeClickEvent(val position: Int?, val action: Int, val data: ResultEpisode) {
-    constructor(action: Int, data: ResultEpisode) : this(null, action, data)
+data class EpisodeClickEvent(
+    val position: Int?,
+    val action: Int,
+    val data: ResultEpisode,
+    val isResume: Boolean = false
+) {
+    constructor(action: Int, data: ResultEpisode) : this(null, action, data, false)
+    constructor(action: Int, data: ResultEpisode, isResume: Boolean) : this(null, action, data, isResume)
 }
 
 class EpisodeAdapter(

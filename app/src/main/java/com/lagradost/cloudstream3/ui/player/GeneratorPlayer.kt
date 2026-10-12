@@ -161,7 +161,8 @@ class GeneratorPlayer : FullScreenPlayer() {
         fun newInstance(
             generator: VideoGenerator<*>,
             index: Int,
-            syncData: HashMap<String, String>? = null
+            syncData: HashMap<String, String>? = null,
+            resume: Boolean = false
         ): Bundle {
             Log.i(TAG, "newInstance = $syncData")
             // Prune oldest generator if map exceeds capacity
@@ -176,6 +177,7 @@ class GeneratorPlayer : FullScreenPlayer() {
             return Bundle().apply {
                 putString("uuid", uuid)
                 putInt("index", index)
+                putBoolean("isResume", resume)
                 if (syncData != null) putSerializable("syncData", syncData)
             }
         }
@@ -203,6 +205,7 @@ class GeneratorPlayer : FullScreenPlayer() {
     private var isPlayerActive: AtomicBoolean = AtomicBoolean(false)
     private var isNextEpisode: Boolean = false // this is used to reset the watch time
     private var isWaitingForMirror: Boolean = false
+    private var isResumeRequested: Boolean = false
     private var savedResumePosition: Long? = null
 
     private var preferredAutoSelectSubtitles: String? = null // null means do nothing, "" means none
@@ -552,10 +555,11 @@ class GeneratorPlayer : FullScreenPlayer() {
         context?.let { ctx ->
             val (url, uri) = link
             val subtitles = viewModel.state.subtitles
+            val shouldResume = com.lagradost.cloudstream4.AppSettings(ctx).player.resumePlayback.get() || isResumeRequested
             val targetStartPos = resumePosition ?: if (sameEpisode) {
-                player.getPosition()?.takeIf { it > 0L } ?: getPos()
+                player.getPosition()?.takeIf { it > 0L } ?: (if (shouldResume) getPos() else 0L)
             } else {
-                if (isNextEpisode) 0L else getPos()
+                if (isNextEpisode) 0L else (if (shouldResume) getPos() else 0L)
             }
             val initialSub = (if (sameEpisode) currentSelectedSubtitles else null) ?: getAutoSelectSubtitle(
                 subtitles, settings = true, downloads = true
@@ -572,7 +576,7 @@ class GeneratorPlayer : FullScreenPlayer() {
                 startPosition = targetStartPos,
                 subtitles,
                 initialSub,
-                autoPlay = if (sameEpisode) true else null,
+                autoPlay = true,
                 preview = true
             )
         }
@@ -2399,6 +2403,9 @@ class GeneratorPlayer : FullScreenPlayer() {
         val uuid = savedInstanceState?.getString("uuid") ?: arguments?.getString("uuid")
         playerUuid = uuid
         val index = savedInstanceState?.getInt("index") ?: arguments?.getInt("index")
+        isResumeRequested = savedInstanceState?.getBoolean("isResume", false)
+            ?: arguments?.getBoolean("isResume", false)
+            ?: false
         val generator = generators[uuid]
 
         unwrapBundle(savedInstanceState)

@@ -315,7 +315,7 @@ class CS3IPlayer : IPlayer {
         }
 
         // we want autoplay because of TV and UX
-        isPlaying = autoPlay ?: isPlaying
+        isPlaying = autoPlay ?: true
 
         // release the current exoplayer and cache
         releasePlayer()

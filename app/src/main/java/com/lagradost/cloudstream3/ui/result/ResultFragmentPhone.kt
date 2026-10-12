@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.ui.result
 
 import android.annotation.SuppressLint
+import com.lagradost.cloudstream4.AppSettings
 import android.app.Dialog
 import android.content.Intent
 import android.content.res.ColorStateList
@@ -746,7 +747,8 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                             )
                     }
                     if (resume.isMovie) {
-                        resultPlayParent.isGone = true
+                        val autoResume = context?.let { AppSettings(it).player.resumePlayback.get() } ?: false
+                        resultPlayParent.isVisible = !autoResume
                         resultResumeSeriesProgressText.isVisible = true
                         resultResumeSeriesProgressText.setText(progress.progressLeft)
                     }
@@ -1435,7 +1437,8 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         viewModel.handleAction(
             EpisodeClickEvent(
                 storedData.playerAction, //?: ACTION_PLAY_EPISODE_IN_PLAYER,
-                resume.result
+                resume.result,
+                isResume = true
             )
         )
     }

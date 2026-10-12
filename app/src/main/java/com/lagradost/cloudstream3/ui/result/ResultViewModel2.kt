@@ -1570,7 +1570,7 @@ class ResultViewModel2 : ViewModel() {
                     activity?.navigate(
                         R.id.global_to_navigation_player,
                         GeneratorPlayer.newInstance(
-                            generator, index,list
+                            generator, index, list, resume = click.isResume
                         )
                     )
                 }
@@ -2527,7 +2527,8 @@ class ResultViewModel2 : ViewModel() {
                             handleAction(
                                 EpisodeClickEvent(
                                     getPlayerAction(activity),
-                                    ep
+                                    ep,
+                                    isResume = true
                                 )
                             )
                             break
