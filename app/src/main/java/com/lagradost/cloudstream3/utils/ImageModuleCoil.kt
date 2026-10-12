@@ -218,24 +218,7 @@ object ImageLoader {
         }
     }
 
-    private fun hasPotentialBrokenHardware(): Boolean {
-        val hardware = Build.HARDWARE?.lowercase() ?: ""
-        val board = Build.BOARD?.lowercase() ?: ""
-        val model = Build.MODEL?.lowercase() ?: ""
-        val manufacturer = Build.MANUFACTURER?.lowercase() ?: ""
-        val soc = if (SDK_INT >= 31) {
-            Build.SOC_MODEL?.lowercase() ?: ""
-        } else ""
-        val allwinnerPatterns = listOf(
-            "sun50iw9", "sun50i", "sunxi", "allwinner", "h313", "h616", "h713", "h6", "h3",
-            "mali-g31", "dolphin", "petrel"
-        )
-        val problematicModels = listOf(
-            "hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box", "x96", "tanix"
-        )
-        return allwinnerPatterns.any { it in hardware || it in board || it in manufacturer || (soc.isNotEmpty() && it in soc) } ||
-                problematicModels.any { it in model }
-    }
+    private fun hasPotentialBrokenHardware(): Boolean = DeviceProfile.hasBrokenHardwareGpu()
 
     /** TYPE_SAFE_LOADERS **/
     fun ImageView.loadImage(
