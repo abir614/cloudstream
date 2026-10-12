@@ -185,7 +185,7 @@ class PackageInstallerService : Service() {
             // Close the service after the update is done
             // If no sleep then the install prompt may not appear and the notification
             // will disappear instantly
-            delay(10_000)
+            delay(60_000)
             this@PackageInstallerService.stopSelf()
         }
         return START_NOT_STICKY

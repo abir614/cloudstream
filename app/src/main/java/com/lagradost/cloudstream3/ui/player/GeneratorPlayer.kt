@@ -1856,6 +1856,11 @@ class GeneratorPlayer : FullScreenPlayer() {
         }
     }
 
+    override fun onPause() {
+        flushCurrentPositionToDisk()
+        super.onPause()
+    }
+
     override fun onStop() {
         flushCurrentPositionToDisk()
         super.onStop()
@@ -1897,7 +1902,7 @@ class GeneratorPlayer : FullScreenPlayer() {
         val percentage = position * 100L / duration
 
         val now = System.currentTimeMillis()
-        val shouldSaveToDisk = (now - lastViewPosDiskSaveMs >= 5000L)
+        val shouldSaveToDisk = (now - lastViewPosDiskSaveMs >= 3000L)
         if (shouldSaveToDisk) {
             lastViewPosDiskSaveMs = now
         }

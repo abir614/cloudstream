@@ -481,10 +481,10 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
                 .filterIsInstance<AutofitRecyclerView>()
 
             all.forEach { view ->
-                view.isVisible = view.tag == position
-                view.isFocusable = view.tag == position
+                val isCurrent = view.tag == position
+                view.isFocusable = isCurrent
 
-                if (view.tag == position)
+                if (isCurrent)
                     view.descendantFocusability = FOCUS_AFTER_DESCENDANTS
                 else
                     view.descendantFocusability = FOCUS_BLOCK_DESCENDANTS

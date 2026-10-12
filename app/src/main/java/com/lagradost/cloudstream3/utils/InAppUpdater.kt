@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager.NameNotFoundException
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -322,6 +324,19 @@ object InAppUpdater {
                 val outcome = UpdateSecurityGate.verifyAndAuthorize(this, downloadedFile, expectedSha256)
                 when (outcome) {
                     is UpdateSecurityGate.VerificationOutcome.Authorized -> {
+                        runOnUiThread {
+                            AlertDialog.Builder(this, R.style.AlertDialogCustom)
+                                .setTitle(R.string.update)
+                                .setMessage(R.string.update_notification_installing)
+                                .setPositiveButton(R.string.update) { _, _ ->
+                                    UpdateSecurityGate.executeInstallation(this, outcome.token) { authorizedFile ->
+                                        openApk(this, authorizedFile)
+                                    }
+                                }
+                                .setNegativeButton(R.string.cancel, null)
+                                .show()
+                                .setDefaultFocus()
+                        }
                         UpdateSecurityGate.executeInstallation(this, outcome.token) { authorizedFile ->
                             openApk(this, authorizedFile)
                         }
@@ -345,6 +360,12 @@ object InAppUpdater {
     }
 
     private fun openApk(context: Context, file: File) = safe {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+            val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        }
         val contentUri = FileProvider.getUriForFile(
             context, BuildConfig.APPLICATION_ID + ".provider", file
         )
@@ -355,7 +376,18 @@ object InAppUpdater {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
         }
-        context.startActivity(installIntent)
+        val act = com.lagradost.cloudstream3.CommonActivity.activity ?: (context as? Activity)
+        if (act != null && !act.isFinishing && !act.isDestroyed) {
+            act.runOnUiThread {
+                try {
+                    act.startActivity(installIntent)
+                } catch (t: Throwable) {
+                    context.startActivity(installIntent)
+                }
+            }
+        } else {
+            context.startActivity(installIntent)
+        }
     }
 
     fun Activity.installPreReleaseIfNeeded() = ioSafe {
