@@ -85,7 +85,7 @@ object InAppUpdater {
         @JsonProperty("expectedSha256") @SerialName("expectedSha256") val expectedSha256: String? = null,
     )
 
-    private fun extractExpectedSha256(
+    private suspend fun extractExpectedSha256(
         assets: List<GithubAsset>,
         targetAssetFileName: String
     ): String? {

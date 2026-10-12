@@ -303,7 +303,7 @@ class SearchViewModel : ViewModel() {
                 val targets = repos.filter { a ->
                     (ignoreSettings || (providersActive.isEmpty() || providersActive.contains(a.name))) &&
                         (!isQuickSearch || a.hasQuickSearch) &&
-                        (nsfwEnabled || !NsfwFilterEngine.isNsfwProvider(a))
+                        (nsfwEnabled || !NsfwFilterEngine.isNsfwProvider(a.api))
                 }
 
                 var lastProgressivePostMs = 0L

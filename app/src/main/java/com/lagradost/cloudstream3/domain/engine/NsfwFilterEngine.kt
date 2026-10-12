@@ -6,6 +6,7 @@ import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.ui.APIRepository
 import com.lagradost.cloudstream3.services.NativeCoreBridge
 
 /**
@@ -144,6 +145,10 @@ object NsfwFilterEngine {
             return true
         }
         return isNsfwText(api.name, api.mainUrl, null)
+    }
+
+    fun isNsfwProvider(repo: APIRepository): Boolean {
+        return isNsfwProvider(repo.api)
     }
 
     /**
