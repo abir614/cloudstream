@@ -193,17 +193,24 @@ pub fn verify_apk_identity(
         };
     }
 
-    // 2. Anti-Rollback Protection (must not be strictly lower than installed version for stable; pre-release tracks commits)
+    // 2. Anti-Rollback Protection (stable requires strictly greater versionCode; pre-release allows same versionCode tracking git commits)
     let is_prerelease = actual_pkg.contains("prerelease") || expected_pkg.contains("prerelease");
-    if !is_prerelease && apk_version_code < installed_version_code {
+    let is_rollback = if is_prerelease {
+        apk_version_code < installed_version_code
+    } else {
+        apk_version_code <= installed_version_code
+    };
+    if is_rollback {
         return ApkVerificationResult {
             is_valid: false,
             package_name: actual_pkg.to_string(),
             file_sha256: String::new(),
             attestation_token: String::new(),
             error_message: Some(format!(
-                "Anti-rollback violation: APK versionCode {} < installed versionCode {}",
-                apk_version_code, installed_version_code
+                "Anti-rollback violation: APK versionCode {} {} installed versionCode {}",
+                apk_version_code,
+                if is_prerelease { "<" } else { "<=" },
+                installed_version_code
             )),
         };
     }
@@ -352,10 +359,15 @@ mod tests {
         assert!(!rollback_result.is_valid);
         assert!(rollback_result.error_message.unwrap().contains("Anti-rollback"));
 
-        // Same version attempt (non-upgrade rejected)
+        // Same version attempt (non-upgrade rejected for stable)
         let same_version_result = verify_apk_identity(path, &nonce, pkg, pkg, cert, cert, 50, 50, None);
         assert!(!same_version_result.is_valid);
         assert!(same_version_result.error_message.unwrap().contains("Anti-rollback"));
+
+        // Pre-release allows same version code (tracks commits)
+        let prerelease_pkg = "com.lagradost.cloudstream3.prerelease";
+        let prerelease_same_version = verify_apk_identity(path, &nonce, prerelease_pkg, prerelease_pkg, cert, cert, 50, 50, None);
+        assert!(prerelease_same_version.is_valid);
 
         // Package spoofing
         let spoof_result = verify_apk_identity(path, &nonce, pkg, "com.malicious.app", cert, cert, 50, 51, None);

@@ -48,14 +48,17 @@ jobs:
 
       - name: Setup Keystore
         id: fetch_keystore
+        env:
+          B64_KEYSTORE: ${{ secrets.RELEASE_KEYSTORE_BASE64 || secrets.CS_KEYSTORE_B64 }}
+          KEYSTORE_PWD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD || secrets.CS_KEYSTORE_PASSWORD || 'android' }}
         run: |
           TMP_KEYSTORE_FILE_PATH="${RUNNER_TEMP}"/keystore
           mkdir -p "${TMP_KEYSTORE_FILE_PATH}"
-          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 || secrets.CS_KEYSTORE_B64 }}" ]; then
+          if [ -n "$B64_KEYSTORE" ]; then
             echo "Using secure release keystore from CI secrets..."
-            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 || secrets.CS_KEYSTORE_B64 }}" | base64 -d > "${TMP_KEYSTORE_FILE_PATH}/release.keystore"
+            echo "$B64_KEYSTORE" | base64 -d > "${TMP_KEYSTORE_FILE_PATH}/release.keystore"
             echo "keystore_path=${TMP_KEYSTORE_FILE_PATH}/release.keystore" >> $GITHUB_OUTPUT
-            echo "key_pwd=${{ secrets.RELEASE_KEYSTORE_PASSWORD || secrets.CS_KEYSTORE_PASSWORD || 'android' }}" >> $GITHUB_OUTPUT
+            echo "key_pwd=${KEYSTORE_PWD}" >> $GITHUB_OUTPUT
           elif [ -f "keystore/release.keystore" ]; then
             echo "Using repository release keystore (deterministic signing)..."
             cp "keystore/release.keystore" "${TMP_KEYSTORE_FILE_PATH}/release.keystore"
@@ -83,6 +86,7 @@ jobs:
 
       - name: Build Rust Native Core for ARM and x86 Architectures
         run: |
+          export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}"
           cargo install cargo-ndk --locked
           cd rust-core
           cargo ndk -t armeabi-v7a -t arm64-v8a -t x86 -t x86_64 -o ../app/src/main/jniLibs build --release
@@ -143,12 +147,18 @@ jobs:
             fi
           done
           sha256sum *.apk > SHA256SUMS
-          cd ../../../../../
+          cd "$GITHUB_WORKSPACE"
           if [ -f "app/build/libs/app-sources.jar" ]; then
             cp "app/build/libs/app-sources.jar" "app/build/libs/app-sources-${TAG}.jar"
           fi
           if [ -f "app/build/classes.jar" ]; then
             cp "app/build/classes.jar" "app/build/classes-${TAG}.jar"
+            mkdir -p app/build/libs
+            cp "app/build/classes.jar" "app/build/libs/classes-${TAG}.jar" 2>/dev/null || true
+          elif [ -f "app/build/libs/classes.jar" ]; then
+            cp "app/build/libs/classes.jar" "app/build/libs/classes-${TAG}.jar"
+            cp "app/build/libs/classes.jar" "app/build/classes.jar" 2>/dev/null || true
+            cp "app/build/libs/classes.jar" "app/build/classes-${TAG}.jar" 2>/dev/null || true
           fi
 
       - name: Create Stable GitHub Release
