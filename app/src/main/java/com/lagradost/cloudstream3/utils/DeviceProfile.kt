@@ -140,37 +140,86 @@ object DeviceProfile {
 
     private val KNOWN_LOW_CHIPS = listOf(
         // Allwinner
-        "sun50iw9", "sun50i", "sunxi", "sun8i", "sun4i", "allwinner", "h313", "h616", "h713", "h6", "h3", "a133", "a50", "dolphin", "petrel",
+        "sun50iw9", "sun50iw6", "sun50iw3", "sun50iw1", "sun50i", "sunxi", "sun8i", "sun4i", "sun7i", "allwinner",
+        "h313", "h616", "h618", "h700", "h713", "h728", "h6", "h3", "h5", "h2", "h2+",
+        "a133", "a133p", "a100", "a50", "a33", "a23", "a64", "a20", "a10",
+        "dolphin", "petrel", "cheetah", "eagle", "tulip",
         // Rockchip budget / TV
-        "rk3128", "rk3229", "rk3328", "rk3528", "rk3026", "rk3066", "rk3188", "rk3368", "rk30board",
+        "rk3128", "rk3229", "rk3328", "rk3528", "rk3026", "rk3066", "rk3188", "rk3368", "rk30board", "rk312x",
         // Amlogic budget / TV
-        "s805", "s905w", "s905l", "s905d", "s905y2", "meson", "gxl", "gxm",
+        "s805", "s805x", "s905w", "s905w2", "s905l", "s905d", "s905y2", "s905y4", "meson-gxl", "meson-gxm", "meson-gxbb", "meson64", "gxl", "gxm", "gxbb",
         // Unisoc / Spreadtrum
-        "sc7731", "sc9832", "sc9863", "sc9863a", "t310", "t606", "sprd", "sharkl", "ums512",
-        // MediaTek entry-level
-        "mt6580", "mt6735", "mt6737", "mt6739", "mt6761", "mt6762", "mt6765", "mt8167", "mt8127", "mt8163", "helio a20", "helio a22", "helio g25", "helio g35",
-        // Qualcomm entry-level
-        "msm8909", "msm8916", "msm8917", "msm8920", "msm8937", "msm8940", "msm8953", "qm215", "sdm429", "sdm439", "sdm450", "sm4250",
+        "sc7731", "sc9832", "sc9863", "sc9863a", "sc9850", "t310", "t606", "sprd", "sharkl", "sp9832", "sp7731",
+        // MediaTek entry-level / legacy
+        "mt6580", "mt6582", "mt6592", "mt6735", "mt6737", "mt6739", "mt6750", "mt6752", "mt6753", "mt6755", "mt6757",
+        "mt6761", "mt6762", "mt6765", "mt8167", "mt8127", "mt8163", "mt8168",
+        "helio a20", "helio a22", "helio g25", "helio g35", "helio p22", "helio p35",
+        // Qualcomm entry-level / legacy
+        "msm8909", "msm8916", "msm8917", "msm8920", "msm8937", "msm8940", "msm8952", "msm8953",
+        "qm215", "sdm429", "sdm439", "sdm450", "sm4250",
         // Known problematic GPUs & Budget TV box models
-        "mali-g31", "mali-400", "mali-450", "ge8300", "hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box",
-        "x96", "tanix", "t95", "hk1", "h96", "mxq", "v88", "tx3", "tx6", "a95x"
+        "mali-g31", "mali-400", "mali-450", "mali-t720", "mali-t820", "ge8300", "ge8320", "ge8100",
+        "hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box",
+        "x96", "tanix", "t95", "hk1", "h96", "mxq", "v88", "tx3", "tx6", "a95x", "transpeed", "dq03"
     )
 
     private val KNOWN_FLAGSHIP_CHIPS = listOf(
         // Qualcomm Flagships (800 series, 8 Gen 1/2/3/4/Elite, 7+ Gen 2/3)
-        "sm8750", "sm8650", "sm8550", "sm8475", "sm8450", "sm8350", "sm8250", "sm8150",
-        "sm7475", "sm7675", "kona", "lahaina", "taro", "kalama", "pineapple", "sun",
-        "snapdragon 8", "snapdragon 7+",
-        // MediaTek Dimensity Flagships
+        "sm8750", "sm8650", "sm8550", "sm8475", "sm8450", "sm8350", "sm8250", "sm8150", "sdm845",
+        "sm7675", "sm7475",
+        "sun", "pineapple", "kalama", "cape", "taro", "lahaina", "kona",
+        "snapdragon 8 elite", "snapdragon 8 gen 4", "snapdragon 8 gen 3", "snapdragon 8 gen 2",
+        "snapdragon 8+ gen 1", "snapdragon 8 gen 1", "snapdragon 888", "snapdragon 870", "snapdragon 865", "snapdragon 855",
+        "snapdragon 7+ gen 3", "snapdragon 7+ gen 2", "snapdragon 7+",
+        // MediaTek Dimensity Flagships & Upper-tier
         "dimensity 9400", "dimensity 9300", "dimensity 9200", "dimensity 9000",
-        "dimensity 8300", "dimensity 8200", "dimensity 8100",
-        "mt6989", "mt6985", "mt6983", "mt6895",
+        "dimensity 8300", "dimensity 8200", "dimensity 8100", "dimensity 8050", "dimensity 8020", "dimensity 8000",
+        "dimensity 1300", "dimensity 1200", "dimensity 1100", "dimensity 1000",
+        "mt6991", "mt6989", "mt6985", "mt6983", "mt6895", "mt6893", "mt6891", "mt6889", "mt6897",
         // Google Tensor
-        "tensor", "gs101", "gs201", "zuma", "zumapro",
+        "tensor g4", "tensor g3", "tensor g2", "tensor", "gs101", "gs201", "zuma", "zumapro", "whitechapel", "cloudripper", "caiman", "komodo", "tokay",
         // Samsung Exynos Flagships
-        "exynos 2400", "exynos 2200", "exynos 2100", "exynos 990", "s5e9945", "s5e9925", "s5e9815",
-        // Nvidia Tegra (Shield TV Pro)
-        "tegra", "foster", "darcy", "mdarcy"
+        "exynos 2500", "exynos 2400", "exynos 2200", "exynos 2100", "exynos 990", "exynos 9825", "exynos 9820",
+        "s5e9945", "s5e9925", "s5e9815", "s5e9830", "s5e9820",
+        // Nvidia Tegra (Shield TV / Pro)
+        "tegra", "tegra210", "foster", "darcy", "mdarcy"
+    )
+
+    private val KNOWN_MID_CHIPS = listOf(
+        // MediaTek Helio G series (including Helio G100 Ultimate!)
+        "g100 ultimate", "g100-ultimate", "helio g100", "helio-g100", "g100",
+        "g99 ultimate", "g99-ultimate", "g99 ultra", "helio g99", "helio-g99", "g99",
+        "helio g96", "helio g95", "helio g90t", "helio g90", "helio g88", "helio g85", "helio g80", "helio g70",
+        "helio p95", "helio p90", "helio p70", "helio p65", "helio p60",
+        "mt6789", "mt6789v", "mt6785", "mt6769", "mt6769t", "mt6769z", "mt6768", "mt6779", "mt6771",
+        // MediaTek Dimensity Midrange
+        "dimensity 7300", "dimensity 7200", "dimensity 7050", "dimensity 7025", "dimensity 7020", "dimensity 7000",
+        "dimensity 6300", "dimensity 6100", "dimensity 6080", "dimensity 6020",
+        "dimensity 1080", "dimensity 930", "dimensity 920", "dimensity 900", "dimensity 810", "dimensity 800", "dimensity 720", "dimensity 700",
+        "mt6878", "mt6886", "mt6877", "mt6877v", "mt6855", "mt6833", "mt6835", "mt6853", "mt6873",
+        // MediaTek Tablets / Kompanio
+        "kompanio", "mt8788", "mt8781", "mt8183", "mt8188", "mt8768",
+        // Qualcomm Snapdragon 7 series
+        "snapdragon 7 gen 3", "snapdragon 7s gen 3", "snapdragon 7s gen 2", "snapdragon 7 gen 1",
+        "snapdragon 782g", "snapdragon 780g", "snapdragon 778g", "snapdragon 768g", "snapdragon 765g", "snapdragon 750g", "snapdragon 732g", "snapdragon 730g", "snapdragon 720g",
+        "sm7550", "sm7635", "sm7435", "sm7450", "sm7325", "sm7350", "sm7250", "sm7225", "sm7150", "sm7125", "sdm710",
+        // Qualcomm Snapdragon 6 series
+        "snapdragon 6 gen 3", "snapdragon 6s gen 3", "snapdragon 6 gen 1",
+        "snapdragon 695", "snapdragon 685", "snapdragon 680", "snapdragon 678", "snapdragon 675", "snapdragon 670", "snapdragon 665", "snapdragon 662", "snapdragon 660",
+        "sm6475", "sm6450", "sm6375", "sm6225", "sm6150", "sm6125", "sm6115", "sdm660", "sdm636",
+        // Qualcomm Snapdragon 4 series (Modern 5G)
+        "snapdragon 4 gen 2", "snapdragon 4s gen 2", "snapdragon 4 gen 1", "snapdragon 480",
+        "sm4450", "sm4375", "sm4350",
+        // Samsung Exynos Midrange
+        "exynos 1580", "exynos 1480", "exynos 1380", "exynos 1330", "exynos 1280", "exynos 1080", "exynos 980", "exynos 880",
+        "s5e8845", "s5e8835", "s5e8825", "s5e8535", "s5e8830", "s5e9630",
+        // Unisoc Modern Midrange
+        "unisoc t820", "unisoc t770", "unisoc t760", "unisoc t619", "unisoc t618", "unisoc t616", "unisoc t612", "unisoc t610",
+        "t820", "t770", "t760", "t619", "t618", "t616", "t612", "t610", "ums9620", "ums9230", "ums512",
+        // Rockchip Midrange
+        "rk3588", "rk3588s", "rk3576", "rk3568", "rk3566", "rk3399", "rk3399pro",
+        // Amlogic Midrange / High TV
+        "s922x", "a311d", "s905x4", "s905x3", "s905x2", "t962e", "t968"
     )
 
     fun hasBrokenHardwareGpu(): Boolean {
@@ -183,10 +232,10 @@ object DeviceProfile {
         } else ""
 
         val brokenGpuPatterns = listOf(
-            "mali-g31", "mali-400", "mali-450", "ge8300",
-            "sun50iw9", "sun50i", "sunxi", "sun8i", "allwinner", "h313", "h616", "h713", "h6", "h3",
+            "mali-g31", "mali-400", "mali-450", "mali-t720", "ge8300", "ge8320", "ge8100",
+            "sun50iw9", "sun50iw6", "sun50i", "sunxi", "sun8i", "allwinner", "h313", "h616", "h713", "h6", "h3",
             "rk3128", "rk3229", "rk3328", "rk3528", "rk30board",
-            "s805", "s905w", "s905l", "meson-gxl",
+            "s805", "s905w", "s905w2", "s905l", "meson-gxl",
             "hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box",
             "x96", "tanix", "t95", "hk1", "h96", "mxq", "v88", "tx3", "tx6", "a95x"
         )
@@ -197,6 +246,36 @@ object DeviceProfile {
 
     fun resetCache() {
         cachedTier = null
+    }
+
+    fun getHardwareSummary(ctx: Context): String {
+        return try {
+            val currentTier = tier(ctx)
+            val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            val mi = ActivityManager.MemoryInfo()
+            val totalMb = if (am != null) {
+                am.getMemoryInfo(mi)
+                mi.totalMem / (1024 * 1024)
+            } else {
+                Runtime.getRuntime().maxMemory() / (1024 * 1024)
+            }
+            val cores = Runtime.getRuntime().availableProcessors()
+            val soc = if (Build.VERSION.SDK_INT >= 31 && !Build.SOC_MODEL.isNullOrBlank()) {
+                Build.SOC_MODEL
+            } else if (!Build.HARDWARE.isNullOrBlank()) {
+                Build.HARDWARE
+            } else {
+                Build.BOARD ?: "Generic"
+            }
+            val tierLabel = when (currentTier) {
+                DeviceTier.LOW -> "Low-End (Potato / Saver)"
+                DeviceTier.MID -> "Balanced / Standard (Common)"
+                DeviceTier.HIGH -> "High Performance / Flagship"
+            }
+            "$tierLabel • ${totalMb} MB RAM • $cores Cores • SoC: $soc"
+        } catch (_: Throwable) {
+            "Standard Profile"
+        }
     }
 
     private fun detect(ctx: Context): DeviceTier {
@@ -216,16 +295,13 @@ object DeviceProfile {
             val board = Build.BOARD?.lowercase() ?: ""
             val model = Build.MODEL?.lowercase() ?: ""
             val manufacturer = Build.MANUFACTURER?.lowercase() ?: ""
+            val product = Build.PRODUCT?.lowercase() ?: ""
+            val device = Build.DEVICE?.lowercase() ?: ""
             val soc = if (Build.VERSION.SDK_INT >= 31) {
-                Build.SOC_MODEL?.lowercase() ?: ""
+                "${Build.SOC_MODEL?.lowercase() ?: ""} ${Build.SOC_MANUFACTURER?.lowercase() ?: ""}"
             } else ""
 
-            val matchesLowChip = KNOWN_LOW_CHIPS.any {
-                it in hardware || it in board || it in manufacturer || it in model || (soc.isNotEmpty() && it in soc)
-            }
-            if (matchesLowChip) {
-                return DeviceTier.LOW
-            }
+            val socIdentifier = "$hardware $board $model $manufacturer $product $device $soc"
 
             val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
             val mi = ActivityManager.MemoryInfo()
@@ -239,17 +315,33 @@ object DeviceProfile {
             val has64Bit = Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()
             val cores = Runtime.getRuntime().availableProcessors()
 
-            val matchesFlagshipChip = KNOWN_FLAGSHIP_CHIPS.any {
-                it in hardware || it in board || it in manufacturer || it in model || (soc.isNotEmpty() && it in soc)
+            // 1. Extreme low-end / broken GPU chips (Allwinner H313, RK3128, S905W, Mali-G31, etc.)
+            val matchesLowChip = KNOWN_LOW_CHIPS.any { it in socIdentifier }
+            if (matchesLowChip && (totalMb <= 3072 || isLowRam || cores <= 4)) {
+                return DeviceTier.LOW
             }
-            if (matchesFlagshipChip && totalMb >= 4096) {
+
+            // 2. High-end Flagships (Snapdragon 8 Elite/Gen 1/2/3, Dimensity 9000+, Tensor, Exynos 2xxx)
+            val matchesFlagshipChip = KNOWN_FLAGSHIP_CHIPS.any { it in socIdentifier }
+            if (matchesFlagshipChip && totalMb >= 3500) {
                 return DeviceTier.HIGH
             }
 
+            // 3. Modern Midrange & Upper-Midrange (Helio G100 Ultimate, G99, Dimensity 7xxx/6xxx, Snapdragon 7/6)
+            val matchesMidChip = KNOWN_MID_CHIPS.any { it in socIdentifier }
+            if (matchesMidChip) {
+                return if (totalMb >= 5500 && cores >= 8) {
+                    DeviceTier.HIGH
+                } else {
+                    DeviceTier.MID
+                }
+            }
+
+            // 4. Universal Hardware Heuristic (for unlisted SoCs)
             when {
-                isLowRam || totalMb <= 2048 || !has64Bit || cores <= 4 -> DeviceTier.LOW
-                totalMb <= 4096 || cores <= 6 -> DeviceTier.MID
-                else -> DeviceTier.HIGH
+                isLowRam || totalMb <= 2200 || !has64Bit || cores <= 4 -> DeviceTier.LOW
+                totalMb >= 5800 && cores >= 8 -> DeviceTier.HIGH
+                else -> DeviceTier.MID
             }
         } catch (_: Throwable) {
             DeviceTier.MID

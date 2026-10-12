@@ -198,6 +198,8 @@ class GeneralPreferences(preferences: PreferenceStore) {
     /** Default is 10 (Resilient Multi-Tier DoH) **/
     val dns = preferences.getInt("dns_key", 10)
 
+    val performanceProfile = preferences.getString("performance_profile_override_key", "auto")
+
     /** Very weird setKey based usage, just having this setting might not do it */
     val jsdelivrProxy = preferences.getBoolean("jsdelivr_proxy_key", false)
 

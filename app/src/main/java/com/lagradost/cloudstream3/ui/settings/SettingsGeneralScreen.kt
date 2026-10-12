@@ -30,6 +30,8 @@ import com.lagradost.cloudstream3.network.initClient
 import com.lagradost.cloudstream3.ui.settings.SettingsProvidersScreen.toStringRes
 import com.lagradost.cloudstream3.utils.BatteryOptimizationChecker.isAppRestricted
 import com.lagradost.cloudstream3.utils.BatteryOptimizationChecker.showRequestIgnoreBatteryOptDialog
+import com.lagradost.cloudstream3.utils.DeviceProfile
+import com.lagradost.cloudstream3.utils.ImageLoader
 import com.lagradost.cloudstream3.utils.SubtitleHelper.fromTagToLanguageName
 import com.lagradost.cloudstream3.utils.SubtitleHelper.getNameNextToFlagEmoji
 import com.lagradost.cloudstream4.AppSettings
@@ -195,6 +197,40 @@ object SettingsGeneralScreen : SearchableSettings {
                             }
                         }
                     ),
+                )
+            ),
+
+            Preference.PreferenceGroup(
+                title = stringResource(R.string.pref_category_performance),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.ListPreference(
+                        title = stringResource(R.string.performance_profile_settings),
+                        subtitle = stringResource(R.string.performance_profile_settings_des),
+                        subtitleProvider = { value, entries ->
+                            val selectedLabel = entries[value] ?: value
+                            val summary = DeviceProfile.getHardwareSummary(context)
+                            if (value == "auto") {
+                                "$selectedLabel\n(Active: $summary)"
+                            } else {
+                                "$selectedLabel\n(Forced: $summary)"
+                            }
+                        },
+                        icon = painterResource(R.drawable.memory_24px),
+                        preference = settings.general.performanceProfile,
+                        entries = stringArrayResource(R.array.performance_profile_values).zip(
+                            stringArrayResource(R.array.performance_profile_entries)
+                        ).toMap(),
+                        onValueChanged = {
+                            (CloudStreamApp.context ?: context).let { ctx ->
+                                DeviceProfile.resetCache()
+                                ImageLoader.resetImageClient()
+                                app.initClient(ctx, ignoreSSL = false)
+                                @OptIn(UnsafeSSL::class)
+                                insecureApp.initClient(ctx, ignoreSSL = true)
+                            }
+                            return@ListPreference true
+                        },
+                    )
                 )
             ),
 

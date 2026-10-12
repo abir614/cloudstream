@@ -359,6 +359,48 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
             return@setOnPreferenceClickListener true
         }
 
+        fun updatePerformanceProfileSummary() {
+            context?.let { ctx ->
+                val currentProfile =
+                    settingsManager.getString(getString(R.string.performance_profile_key), "auto") ?: "auto"
+                val prefNames = resources.getStringArray(R.array.performance_profile_entries)
+                val prefValues = resources.getStringArray(R.array.performance_profile_values)
+                val index = prefValues.indexOf(currentProfile).coerceAtLeast(0)
+                val label = prefNames.getOrNull(index) ?: currentProfile
+                val summary = com.lagradost.cloudstream3.utils.DeviceProfile.getHardwareSummary(ctx)
+                val statusText = if (currentProfile == "auto") "Active" else "Forced"
+                getPref(R.string.performance_profile_key)?.summary = "$label ($statusText: $summary)"
+            }
+        }
+        updatePerformanceProfileSummary()
+
+        getPref(R.string.performance_profile_key)?.setOnPreferenceClickListener {
+            val prefNames = resources.getStringArray(R.array.performance_profile_entries)
+            val prefValues = resources.getStringArray(R.array.performance_profile_values)
+
+            val currentProfile =
+                settingsManager.getString(getString(R.string.performance_profile_key), "auto") ?: "auto"
+
+            val activeIndex = prefValues.indexOf(currentProfile).coerceAtLeast(0)
+
+            activity?.showBottomDialog(
+                prefNames.toList(),
+                activeIndex,
+                getString(R.string.performance_profile_settings),
+                true,
+                {}) {
+                val selected = prefValues[it]
+                settingsManager.edit { putString(getString(R.string.performance_profile_key), selected) }
+                (context ?: CloudStreamApp.context)?.let { ctx ->
+                    com.lagradost.cloudstream3.utils.DeviceProfile.resetCache()
+                    com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+                    app.initClient(ctx)
+                }
+                updatePerformanceProfileSummary()
+            }
+            return@setOnPreferenceClickListener true
+        }
+
         fun getDownloadDirs(): List<String> {
             return safe {
                 context?.let { ctx ->

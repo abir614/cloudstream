@@ -55,6 +55,15 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/pref_category_performance">
+        <Preference
+            android:defaultValue="auto"
+            android:icon="@drawable/memory_24px"
+            android:key="@string/performance_profile_key"
+            android:summary="@string/performance_profile_settings_des"
+            android:title="@string/performance_profile_settings" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/pref_category_bypass">
 
         <Preference
