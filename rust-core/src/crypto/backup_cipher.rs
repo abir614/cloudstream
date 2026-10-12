@@ -23,7 +23,7 @@ const NONCE_LEN: usize = 12;
 
 /// Derives a 256-bit symmetric key from passphrase and salt using Argon2id.
 fn derive_key(passphrase: &str, salt: &[u8]) -> Result<[u8; 32], BackupCipherError> {
-    let mut key = [0u8; 32];
+    let mut key: [u8; 32] = core::array::from_fn(|_| 0);
     // Mobile-optimized Argon2id params: 19 MiB RAM, 2 iterations, 1 lane
     let params = Params::new(19 * 1024, 2, 1, Some(32))
         .map_err(|e| BackupCipherError::KdfError(e.to_string()))?;
@@ -42,11 +42,11 @@ pub fn encrypt_backup_payload(data: &[u8], passphrase: &str) -> Result<Vec<u8>, 
         return Err(BackupCipherError::EncryptionError("Passphrase cannot be empty".to_string()));
     }
 
-    let mut salt = [0u8; SALT_LEN];
+    let mut salt: [u8; SALT_LEN] = core::array::from_fn(|_| 0);
     getrandom::getrandom(&mut salt)
         .map_err(|e| BackupCipherError::RandomError(e.to_string()))?;
 
-    let mut nonce_bytes = [0u8; NONCE_LEN];
+    let mut nonce_bytes: [u8; NONCE_LEN] = core::array::from_fn(|_| 0);
     getrandom::getrandom(&mut nonce_bytes)
         .map_err(|e| BackupCipherError::RandomError(e.to_string()))?;
 
