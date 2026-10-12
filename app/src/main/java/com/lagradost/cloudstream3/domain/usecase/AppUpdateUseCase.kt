@@ -31,9 +31,10 @@ class AppUpdateUseCase(
      */
     fun verifyUpdateBinary(
         context: Context,
-        apkFile: File
+        apkFile: File,
+        expectedSha256: String? = null
     ): UpdateSecurityGate.VerificationOutcome {
-        return securityGate.verifyAndAuthorize(context, apkFile)
+        return securityGate.verifyAndAuthorize(context, apkFile, expectedSha256)
     }
 
     /**

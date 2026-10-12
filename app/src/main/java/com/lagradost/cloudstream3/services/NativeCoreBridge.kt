@@ -199,4 +199,32 @@ object NativeCoreBridge {
             WasmExecutionResult(false, emptyList(), t.message ?: "Unknown WASM execution error")
         }
     }
+
+    // --- Native Offline Ed25519 Signature Verification (§2.3) ---
+    external fun nativeVerifyEd25519(manifest: String, signatureHex: String, publicKeyHex: String): Boolean
+
+    fun verifyEd25519(manifest: String, signatureHex: String, publicKeyHex: String): Boolean {
+        return if (isLoaded) nativeVerifyEd25519(manifest, signatureHex, publicKeyHex) else false
+    }
+
+    // --- Native Authenticated Backup Encryption (§4.1) ---
+    external fun nativeEncryptBackup(data: ByteArray, passphrase: String): ByteArray?
+    external fun nativeDecryptBackup(encrypted: ByteArray, passphrase: String): ByteArray?
+    external fun nativeIsEncryptedBackup(data: ByteArray): Boolean
+
+    fun encryptBackup(data: ByteArray, passphrase: String): ByteArray? {
+        return if (isLoaded) nativeEncryptBackup(data, passphrase) else null
+    }
+
+    fun decryptBackup(encrypted: ByteArray, passphrase: String): ByteArray? {
+        return if (isLoaded) nativeDecryptBackup(encrypted, passphrase) else null
+    }
+
+    fun isEncryptedBackup(data: ByteArray): Boolean {
+        return if (isLoaded) {
+            nativeIsEncryptedBackup(data)
+        } else {
+            data.size >= 6 && data.sliceArray(0 until 6).contentEquals("CSENC1".toByteArray(Charsets.UTF_8))
+        }
+    }
 }

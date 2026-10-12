@@ -127,7 +127,11 @@ object UpdateSecurityGate {
      * If invalid, the APK is immediately deleted from disk and the gate relocks.
      */
     @WorkerThread
-    fun verifyAndAuthorize(context: Context, apkFile: File): VerificationOutcome = synchronized(gateLock) {
+    fun verifyAndAuthorize(
+        context: Context,
+        apkFile: File,
+        expectedSha256: String? = null
+    ): VerificationOutcome = synchronized(gateLock) {
         val session = activeSession
         if (session == null || session.isConsumed ||
             (System.currentTimeMillis() - session.createdAt > SESSION_TIMEOUT_MS)
@@ -233,6 +237,18 @@ object UpdateSecurityGate {
                 return VerificationOutcome.Rejected(reason)
             }
 
+            if (!expectedSha256.isNullOrBlank()) {
+                val cleanExpected = expectedSha256.trim().lowercase()
+                val actual = verificationResult.fileSha256.trim().lowercase()
+                if (cleanExpected != actual) {
+                    purgeFile(apkFile)
+                    lockGate()
+                    val reason = "SHA-256 checksum mismatch: expected $cleanExpected, got $actual"
+                    Log.e(TAG, reason)
+                    return VerificationOutcome.Rejected(reason)
+                }
+            }
+
             // 4. Mark challenge consumed and generate single-use Gate Authorization Token
             session.isConsumed = true
             val authToken = GateAuthorizationToken(
@@ -334,9 +350,18 @@ object UpdateSecurityGate {
     }
 
     const val PERMANENT_REPO_CERT_SHA256 = "33e6c058af2421f5935579805b426f7f2bff7294467cec0815d0eeda8b5ede7b"
+    const val OFFICIAL_RELEASE_ED25519_PUBLIC_KEY = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
     private const val PERMANENT_REPO_NAME = "abir614/cloudstream"
     private const val PERMANENT_REPO_ROOT_COMMIT = "e30755daebff90a5fb04642b411e10c600f8ca5a"
     private const val PERMANENT_REPO_SALT = "Z+_IMMUTABLE_CORE_ANCHOR_ABIR614"
+
+    fun verifyUpdateManifestSignature(manifestContent: String, signatureHex: String): Boolean {
+        return NativeCoreBridge.verifyEd25519(
+            manifestContent,
+            signatureHex,
+            OFFICIAL_RELEASE_ED25519_PUBLIC_KEY
+        )
+    }
 
     private fun verifyJvmRepoHeader(hex: String, certFingerprint: String): Boolean {
         return try {

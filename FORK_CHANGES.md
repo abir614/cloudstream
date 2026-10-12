@@ -51,6 +51,14 @@ This document catalogues all intentional architectural deviations, security hard
 - **No Unencrypted OS Backups**: `android:allowBackup="false"` enforced in `AndroidManifest.xml`, along with explicit deny rules in `data_extraction_rules.xml` and `backup_descriptor.xml` preventing unencrypted ADB or cloud extraction of credentials/keys.
 - **Strict Anti-Rollback (§2.3)**: Both [`UpdateSecurityGate`](file:///home/x/Projects/CS/cloudstream/app/src/main/java/com/lagradost/cloudstream3/utils/UpdateSecurityGate.kt) and native Rust verifier strictly enforce `apkVersionCode > installedVersionCode` (rejecting both downgrades and non-upgrading reinstallations).
 
+### 2.8 Offline Ed25519 Update Manifest Attestation (§2.3)
+- **Air-Gapped Trust**: Update authenticity verification using offline Ed25519 signature checks on `SHA256SUMS` manifests, verified via `ed25519-dalek` in the native Rust core (`NativeCoreBridge.verifyEd25519`).
+- **Fail-Closed Download Gate**: `UpdateSecurityGate.verifyAndAuthorize` asserts the computed SHA-256 against signed manifests before permitting installation.
+
+### 2.9 Authenticated Encrypted Backups (§4.1)
+- **Native Argon2id + ChaCha20-Poly1305**: Backups can be exported with an optional user passphrase, encrypted with authenticated memory-hard Argon2id key derivation and ChaCha20-Poly1305 encryption (`CSENC1` format).
+- **Tamper Detection**: Poly1305 authentication tags guarantee corrupted or wrong-passphrase backups fail closed without modifying app state.
+
 ---
 
 ## 3. Native Rust Core & JNI Hardening
@@ -92,9 +100,16 @@ This document catalogues all intentional architectural deviations, security hard
 - **MID**: Minimum buffer: 20s, maximum buffer: 45s, target buffer: 48 MB, back buffer: 15s.
 - **HIGH**: Minimum buffer: 30s, maximum buffer: 60s, target buffer: 128 MB, back buffer: 30s.
 
-### 4.5 CI Release Hygiene & Integrity Verification (§4.4)
+### 4.5 Packaging & Native ABI Optimization (§6.1)
+- **Focused ABI Splits**: Builds package `arm64-v8a` and `armeabi-v7a` plus an optional universal APK, dropping obsolete x86 emulators from releases.
+- **Page-Aligned Uncompressed Native Libs**: Configured `useLegacyPackaging = false` and `android:extractNativeLibs="false"`, allowing Android to `mmap` native libraries directly from the APK rather than extracting them onto flash storage, speeding up cold startup and saving storage space.
+
+### 4.6 Memory Pressure Trimming & Connection Eviction (§5.3)
+- **`onTrimMemory` & `onLowMemory`**: On moderate/low/critical memory pressure, the app automatically flushes Coil bitmap memory caches and evicts all idle OkHttp network connections via `baseClient.connectionPool.evictAll()`.
+
+### 4.7 CI Release Hygiene & Integrity Verification (§4.4)
 - **Secret-Only Signing**: Fallback passwords removed; unsigned if signing secrets are absent.
-- **Automated Checksums**: CI workflows compute and publish `SHA256SUMS` for all built APKs.
+- **Automated Checksums & Manifests**: CI workflows compute and publish `SHA256SUMS*` for all built APKs, ready for offline signature attestation.
 
 ---
 

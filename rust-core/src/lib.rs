@@ -13,7 +13,11 @@ pub mod subtitles;
 
 pub use compression::{compress_deflate, compress_string, compress_zlib, decompress_deflate, decompress_string, decompress_zlib, CompressionError};
 pub use cache::{cache_clear, cache_get, cache_put, cache_remove, LruCache};
-pub use crypto::{fast_hash32, fast_hash64, fast_hash64_str, md5_hex, sha256_hex};
+pub use crypto::{
+    fast_hash32, fast_hash64, fast_hash64_str, md5_hex, sha256_hex,
+    verify_ed25519_signature, verify_manifest_signature,
+    encrypt_backup_payload, decrypt_backup_payload, is_encrypted_backup,
+};
 pub use extractors::html::{extract_media_links, extract_script_json, ExtractedMediaLink};
 pub use extractors::unpacker::{extract_stream_urls, unpack_dean_edwards};
 pub use media::m3u8::{parse_iptv_playlist, parse_master_playlist, IptvItem, M3u8Stream};

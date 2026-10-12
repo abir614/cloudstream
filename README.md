@@ -40,17 +40,31 @@
   - Distinguishes and detects disguised hentai categorized by scraping providers under `TvType.Anime` or `TvType.OVA` without false positives on clean mainstream anime (e.g., Attack on Titan, Hunter x Hunter, Assassination Classroom, Spy x Family).
   - Can be explicitly enabled in Settings → Providers (`enable_nsfw_on_providers_key`), synchronizing immediately in memory.
 
-#### 5. Hardware-Adaptive Profiling
+#### 5. Cryptographic Attestation & Encrypted Backups
+- **Offline Ed25519 Update Verification (§2.3)**:
+  - Updates require verification against `SHA256SUMS` manifests signed offline via Ed25519, verified in native Rust core before APK installation is authorized.
+  - Strict anti-rollback protection rejects downgrades and re-installations (`apkVersionCode > installedVersionCode`).
+- **Authenticated Backups (Argon2id + ChaCha20-Poly1305) (§4.1)**:
+  - Optional user-passphrase encrypted `.csbackup` files (`CSENC1` format) powered by memory-hard Argon2id key derivation and ChaCha20-Poly1305 AEAD in the native Rust core.
+  - Fail-closed tamper detection prevents corrupted or wrong-passphrase restore attempts.
+
+#### 6. Hardware-Adaptive Profiling & Packaging
 - **Device Profile Engine ([`DeviceProfile.kt`](file:///home/x/Projects/CS/cloudstream/app/src/main/java/com/lagradost/cloudstream3/utils/DeviceProfile.kt))**:
   - Dynamically classifies hardware into tiers (`LOW`, `MID`, `HIGH`) based on device RAM, Android Go status, and 64-bit ABI support.
-  - Tiers OkHttp networking (`LOW`: 24 requests / 4 per host / 3 idle connections; `MID`: 48/5/5; `HIGH`: 64/6/8) to avoid CPU exhaustion and rate-limiting on weak TV sticks.
+  - Tiers OkHttp networking (`LOW`: 24 requests / 4 per host / 3 idle connections; `MID`: 48/5/5; `HIGH`: 64/6/8).
+  - Tiers Coil image caches and formats (`LOW`: 10% cache, `RGB_565` bitmap config saving 50% poster memory; `MID`/`HIGH`: 20–25% cache, `ARGB_8888`).
+  - Tiers Media3 / ExoPlayer `DefaultLoadControl` buffers (`LOW`: 10s min / 25s max / 12MB target; `MID`: 20s/45s/48MB; `HIGH`: 30s/60s/128MB).
+- **Packaging & Memory Optimizations (§5.3, §6.1)**:
+  - Focused ABI splits for `arm64-v8a` and `armeabi-v7a` plus universal APK.
+  - `useLegacyPackaging = false` and `android:extractNativeLibs="false"` allow memory-mapping native libraries directly from the APK, accelerating cold startup and saving storage.
+  - `onTrimMemory` and `onLowMemory` callbacks evict Coil memory caches and flush idle OkHttp connection pools.
 
-#### 6. Scoped Permissive SSL & Clean Core
+#### 7. Scoped Permissive SSL & Clean Core
 - **Scoped Insecure Client (§2.6)**: Permissive [`SSLTrustManager`](file:///home/x/Projects/CS/cloudstream/app/src/main/java/com/lagradost/cloudstream3/ui/player/SSLTrustManager.kt) is strictly isolated to playback instances and `insecureApp` via `app.baseClient.newBuilder().ignoreAllSSLErrors().build()`. Process-wide `HttpsURLConnection` defaults are never altered.
 - **Clean Core Details (§6.5)**: Bundled third-party account sync providers (MAL, Kitsu, AniList, Simkl) and subtitle scrapers (OpenSubtitles, SubDL, etc.) are trimmed to minimize background resource drain.
 - **Detailed Diff Log**: See [`FORK_CHANGES.md`](file:///home/x/Projects/CS/cloudstream/FORK_CHANGES.md) for a comprehensive itemized log of all differences against upstream.
 
-#### 7. Plugin Execution & Transparency
+#### 8. Plugin Execution & Transparency
 - **Plugin Architecture Notice**: Plugins currently execute in-process via `PathClassLoader` (same as upstream CloudStream). An isolated-process IPC host model for data-only scrapers is on the roadmap.
 - **Release Signing**: Release keystores are strictly excluded from git history. Release builds are signed only via CI environment secrets (`CS_KEYSTORE_PATH`).
 

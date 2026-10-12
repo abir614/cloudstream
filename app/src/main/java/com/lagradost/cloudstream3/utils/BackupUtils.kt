@@ -21,6 +21,7 @@ import com.lagradost.cloudstream3.syncproviders.AccountManager
 import com.lagradost.cloudstream3.syncproviders.providers.AniListApi.Companion.ANILIST_CACHED_LIST
 import com.lagradost.cloudstream3.syncproviders.providers.MALApi.Companion.MAL_CACHED_LIST
 import com.lagradost.cloudstream3.syncproviders.providers.KitsuApi.Companion.KITSU_CACHED_LIST
+import com.lagradost.cloudstream3.services.NativeCoreBridge
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
@@ -198,10 +199,9 @@ object BackupUtils {
         }
     }
 
-    fun backup(context: Context?) = ioSafe {
+    fun backup(context: Context?, passphrase: String? = null) = ioSafe {
         if (context == null) return@ioSafe
         var fileStream: OutputStream? = null
-        var printStream: PrintWriter? = null
 
         try {
             if (!context.checkWrite()) {
@@ -215,12 +215,22 @@ object BackupUtils {
             val backupFile = getBackup(context)
             val stream = setupBackupStream(context, displayName, ext = "csbackup")
 
+            val jsonBytes = backupFile.toJson().toByteArray(Charsets.UTF_8)
+            val gzipBos = java.io.ByteArrayOutputStream()
+            java.util.zip.GZIPOutputStream(gzipBos).use { gz ->
+                gz.write(jsonBytes)
+            }
+            val compressedBytes = gzipBos.toByteArray()
+
+            val finalBytes = if (!passphrase.isNullOrBlank()) {
+                NativeCoreBridge.encryptBackup(compressedBytes, passphrase) ?: compressedBytes
+            } else {
+                compressedBytes
+            }
+
             fileStream = stream.openNew()
-            val gzipStream = java.util.zip.GZIPOutputStream(fileStream)
-            printStream = PrintWriter(java.io.OutputStreamWriter(gzipStream, java.nio.charset.StandardCharsets.UTF_8))
-            printStream.print(backupFile.toJson())
-            printStream.flush()
-            gzipStream.finish()
+            fileStream.write(finalBytes)
+            fileStream.flush()
             showToast(R.string.backup_success, Toast.LENGTH_LONG)
         } catch (e: Exception) {
             logError(e)
@@ -233,7 +243,6 @@ object BackupUtils {
                 logError(e)
             }
         } finally {
-            printStream?.closeQuietly()
             fileStream?.closeQuietly()
         }
     }
@@ -261,30 +270,8 @@ object BackupUtils {
                             val rawInput = activity.contentResolver.openInputStream(uri)
                                 ?: return@ioSafe
 
-                            val buffered = if (rawInput.markSupported()) rawInput else java.io.BufferedInputStream(rawInput)
-                            buffered.mark(2)
-                            val header = ByteArray(2)
-                            val bytesRead = buffered.read(header)
-                            buffered.reset()
-
-                            // Auto-detect GZIP magic header (0x1f, 0x8b) for compressed .csbackup,
-                            // while maintaining 100% backwards compatibility with legacy uncompressed .txt backups
-                            val decompressedStream = if (bytesRead == 2 && header[0] == 0x1f.toByte() && header[1] == 0x8b.toByte()) {
-                                java.util.zip.GZIPInputStream(buffered)
-                            } else {
-                                buffered
-                            }
-
-                            val text = decompressedStream.bufferedReader(Charsets.UTF_8).readText()
-                            val restoredValue = parseJson<BackupFile>(text)
-
-                            restore(
-                                activity,
-                                restoredValue,
-                                restoreSettings = true,
-                                restoreDataStore = true,
-                            )
-                            activity.runOnUiThread { activity.recreate() }
+                            val rawBytes = rawInput.use { it.readBytes() }
+                            restoreFromBytes(activity, rawBytes)
                         } catch (e: Exception) {
                             logError(e)
                             main { // smth can fail in .format
@@ -297,6 +284,63 @@ object BackupUtils {
                 }
         } catch (e: Exception) {
             logError(e)
+        }
+    }
+
+    fun restoreFromBytes(activity: FragmentActivity, rawBytes: ByteArray, passphrase: String? = null): Boolean {
+        return try {
+            val processedBytes = if (NativeCoreBridge.isEncryptedBackup(rawBytes)) {
+                if (passphrase.isNullOrBlank()) {
+                    main {
+                        val input = android.widget.EditText(activity).apply {
+                            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                            hint = "Backup Passphrase"
+                        }
+                        androidx.appcompat.app.AlertDialog.Builder(activity, R.style.AlertDialogCustom)
+                            .setTitle("Encrypted Backup")
+                            .setMessage("Enter the passphrase used to encrypt this backup:")
+                            .setView(input)
+                            .setPositiveButton("Restore") { _, _ ->
+                                val entered = input.text?.toString() ?: ""
+                                ioSafe { restoreFromBytes(activity, rawBytes, entered) }
+                            }
+                            .setNegativeButton(android.R.string.cancel, null)
+                            .show()
+                    }
+                    return false
+                }
+                val decrypted = NativeCoreBridge.decryptBackup(rawBytes, passphrase)
+                if (decrypted == null) {
+                    main { showToast("Decryption failed: Incorrect passphrase or corrupted backup", Toast.LENGTH_LONG) }
+                    return false
+                }
+                decrypted
+            } else {
+                rawBytes
+            }
+
+            val isGzip = processedBytes.size >= 2 && processedBytes[0] == 0x1f.toByte() && processedBytes[1] == 0x8b.toByte()
+            val text = if (isGzip) {
+                java.util.zip.GZIPInputStream(processedBytes.inputStream()).bufferedReader(Charsets.UTF_8).readText()
+            } else {
+                processedBytes.toString(Charsets.UTF_8)
+            }
+            val restoredValue = parseJson<BackupFile>(text)
+
+            restore(
+                activity,
+                restoredValue,
+                restoreSettings = true,
+                restoreDataStore = true,
+            )
+            activity.runOnUiThread { activity.recreate() }
+            true
+        } catch (e: Exception) {
+            logError(e)
+            main {
+                showToast(activity.getString(R.string.restore_failed_format).format(e.toString()), Toast.LENGTH_LONG)
+            }
+            false
         }
     }
 

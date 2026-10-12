@@ -31,6 +31,11 @@ hex = "0.4.3"
 # Error handling
 thiserror = "2.0.11"
 
+# Modern Cryptography: Offline Ed25519 update verification & Encrypted backup
+ed25519-dalek = { version = "2.1", default-features = false }
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+
 # Android JNI integration (optional feature)
 jni = { version = "0.21.1", default-features = false }
 miniz_oxide = "0.9.1"

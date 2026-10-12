@@ -258,9 +258,8 @@ android {
 
     packaging {
         jniLibs {
-            // Enables legacy JNI packaging to reduce APK size (similar to builds before minSdk 23).
-            // Note: This may increase app startup time slightly.
-            useLegacyPackaging = true
+            // Uncompressed, 16KB/4KB page-aligned native libs load faster via mmap and save storage
+            useLegacyPackaging = false
         }
     }
 
@@ -268,7 +267,7 @@ android {
         abi {
             isEnable = true
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include("armeabi-v7a", "arm64-v8a")
             isUniversalApk = true
         }
     }

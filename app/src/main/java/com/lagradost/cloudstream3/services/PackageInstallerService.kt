@@ -60,7 +60,7 @@ class PackageInstallerService : Service() {
 
     private val updateLock = Mutex()
 
-    private suspend fun downloadUpdate(url: String): Boolean {
+    private suspend fun downloadUpdate(url: String, expectedSha256: String? = null): Boolean {
         try {
             Log.d("PackageInstallerService", "Downloading update: $url")
             val appUpdateName = "CloudStream"
@@ -108,7 +108,7 @@ class PackageInstallerService : Service() {
                     }
                 }
 
-                val outcome = UpdateSecurityGate.verifyAndAuthorize(this@PackageInstallerService, stagedFile)
+                val outcome = UpdateSecurityGate.verifyAndAuthorize(this@PackageInstallerService, stagedFile, expectedSha256)
                 if (outcome !is UpdateSecurityGate.VerificationOutcome.Authorized) {
                     val reason = (outcome as? UpdateSecurityGate.VerificationOutcome.Rejected)?.reason
                         ?: "Update rejected by security gate"
@@ -179,8 +179,9 @@ class PackageInstallerService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val url = intent?.getStringExtra(EXTRA_URL) ?: return START_NOT_STICKY
+        val expectedSha256 = intent.getStringExtra(EXTRA_EXPECTED_SHA256)
         ioSafe {
-            downloadUpdate(url)
+            downloadUpdate(url, expectedSha256)
             // Close the service after the update is done
             // If no sleep then the install prompt may not appear and the notification
             // will disappear instantly
@@ -205,6 +206,7 @@ class PackageInstallerService : Service() {
 
     companion object {
         private const val EXTRA_URL = "EXTRA_URL"
+        private const val EXTRA_EXPECTED_SHA256 = "EXTRA_EXPECTED_SHA256"
 
         const val UPDATE_CHANNEL_ID = "cloudstream3.updates"
         const val UPDATE_CHANNEL_NAME = "App Updates"
@@ -214,9 +216,11 @@ class PackageInstallerService : Service() {
         fun getIntent(
             context: Context,
             url: String,
+            expectedSha256: String? = null,
         ): Intent {
             return Intent(context, PackageInstallerService::class.java)
                 .putExtra(EXTRA_URL, url)
+                .putExtra(EXTRA_EXPECTED_SHA256, expectedSha256)
         }
     }
 }

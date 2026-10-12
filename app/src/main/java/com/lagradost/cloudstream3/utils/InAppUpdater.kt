@@ -82,7 +82,42 @@ object InAppUpdater {
         @JsonProperty("updateVersion") @SerialName("updateVersion") val updateVersion: String?,
         @JsonProperty("changelog") @SerialName("changelog") val changelog: String?,
         @JsonProperty("updateNodeId") @SerialName("updateNodeId") val updateNodeId: String?,
+        @JsonProperty("expectedSha256") @SerialName("expectedSha256") val expectedSha256: String? = null,
     )
+
+    private fun extractExpectedSha256(
+        assets: List<GithubAsset>,
+        targetAssetFileName: String
+    ): String? {
+        val sumsAsset = assets.firstOrNull {
+            it.name.equals("SHA256SUMS", ignoreCase = true) || it.name.equals("SHA256SUMS.txt", ignoreCase = true)
+        } ?: return null
+        return try {
+            val sumsText = app.get(sumsAsset.browserDownloadUrl, cacheTime = 15, cacheUnit = TimeUnit.MINUTES).text
+            if (sumsText.isBlank()) return null
+
+            val sigAsset = assets.firstOrNull {
+                it.name.equals("SHA256SUMS.sig", ignoreCase = true) ||
+                it.name.equals("SHA256SUMS.minisig", ignoreCase = true)
+            }
+            if (sigAsset != null) {
+                val sigText = app.get(sigAsset.browserDownloadUrl, cacheTime = 15, cacheUnit = TimeUnit.MINUTES).text.trim()
+                val isValid = UpdateSecurityGate.verifyUpdateManifestSignature(sumsText, sigText)
+                if (!isValid) {
+                    Log.e(LOG_TAG, "Ed25519 signature verification failed for SHA256SUMS manifest!")
+                    return null
+                }
+                Log.i(LOG_TAG, "Ed25519 signature verified for SHA256SUMS manifest.")
+            }
+
+            sumsText.lines().firstOrNull { line ->
+                line.contains(targetAssetFileName)
+            }?.split("""\s+""".toRegex())?.firstOrNull()?.trim()?.lowercase()
+        } catch (e: Throwable) {
+            Log.w(LOG_TAG, "Failed to resolve or verify SHA256SUMS: $e")
+            null
+        }
+    }
 
     private suspend fun Activity.getAppUpdate(installPrerelease: Boolean): Update {
         return try {
@@ -183,12 +218,14 @@ object InAppUpdater {
             currentScore < remoteScore
         }
 
+        val expectedSha256 = extractExpectedSha256(found.assets, foundAsset.name)
         return Update(
             shouldUpdate,
             foundAsset.browserDownloadUrl,
             remoteVersionStr,
             found.body,
-            found.nodeId
+            found.nodeId,
+            expectedSha256
         )
     }
 
@@ -248,18 +285,20 @@ object InAppUpdater {
 
         Log.d(LOG_TAG, "Fetched GitHub tag: $updateCommitHash")
 
+        val expectedSha256 = extractExpectedSha256(found.assets, foundAsset.name)
         return Update(
             currentCommitHash() != updateCommitHash,
             foundAsset.browserDownloadUrl,
             updateCommitHash,
             found.body,
-            found.nodeId
+            found.nodeId,
+            expectedSha256
         )
     }
 
     private val updateLock = Mutex()
 
-    private suspend fun Activity.downloadUpdate(url: String): Boolean {
+    private suspend fun Activity.downloadUpdate(url: String, expectedSha256: String? = null): Boolean {
         try {
             Log.d(LOG_TAG, "Downloading update: $url")
             val appUpdateName = "CloudStream"
@@ -280,7 +319,7 @@ object InAppUpdater {
                     sink.writeAll(app.get(url).body.source())
                 }
 
-                val outcome = UpdateSecurityGate.verifyAndAuthorize(this, downloadedFile)
+                val outcome = UpdateSecurityGate.verifyAndAuthorize(this, downloadedFile, expectedSha256)
                 when (outcome) {
                     is UpdateSecurityGate.VerificationOutcome.Authorized -> {
                         UpdateSecurityGate.executeInstallation(this, outcome.token) { authorizedFile ->
@@ -412,7 +451,7 @@ object InAppUpdater {
                             // New method
                             0 -> {
                                 val intent = PackageInstallerService.Companion.getIntent(
-                                    this@runAutoUpdate, update.updateURL
+                                    this@runAutoUpdate, update.updateURL, update.expectedSha256
                                 )
                                 ContextCompat.startForegroundService(
                                     this@runAutoUpdate, intent
@@ -421,7 +460,7 @@ object InAppUpdater {
                             // Legacy
                             1 -> {
                                 ioSafe {
-                                    if (!downloadUpdate(update.updateURL)) {
+                                    if (!downloadUpdate(update.updateURL, update.expectedSha256)) {
                                         runOnUiThread {
                                             showToast(
                                                 R.string.download_failed, Toast.LENGTH_LONG

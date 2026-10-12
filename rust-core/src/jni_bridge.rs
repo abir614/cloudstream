@@ -788,4 +788,123 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     }
 }
 
+/// JNI bridge to verify an offline Ed25519 signature on an update manifest or artifact
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeVerifyEd25519(
+    mut env: JNIEnv,
+    _class: JClass,
+    manifest_input: JString,
+    signature_hex_input: JString,
+    public_key_hex_input: JString,
+) -> jboolean {
+    if manifest_input.is_null() || signature_hex_input.is_null() || public_key_hex_input.is_null() {
+        return 0;
+    }
+    let manifest: String = match env.get_string(&manifest_input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let signature_hex: String = match env.get_string(&signature_hex_input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+    let public_key_hex: String = match env.get_string(&public_key_hex_input) {
+        Ok(s) => s.into(),
+        Err(_) => return 0,
+    };
+
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::crypto::ed25519::verify_manifest_signature(&manifest, &signature_hex, &public_key_hex)
+    });
+
+    match safe_res {
+        Ok(true) => 1,
+        _ => 0,
+    }
+}
+
+/// JNI bridge to encrypt backup bytes with user passphrase using Argon2id + ChaCha20-Poly1305
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeEncryptBackup(
+    mut env: JNIEnv,
+    _class: JClass,
+    data_input: jni::objects::JByteArray,
+    passphrase_input: JString,
+) -> jni::sys::jbyteArray {
+    if data_input.is_null() || passphrase_input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let data = match env.convert_byte_array(&data_input) {
+        Ok(b) => b,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let passphrase: String = match env.get_string(&passphrase_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::crypto::backup_cipher::encrypt_backup_payload(&data, &passphrase)
+    });
+
+    match safe_res {
+        Ok(Ok(encrypted)) => match env.byte_array_from_slice(&encrypted) {
+            Ok(arr) => arr.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        _ => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to decrypt backup bytes with user passphrase
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeDecryptBackup(
+    mut env: JNIEnv,
+    _class: JClass,
+    encrypted_input: jni::objects::JByteArray,
+    passphrase_input: JString,
+) -> jni::sys::jbyteArray {
+    if encrypted_input.is_null() || passphrase_input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let encrypted = match env.convert_byte_array(&encrypted_input) {
+        Ok(b) => b,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let passphrase: String = match env.get_string(&passphrase_input) {
+        Ok(s) => s.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::crypto::backup_cipher::decrypt_backup_payload(&encrypted, &passphrase)
+    });
+
+    match safe_res {
+        Ok(Ok(plaintext)) => match env.byte_array_from_slice(&plaintext) {
+            Ok(arr) => arr.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        _ => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to check if backup bytes are encrypted with CSENC1 header
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeIsEncryptedBackup(
+    env: JNIEnv,
+    _class: JClass,
+    data_input: jni::objects::JByteArray,
+) -> jboolean {
+    if data_input.is_null() {
+        return 0;
+    }
+    let data = match env.convert_byte_array(&data_input) {
+        Ok(b) => b,
+        Err(_) => return 0,
+    };
+
+    if crate::crypto::backup_cipher::is_encrypted_backup(&data) { 1 } else { 0 }
+}
+
 

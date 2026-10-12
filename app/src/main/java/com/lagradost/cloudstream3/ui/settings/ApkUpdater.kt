@@ -93,7 +93,10 @@ object ApkUpdater : AppUpdater {
                 transfer(writeStream, readStream, length, downloadProgress, digest)
             }
 
-            val outcome = UpdateSecurityGate.verifyAndAuthorize(activity, stagedFile)
+            val expectedSha256 = if (digest?.algorithm?.equals("sha256", ignoreCase = true) == true) {
+                digest.digest.joinToString("") { "%02x".format(it) }
+            } else null
+            val outcome = UpdateSecurityGate.verifyAndAuthorize(activity, stagedFile, expectedSha256)
             if (outcome !is UpdateSecurityGate.VerificationOutcome.Authorized) {
                 val reason = (outcome as? UpdateSecurityGate.VerificationOutcome.Rejected)?.reason
                     ?: "Update rejected by security gate"
@@ -229,7 +232,10 @@ object ApkUpdater : AppUpdater {
                 transfer(writeStream, readStream, length, downloadProgress, digest)
             }
 
-            val outcome = UpdateSecurityGate.verifyAndAuthorize(activity, downloadedFile)
+            val expectedSha256 = if (digest?.algorithm?.equals("sha256", ignoreCase = true) == true) {
+                digest.digest.joinToString("") { "%02x".format(it) }
+            } else null
+            val outcome = UpdateSecurityGate.verifyAndAuthorize(activity, downloadedFile, expectedSha256)
             when (outcome) {
                 is UpdateSecurityGate.VerificationOutcome.Authorized -> {
                     UpdateSecurityGate.executeInstallation(activity, outcome.token) { authorizedFile ->

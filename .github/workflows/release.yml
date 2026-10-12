@@ -139,6 +139,6 @@ jobs:
           fail_on_unmatched_files: false
           files: |
             app/build/outputs/apk/stable/release/*.apk
-            app/build/outputs/apk/stable/release/SHA256SUMS
+            app/build/outputs/apk/stable/release/SHA256SUMS*
             app/build/libs/app-sources.jar
             app/build/classes.jar

@@ -129,6 +129,12 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                     memCache.trimToSize(memCache.size / 2)
                 }
             }
+            if (level >= TRIM_MEMORY_RUNNING_LOW || level >= TRIM_MEMORY_MODERATE) {
+                try {
+                    com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
+                } catch (_: Throwable) {
+                }
+            }
             if (level >= TRIM_MEMORY_RUNNING_CRITICAL) {
                 System.gc()
             }
@@ -145,6 +151,10 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                 com.lagradost.cloudstream3.utils.telemetry.TelemetryService.Level.FATAL
             )
             SingletonImageLoader.get(this).memoryCache?.clear()
+            try {
+                com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
+            } catch (_: Throwable) {
+            }
             System.gc()
         } catch (_: Throwable) {
         }
