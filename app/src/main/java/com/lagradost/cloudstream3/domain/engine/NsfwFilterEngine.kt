@@ -163,7 +163,7 @@ object NsfwFilterEngine {
         }
         if (items.isNotEmpty()) {
             val nsfwCount = items.count { isNsfw(it) }
-            if (nsfwCount > 0 && nsfwCount >= (items.size / 2)) {
+            if (nsfwCount * 2 > items.size) {
                 return true
             }
         }
