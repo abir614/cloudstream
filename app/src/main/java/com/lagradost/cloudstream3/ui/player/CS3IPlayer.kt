@@ -98,6 +98,7 @@ import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.ui.subtitles.SaveCaptionStyle
 import com.lagradost.cloudstream3.ui.subtitles.SubtitlesFragment.Companion.applyStyle
 import com.lagradost.cloudstream3.utils.AppContextUtils.isUsingMobileData
+import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.AppContextUtils.setDefaultFocus
 import com.lagradost.cloudstream3.utils.CLEARKEY_DRM_UUID
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
@@ -1108,45 +1109,18 @@ class CS3IPlayer : IPlayer {
         /** External audio tracks to merge with the video */
         audioSources: List<MediaSource> = emptyList()
     ): ExoPlayer {
-        // Hardware Adaptive LoadControl: queries real physical device RAM from Linux kernel
-        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        val totalRamBytes = try {
-            val memInfo = ActivityManager.MemoryInfo().also { activityManager?.getMemoryInfo(it) }
-            memInfo.totalMem
-        } catch (_: Throwable) {
-            0L
-        }
-        val isLowRamFlag = activityManager?.isLowRamDevice == true
-
-        val isPotatoDevice = isLowRamFlag || (totalRamBytes in 1..805306368L) // <= 768MB
-        val isMidRamDevice = totalRamBytes in 805306369L..2147483648L // ~1GB - 2GB
-        val isHighEndDevice = totalRamBytes > 2147483648L // > 2GB (Shield TV, modern smartphones, high-end boxes)
+        // Hardware Adaptive LoadControl driven by centralized DeviceProfile (§5.2, §5.6)
+        val playerConfig = DeviceProfile.getPlayerBufferConfig(context)
 
         val targetBufferBytes = when {
             cacheSize > 0 -> if (cacheSize > Int.MAX_VALUE) Int.MAX_VALUE else cacheSize.toInt()
-            isPotatoDevice -> 16 * 1024 * 1024 // 16 MB on <= 768MB potato devices
-            isMidRamDevice -> 48 * 1024 * 1024 // 48 MB on 1GB - 2GB TV sticks
-            isHighEndDevice -> 256 * 1024 * 1024 // 256 MB on high-end 3GB+ devices (4K HDR / REMUX streaming headroom)
-            else -> DefaultLoadControl.DEFAULT_TARGET_BUFFER_BYTES // 144 MB fallback
+            else -> playerConfig.targetBufferBytes
         }
-        val backBufferMs = when {
-            isPotatoDevice -> 5000
-            isMidRamDevice -> 15000
-            isHighEndDevice -> 60000 // 60s instant rewind
-            else -> 30000
-        }
-        val minBufferMs = when {
-            isPotatoDevice -> 10000
-            isMidRamDevice -> 20000
-            isHighEndDevice -> 30000
-            else -> DefaultLoadControl.DEFAULT_MIN_BUFFER_MS
-        }
+        val backBufferMs = playerConfig.backBufferMs
+        val minBufferMs = playerConfig.minBufferMs
         val maxBufferMs = when {
             videoBufferMs > 0 -> videoBufferMs.toInt()
-            isPotatoDevice -> 20000
-            isMidRamDevice -> 35000
-            isHighEndDevice -> 120000 // 2 minutes forward buffer
-            else -> DefaultLoadControl.DEFAULT_MAX_BUFFER_MS
+            else -> playerConfig.maxBufferMs
         }
 
         val exoPlayerBuilder =
@@ -1323,6 +1297,7 @@ class CS3IPlayer : IPlayer {
                 .setLoadControl(
                     DefaultLoadControl.Builder()
                         .setTargetBufferBytes(targetBufferBytes)
+                        .setPrioritizeTimeOverSizeThresholds(false)
                         .setBackBuffer(
                             backBufferMs,
                             true
@@ -1330,8 +1305,8 @@ class CS3IPlayer : IPlayer {
                         .setBufferDurationsMs(
                             minBufferMs,
                             maxBufferMs,
-                            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_MS,
-                            DefaultLoadControl.DEFAULT_BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS
+                            playerConfig.bufferForPlaybackMs,
+                            playerConfig.bufferForPlaybackAfterRebufferMs
                         ).build()
                 )
 

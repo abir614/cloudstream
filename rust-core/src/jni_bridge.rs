@@ -621,54 +621,78 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     initial_fuel: jni::sys::jlong,
     max_memory_bytes: jni::sys::jlong,
 ) -> jstring {
-    let bytes: Vec<u8> = match env.convert_byte_array(&wasm_bytes_input) {
-        Ok(b) => b,
-        Err(e) => {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        #[cfg(feature = "wasm-sandbox")]
+        {
+            let bytes: Vec<u8> = match env.convert_byte_array(&wasm_bytes_input) {
+                Ok(b) => b,
+                Err(e) => {
+                    let res = serde_json::json!({
+                        "success": false,
+                        "logs": Vec::<String>::new(),
+                        "error": format!("JNI convert_byte_array failed: {}", e)
+                    });
+                    return match env.new_string(res.to_string()) {
+                        Ok(js) => js.into_raw(),
+                        Err(_) => std::ptr::null_mut(),
+                    };
+                }
+            };
+
+            let sandbox = match crate::sandbox::wasm::WasmSandbox::new() {
+                Ok(s) => s,
+                Err(e) => {
+                    let res = serde_json::json!({
+                        "success": false,
+                        "logs": Vec::<String>::new(),
+                        "error": format!("WasmSandbox initialization failed: {}", e)
+                    });
+                    return match env.new_string(res.to_string()) {
+                        Ok(js) => js.into_raw(),
+                        Err(_) => std::ptr::null_mut(),
+                    };
+                }
+            };
+
+            let fuel = if initial_fuel <= 0 { 500_000 } else { initial_fuel as u64 };
+            let max_mem = if max_memory_bytes <= 0 { 16 * 1024 * 1024 } else { max_memory_bytes as usize };
+
+            let res = match sandbox.run_extension(&bytes, fuel, max_mem) {
+                Ok(logs) => serde_json::json!({
+                    "success": true,
+                    "logs": logs,
+                    "error": null
+                }),
+                Err(e) => serde_json::json!({
+                    "success": false,
+                    "logs": Vec::<String>::new(),
+                    "error": e.to_string()
+                }),
+            };
+
+            match env.new_string(res.to_string()) {
+                Ok(js) => js.into_raw(),
+                Err(_) => std::ptr::null_mut(),
+            }
+        }
+
+        #[cfg(not(feature = "wasm-sandbox"))]
+        {
+            let _ = (&env, &wasm_bytes_input, initial_fuel, max_memory_bytes);
             let res = serde_json::json!({
                 "success": false,
                 "logs": Vec::<String>::new(),
-                "error": format!("JNI convert_byte_array failed: {}", e)
+                "error": "WASM sandbox runtime is disabled in this lean build"
             });
-            return match env.new_string(res.to_string()) {
+            match env.new_string(res.to_string()) {
                 Ok(js) => js.into_raw(),
                 Err(_) => std::ptr::null_mut(),
-            };
+            }
         }
-    };
+    }));
 
-    let sandbox = match crate::sandbox::wasm::WasmSandbox::new() {
-        Ok(s) => s,
-        Err(e) => {
-            let res = serde_json::json!({
-                "success": false,
-                "logs": Vec::<String>::new(),
-                "error": format!("WasmSandbox initialization failed: {}", e)
-            });
-            return match env.new_string(res.to_string()) {
-                Ok(js) => js.into_raw(),
-                Err(_) => std::ptr::null_mut(),
-            };
-        }
-    };
-
-    let fuel = if initial_fuel <= 0 { 500_000 } else { initial_fuel as u64 };
-    let max_mem = if max_memory_bytes <= 0 { 16 * 1024 * 1024 } else { max_memory_bytes as usize };
-
-    let res = match sandbox.run_extension(&bytes, fuel, max_mem) {
-        Ok(logs) => serde_json::json!({
-            "success": true,
-            "logs": logs,
-            "error": null
-        }),
-        Err(e) => serde_json::json!({
-            "success": false,
-            "logs": Vec::<String>::new(),
-            "error": e.to_string()
-        }),
-    };
-
-    match env.new_string(res.to_string()) {
-        Ok(js) => js.into_raw(),
+    match result {
+        Ok(ptr) => ptr,
         Err(_) => std::ptr::null_mut(),
     }
 }

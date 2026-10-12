@@ -49,19 +49,15 @@ jobs:
       - name: Setup Keystore
         id: fetch_keystore
         run: |
-          TMP_KEYSTORE_FILE_PATH="${RUNNER_TEMP}"/keystore
-          mkdir -p "${TMP_KEYSTORE_FILE_PATH}"
-          if [ -f "keystore/release.keystore" ]; then
-            echo "Using permanent repository release keystore (deterministic signing)..."
-            cp "keystore/release.keystore" "${TMP_KEYSTORE_FILE_PATH}/prerelease_keystore.keystore"
-            echo "key_pwd=android" >> $GITHUB_OUTPUT
-          elif [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" ]; then
-            echo "Using persistent release keystore from secrets..."
-            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 }}" | base64 -d > "${TMP_KEYSTORE_FILE_PATH}/prerelease_keystore.keystore"
-            echo "key_pwd=${{ secrets.RELEASE_KEYSTORE_PASSWORD || 'android' }}" >> $GITHUB_OUTPUT
+          if [ -n "${{ secrets.RELEASE_KEYSTORE_BASE64 || secrets.CS_KEYSTORE_B64 }}" ]; then
+            TMP_KEYSTORE_FILE_PATH="${RUNNER_TEMP}"/keystore
+            mkdir -p "${TMP_KEYSTORE_FILE_PATH}"
+            echo "Using secure release keystore from CI secrets..."
+            echo "${{ secrets.RELEASE_KEYSTORE_BASE64 || secrets.CS_KEYSTORE_B64 }}" | base64 -d > "${TMP_KEYSTORE_FILE_PATH}/release.keystore"
+            echo "keystore_path=${TMP_KEYSTORE_FILE_PATH}/release.keystore" >> $GITHUB_OUTPUT
+            echo "key_pwd=${{ secrets.RELEASE_KEYSTORE_PASSWORD || secrets.CS_KEYSTORE_PASSWORD }}" >> $GITHUB_OUTPUT
           else
-            echo "Using default repo keystore..."
-            echo "key_pwd=android" >> $GITHUB_OUTPUT
+            echo "No keystore secret provided. Build will remain unsigned."
           fi
 
       - name: Setup Gradle
@@ -110,6 +106,10 @@ jobs:
         env:
           RELEASE_TAG: ${{ steps.release_meta.outputs.tag }}
           APP_VERSION_NAME: ${{ steps.release_meta.outputs.tag }}
+          CS_KEYSTORE_PATH: ${{ steps.fetch_keystore.outputs.keystore_path }}
+          CS_KEYSTORE_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
+          CS_KEY_ALIAS: "key0"
+          CS_KEY_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
           SIGNING_KEY_ALIAS: "key0"
           SIGNING_KEY_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
           SIGNING_STORE_PASSWORD: ${{ steps.fetch_keystore.outputs.key_pwd }}
@@ -119,6 +119,11 @@ jobs:
           MDL_API_KEY: ${{ secrets.MDL_API_KEY }}
           MAL_KEY: ${{ secrets.MAL_KEY }}
           ANILIST_KEY: ${{ secrets.ANILIST_KEY }}
+
+      - name: Generate SHA256SUMS Checksums
+        run: |
+          cd app/build/outputs/apk/stable/release/
+          sha256sum *.apk > SHA256SUMS
 
       - name: Create Stable GitHub Release
         uses: softprops/action-gh-release@v2
@@ -134,5 +139,6 @@ jobs:
           fail_on_unmatched_files: false
           files: |
             app/build/outputs/apk/stable/release/*.apk
+            app/build/outputs/apk/stable/release/SHA256SUMS
             app/build/libs/app-sources.jar
             app/build/classes.jar

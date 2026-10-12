@@ -5,6 +5,7 @@ pub mod extractors;
 pub mod jni_bridge;
 pub mod media;
 pub mod network;
+#[cfg(feature = "wasm-sandbox")]
 pub mod sandbox;
 pub mod search;
 pub mod security;
@@ -17,6 +18,7 @@ pub use extractors::html::{extract_media_links, extract_script_json, ExtractedMe
 pub use extractors::unpacker::{extract_stream_urls, unpack_dean_edwards};
 pub use media::m3u8::{parse_iptv_playlist, parse_master_playlist, IptvItem, M3u8Stream};
 pub use network::{resolve_url, sanitize_url};
+#[cfg(feature = "wasm-sandbox")]
 pub use sandbox::wasm::{SandboxError, WasmSandbox};
 pub use search::levenshtein::{fuzzy_ratio, levenshtein_distance};
 pub use security::apk_verifier::{

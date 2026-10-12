@@ -416,10 +416,10 @@ object UpdateSecurityGate {
             )
         }
 
-        if (apkVersion < installedVersion) {
+        if (apkVersion <= installedVersion) {
             return InternalVerificationResult(
                 false, "", "",
-                "Anti-rollback violation: APK version $apkVersion < installed $installedVersion"
+                "Anti-rollback violation: APK version $apkVersion <= installed $installedVersion"
             )
         }
 

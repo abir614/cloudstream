@@ -47,6 +47,10 @@ This document catalogues all intentional architectural deviations, security hard
 - **No Committed Keystores**: The release keystore file is purged from tracking and excluded via `.gitignore`.
 - **No Hardcoded Passwords**: Gradle release signing requires environment secrets (`CS_KEYSTORE_PATH`, `CS_KEYSTORE_PASSWORD`, etc.) and produces unsigned builds if secrets are absent.
 
+### 2.7 Data at Rest & Strict Anti-Rollback Gating
+- **No Unencrypted OS Backups**: `android:allowBackup="false"` enforced in `AndroidManifest.xml`, along with explicit deny rules in `data_extraction_rules.xml` and `backup_descriptor.xml` preventing unencrypted ADB or cloud extraction of credentials/keys.
+- **Strict Anti-Rollback (§2.3)**: Both [`UpdateSecurityGate`](file:///home/x/Projects/CS/cloudstream/app/src/main/java/com/lagradost/cloudstream3/utils/UpdateSecurityGate.kt) and native Rust verifier strictly enforce `apkVersionCode > installedVersionCode` (rejecting both downgrades and non-upgrading reinstallations).
+
 ---
 
 ## 3. Native Rust Core & JNI Hardening
@@ -61,6 +65,9 @@ This document catalogues all intentional architectural deviations, security hard
 - **Panic Boundary Safety**: Every JNI function in [`jni_bridge.rs`](file:///home/x/Projects/CS/cloudstream/rust-core/src/jni_bridge.rs) wraps Rust logic in `std::panic::catch_unwind` and validates input pointers, ensuring panics never cross the FFI boundary as undefined behavior.
 - **Release Profile**: Configured with `panic = "unwind"`, `opt-level = "z"`, and `lto = "fat"`.
 
+### 3.3 Lean Release Profile & Feature-Gated WASM Sandbox (§3.5, §6.2)
+- **Feature-Gated Runtime**: The `wasmi` WebAssembly engine is optional and disabled by default under `features = ["wasm-sandbox"]`, reducing binary size and memory overhead on mobile and TV sticks.
+
 ---
 
 ## 4. Hardware-Adaptive Profiling (`DeviceProfile`)
@@ -74,6 +81,20 @@ This document catalogues all intentional architectural deviations, security hard
 - **LOW**: Max requests: 24, max per host: 4, idle connections: 3, keep-alive: 1 min.
 - **MID**: Max requests: 48, max per host: 5, idle connections: 5, keep-alive: 3 min.
 - **HIGH**: Max requests: 64, max per host: 6, idle connections: 8, keep-alive: 5 min.
+
+### 4.3 Image Caching & Decoding (Coil) (§5.5)
+- **LOW**: 10% memory cache, crossfade disabled, hardware bitmaps disabled, `RGB_565` bitmap configuration (halving poster memory consumption).
+- **MID**: 20% memory cache, 150ms crossfade, `ARGB_8888`.
+- **HIGH**: 25% memory cache, 250ms crossfade, `ARGB_8888`.
+
+### 4.4 Media3 / ExoPlayer LoadControl Buffers (§5.6)
+- **LOW**: Minimum buffer: 10s, maximum buffer: 25s, target buffer: 12 MB, back buffer: 5s.
+- **MID**: Minimum buffer: 20s, maximum buffer: 45s, target buffer: 48 MB, back buffer: 15s.
+- **HIGH**: Minimum buffer: 30s, maximum buffer: 60s, target buffer: 128 MB, back buffer: 30s.
+
+### 4.5 CI Release Hygiene & Integrity Verification (§4.4)
+- **Secret-Only Signing**: Fallback passwords removed; unsigned if signing secrets are absent.
+- **Automated Checksums**: CI workflows compute and publish `SHA256SUMS` for all built APKs.
 
 ---
 

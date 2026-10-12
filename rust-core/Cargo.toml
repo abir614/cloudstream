@@ -10,8 +10,8 @@ name = "cloudstream_core"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# Embedded WebAssembly runtime with fuel limiting (ideal for ARMv7/ARMv8 low memory)
-wasmi = "0.36.0"
+# Embedded WebAssembly runtime with fuel limiting (optional feature-gated)
+wasmi = { version = "0.36.0", optional = true }
 
 # URL parsing & Anti-SSRF validation
 url = "2.5.4"
@@ -40,6 +40,10 @@ miniz_oxide = "0.9.1"
 quickcheck = "1.0.3"
 quickcheck_macros = "1.0.3"
 tempfile = "3.16.0"
+
+[features]
+default = []
+wasm-sandbox = ["dep:wasmi"]
 
 [profile.release]
 opt-level = "z"

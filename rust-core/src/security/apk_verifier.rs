@@ -20,7 +20,7 @@ pub enum VerifierError {
     PackageMismatch { expected: String, actual: String },
     #[error("Certificate fingerprint mismatch: expected '{expected}', found '{actual}'")]
     CertMismatch { expected: String, actual: String },
-    #[error("Rollback detected: downloaded versionCode {actual} < installed {min_required}")]
+    #[error("Rollback detected: downloaded versionCode {actual} <= installed {min_required}")]
     RollbackDetected { min_required: i64, actual: i64 },
     #[error("Session nonce is invalid or empty")]
     InvalidNonce,
@@ -193,15 +193,15 @@ pub fn verify_apk_identity(
         };
     }
 
-    // 2. Anti-Rollback Protection
-    if apk_version_code < installed_version_code {
+    // 2. Anti-Rollback Protection (must be strictly higher than installed version)
+    if apk_version_code <= installed_version_code {
         return ApkVerificationResult {
             is_valid: false,
             package_name: actual_pkg.to_string(),
             file_sha256: String::new(),
             attestation_token: String::new(),
             error_message: Some(format!(
-                "Anti-rollback violation: APK versionCode {} < installed versionCode {}",
+                "Anti-rollback violation: APK versionCode {} <= installed versionCode {}",
                 apk_version_code, installed_version_code
             )),
         };
@@ -350,6 +350,11 @@ mod tests {
         let rollback_result = verify_apk_identity(path, &nonce, pkg, pkg, cert, cert, 50, 49, None);
         assert!(!rollback_result.is_valid);
         assert!(rollback_result.error_message.unwrap().contains("Anti-rollback"));
+
+        // Same version attempt (non-upgrade rejected)
+        let same_version_result = verify_apk_identity(path, &nonce, pkg, pkg, cert, cert, 50, 50, None);
+        assert!(!same_version_result.is_valid);
+        assert!(same_version_result.error_message.unwrap().contains("Anti-rollback"));
 
         // Package spoofing
         let spoof_result = verify_apk_identity(path, &nonce, pkg, "com.malicious.app", cert, cert, 50, 51, None);

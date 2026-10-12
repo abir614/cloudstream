@@ -21,6 +21,23 @@ data class NetworkTierConfig(
     val readTimeoutSeconds: Long
 )
 
+data class PlayerBufferConfig(
+    val minBufferMs: Int,
+    val maxBufferMs: Int,
+    val bufferForPlaybackMs: Int,
+    val bufferForPlaybackAfterRebufferMs: Int,
+    val targetBufferBytes: Int,
+    val backBufferMs: Int
+)
+
+data class CoilTierConfig(
+    val memoryCachePercent: Double,
+    val diskCacheMaxBytes: Long,
+    val crossfadeMs: Int,
+    val allowHardwareBitmaps: Boolean,
+    val useRgb565: Boolean
+)
+
 /**
  * Centralized Hardware-Adaptive Profile Engine.
  * Dynamically computes device capability tier (LOW, MID, HIGH) based on total system RAM,
@@ -62,6 +79,61 @@ object DeviceProfile {
                 keepAliveDurationMinutes = 5L,
                 connectTimeoutSeconds = 10L,
                 readTimeoutSeconds = 20L
+            )
+        }
+    }
+
+    fun getPlayerBufferConfig(ctx: Context): PlayerBufferConfig {
+        return when (tier(ctx)) {
+            DeviceTier.LOW -> PlayerBufferConfig(
+                minBufferMs = 10_000,
+                maxBufferMs = 25_000,
+                bufferForPlaybackMs = 1_500,
+                bufferForPlaybackAfterRebufferMs = 3_000,
+                targetBufferBytes = 12 * 1024 * 1024, // 12 MB
+                backBufferMs = 5_000
+            )
+            DeviceTier.MID -> PlayerBufferConfig(
+                minBufferMs = 20_000,
+                maxBufferMs = 45_000,
+                bufferForPlaybackMs = 2_000,
+                bufferForPlaybackAfterRebufferMs = 4_000,
+                targetBufferBytes = 48 * 1024 * 1024, // 48 MB
+                backBufferMs = 15_000
+            )
+            DeviceTier.HIGH -> PlayerBufferConfig(
+                minBufferMs = 30_000,
+                maxBufferMs = 60_000,
+                bufferForPlaybackMs = 2_500,
+                bufferForPlaybackAfterRebufferMs = 5_000,
+                targetBufferBytes = 128 * 1024 * 1024, // 128 MB
+                backBufferMs = 30_000
+            )
+        }
+    }
+
+    fun getCoilConfig(ctx: Context): CoilTierConfig {
+        return when (tier(ctx)) {
+            DeviceTier.LOW -> CoilTierConfig(
+                memoryCachePercent = 0.10, // ~10% of app memory
+                diskCacheMaxBytes = 128L * 1024 * 1024,
+                crossfadeMs = 0, // crossfade off on LOW
+                allowHardwareBitmaps = false,
+                useRgb565 = true // RGB_565 saves 50% bitmap memory on LOW devices
+            )
+            DeviceTier.MID -> CoilTierConfig(
+                memoryCachePercent = 0.20, // ~20% of app memory
+                diskCacheMaxBytes = 512L * 1024 * 1024,
+                crossfadeMs = 150,
+                allowHardwareBitmaps = true,
+                useRgb565 = false
+            )
+            DeviceTier.HIGH -> CoilTierConfig(
+                memoryCachePercent = 0.25, // ~25% of app memory
+                diskCacheMaxBytes = 1024L * 1024 * 1024,
+                crossfadeMs = 250,
+                allowHardwareBitmaps = true,
+                useRgb565 = false
             )
         }
     }
