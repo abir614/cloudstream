@@ -33,11 +33,14 @@ import com.lagradost.cloudstream3.ui.search.SearchClickCallback
 import com.lagradost.cloudstream3.ui.search.SearchHelper
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.addProgramsToContinueWatching
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterHomePageListByFilmQuality
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterProviderByPreferredMedia
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterSearchResultByFilmQuality
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.loadResult
+
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.DOWNLOAD_HEADER_CACHE
 import com.lagradost.cloudstream3.utils.DOWNLOAD_HEADER_CACHE_BACKUP
@@ -233,8 +236,10 @@ class HomeViewModel : ViewModel() {
                 val nextPage = current.currentPage + 1
                 val next = getMainPage(nextPage, mainPage.indexOfFirst { it.name == name })
                 if (next is Resource.Success) {
+                    val nsfwEnabled = context?.isNsfwEnabled() ?: false
                     next.value.filterNotNull().forEach { main ->
-                        main.items.forEach { newList ->
+                        main.items.forEach { rawList ->
+                            val newList = NsfwFilterEngine.filterHomePageList(rawList, nsfwEnabled) ?: return@forEach
                             val key = newList.name
                             expandable[key]?.apply {
                                 hasNext = main.hasNext
@@ -329,18 +334,22 @@ class HomeViewModel : ViewModel() {
             is Resource.Success -> {
                 try {
                     expandable.clear()
+                    val nsfwEnabled = context?.isNsfwEnabled() ?: false
                     data.value.forEach { home ->
                         home?.items?.forEach { list ->
-                            val filteredList =
-                                context?.filterHomePageListByFilmQuality(list) ?: list
-                            expandable[list.name] =
-                                ExpandableHomepageList(
-                                    filteredList.copy(
-                                        list = CopyOnWriteArrayList(
-                                            filteredList.list
-                                        )
-                                    ), 1, home.hasNext
-                                )
+                            val nsfwFiltered = NsfwFilterEngine.filterHomePageList(list, nsfwEnabled)
+                            if (nsfwFiltered != null) {
+                                val filteredList =
+                                    context?.filterHomePageListByFilmQuality(nsfwFiltered) ?: nsfwFiltered
+                                expandable[list.name] =
+                                    ExpandableHomepageList(
+                                        filteredList.copy(
+                                            list = CopyOnWriteArrayList(
+                                                filteredList.list
+                                            )
+                                        ), 1, home.hasNext
+                                    )
+                            }
                         }
                     }
 
@@ -360,10 +369,11 @@ class HomeViewModel : ViewModel() {
                                 .flatMap { it.list }
                                 .distinctBy { it.url }.toList()
 
-                        if (currentList.isNotEmpty()) {
+                        val nsfwFilteredCurrentList = NsfwFilterEngine.filterSearchResults(currentList, nsfwEnabled)
+                        if (nsfwFilteredCurrentList.isNotEmpty()) {
                             val randomItems =
-                                context?.filterSearchResultByFilmQuality(currentList.shuffled())
-                                    ?: currentList.shuffled()
+                                context?.filterSearchResultByFilmQuality(nsfwFilteredCurrentList.shuffled())
+                                    ?: nsfwFilteredCurrentList.shuffled()
 
                             updatePreviewResponses(
                                 previewResponses,
@@ -376,6 +386,7 @@ class HomeViewModel : ViewModel() {
                             currentShuffledList = randomItems
                         }
                     }
+
                     if (previewResponses.isEmpty()) {
                         _preview.postValue(
                             Resource.Failure(
@@ -532,9 +543,14 @@ class HomeViewModel : ViewModel() {
                         _apiName.postValue(preferredApiName)
                 }
             } else {
-                // if the api is found, then set it to it and save key
-                if (fromUI) DataStoreHelper.currentHomePage = api.name
-                loadAndCancel(api, forceReload)
+                val nsfwEnabled = context?.isNsfwEnabled() ?: false
+                if (!nsfwEnabled && NsfwFilterEngine.isNsfwProvider(api)) {
+                    loadAndCancel(noneApi, forceReload)
+                } else {
+                    // if the api is found, then set it to it and save key
+                    if (fromUI) DataStoreHelper.currentHomePage = api.name
+                    loadAndCancel(api, forceReload)
+                }
             }
             reloadAccount()
         }

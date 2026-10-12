@@ -23,5 +23,7 @@ pub use security::apk_verifier::{
     compute_file_sha256, generate_attestation_token, generate_session_nonce, verify_apk_identity,
     verify_attestation_token, ApkVerificationResult, VerifierError,
 };
+pub use security::nsfw_classifier::is_nsfw_text;
 pub use security::ssrf::{validate_url_safety, NetworkSecurityError};
 pub use subtitles::{parse_srt, SubtitleCue};
+

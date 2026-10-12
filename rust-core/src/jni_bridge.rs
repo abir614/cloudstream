@@ -691,3 +691,34 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Err(_) => std::ptr::null_mut(),
     }
 }
+
+/// JNI bridge to classify NSFW / Hentai content based on title, url, and optional tags
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeIsNsfw(
+    mut env: JNIEnv,
+    _class: JClass,
+    title_input: JString,
+    url_input: JString,
+    tags_input: JString,
+) -> jboolean {
+    let title: String = match env.get_string(&title_input) {
+        Ok(s) => s.into(),
+        Err(_) => String::new(),
+    };
+    let url: String = match env.get_string(&url_input) {
+        Ok(s) => s.into(),
+        Err(_) => String::new(),
+    };
+    let tags: Option<String> = if !tags_input.is_null() {
+        env.get_string(&tags_input).ok().map(|s| s.into())
+    } else {
+        None
+    };
+
+    if crate::security::nsfw_classifier::is_nsfw_text(&title, &url, tags.as_deref()) {
+        1
+    } else {
+        0
+    }
+}
+

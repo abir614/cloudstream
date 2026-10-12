@@ -17,10 +17,14 @@ import com.lagradost.cloudstream3.mvvm.debugWarning
 import com.lagradost.cloudstream3.mvvm.launchSafe
 import com.lagradost.cloudstream3.ui.APIRepository
 import com.lagradost.cloudstream3.ui.home.HomeViewModel
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.DataStoreHelper.currentAccount
 import com.lagradost.cloudstream3.utils.Levenshtein
 import kotlinx.coroutines.Dispatchers
+
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -145,17 +149,19 @@ class SearchViewModel : ViewModel() {
             val next = repo.search(query, nextPage)
             if (next is Resource.Success) {
                 val nextValue = next.value
+                val nsfwEnabled = isNsfwGloballyEnabled()
+                val filteredNextItems = NsfwFilterEngine.filterSearchResults(nextValue.items, nsfwEnabled)
                 expandableSearches[name]?.apply {
                     this.hasNext = nextValue.hasNext
                     this.currentPage = nextPage
 
-                    debugWarning({ nextValue.items.any { outer -> this.list.any { it.url == outer.url } } }) {
-                        "Expanded search contained an item that was previously already in the list.\nQuery = $query, ${nextValue.items} = ${this.list}"
+                    debugWarning({ filteredNextItems.any { outer -> this.list.any { it.url == outer.url } } }) {
+                        "Expanded search contained an item that was previously already in the list.\nQuery = $query, ${filteredNextItems} = ${this.list}"
                     }
 
                     // just to be sure we are not adding the same shit for some reason
                     // Avoids weird behavior in the recyclerview by recreating the list
-                    this.list = (this.list + nextValue.items).distinctBy { it.url }
+                    this.list = (this.list + filteredNextItems).distinctBy { it.url }
                 } ?: debugWarning {
                     "Expanded an item not in search load named $name, current list is ${expandableSearches.keys}"
                 }
@@ -208,13 +214,15 @@ class SearchViewModel : ViewModel() {
 
     private fun bundleSearch(
         lists: Map<String, ExpandableSearchList>,
-        query: String? = lastQuery
+        query: String? = lastQuery,
+        nsfwEnabled: Boolean = isNsfwGloballyEnabled(),
     ): ExpandableSearchList {
         if (lists.isEmpty()) {
             return ExpandableSearchList(emptyList(), 1, false)
         }
         if (lists.size == 1 && query.isNullOrBlank()) {
-            return lists.values.first()
+            val single = lists.values.first()
+            return single.copy(list = NsfwFilterEngine.filterSearchResults(single.list, nsfwEnabled))
         }
 
         val list = ArrayList<SearchResponse>()
@@ -234,12 +242,14 @@ class SearchViewModel : ViewModel() {
             index++
         }
 
+        val filteredList = NsfwFilterEngine.filterSearchResults(list, nsfwEnabled)
+
         if (query.isNullOrBlank()) {
-            return ExpandableSearchList(list, 1, false)
+            return ExpandableSearchList(filteredList, 1, false)
         }
 
         // Rank by multi-tier relevance score descending, breaking ties by shorter title
-        val sortedList = list.sortedWith(
+        val sortedList = filteredList.sortedWith(
             compareByDescending<SearchResponse> { calculateRelevance(it.name, query) }
                 .thenBy { it.name.length }
         )
@@ -289,8 +299,11 @@ class SearchViewModel : ViewModel() {
                 }
                 val semaphore = Semaphore(maxConcurrent)
 
+                val nsfwEnabled = isNsfwGloballyEnabled()
                 val targets = repos.filter { a ->
-                    (ignoreSettings || (providersActive.isEmpty() || providersActive.contains(a.name))) && (!isQuickSearch || a.hasQuickSearch)
+                    (ignoreSettings || (providersActive.isEmpty() || providersActive.contains(a.name))) &&
+                        (!isQuickSearch || a.hasQuickSearch) &&
+                        (nsfwEnabled || !NsfwFilterEngine.isNsfwProvider(a))
                 }
 
                 var lastProgressivePostMs = 0L
@@ -304,8 +317,9 @@ class SearchViewModel : ViewModel() {
                                 if (currentSearchIndex != currentIndex || !isActive) return@async
                                 if (search is Resource.Success) {
                                     val searchValue = search.value
+                                    val filteredItems = NsfwFilterEngine.filterSearchResults(searchValue.items, nsfwEnabled)
                                     expandableSearches[a.name] =
-                                        ExpandableSearchList(searchValue.items, 1, searchValue.hasNext)
+                                        ExpandableSearchList(filteredItems, 1, searchValue.hasNext)
 
                                     val snapshot = expandableSearches.toMap()
                                     _currentSearch.postValue(snapshot)
@@ -314,7 +328,7 @@ class SearchViewModel : ViewModel() {
                                     val now = System.currentTimeMillis()
                                     if (now - lastProgressivePostMs >= 350L) {
                                         lastProgressivePostMs = now
-                                        val partialList = bundleSearch(snapshot, query)
+                                        val partialList = bundleSearch(snapshot, query, nsfwEnabled)
                                         _searchResponse.postValue(Resource.Success(partialList))
                                     }
                                 }
@@ -327,9 +341,10 @@ class SearchViewModel : ViewModel() {
 
                 val finalSnapshot = expandableSearches.toMap()
                 _currentSearch.postValue(finalSnapshot)
-                val finalList = bundleSearch(finalSnapshot, query)
+                val finalList = bundleSearch(finalSnapshot, query, nsfwEnabled)
 
                 _searchResponse.postValue(Resource.Success(finalList))
             }
         }
 }
+

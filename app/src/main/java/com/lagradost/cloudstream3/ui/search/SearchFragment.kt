@@ -64,10 +64,13 @@ import com.lagradost.cloudstream3.ui.settings.Globals.PHONE
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLandscape
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterProviderByPreferredMedia
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterSearchResultByFilmQuality
 import com.lagradost.cloudstream3.utils.AppContextUtils.getApiProviderLangSettings
 import com.lagradost.cloudstream3.utils.AppContextUtils.getApiSettings
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
+
 import com.lagradost.cloudstream3.utils.AppContextUtils.ownHide
 import com.lagradost.cloudstream3.utils.AppContextUtils.ownShow
 import com.lagradost.cloudstream3.utils.AppContextUtils.setDefaultFocus
@@ -208,17 +211,23 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
         } else {
             allValid
         }
-        return activeApis.flatMap { it.supportedTypes }.distinct()
+        val isAdultEnabled = context?.isNsfwEnabled() ?: false
+        return activeApis.flatMap { it.supportedTypes }.distinct().filter {
+            isAdultEnabled || it != TvType.NSFW
+        }
     }
 
     private fun filterSearchResults(results: List<SearchResponse>): List<SearchResponse> {
+        val isAdultEnabled = context?.isNsfwEnabled() ?: false
+        val nsfwFiltered = NsfwFilterEngine.filterSearchResults(results, isAdultEnabled)
         val categoryFiltered = if (selectedSearchTypes.isNotEmpty()) {
-            results.filter { item -> item.type == null || selectedSearchTypes.contains(item.type) }
+            nsfwFiltered.filter { item -> item.type == null || selectedSearchTypes.contains(item.type) }
         } else {
-            results
+            nsfwFiltered
         }
         return categoryFiltered.filterSearchResponse()
     }
+
 
     private fun reapplySearchResultFilters() {
         val currentResource = searchViewModel.searchResponse.value

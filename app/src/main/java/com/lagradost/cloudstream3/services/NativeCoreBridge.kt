@@ -129,6 +129,22 @@ object NativeCoreBridge {
     external fun nativeFuzzyRatio(s1: String, s2: String): Int
     external fun nativeLevenshtein(s1: String, s2: String): Int
 
+    // --- Native NSFW / Hentai Classification ---
+    external fun nativeIsNsfw(title: String, url: String, tags: String?): Boolean
+
+    fun isNsfw(title: String, url: String, tags: String? = null): Boolean? {
+        return if (isLoaded) {
+            try {
+                nativeIsNsfw(title, url, tags)
+            } catch (_: Throwable) {
+                null
+            }
+        } else {
+            null
+        }
+    }
+
+
     // --- Native Fast In-Memory DEFLATE Compression ---
     external fun nativeCompressString(text: String): ByteArray?
     external fun nativeDecompressString(bytes: ByteArray): String?

@@ -33,7 +33,14 @@ class SettingsProviders : BasePreferenceFragmentCompat() {
         setPreferencesFromResource(R.xml.settings_providers, rootKey)
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(requireContext())
 
+        getPref(R.string.enable_nsfw_on_providers_key)?.setOnPreferenceChangeListener { _, newValue ->
+            val enabled = newValue as? Boolean ?: false
+            MainAPI.settingsForProvider.enableAdult = enabled
+            true
+        }
+
         getPref(R.string.display_sub_key)?.setOnPreferenceClickListener {
+
             activity?.getApiDubstatusSettings()?.let { current ->
                 val dublist = DubStatus.entries
                 val names = dublist.map { it.name }

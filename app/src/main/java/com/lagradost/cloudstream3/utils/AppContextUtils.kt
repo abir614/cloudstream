@@ -400,6 +400,22 @@ object AppContextUtils {
         )
     }
 
+    fun Context.isNsfwEnabled(): Boolean {
+        val enabled = PreferenceManager.getDefaultSharedPreferences(this)
+            .getBoolean(this.getString(R.string.enable_nsfw_on_providers_key), false)
+        MainAPI.settingsForProvider.enableAdult = enabled
+        return enabled
+    }
+
+    fun isNsfwGloballyEnabled(): Boolean {
+        val ctx = CloudStreamApp.context
+        return if (ctx != null) {
+            ctx.isNsfwEnabled()
+        } else {
+            MainAPI.settingsForProvider.enableAdult
+        }
+    }
+
     fun Context.filterProviderByPreferredMedia(hasHomePageIsRequired: Boolean = true): List<MainAPI> {
         // We are getting the weirdest crash ever done:
         // java.lang.ClassCastException: com.lagradost.cloudstream3.TvType cannot be cast to com.lagradost.cloudstream3.TvType
@@ -426,13 +442,16 @@ object AppContextUtils {
         val hasUniversal = langs.contains(AllLanguagesName)
         val allApis =
             apis.filter { api -> (hasUniversal || langs.contains(api.lang)) && (api.hasMainPage || !hasHomePageIsRequired) }
-        return if (currentPrefMedia.isEmpty()) {
+        val candidateApis = if (currentPrefMedia.isEmpty()) {
             allApis
         } else {
             // Filter API depending on preferred media type
             allApis.filter { api -> api.supportedTypes.any { currentPrefMedia.contains(it.ordinal) } }
         }
+        val nsfwEnabled = this.isNsfwEnabled()
+        return com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.filterProviders(candidateApis, nsfwEnabled)
     }
+
 
     fun Context.filterSearchResultByFilmQuality(data: List<SearchResponse>): List<SearchResponse> {
         // Filter results omitting entries with certain quality
