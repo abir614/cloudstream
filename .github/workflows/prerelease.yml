@@ -112,22 +112,14 @@ jobs:
           if [ -f "$apk" ]; then
             abi=$(echo "$apk" | sed -E 's/app-prerelease-(.*)-release\.apk/\1/')
             tagged="CloudStream-prerelease-${TAG}-${abi}.apk"
-            cp "$apk" "$tagged"
+            mv "$apk" "$tagged"
           fi
         done
         sha256sum *.apk > SHA256SUMS
         cd "$GITHUB_WORKSPACE"
-        if [ -f "app/build/libs/app-sources.jar" ]; then
-          cp "app/build/libs/app-sources.jar" "app/build/libs/app-sources-${TAG}.jar"
-        fi
         if [ -f "app/build/classes.jar" ]; then
-          cp "app/build/classes.jar" "app/build/classes-${TAG}.jar"
           mkdir -p app/build/libs
-          cp "app/build/classes.jar" "app/build/libs/classes-${TAG}.jar" 2>/dev/null || true
-        elif [ -f "app/build/libs/classes.jar" ]; then
-          cp "app/build/libs/classes.jar" "app/build/libs/classes-${TAG}.jar"
-          cp "app/build/libs/classes.jar" "app/build/classes.jar" 2>/dev/null || true
-          cp "app/build/libs/classes.jar" "app/build/classes-${TAG}.jar" 2>/dev/null || true
+          cp "app/build/classes.jar" "app/build/libs/classes.jar"
         fi
 
     - name: Create pre-release
@@ -140,5 +132,5 @@ jobs:
         files: |
           app/build/outputs/apk/prerelease/release/*.apk
           app/build/outputs/apk/prerelease/release/SHA256SUMS*
-          app/build/libs/*.jar
-          app/build/classes*.jar
+          app/build/libs/classes.jar
+          app/build/libs/app-sources.jar
