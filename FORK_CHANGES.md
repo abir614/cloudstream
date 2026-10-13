@@ -121,10 +121,18 @@ This document catalogues all intentional architectural deviations, security hard
 
 ---
 
-## 6. Clean Core: Removed Sync & Subtitle Providers
+## 6. Full Local & Sync Account Providers
 
-In upstream CloudStream, several third-party sync and subtitle accounts are bundled. In this fork, they are omitted to reduce background sync services, APK size, and external attack surface:
-- **Account Sync Providers**: MyAnimeList (MAL), Kitsu, AniList, Simkl.
+All primary third-party sync and subtitle accounts are wired and hardened with crash-resilient null-safe state stores:
+- **Account Sync Providers**: MyAnimeList (MAL), Kitsu, AniList, Simkl, and LocalList.
 - **Subtitle Providers**: OpenSubtitles, SubDL, Addic7ed, SubSource, AnimeSkip.
+- **Null-Safe Local Library**: `LocalList` and `DataStoreHelper` guarantee non-null list returns, allowing the library tabs (Watching, Plan to Watch, Completed, On Hold, Dropped, Favorites, Subscriptions) to render properly even before any items are saved.
 
-*(All removed providers are documented here and in the README; dead UI settings are omitted.)*
+---
+
+## 7. Z+ Zero-Trust In-App Updates & Streamlined Releases
+
+- **Z+ Isolated Security Gate**: Updates require an ephemeral single-use challenge nonce and pass package identity, anti-rollback, and signing certificate fingerprint validation before execution.
+- **Interactive Update Confirmation**: Prompts the user upon download completion and consumes the single-use token only when the user confirms.
+- **Streamlined Packaging**: Each release generates exactly 6 artifacts (`arm64-v8a`, `armeabi-v7a`, `universal`, `SHA256SUMS`, `classes.jar`, `app-sources.jar`), eliminating duplicate untagged binaries.
+
