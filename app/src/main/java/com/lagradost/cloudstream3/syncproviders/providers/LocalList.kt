@@ -30,8 +30,8 @@ class LocalList : SyncAPI() {
         val watchStatusIds = ioWork {
             getAllWatchStateIds()?.map { id ->
                 Pair(id, getResultWatchState(id))
-            }
-        }?.distinctBy { it.first } ?: return null
+            } ?: emptyList()
+        }?.distinctBy { it.first } ?: emptyList()
 
         val list = ioWork {
             val isTrueTv = isLayout(TV)

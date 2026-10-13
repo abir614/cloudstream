@@ -469,8 +469,8 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
 
                 is Resource.Failure -> {
                     stopLoading.run()
-                    // No user indication it failed :(
-                    // TODO
+                    binding.emptyListTextview.isVisible = true
+                    binding.emptyListTextview.setText(R.string.empty_library_no_accounts_message)
                 }
             }
         }

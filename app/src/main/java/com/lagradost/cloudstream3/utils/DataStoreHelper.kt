@@ -493,11 +493,11 @@ object DataStoreHelper {
     private val sessionPosDur = java.util.concurrent.ConcurrentHashMap<Int, PosDur>()
     private val sessionWatchState = java.util.concurrent.ConcurrentHashMap<Int, VideoWatchState>()
 
-    fun getAllWatchStateIds(): List<Int>? {
+    fun getAllWatchStateIds(): List<Int> {
         val folder = "$currentAccount/$RESULT_WATCH_STATE"
         return getKeys(folder)?.mapNotNull {
             it.removePrefix("$folder/").toIntOrNull()
-        }
+        } ?: emptyList()
     }
 
     fun deleteAllResumeStateIds() {
@@ -516,11 +516,11 @@ object DataStoreHelper {
         AccountManager.localListApi.requireLibraryRefresh = true
     }
 
-    fun getAllResumeStateIds(): List<Int>? {
+    fun getAllResumeStateIds(): List<Int> {
         val folder = "$currentAccount/$RESULT_RESUME_WATCHING"
         return getKeys(folder)?.mapNotNull {
             it.removePrefix("$folder/").toIntOrNull()
-        }
+        } ?: emptyList()
     }
 
     private fun getAllResumeStateIdsOld(): List<Int>? {
