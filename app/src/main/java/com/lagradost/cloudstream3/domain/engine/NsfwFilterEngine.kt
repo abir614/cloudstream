@@ -77,18 +77,6 @@ object NsfwFilterEngine {
         "初体験", "援助交際", "援交", "パパ活", "変態", "色情"
     )
 
-    private val ADULT_DOMAINS = arrayOf(
-        "hanime.tv", "hentaihaven", "nhentai.net", "fakku.net", "tsumino.com", "luscious.net",
-        "pornhub.com", "xvideos.com", "xnxx.com", "spankbang.com", "eporner.com", "missav.com",
-        "supjav.com", "javhd.com", "rule34.xxx", "rule34video.com", "erome.com", "h-anime.net",
-        "javmost", "javfree", "hentaicity", "hentaipulse", "hentaimama", "muchohentai",
-        "animehentai", "hentai2read", "simply-hentai", "asmhentai",
-        "hentaicdn", "hentaistream", "hentaidude", "underhentai", "7mmtv", "tokyomotion",
-        "xhamster", "youporn", "redtube", "tube8", "porn555", "xmoviesforyou",
-        "beeg.com", "chaturbate", "myhentaigallery", "hitomi.la", "e-hentai.org",
-        "exhentai.org", "hentai-foundry", "gelbooru.com", "danbooru.donmai.us", "tbib.org"
-    )
-
     private val ADULT_URL_SLUG_TOKENS = hashSetOf(
         "hentai", "hanime", "jav", "xxx", "porn", "r18", "nsfw",
         "doujin", "futanari", "uncensored", "netorare", "ntr",
@@ -105,14 +93,11 @@ object NsfwFilterEngine {
     }
 
     /**
-     * Checks if a URL or image link belongs to a known adult domain or contains adult slug markers.
+     * Checks if a URL path or query contains adult slug markers (e.g. /hentai/, /xxx/).
      */
     fun isNsfwUrl(url: String): Boolean {
         if (url.isBlank()) return false
         val lowerUrl = url.lowercase()
-        for (domain in ADULT_DOMAINS) {
-            if (lowerUrl.contains(domain)) return true
-        }
         for (token in extractTokens(lowerUrl)) {
             if (ADULT_URL_SLUG_TOKENS.contains(token)) return true
         }
@@ -130,10 +115,6 @@ object NsfwFilterEngine {
         // 2. JVM Fallback
         val lowerTitle = title.lowercase()
         val lowerUrl = url.lowercase()
-
-        for (domain in ADULT_DOMAINS) {
-            if (lowerUrl.contains(domain)) return true
-        }
 
         if (lowerTitle.contains("r-18") || lowerTitle.contains("r18+") || lowerTitle.contains("18+") || lowerTitle.contains("18禁")) {
             return true
@@ -202,11 +183,8 @@ object NsfwFilterEngine {
 
         val otherName = (item as? com.lagradost.cloudstream3.AnimeSearchResponse)?.otherName
         val combinedTitle = if (!otherName.isNullOrBlank()) "${item.name} $otherName" else item.name
-        val poster = item.posterUrl ?: ""
 
-        if (poster.isNotBlank() && isNsfwUrl(poster)) return true
-
-        return isNsfwText(combinedTitle, item.url, poster.ifBlank { null })
+        return isNsfwText(combinedTitle, item.url, null)
     }
 
     /**
@@ -236,9 +214,6 @@ object NsfwFilterEngine {
                 return true
             }
         }
-
-        val poster = item.posterUrl ?: ""
-        if (poster.isNotBlank() && isNsfwUrl(poster)) return true
 
         val plotStr = item.plot
         val metadataCombined = listOfNotNull(tagsStr, plotStr).joinToString(" | ")

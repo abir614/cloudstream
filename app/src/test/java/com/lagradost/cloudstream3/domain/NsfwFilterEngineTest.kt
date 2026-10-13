@@ -43,10 +43,10 @@ class NsfwFilterEngineTest {
     }
 
     @Test
-    fun `test isNsfwUrl detects adult domains and slugs`() {
-        assertTrue(NsfwFilterEngine.isNsfwUrl("https://hanime.tv/poster/123.jpg"))
+    fun `test isNsfwUrl detects adult slugs`() {
         assertTrue(NsfwFilterEngine.isNsfwUrl("https://cdn.anime.com/covers/hentai/pic.png"))
         assertTrue(NsfwFilterEngine.isNsfwUrl("https://images.site.org/r18/image.webp"))
+        assertTrue(NsfwFilterEngine.isNsfwUrl("https://site.org/watch/uncensored/video.mp4"))
         assertFalse(NsfwFilterEngine.isNsfwUrl("https://cdn.anime.com/covers/action/attack-on-titan.jpg"))
     }
 
@@ -68,7 +68,7 @@ class NsfwFilterEngineTest {
     fun `test isNsfwText detects general adult, JAV and explicit ratings`() {
         assertTrue(NsfwFilterEngine.isNsfwText("JAV Uncensored Collection", "https://stream.com/watch/jav-123"))
         assertTrue(NsfwFilterEngine.isNsfwText("Hot Erotica Night", "https://stream.com/movie/hot-erotica"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Random Title", "https://spankbang.com/watch/video"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Adult Series", "https://stream.com/watch/xxx-video"))
         assertTrue(NsfwFilterEngine.isNsfwText("Adult Film", "https://stream.com/watch/title", "Drama, 18+, Adult"))
         assertTrue(NsfwFilterEngine.isNsfwText("Special Series (R-18)", "https://stream.com/watch/title"))
     }

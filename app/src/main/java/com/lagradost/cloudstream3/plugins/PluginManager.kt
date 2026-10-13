@@ -401,8 +401,7 @@ object PluginManager {
             //Omit NSFW, if disabled
             if (!settingsForProvider.enableAdult) {
                 if (tvtypes.contains(TvType.NSFW.name) ||
-                    com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.isNsfwText(sitePlugin.name, sitePlugin.url) ||
-                    com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.isNsfwUrl(sitePlugin.url)
+                    com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.isNsfwText(sitePlugin.name, sitePlugin.url)
                 ) {
                     return@mapNotNull null
                 }

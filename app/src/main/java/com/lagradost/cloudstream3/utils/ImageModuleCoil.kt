@@ -206,13 +206,6 @@ object ImageLoader {
         if (imageData is Int) {
             this.setImageResource(imageData); return
         }
-        if (imageData is String) {
-            val isAdultAllowed = com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled()
-            if (!isAdultAllowed && com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.isNsfwUrl(imageData)) {
-                this.setImageResource(R.drawable.default_cover)
-                return
-            }
-        }
         // headers can be overridden by extensions.
         this.load(imageData, SingletonImageLoader.get(context)) {
             this.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->

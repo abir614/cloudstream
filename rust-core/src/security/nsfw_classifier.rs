@@ -319,60 +319,6 @@ const CJK_ADULT_PHRASES: &[&str] = &[
     "色情",
 ];
 
-/// Known adult domain substrings in URLs
-const ADULT_DOMAINS: &[&str] = &[
-    "hanime.tv",
-    "hentaihaven",
-    "nhentai.net",
-    "fakku.net",
-    "tsumino.com",
-    "luscious.net",
-    "pornhub.com",
-    "xvideos.com",
-    "xnxx.com",
-    "spankbang.com",
-    "eporner.com",
-    "missav.com",
-    "supjav.com",
-    "javhd.com",
-    "rule34.xxx",
-    "rule34video.com",
-    "erome.com",
-    "h-anime.net",
-    "javmost",
-    "javfree",
-    "hentaicity",
-    "hentaipulse",
-    "hentaimama",
-    "muchohentai",
-    "animehentai",
-    "hentai2read",
-    "simply-hentai",
-    "asmhentai",
-    "hentaicdn",
-    "hentaistream",
-    "hentaidude",
-    "underhentai",
-    "7mmtv",
-    "tokyomotion",
-    "xhamster",
-    "youporn",
-    "redtube",
-    "tube8",
-    "porn555",
-    "xmoviesforyou",
-    "beeg.com",
-    "chaturbate",
-    "myhentaigallery",
-    "hitomi.la",
-    "e-hentai.org",
-    "exhentai.org",
-    "hentai-foundry",
-    "gelbooru.com",
-    "danbooru.donmai.us",
-    "tbib.org",
-];
-
 /// Normalizes text into lowercase tokens split by non-alphanumeric characters.
 fn extract_tokens(input: &str) -> Vec<String> {
     input
@@ -387,13 +333,6 @@ fn extract_tokens(input: &str) -> Vec<String> {
 pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
     let lower_title = title.to_lowercase();
     let lower_url = url.to_lowercase();
-
-    // 1. Check known adult domains in URL
-    for domain in ADULT_DOMAINS {
-        if lower_url.contains(domain) {
-            return true;
-        }
-    }
 
     // Direct check for explicit rating symbols
     if lower_title.contains("r-18") || lower_title.contains("r18+") || lower_title.contains("18+") {
@@ -543,7 +482,7 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
         let cr = 128.0 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
         // YCbCr skin tone cluster encompassing human & anime flesh tones
-        if cb >= 80.0 && cb <= 135.0 && cr >= 133.0 && cr <= 178.0 && y >= 40.0 {
+        if (80.0..=135.0).contains(&cb) && (133.0..=178.0).contains(&cr) && y >= 40.0 {
             skin_count += 1;
         }
 
@@ -571,7 +510,7 @@ mod tests {
         assert!(is_nsfw_text("Mankitsu Happening", "https://anime.tv/watch/mankitsu-happening", Some("Hentai, OVA")));
         assert!(is_nsfw_text("Ane wa Yanmama Junyuuchuu Episode 1", "https://anime.tv/watch/ane-wa-yanmama-hentai", None));
         assert!(is_nsfw_text("Rance 01: Hikari o Motomete The Animation", "https://anime.tv/watch/rance", Some("Action, Fantasy, Hentai")));
-        assert!(is_nsfw_text("Some Anime Title", "https://hanime.tv/videos/hentai/video-1", None));
+        assert!(is_nsfw_text("Some Anime Title", "https://anime.tv/videos/hentai/video-1", None));
         // Newly added untagged hentai franchise stems
         assert!(is_nsfw_text("Boku no Pico", "https://anime.tv/watch/boku-no-pico", None));
         assert!(is_nsfw_text("Bible Black: La Noche de Walpurgis", "https://anime.tv/watch/bible-black", None));
@@ -608,7 +547,7 @@ mod tests {
     fn test_detects_general_adult_and_jav() {
         assert!(is_nsfw_text("JAV Uncensored Collection", "https://stream.com/watch/jav-123", None));
         assert!(is_nsfw_text("Hot Erotica Night", "https://stream.com/movie/hot-erotica", None));
-        assert!(is_nsfw_text("Random Title", "https://spankbang.com/watch/video", None));
+        assert!(is_nsfw_text("Adult Series", "https://stream.com/watch/xxx-video", None));
         assert!(is_nsfw_text("Title with adult rating", "https://stream.com/watch/title", Some("Drama, 18+, Adult")));
     }
 
