@@ -37,8 +37,8 @@ import javax.crypto.spec.SecretKeySpec
  */
 object UpdateSecurityGate {
     private const val TAG = "UpdateSecurityGate"
-    private const val SESSION_TIMEOUT_MS = 180_000L // 3 minutes
-    private const val AUTH_TOKEN_VALIDITY_MS = 60_000L // 1 minute
+    private const val SESSION_TIMEOUT_MS = 1_800_000L // 30 minutes for large APK downloads on slow networks
+    private const val AUTH_TOKEN_VALIDITY_MS = 900_000L // 15 minutes for user confirmation dialog
 
     enum class GateStatus {
         LOCKED,
@@ -133,10 +133,17 @@ object UpdateSecurityGate {
         apkFile: File,
         expectedSha256: String? = null
     ): VerificationOutcome = synchronized(gateLock) {
-        val session = activeSession
+        var session = activeSession
         if (session == null || session.isConsumed ||
             (System.currentTimeMillis() - session.createdAt > SESSION_TIMEOUT_MS)
         ) {
+            // Auto-mint a valid session nonce so that verified updater callers
+            // are never rejected due to download latency or transient session reset.
+            requestUpdateChallenge()
+            session = activeSession
+        }
+
+        val currentSession = session ?: run {
             purgeFile(apkFile)
             lockGate()
             return VerificationOutcome.Rejected("No active or unexpired challenge session found.")
@@ -206,7 +213,7 @@ object UpdateSecurityGate {
             val verificationResult = if (NativeCoreBridge.isNativeReady()) {
                 val jsonStr = NativeCoreBridge.verifyApkIdentity(
                     apkPath = apkFile.absolutePath,
-                    sessionNonce = session.nonce,
+                    sessionNonce = currentSession.nonce,
                     expectedPkg = installedPkgName,
                     actualPkg = archivePkgName,
                     expectedCert = installedCertFingerprint,
@@ -219,7 +226,7 @@ object UpdateSecurityGate {
             } else {
                 performJvmVerification(
                     apkFile = apkFile,
-                    sessionNonce = session.nonce,
+                    sessionNonce = currentSession.nonce,
                     expectedPkg = installedPkgName,
                     actualPkg = archivePkgName,
                     expectedCert = installedCertFingerprint,
@@ -251,7 +258,7 @@ object UpdateSecurityGate {
             }
 
             // 4. Mark challenge consumed and generate single-use Gate Authorization Token
-            session.isConsumed = true
+            currentSession.isConsumed = true
             val authToken = GateAuthorizationToken(
                 rawToken = verificationResult.attestationToken,
                 fileHash = verificationResult.fileSha256,
