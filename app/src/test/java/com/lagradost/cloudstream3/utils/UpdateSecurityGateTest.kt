@@ -36,15 +36,26 @@ class UpdateSecurityGateTest {
 
     @Test
     fun `test authorization token expiry logic`() {
-        val token = UpdateSecurityGate.GateAuthorizationToken(
-            rawToken = "mock_token",
+        val freshToken = UpdateSecurityGate.GateAuthorizationToken(
+            rawToken = "mock_token_fresh",
             fileHash = "mock_hash",
             packageName = "com.lagradost.cloudstream3",
             certFingerprint = "mock_cert",
             versionCode = 1001L,
             authorizedFile = File("/mock/path.apk"),
-            issuedAt = System.currentTimeMillis() - 120_000L // 2 mins ago (limit is 60s)
+            issuedAt = System.currentTimeMillis() - 60_000L // 1 minute ago (valid for 15 mins)
         )
-        assertTrue(token.isExpired())
+        org.junit.Assert.assertFalse(freshToken.isExpired())
+
+        val expiredToken = UpdateSecurityGate.GateAuthorizationToken(
+            rawToken = "mock_token_expired",
+            fileHash = "mock_hash",
+            packageName = "com.lagradost.cloudstream3",
+            certFingerprint = "mock_cert",
+            versionCode = 1001L,
+            authorizedFile = File("/mock/path.apk"),
+            issuedAt = System.currentTimeMillis() - 1_000_000L // ~16.6 mins ago (> 15 mins limit)
+        )
+        assertTrue(expiredToken.isExpired())
     }
 }
