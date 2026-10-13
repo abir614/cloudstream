@@ -8,6 +8,8 @@ import android.os.Build.VERSION.SDK_INT
 import android.util.Log
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
+import androidx.core.graphics.drawable.toBitmap
+import coil3.asDrawable
 import coil3.EventListener
 import coil3.ImageLoader
 import coil3.PlatformContext
@@ -31,6 +33,8 @@ import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.USER_AGENT
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.network.SafeDns
 import com.lagradost.cloudstream3.network.addAdGuardDns
 import com.lagradost.cloudstream3.network.addCanadianShieldDns
@@ -193,6 +197,33 @@ object ImageLoader {
         }
     }
 
+    internal fun checkBitmapSkinExcessive(bitmap: Bitmap): Boolean {
+        return try {
+            val sampleW = 32
+            val sampleH = 48
+            val smallBitmap = Bitmap.createBitmap(sampleW, sampleH, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(smallBitmap)
+            val rect = android.graphics.Rect(0, 0, sampleW, sampleH)
+            canvas.drawBitmap(bitmap, null, rect, null)
+
+            val pixels = IntArray(sampleW * sampleH)
+            smallBitmap.getPixels(pixels, 0, sampleW, 0, 0, sampleW, sampleH)
+            smallBitmap.recycle()
+
+            val rgbBytes = ByteArray(pixels.size * 3)
+            var idx = 0
+            for (p in pixels) {
+                rgbBytes[idx] = ((p shr 16) and 0xFF).toByte()
+                rgbBytes[idx + 1] = ((p shr 8) and 0xFF).toByte()
+                rgbBytes[idx + 2] = (p and 0xFF).toByte()
+                idx += 3
+            }
+            NsfwFilterEngine.isSkinExposureExcessive(rgbBytes, 3)
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     /** coil's built in loader attached w/ global synchronized instance **/
     private fun ImageView.loadImageInternal(
         imageData: Any?,
@@ -214,6 +245,19 @@ object ImageLoader {
                     headerBuilder[key] = value
                 }
             }.build())
+            if (!isNsfwGloballyEnabled()) {
+                listener(
+                    onSuccess = { _, result ->
+                        try {
+                            val bitmap = result.image.asDrawable(context.resources).toBitmap()
+                            if (checkBitmapSkinExcessive(bitmap)) {
+                                this@loadImageInternal.setImageResource(R.drawable.default_cover)
+                            }
+                        } catch (_: Throwable) {
+                        }
+                    }
+                )
+            }
             builder() // if passed
         }
     }

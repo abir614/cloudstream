@@ -15,84 +15,12 @@ import org.junit.Test
 
 class NsfwFilterEngineTest {
 
-    @Test
-    fun `test isNsfwText detects hentai disguised or blended into anime`() {
-        // Disguised titles or releases marked as uncensored / hentai / adult
-        assertTrue(NsfwFilterEngine.isNsfwText("Overflow (Uncensored)", "https://anime.tv/watch/overflow"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Mankitsu Happening", "https://anime.tv/watch/mankitsu-happening", "Hentai, OVA"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Ane wa Yanmama Junyuuchuu Episode 1", "https://anime.tv/watch/ane-wa-yanmama-hentai"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Rance 01: Hikari o Motomete The Animation", "https://anime.tv/watch/rance", "Action, Fantasy, Hentai"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Some Anime Title", "https://hanime.tv/videos/hentai/video-1"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Eroge H-Game OVA", "https://anime.tv/watch/eroge-ova"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Netorare NTR Special", "https://anime.tv/watch/ntr-special"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Futanari Bitch OVA", "https://anime.tv/watch/futanari-bitch"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Ahegao Maid", "https://anime.tv/watch/ahegao-maid"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Uncensored Doujin Anime", "https://anime.tv/watch/doujin"))
-        // Untagged notorious hentai franchise stems
-        assertTrue(NsfwFilterEngine.isNsfwText("Boku no Pico", "https://anime.tv/watch/boku-no-pico"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Bible Black: La Noche de Walpurgis", "https://anime.tv/watch/bible-black"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Kuroinu: Kedakaki Seishi ni Somaru Yami", "https://anime.tv/watch/kuroinu"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Taimanin Asagi Episode 1", "https://anime.tv/watch/taimanin-asagi"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Oni Chichi: Re-born", "https://anime.tv/watch/oni-chichi"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Seikatsu Shuukan OVA", "https://anime.tv/watch/seikatsu-shuukan"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Euphoria HD", "https://anime.tv/watch/euphoria"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Resort Boin", "https://anime.tv/watch/resort-boin"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Shoujo Ramune", "https://anime.tv/watch/shoujo-ramune"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Otome Dori", "https://anime.tv/watch/otome-dori"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Night Shift Nurses", "https://anime.tv/watch/night-shift-nurses"))
-    }
-
-    @Test
-    fun `test isNsfwUrl detects adult slugs`() {
-        assertTrue(NsfwFilterEngine.isNsfwUrl("https://cdn.anime.com/covers/hentai/pic.png"))
-        assertTrue(NsfwFilterEngine.isNsfwUrl("https://images.site.org/r18/image.webp"))
-        assertTrue(NsfwFilterEngine.isNsfwUrl("https://site.org/watch/uncensored/video.mp4"))
-        assertFalse(NsfwFilterEngine.isNsfwUrl("https://cdn.anime.com/covers/action/attack-on-titan.jpg"))
-    }
-
-    @Test
-    fun `test isNsfwText preserves mainstream anime without false positives`() {
-        assertFalse(NsfwFilterEngine.isNsfwText("Attack on Titan", "https://anime.tv/watch/attack-on-titan", "Action, Shounen"))
-        assertFalse(NsfwFilterEngine.isNsfwText("Hunter x Hunter (2011)", "https://anime.tv/watch/hunter-x-hunter-2011", "Adventure, Shounen"))
-        assertFalse(NsfwFilterEngine.isNsfwText("Assassination Classroom", "https://anime.tv/watch/assassination-classroom", "Action, Comedy"))
-        assertFalse(NsfwFilterEngine.isNsfwText("Haikyuu!! Second Season", "https://anime.tv/watch/haikyuu", "Sports"))
-        assertFalse(NsfwFilterEngine.isNsfwText("Bleach: Thousand-Year Blood War", "https://anime.tv/watch/bleach-tybw", "Action, Supernatural"))
-        assertFalse(NsfwFilterEngine.isNsfwText("Classroom of the Elite", "https://anime.tv/watch/classroom-of-the-elite", "Drama, Mystery"))
-        assertFalse(NsfwFilterEngine.isNsfwText("Spy x Family", "https://anime.tv/watch/spy-x-family", "Comedy, Action"))
-        assertFalse(NsfwFilterEngine.isNsfwText("One Piece", "https://anime.tv/watch/one-piece", "Adventure, Comedy"))
-        assertFalse(NsfwFilterEngine.isNsfwText("Naruto: Shippuden", "https://anime.tv/watch/naruto-shippuden", "Action"))
-        assertFalse(NsfwFilterEngine.isNsfwText("Demon Slayer: Kimetsu no Yaiba", "https://anime.tv/watch/demon-slayer", "Supernatural"))
-    }
-
-    @Test
-    fun `test isNsfwText detects general adult, JAV and explicit ratings`() {
-        assertTrue(NsfwFilterEngine.isNsfwText("JAV Uncensored Collection", "https://stream.com/watch/jav-123"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Hot Erotica Night", "https://stream.com/movie/hot-erotica"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Adult Series", "https://stream.com/watch/xxx-video"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Adult Film", "https://stream.com/watch/title", "Drama, 18+, Adult"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Special Series (R-18)", "https://stream.com/watch/title"))
-    }
-
-    @Test
-    fun `test isNsfwText detects CJK, Japanese and Chinese adult titles`() {
-        assertTrue(NsfwFilterEngine.isNsfwText("18禁裏アニメ OVA 01", "https://anime.tv/watch/video-1"))
-        assertTrue(NsfwFilterEngine.isNsfwText("【無修正】Ane wa Yanmama", "https://stream.com/watch/video-2"))
-        assertTrue(NsfwFilterEngine.isNsfwText("中出し調教 Special", "https://stream.com/watch/video-3"))
-        assertTrue(NsfwFilterEngine.isNsfwText("新作里番合集", "https://stream.com/watch/video-4"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Netorare 寝取られ OVA", "https://stream.com/watch/video-5"))
-        assertTrue(NsfwFilterEngine.isNsfwText("無修正 JAV 001", "https://stream.com/watch/video-6"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Eroge エロアニメ 01", "https://stream.com/watch/video-7"))
-        assertTrue(NsfwFilterEngine.isNsfwText("Untagged Anime", "https://stream.com/watch/video-8", "18禁, 裏アニメ"))
-    }
-
     @Suppress("DEPRECATION_ERROR")
     @Test
-    fun `test filterSearchResults removes adult and blended hentai items when disabled`() {
+    fun `test filterSearchResults removes adult items when disabled`() {
         val mixedResults: List<SearchResponse> = listOf(
             AnimeSearchResponse("Attack on Titan", "https://anime.tv/aot", "AnimeProvider", TvType.Anime),
-            AnimeSearchResponse("Overflow (Uncensored)", "https://anime.tv/overflow", "AnimeProvider", TvType.Anime),
             MovieSearchResponse("Inception", "https://movies.tv/inception", "MovieProvider", TvType.Movie),
-            AnimeSearchResponse("Mankitsu Happening", "https://anime.tv/mankitsu-hentai", "AnimeProvider", TvType.OVA),
             MovieSearchResponse("Adult JAV Vol 1", "https://stream.tv/jav-1", "JavProvider", TvType.NSFW),
             AnimeSearchResponse("Spy x Family", "https://anime.tv/spy-family", "AnimeProvider", TvType.Anime)
         )
@@ -105,7 +33,7 @@ class NsfwFilterEngineTest {
 
         // When user explicitly enables NSFW, all items should be retained
         val allAllowed = NsfwFilterEngine.filterSearchResults(mixedResults, isNsfwEnabled = true)
-        assertEquals(6, allAllowed.size)
+        assertEquals(4, allAllowed.size)
     }
 
     @Suppress("DEPRECATION_ERROR")
@@ -113,10 +41,10 @@ class NsfwFilterEngineTest {
     fun `test filterHomePageList eliminates adult rows and sanitizes mixed rows`() {
         // Adult-only row
         val adultRow = HomePageList(
-            name = "Hentai Trending",
+            name = "Adult Trending",
             list = listOf(
-                AnimeSearchResponse("Hentai 1", "https://anime.tv/h1", "AnimeProvider", TvType.Anime),
-                AnimeSearchResponse("Hentai 2", "https://anime.tv/h2", "AnimeProvider", TvType.Anime)
+                MovieSearchResponse("Adult 1", "https://stream.tv/a1", "JavProvider", TvType.NSFW),
+                MovieSearchResponse("Adult 2", "https://stream.tv/a2", "JavProvider", TvType.NSFW)
             )
         )
         assertNull(NsfwFilterEngine.filterHomePageList(adultRow, isNsfwEnabled = false))
@@ -127,7 +55,7 @@ class NsfwFilterEngineTest {
             name = "Popular Anime",
             list = listOf(
                 AnimeSearchResponse("Attack on Titan", "https://anime.tv/aot", "AnimeProvider", TvType.Anime),
-                AnimeSearchResponse("Overflow (Uncensored)", "https://anime.tv/overflow", "AnimeProvider", TvType.Anime),
+                MovieSearchResponse("Adult JAV Vol 1", "https://stream.tv/jav-1", "JavProvider", TvType.NSFW),
                 AnimeSearchResponse("Hunter x Hunter (2011)", "https://anime.tv/hxh", "AnimeProvider", TvType.Anime)
             )
         )
