@@ -64,6 +64,15 @@
             android:title="@string/performance_profile_settings" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/pref_category_content_safety">
+        <SwitchPreference
+            android:defaultValue="false"
+            android:icon="@drawable/ic_outline_remove_red_eye_24"
+            android:key="@string/enable_nsfw_on_providers_key"
+            android:summary="@string/enable_nsfw_summary"
+            android:title="@string/enable_nsfw_on_providers" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/pref_category_bypass">
 
         <Preference

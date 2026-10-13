@@ -152,6 +152,10 @@ class ProviderPreferences(preferences: PreferenceStore) {
     val displayDubSub = preferences.getStringSet(
         "display_sub_key", defaultDub
     )
+
+    val enableNsfw = preferences.getBoolean(
+        "enable_nsfw_on_providers_key", false
+    )
 }
 
 class PlayerPreferences(preferences: PreferenceStore) {
@@ -194,6 +198,9 @@ class GeneralPreferences(preferences: PreferenceStore) {
     val parallelDownloads = preferences.getInt("download_parallel_key", 3)
     val concurrentConnections = preferences.getInt("download_concurrent_key", 3)
     val batterOptimization = preferences.getBoolean("battery_optimisation_key", false)
+
+    /** Content & Family Safety: Allow adult/NSFW 18+ content */
+    val enableNsfw = preferences.getBoolean("enable_nsfw_on_providers_key", false)
 
     /** Default is 10 (Resilient Multi-Tier DoH) **/
     val dns = preferences.getInt("dns_key", 10)

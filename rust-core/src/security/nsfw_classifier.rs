@@ -63,6 +63,26 @@ const EXPLICIT_ADULT_TOKENS: &[&str] = &[
     "onichichi",
     "seikatsushuukan",
     "smut",
+    "botehara",
+    "fella",
+    "fellatio",
+    "cunnilingus",
+    "pegging",
+    "shemale",
+    "transsexual",
+    "hentaistream",
+    "muchohentai",
+    "hentaimama",
+    "hentaicity",
+    "hentaipulse",
+    "underhentai",
+    "purehentai",
+    "hentai2read",
+    "asmhentai",
+    "hentaicdn",
+    "hentaidude",
+    "milf",
+    "bbw",
     // Adult Studios & Platforms
     "bunnywalker",
     "pinkpineapple",
@@ -134,6 +154,169 @@ const EXPLICIT_ADULT_PHRASES: &[&str] = &[
     "adult animation",
     "hentai anime",
     "hentai ova",
+    "mankitsu happening",
+    "itadaki seieki",
+    "discipline zero",
+    "starless",
+    "front innocent",
+    "yarichin bitch",
+    "chiisana tsubomi",
+    "saimin seishidou",
+    "enjo kouhai",
+    "maki-chan to nau",
+    "imouto biyori",
+    "kansen sodom",
+    "makai tenshi djibril",
+    "baku ane",
+    "eroge h-game",
+    "shikkoku no shaga",
+    "kuro gal",
+    "swing out sisters",
+    "gakuen saimin",
+    "koikishi purely",
+    "sweet home: h na",
+    "tiny evil",
+    "brand new maid",
+    "ane chikan",
+    "ane kyun",
+    "harem time",
+    "ero konbini",
+    "joshi ochi",
+    "25-sai no joshikousei",
+    "soryo to majiwaru",
+    "skirt no naka wa",
+    "araiya-san",
+    "yubisaki kara no honki",
+    "kuro gal o/s",
+    "fella hame",
+    "ryoujoku famiresu",
+    "houkago no yuutousei",
+    "shounen maid kuro-kun",
+    "boku no yayoi-san",
+    "yariman bitch",
+    "oppai heart",
+    "zettai junpaku mahou shoujo",
+    "mama katsu",
+    "papa katsu",
+    "dokidoki oyako",
+    "onsen de w",
+    "maid ane",
+    "nuki doki",
+    "bitch gakuen",
+    "tsundere inran shoujo",
+    "bishoujo mangekyou",
+    "sayonara o oshiete",
+    "kara no shoujo",
+    "cartagra",
+    "soushi souai",
+    "kanojo ga yatsu ni",
+    "netorarete",
+    "inyouchuu",
+    "kuro no kyoushitsu",
+    "inma seiden",
+    "bible pink",
+    "kagirohi",
+    "dark shell",
+    "viper gts",
+    "dragon knight 4",
+    "pia carrot",
+    "kakyuusei",
+    "shoujo sect",
+    "boin dori",
+    "dekisoko",
+    "choukou tenshi",
+    "fault!!",
+    "kuttsukiboshi",
+    "bijukubo",
+    "himesama navigation",
+    "tsunpuri",
+    "fella pure",
+    "fella clinic",
+    "oppai gakuen",
+    "eroge de subete",
+    "inmou",
+    "kyonyuu reijou",
+    "bakunyuu maid",
+    "chikan densha",
+    "chikan juunin",
+    "taboo charm",
+    "kyonyuu hime",
+    "oppai life",
+];
+
+/// Japanese, Chinese, and CJK adult / hentai tokens and stems (matched as case-insensitive substrings).
+const CJK_ADULT_PHRASES: &[&str] = &[
+    // Rating & Censorship
+    "18禁",
+    "無修正",
+    "无码",
+    "無碼",
+    "成人向け",
+    "裏アニメ",
+    "裏ビデオ",
+    "裏本",
+    "里番",
+    // Adult anime & game categories
+    "エロアニメ",
+    "エロ動画",
+    "エロゲ",
+    "エロ漫画",
+    "エロい",
+    "同人誌",
+    "同人cg",
+    "同人音声",
+    // Explicit genres & tropes
+    "中出し",
+    "中出",
+    "調教",
+    "调教",
+    "痴漢",
+    "近親相姦",
+    "乱伦",
+    "乱交",
+    "群交",
+    "触手",
+    "オナニー",
+    "陵辱",
+    "寝取られ",
+    "催眠",
+    "パイズリ",
+    "アヘ顔",
+    "ボテ腹",
+    "拘束",
+    "奴隷",
+    "生ハメ",
+    "潮吹き",
+    "ハメ撮り",
+    "絶頂",
+    "肉便器",
+    "熟女",
+    "人妻",
+    "母乳",
+    "乱暴",
+    "淫乱",
+    "淫魔",
+    "発情",
+    "雌豚",
+    "牝犬",
+    "巨乳",
+    "爆乳",
+    "ヘンタイ",
+    "アナル",
+    "フェラ",
+    "クンニ",
+    "バイブ",
+    "電マ",
+    "スカトロ",
+    "放尿",
+    "潮吹",
+    "処女喪失",
+    "初体験",
+    "援助交際",
+    "援交",
+    "パパ活",
+    "変態",
+    "色情",
 ];
 
 /// Known adult domain substrings in URLs
@@ -166,6 +349,28 @@ const ADULT_DOMAINS: &[&str] = &[
     "hentai2read",
     "simply-hentai",
     "asmhentai",
+    "hentaicdn",
+    "hentaistream",
+    "hentaidude",
+    "underhentai",
+    "7mmtv",
+    "tokyomotion",
+    "xhamster",
+    "youporn",
+    "redtube",
+    "tube8",
+    "porn555",
+    "xmoviesforyou",
+    "beeg.com",
+    "chaturbate",
+    "myhentaigallery",
+    "hitomi.la",
+    "e-hentai.org",
+    "exhentai.org",
+    "hentai-foundry",
+    "gelbooru.com",
+    "danbooru.donmai.us",
+    "tbib.org",
 ];
 
 /// Normalizes text into lowercase tokens split by non-alphanumeric characters.
@@ -205,7 +410,14 @@ pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
         }
     }
 
-    // 3. Tokenize title and check against explicit adult/hentai single tokens
+    // 3. Check CJK / Japanese / Chinese adult and hentai stems
+    for phrase in CJK_ADULT_PHRASES {
+        if lower_title.contains(phrase) || lower_url.contains(phrase) {
+            return true;
+        }
+    }
+
+    // 4. Tokenize title and check against explicit adult/hentai single tokens
     let title_tokens = extract_tokens(&lower_title);
     for token in &title_tokens {
         for adult_token in EXPLICIT_ADULT_TOKENS {
@@ -215,7 +427,7 @@ pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
         }
     }
 
-    // 4. Tokenize URL slug segments (often contains /hentai/ or /xxx/)
+    // 5. Tokenize URL slug segments (often contains /hentai/ or /xxx/)
     let url_tokens = extract_tokens(&lower_url);
     for token in &url_tokens {
         if token == "hentai"
@@ -236,20 +448,36 @@ pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
             || token == "mankitsu"
             || token == "overflow"
             || token == "euphoria"
+            || token == "erotica"
+            || token == "erotic"
+            || token == "eroge"
+            || token == "ahegao"
+            || token == "paizuri"
+            || token == "nakadashi"
+            || token == "chikan"
         {
             return true;
         }
     }
 
-    // 5. Check tags or genres if provided
+    // 6. Check tags, genres, or plot synopsis if provided
     if let Some(tag_str) = tags {
         let lower_tags = tag_str.to_lowercase();
-        if lower_tags.contains("18+") || lower_tags.contains("r-18") || lower_tags.contains("r18+") {
+        if lower_tags.contains("18+")
+            || lower_tags.contains("r-18")
+            || lower_tags.contains("r18+")
+            || lower_tags.contains("18禁")
+        {
             return true;
         }
 
-        // Check multi-word phrases in tags
+        // Check multi-word phrases and CJK adult terms in tags
         for phrase in EXPLICIT_ADULT_PHRASES {
+            if lower_tags.contains(phrase) {
+                return true;
+            }
+        }
+        for phrase in CJK_ADULT_PHRASES {
             if lower_tags.contains(phrase) {
                 return true;
             }
@@ -399,5 +627,17 @@ mod tests {
             clean_image.extend_from_slice(&[50, 100, 220]);
         }
         assert!(!is_skin_exposure_excessive(&clean_image, 3));
+    }
+
+    #[test]
+    fn test_detects_cjk_and_disguised_hentai() {
+        assert!(is_nsfw_text("18禁裏アニメ OVA 01", "https://anime.tv/watch/video-1", None));
+        assert!(is_nsfw_text("【無修正】Ane wa Yanmama", "https://stream.com/watch/video-2", None));
+        assert!(is_nsfw_text("中出し調教 Special", "https://stream.com/watch/video-3", None));
+        assert!(is_nsfw_text("新作里番合集", "https://stream.com/watch/video-4", None));
+        assert!(is_nsfw_text("Netorare 寝取られ OVA", "https://stream.com/watch/video-5", None));
+        assert!(is_nsfw_text("無修正 JAV 001", "https://stream.com/watch/video-6", None));
+        assert!(is_nsfw_text("Eroge エロアニメ 01", "https://stream.com/watch/video-7", None));
+        assert!(is_nsfw_text("Untagged Anime", "https://stream.com/watch/video-8", Some("18禁, 裏アニメ")));
     }
 }

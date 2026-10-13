@@ -36,6 +36,7 @@ class SettingsProviders : BasePreferenceFragmentCompat() {
         getPref(R.string.enable_nsfw_on_providers_key)?.setOnPreferenceChangeListener { _, newValue ->
             val enabled = newValue as? Boolean ?: false
             MainAPI.settingsForProvider.enableAdult = enabled
+            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
             true
         }
 

@@ -73,6 +73,18 @@ class NsfwFilterEngineTest {
         assertTrue(NsfwFilterEngine.isNsfwText("Special Series (R-18)", "https://stream.com/watch/title"))
     }
 
+    @Test
+    fun `test isNsfwText detects CJK, Japanese and Chinese adult titles`() {
+        assertTrue(NsfwFilterEngine.isNsfwText("18禁裏アニメ OVA 01", "https://anime.tv/watch/video-1"))
+        assertTrue(NsfwFilterEngine.isNsfwText("【無修正】Ane wa Yanmama", "https://stream.com/watch/video-2"))
+        assertTrue(NsfwFilterEngine.isNsfwText("中出し調教 Special", "https://stream.com/watch/video-3"))
+        assertTrue(NsfwFilterEngine.isNsfwText("新作里番合集", "https://stream.com/watch/video-4"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Netorare 寝取られ OVA", "https://stream.com/watch/video-5"))
+        assertTrue(NsfwFilterEngine.isNsfwText("無修正 JAV 001", "https://stream.com/watch/video-6"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Eroge エロアニメ 01", "https://stream.com/watch/video-7"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Untagged Anime", "https://stream.com/watch/video-8", "18禁, 裏アニメ"))
+    }
+
     @Suppress("DEPRECATION_ERROR")
     @Test
     fun `test filterSearchResults removes adult and blended hentai items when disabled`() {

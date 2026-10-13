@@ -235,6 +235,23 @@ object SettingsGeneralScreen : SearchableSettings {
             ),
 
             Preference.PreferenceGroup(
+                title = stringResource(R.string.pref_category_content_safety),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.SwitchPreference(
+                        title = stringResource(R.string.enable_nsfw_on_providers),
+                        subtitle = stringResource(R.string.enable_nsfw_summary),
+                        icon = painterResource(R.drawable.ic_outline_remove_red_eye_24),
+                        preference = settings.general.enableNsfw,
+                        onValueChanged = { enabled ->
+                            com.lagradost.cloudstream3.MainAPI.settingsForProvider.enableAdult = enabled
+                            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+                            true
+                        }
+                    )
+                )
+            ),
+
+            Preference.PreferenceGroup(
                 title = stringResource(R.string.pref_category_bypass),
                 preferenceItems = persistentListOf(
                     Preference.PreferenceItem.TextPreference(

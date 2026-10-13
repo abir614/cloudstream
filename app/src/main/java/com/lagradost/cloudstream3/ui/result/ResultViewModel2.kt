@@ -83,6 +83,8 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.getNameFull
 import com.lagradost.cloudstream3.utils.AppContextUtils.isConnectedToChromecast
 import com.lagradost.cloudstream3.utils.AppContextUtils.setDefaultFocus
 import com.lagradost.cloudstream3.utils.AppContextUtils.sortSubs
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
 import com.lagradost.cloudstream3.utils.CastHelper.startCast
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
@@ -2509,7 +2511,11 @@ class ResultViewModel2 : ViewModel() {
 
     // this instantly updates the metadata on the page
     private fun postPage(loadResponse: LoadResponse, apiRepository: APIRepository) {
-        _recommendations.postValue(loadResponse.recommendations ?: emptyList())
+        val nsfwEnabled = isNsfwGloballyEnabled()
+        val recs = loadResponse.recommendations?.let {
+            NsfwFilterEngine.filterSearchResults(it, nsfwEnabled)
+        } ?: emptyList()
+        _recommendations.postValue(recs)
         _page.postValue(Resource.Success(loadResponse.toResultData(apiRepository)))
     }
 

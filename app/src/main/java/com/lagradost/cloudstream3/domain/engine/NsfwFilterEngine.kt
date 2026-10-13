@@ -28,7 +28,9 @@ object NsfwFilterEngine {
         "gangbang", "deepthroat", "swinger", "cuckold", "masturbation", "incest", "uncensored", "decensored",
         "rance", "kuroinu", "taimanin", "mankitsu", "overflow", "euphoria", "futabu", "shoujoramune",
         "otomedori", "resortboin", "bakunyuu", "kyonyuu", "oppai", "nukige", "eromanga", "erogame",
-        "onichichi", "seikatsushuukan", "smut",
+        "onichichi", "seikatsushuukan", "smut", "botehara", "fella", "fellatio", "cunnilingus", "pegging",
+        "shemale", "transsexual", "hentaistream", "muchohentai", "hentaimama", "hentaicity", "hentaipulse",
+        "underhentai", "purehentai", "hentai2read", "asmhentai", "hentaicdn", "hentaidude", "milf", "bbw",
         "bunnywalker", "pinkpineapple", "queenbee", "poros", "greenbunny", "whitebear", "naturalhigh",
         "nhentai", "tsumino", "fakku", "luscious",
         "pornhub", "xvideos", "xnxx", "spankbang", "eporner", "missav", "supjav", "javhd", "rule34"
@@ -43,7 +45,36 @@ object NsfwFilterEngine {
         "cream lemon", "adventure kid", "kyonyuu fantasy", "futanari bitch", "dokidoki little",
         "marshmallow imouto", "meshimase", "chikan joushaden", "velvet kiss", "aki sora",
         "ane wa yanmama", "uncensored ova", "uncensored anime", "h-anime", "h anime",
-        "r-18 anime", "r18 anime", "adult anime", "adult animation", "hentai anime", "hentai ova"
+        "r-18 anime", "r18 anime", "adult anime", "adult animation", "hentai anime", "hentai ova",
+        "mankitsu happening", "itadaki seieki", "discipline zero", "starless", "front innocent",
+        "yarichin bitch", "chiisana tsubomi", "saimin seishidou", "enjo kouhai", "maki-chan to nau",
+        "imouto biyori", "kansen sodom", "makai tenshi djibril", "baku ane", "eroge h-game",
+        "shikkoku no shaga", "kuro gal", "swing out sisters", "gakuen saimin", "koikishi purely",
+        "sweet home: h na", "tiny evil", "brand new maid", "ane chikan", "ane kyun",
+        "harem time", "ero konbini", "joshi ochi", "25-sai no joshikousei", "soryo to majiwaru",
+        "skirt no naka wa", "araiya-san", "yubisaki kara no honki", "kuro gal o/s", "fella hame",
+        "ryoujoku famiresu", "houkago no yuutousei", "shounen maid kuro-kun", "boku no yayoi-san",
+        "yariman bitch", "oppai heart", "zettai junpaku mahou shoujo", "mama katsu", "papa katsu",
+        "dokidoki oyako", "onsen de w", "maid ane", "nuki doki", "bitch gakuen",
+        "tsundere inran shoujo", "bishoujo mangekyou", "sayonara o oshiete", "kara no shoujo",
+        "cartagra", "soushi souai", "kanojo ga yatsu ni", "netorarete", "inyouchuu",
+        "kuro no kyoushitsu", "inma seiden", "bible pink", "kagirohi", "dark shell",
+        "viper gts", "dragon knight 4", "pia carrot", "kakyuusei", "shoujo sect",
+        "boin dori", "dekisoko", "choukou tenshi", "fault!!", "kuttsukiboshi",
+        "bijukubo", "himesama navigation", "tsunpuri", "fella pure", "fella clinic",
+        "oppai gakuen", "eroge de subete", "inmou", "kyonyuu reijou", "bakunyuu maid",
+        "chikan densha", "chikan juunin", "taboo charm", "kyonyuu hime", "oppai life"
+    )
+
+    private val CJK_ADULT_PHRASES = arrayOf(
+        "18禁", "無修正", "无码", "無碼", "成人向け", "裏アニメ", "裏ビデオ", "裏本", "里番",
+        "エロアニメ", "エロ動画", "エロゲ", "エロ漫画", "エロい", "同人誌", "同人cg", "同人音声",
+        "中出し", "中出", "調教", "调教", "痴漢", "近親相姦", "乱伦", "乱交", "群交", "触手",
+        "オナニー", "陵辱", "寝取られ", "催眠", "パイズリ", "アヘ顔", "ボテ腹", "拘束", "奴隷",
+        "生ハメ", "潮吹き", "ハメ撮り", "絶頂", "肉便器", "熟女", "人妻", "母乳", "乱暴",
+        "淫乱", "淫魔", "発情", "雌豚", "牝犬", "巨乳", "爆乳", "ヘンタイ", "アナル",
+        "フェラ", "クンニ", "バイブ", "電マ", "スカトロ", "放尿", "潮吹", "処女喪失",
+        "初体験", "援助交際", "援交", "パパ活", "変態", "色情"
     )
 
     private val ADULT_DOMAINS = arrayOf(
@@ -51,13 +82,18 @@ object NsfwFilterEngine {
         "pornhub.com", "xvideos.com", "xnxx.com", "spankbang.com", "eporner.com", "missav.com",
         "supjav.com", "javhd.com", "rule34.xxx", "rule34video.com", "erome.com", "h-anime.net",
         "javmost", "javfree", "hentaicity", "hentaipulse", "hentaimama", "muchohentai",
-        "animehentai", "hentai2read", "simply-hentai", "asmhentai"
+        "animehentai", "hentai2read", "simply-hentai", "asmhentai",
+        "hentaicdn", "hentaistream", "hentaidude", "underhentai", "7mmtv", "tokyomotion",
+        "xhamster", "youporn", "redtube", "tube8", "porn555", "xmoviesforyou",
+        "beeg.com", "chaturbate", "myhentaigallery", "hitomi.la", "e-hentai.org",
+        "exhentai.org", "hentai-foundry", "gelbooru.com", "danbooru.donmai.us", "tbib.org"
     )
 
     private val ADULT_URL_SLUG_TOKENS = hashSetOf(
         "hentai", "hanime", "jav", "xxx", "porn", "r18", "nsfw",
         "doujin", "futanari", "uncensored", "netorare", "ntr",
-        "rance", "kuroinu", "taimanin", "mankitsu", "overflow", "euphoria"
+        "rance", "kuroinu", "taimanin", "mankitsu", "overflow", "euphoria",
+        "erotica", "erotic", "eroge", "ahegao", "paizuri", "nakadashi", "chikan"
     )
 
     private val ADULT_TAG_TOKENS = hashSetOf(
@@ -99,7 +135,7 @@ object NsfwFilterEngine {
             if (lowerUrl.contains(domain)) return true
         }
 
-        if (lowerTitle.contains("r-18") || lowerTitle.contains("r18+") || lowerTitle.contains("18+")) {
+        if (lowerTitle.contains("r-18") || lowerTitle.contains("r18+") || lowerTitle.contains("18+") || lowerTitle.contains("18禁")) {
             return true
         }
         if (lowerUrl.contains("r-18") || lowerUrl.contains("r18+")) {
@@ -107,6 +143,10 @@ object NsfwFilterEngine {
         }
 
         for (phrase in EXPLICIT_ADULT_PHRASES) {
+            if (lowerTitle.contains(phrase) || lowerUrl.contains(phrase)) return true
+        }
+
+        for (phrase in CJK_ADULT_PHRASES) {
             if (lowerTitle.contains(phrase) || lowerUrl.contains(phrase)) return true
         }
 
@@ -122,10 +162,13 @@ object NsfwFilterEngine {
 
         if (tags != null) {
             val lowerTags = tags.lowercase()
-            if (lowerTags.contains("18+") || lowerTags.contains("r-18") || lowerTags.contains("r18+")) {
+            if (lowerTags.contains("18+") || lowerTags.contains("r-18") || lowerTags.contains("r18+") || lowerTags.contains("18禁")) {
                 return true
             }
             for (phrase in EXPLICIT_ADULT_PHRASES) {
+                if (lowerTags.contains(phrase)) return true
+            }
+            for (phrase in CJK_ADULT_PHRASES) {
                 if (lowerTags.contains(phrase)) return true
             }
             val tagTokens = extractTokens(lowerTags)
@@ -180,7 +223,16 @@ object NsfwFilterEngine {
         val rating = item.contentRating
         if (!rating.isNullOrBlank()) {
             val lowerRating = rating.lowercase().trim()
-            if (lowerRating == "18+" || lowerRating == "r18" || lowerRating == "rx" || lowerRating == "nc-17" || lowerRating == "adult") {
+            if (lowerRating.contains("rx") ||
+                lowerRating.contains("r18") ||
+                lowerRating.contains("r-18") ||
+                lowerRating.contains("18+") ||
+                lowerRating.contains("18禁") ||
+                lowerRating.contains("nc-17") ||
+                lowerRating.contains("adult") ||
+                lowerRating.contains("hentai") ||
+                lowerRating.contains("x-rated")
+            ) {
                 return true
             }
         }
