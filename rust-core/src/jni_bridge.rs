@@ -1,5 +1,5 @@
 use jni::objects::{JByteArray, JClass, JString};
-use jni::sys::{jboolean, jstring};
+use jni::sys::{jboolean, jint, jstring};
 use jni::JNIEnv;
 
 use crate::security::ssrf::validate_url_safety;
@@ -780,6 +780,34 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
 
     let safe_res = std::panic::catch_unwind(|| {
         crate::security::nsfw_classifier::is_nsfw_text(&title, &url, tags.as_deref())
+    });
+
+    match safe_res {
+        Ok(true) => 1,
+        _ => 0,
+    }
+}
+
+/// JNI bridge to check if an image buffer exhibits excessive exposed skin tone (> 48%)
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeIsSkinExposureExcessive(
+    env: JNIEnv,
+    _class: JClass,
+    bytes_input: jni::objects::JByteArray,
+    bytes_per_pixel: jint,
+) -> jboolean {
+    if bytes_input.is_null() {
+        return 0;
+    }
+
+    let bytes: Vec<u8> = match env.convert_byte_array(&bytes_input) {
+        Ok(b) => b,
+        Err(_) => return 0,
+    };
+
+    let bpp = if bytes_per_pixel >= 3 { bytes_per_pixel as usize } else { 3 };
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::security::nsfw_classifier::is_skin_exposure_excessive(&bytes, bpp)
     });
 
     match safe_res {

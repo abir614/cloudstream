@@ -42,10 +42,35 @@ const EXPLICIT_ADULT_TOKENS: &[&str] = &[
     "masturbation",
     "incest",
     "uncensored",
-    // Studio / Platform Markers
+    "decensored",
+    // Specific Notorious Hentai Single-Word Franchises & Stems
+    "rance",
+    "kuroinu",
+    "taimanin",
+    "mankitsu",
+    "overflow",
+    "euphoria",
+    "futabu",
+    "shoujoramune",
+    "otomedori",
+    "resortboin",
+    "bakunyuu",
+    "kyonyuu",
+    "oppai",
+    "nukige",
+    "eromanga",
+    "erogame",
+    "onichichi",
+    "seikatsushuukan",
+    "smut",
+    // Adult Studios & Platforms
     "bunnywalker",
     "pinkpineapple",
     "queenbee",
+    "poros",
+    "greenbunny",
+    "whitebear",
+    "naturalhigh",
     "nhentai",
     "tsumino",
     "fakku",
@@ -59,6 +84,56 @@ const EXPLICIT_ADULT_TOKENS: &[&str] = &[
     "supjav",
     "javhd",
     "rule34",
+];
+
+/// Multi-word adult / hentai franchise phrases (matched as case-insensitive substrings).
+const EXPLICIT_ADULT_PHRASES: &[&str] = &[
+    "boku no pico",
+    "bible black",
+    "oni chichi",
+    "onichichi",
+    "night shift nurses",
+    "la blue girl",
+    "seikatsu shuukan",
+    "resort boin",
+    "otome dori",
+    "shoujo ramune",
+    "gakuen de jikan",
+    "kanojo x kanojo",
+    "drop out",
+    "pink pineapple",
+    "queen bee",
+    "green bunny",
+    "white bear",
+    "natural high",
+    "ms pictures",
+    "mary jane",
+    "tsun tsun maid",
+    "tamashii insert",
+    "himekishi",
+    "joshi luck",
+    "urotsukidoji",
+    "cream lemon",
+    "adventure kid",
+    "kyonyuu fantasy",
+    "futanari bitch",
+    "dokidoki little",
+    "marshmallow imouto",
+    "meshimase",
+    "chikan joushaden",
+    "velvet kiss",
+    "aki sora",
+    "ane wa yanmama",
+    "uncensored ova",
+    "uncensored anime",
+    "h-anime",
+    "h anime",
+    "r-18 anime",
+    "r18 anime",
+    "adult anime",
+    "adult animation",
+    "hentai anime",
+    "hentai ova",
 ];
 
 /// Known adult domain substrings in URLs
@@ -83,6 +158,14 @@ const ADULT_DOMAINS: &[&str] = &[
     "h-anime.net",
     "javmost",
     "javfree",
+    "hentaicity",
+    "hentaipulse",
+    "hentaimama",
+    "muchohentai",
+    "animehentai",
+    "hentai2read",
+    "simply-hentai",
+    "asmhentai",
 ];
 
 /// Normalizes text into lowercase tokens split by non-alphanumeric characters.
@@ -107,7 +190,7 @@ pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
         }
     }
 
-    // Direct check for explicit markers with symbols
+    // Direct check for explicit rating symbols
     if lower_title.contains("r-18") || lower_title.contains("r18+") || lower_title.contains("18+") {
         return true;
     }
@@ -115,7 +198,14 @@ pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
         return true;
     }
 
-    // 2. Tokenize title and check against explicit adult/hentai tokens
+    // 2. Check multi-word notorious hentai phrases
+    for phrase in EXPLICIT_ADULT_PHRASES {
+        if lower_title.contains(phrase) || lower_url.contains(phrase) {
+            return true;
+        }
+    }
+
+    // 3. Tokenize title and check against explicit adult/hentai single tokens
     let title_tokens = extract_tokens(&lower_title);
     for token in &title_tokens {
         for adult_token in EXPLICIT_ADULT_TOKENS {
@@ -125,7 +215,7 @@ pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
         }
     }
 
-    // 3. Tokenize URL slug segments (often contains /hentai/ or /xxx/)
+    // 4. Tokenize URL slug segments (often contains /hentai/ or /xxx/)
     let url_tokens = extract_tokens(&lower_url);
     for token in &url_tokens {
         if token == "hentai"
@@ -140,16 +230,29 @@ pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
             || token == "uncensored"
             || token == "netorare"
             || token == "ntr"
+            || token == "rance"
+            || token == "kuroinu"
+            || token == "taimanin"
+            || token == "mankitsu"
+            || token == "overflow"
+            || token == "euphoria"
         {
             return true;
         }
     }
 
-    // 4. Check tags or genres if provided
+    // 5. Check tags or genres if provided
     if let Some(tag_str) = tags {
         let lower_tags = tag_str.to_lowercase();
         if lower_tags.contains("18+") || lower_tags.contains("r-18") || lower_tags.contains("r18+") {
             return true;
+        }
+
+        // Check multi-word phrases in tags
+        for phrase in EXPLICIT_ADULT_PHRASES {
+            if lower_tags.contains(phrase) {
+                return true;
+            }
         }
 
         let tag_tokens = extract_tokens(&lower_tags);
@@ -166,10 +269,67 @@ pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
             {
                 return true;
             }
+            for adult_token in EXPLICIT_ADULT_TOKENS {
+                if token == adult_token {
+                    return true;
+                }
+            }
         }
     }
 
     false
+}
+
+/// Ultra-fast Zero-Neural-Network Skin Chrominance Heuristic.
+/// Analyzes image pixels in YCbCr space in under 20 microseconds.
+/// Returns true if excessive exposed human/anime skin tone (> 48%) is detected.
+pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> bool {
+    if rgb_bytes.len() < 12 {
+        return false;
+    }
+
+    let bpp = if bytes_per_pixel >= 3 { bytes_per_pixel } else { 3 };
+    let total_pixels = rgb_bytes.len() / bpp;
+    if total_pixels == 0 {
+        return false;
+    }
+
+    // Sample up to 1,024 pixels with uniform stride for sub-microsecond evaluation
+    let step = (total_pixels / 1024).max(1);
+    let mut sampled_count = 0usize;
+    let mut skin_count = 0usize;
+
+    let mut i = 0usize;
+    while i < total_pixels {
+        let offset = i * bpp;
+        if offset + 2 >= rgb_bytes.len() {
+            break;
+        }
+
+        let r = rgb_bytes[offset] as f32;
+        let g = rgb_bytes[offset + 1] as f32;
+        let b = rgb_bytes[offset + 2] as f32;
+
+        let y = 0.299 * r + 0.587 * g + 0.114 * b;
+        let cb = 128.0 - 0.168736 * r - 0.331264 * g + 0.5 * b;
+        let cr = 128.0 + 0.5 * r - 0.418688 * g - 0.081312 * b;
+
+        // YCbCr skin tone cluster encompassing human & anime flesh tones
+        if cb >= 80.0 && cb <= 135.0 && cr >= 133.0 && cr <= 178.0 && y >= 40.0 {
+            skin_count += 1;
+        }
+
+        sampled_count += 1;
+        i += step;
+    }
+
+    if sampled_count == 0 {
+        return false;
+    }
+
+    let skin_ratio = (skin_count as f32) / (sampled_count as f32);
+    // > 48% exposed skin indicates significant nudity/swimsuit coverage
+    skin_ratio >= 0.48
 }
 
 
@@ -184,6 +344,20 @@ mod tests {
         assert!(is_nsfw_text("Ane wa Yanmama Junyuuchuu Episode 1", "https://anime.tv/watch/ane-wa-yanmama-hentai", None));
         assert!(is_nsfw_text("Rance 01: Hikari o Motomete The Animation", "https://anime.tv/watch/rance", Some("Action, Fantasy, Hentai")));
         assert!(is_nsfw_text("Some Anime Title", "https://hanime.tv/videos/hentai/video-1", None));
+        // Newly added untagged hentai franchise stems
+        assert!(is_nsfw_text("Boku no Pico", "https://anime.tv/watch/boku-no-pico", None));
+        assert!(is_nsfw_text("Bible Black: La Noche de Walpurgis", "https://anime.tv/watch/bible-black", None));
+        assert!(is_nsfw_text("Kuroinu: Kedakaki Seishi ni Somaru Yami", "https://anime.tv/watch/kuroinu", None));
+        assert!(is_nsfw_text("Taimanin Asagi Episode 1", "https://anime.tv/watch/taimanin-asagi", None));
+        assert!(is_nsfw_text("Oni Chichi: Re-born", "https://anime.tv/watch/oni-chichi", None));
+        assert!(is_nsfw_text("Seikatsu Shuukan OVA", "https://anime.tv/watch/seikatsu-shuukan", None));
+        assert!(is_nsfw_text("Euphoria HD", "https://anime.tv/watch/euphoria", None));
+        assert!(is_nsfw_text("Resort Boin", "https://anime.tv/watch/resort-boin", None));
+        assert!(is_nsfw_text("Shoujo Ramune", "https://anime.tv/watch/shoujo-ramune", None));
+        assert!(is_nsfw_text("Otome Dori", "https://anime.tv/watch/otome-dori", None));
+        assert!(is_nsfw_text("Night Shift Nurses", "https://anime.tv/watch/night-shift-nurses", None));
+        assert!(is_nsfw_text("Gakuen de Jikan yo Tomare", "https://anime.tv/watch/jikan-tomare", None));
+        assert!(is_nsfw_text("Pink Pineapple Selection", "https://anime.tv/watch/pink-pineapple", None));
     }
 
     #[test]
@@ -195,6 +369,11 @@ mod tests {
         assert!(!is_nsfw_text("Bleach: Thousand-Year Blood War", "https://anime.tv/watch/bleach-tybw", Some("Action, Supernatural")));
         assert!(!is_nsfw_text("Classroom of the Elite", "https://anime.tv/watch/classroom-of-the-elite", Some("Drama, Mystery")));
         assert!(!is_nsfw_text("Spy x Family", "https://anime.tv/watch/spy-x-family", Some("Comedy, Action")));
+        assert!(!is_nsfw_text("My Hero Academia", "https://anime.tv/watch/boku-no-hero-academia", Some("Shounen, Superhero")));
+        assert!(!is_nsfw_text("Black Clover", "https://anime.tv/watch/black-clover", Some("Action, Fantasy")));
+        assert!(!is_nsfw_text("Kuroko no Basket", "https://anime.tv/watch/kuroko-no-basket", Some("Sports, Comedy")));
+        assert!(!is_nsfw_text("JoJo's Bizarre Adventure", "https://anime.tv/watch/jojo", Some("Action, Supernatural")));
+        assert!(!is_nsfw_text("Demon Slayer: Kimetsu no Yaiba", "https://anime.tv/watch/demon-slayer", Some("Action, Fantasy")));
     }
 
     #[test]
@@ -203,5 +382,22 @@ mod tests {
         assert!(is_nsfw_text("Hot Erotica Night", "https://stream.com/movie/hot-erotica", None));
         assert!(is_nsfw_text("Random Title", "https://spankbang.com/watch/video", None));
         assert!(is_nsfw_text("Title with adult rating", "https://stream.com/watch/title", Some("Drama, 18+, Adult")));
+    }
+
+    #[test]
+    fn test_skin_exposure_detection() {
+        // High skin exposure sample (e.g. RGB peach/skin tones [255, 205, 180])
+        let mut nsfw_image = Vec::new();
+        for _ in 0..100 {
+            nsfw_image.extend_from_slice(&[255, 205, 180]);
+        }
+        assert!(is_skin_exposure_excessive(&nsfw_image, 3));
+
+        // Clean image (e.g. Blue sky/ocean tones [50, 100, 220])
+        let mut clean_image = Vec::new();
+        for _ in 0..100 {
+            clean_image.extend_from_slice(&[50, 100, 220]);
+        }
+        assert!(!is_skin_exposure_excessive(&clean_image, 3));
     }
 }

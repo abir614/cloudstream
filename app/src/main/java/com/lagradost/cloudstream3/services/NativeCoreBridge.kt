@@ -131,11 +131,24 @@ object NativeCoreBridge {
 
     // --- Native NSFW / Hentai Classification ---
     external fun nativeIsNsfw(title: String, url: String, tags: String?): Boolean
+    external fun nativeIsSkinExposureExcessive(bytes: ByteArray, bytesPerPixel: Int): Boolean
 
     fun isNsfw(title: String, url: String, tags: String? = null): Boolean? {
         return if (isLoaded) {
             try {
                 nativeIsNsfw(title, url, tags)
+            } catch (_: Throwable) {
+                null
+            }
+        } else {
+            null
+        }
+    }
+
+    fun isSkinExposureExcessive(bytes: ByteArray, bytesPerPixel: Int = 3): Boolean? {
+        return if (isLoaded) {
+            try {
+                nativeIsSkinExposureExcessive(bytes, bytesPerPixel)
             } catch (_: Throwable) {
                 null
             }

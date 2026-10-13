@@ -25,21 +25,39 @@ object NsfwFilterEngine {
         "xxx", "porn", "porno", "pornography", "nsfw", "jav", "r18", "r-18", "r18+", "erotica", "erotic",
         "hentai", "hanime", "ero-anime", "eroanime", "eroge", "ahegao", "doujin", "doujinshi", "futanari",
         "netorare", "ntr", "chikan", "paizuri", "nakadashi", "shibari", "bukkake", "creampie", "blowjob",
-        "gangbang", "deepthroat", "swinger", "cuckold", "masturbation", "incest", "uncensored",
-        "bunnywalker", "pinkpineapple", "queenbee", "nhentai", "tsumino", "fakku", "luscious",
+        "gangbang", "deepthroat", "swinger", "cuckold", "masturbation", "incest", "uncensored", "decensored",
+        "rance", "kuroinu", "taimanin", "mankitsu", "overflow", "euphoria", "futabu", "shoujoramune",
+        "otomedori", "resortboin", "bakunyuu", "kyonyuu", "oppai", "nukige", "eromanga", "erogame",
+        "onichichi", "seikatsushuukan", "smut",
+        "bunnywalker", "pinkpineapple", "queenbee", "poros", "greenbunny", "whitebear", "naturalhigh",
+        "nhentai", "tsumino", "fakku", "luscious",
         "pornhub", "xvideos", "xnxx", "spankbang", "eporner", "missav", "supjav", "javhd", "rule34"
+    )
+
+    private val EXPLICIT_ADULT_PHRASES = arrayOf(
+        "boku no pico", "bible black", "oni chichi", "onichichi", "night shift nurses",
+        "la blue girl", "seikatsu shuukan", "resort boin", "otome dori", "shoujo ramune",
+        "gakuen de jikan", "kanojo x kanojo", "drop out", "pink pineapple", "queen bee",
+        "green bunny", "white bear", "natural high", "ms pictures", "mary jane",
+        "tsun tsun maid", "tamashii insert", "himekishi", "joshi luck", "urotsukidoji",
+        "cream lemon", "adventure kid", "kyonyuu fantasy", "futanari bitch", "dokidoki little",
+        "marshmallow imouto", "meshimase", "chikan joushaden", "velvet kiss", "aki sora",
+        "ane wa yanmama", "uncensored ova", "uncensored anime", "h-anime", "h anime",
+        "r-18 anime", "r18 anime", "adult anime", "adult animation", "hentai anime", "hentai ova"
     )
 
     private val ADULT_DOMAINS = arrayOf(
         "hanime.tv", "hentaihaven", "nhentai.net", "fakku.net", "tsumino.com", "luscious.net",
         "pornhub.com", "xvideos.com", "xnxx.com", "spankbang.com", "eporner.com", "missav.com",
         "supjav.com", "javhd.com", "rule34.xxx", "rule34video.com", "erome.com", "h-anime.net",
-        "javmost", "javfree"
+        "javmost", "javfree", "hentaicity", "hentaipulse", "hentaimama", "muchohentai",
+        "animehentai", "hentai2read", "simply-hentai", "asmhentai"
     )
 
     private val ADULT_URL_SLUG_TOKENS = hashSetOf(
         "hentai", "hanime", "jav", "xxx", "porn", "r18", "nsfw",
-        "doujin", "futanari", "uncensored", "netorare", "ntr"
+        "doujin", "futanari", "uncensored", "netorare", "ntr",
+        "rance", "kuroinu", "taimanin", "mankitsu", "overflow", "euphoria"
     )
 
     private val ADULT_TAG_TOKENS = hashSetOf(
@@ -48,6 +66,21 @@ object NsfwFilterEngine {
 
     private fun extractTokens(text: String): List<String> {
         return text.lowercase().split(Regex("[^a-zA-Z0-9]+")).filter { it.isNotEmpty() }
+    }
+
+    /**
+     * Checks if a URL or image link belongs to a known adult domain or contains adult slug markers.
+     */
+    fun isNsfwUrl(url: String): Boolean {
+        if (url.isBlank()) return false
+        val lowerUrl = url.lowercase()
+        for (domain in ADULT_DOMAINS) {
+            if (lowerUrl.contains(domain)) return true
+        }
+        for (token in extractTokens(lowerUrl)) {
+            if (ADULT_URL_SLUG_TOKENS.contains(token)) return true
+        }
+        return false
     }
 
     /**
@@ -73,6 +106,10 @@ object NsfwFilterEngine {
             return true
         }
 
+        for (phrase in EXPLICIT_ADULT_PHRASES) {
+            if (lowerTitle.contains(phrase) || lowerUrl.contains(phrase)) return true
+        }
+
         val titleTokens = extractTokens(lowerTitle)
         for (token in titleTokens) {
             if (EXPLICIT_ADULT_TOKENS.contains(token)) return true
@@ -88,14 +125,25 @@ object NsfwFilterEngine {
             if (lowerTags.contains("18+") || lowerTags.contains("r-18") || lowerTags.contains("r18+")) {
                 return true
             }
+            for (phrase in EXPLICIT_ADULT_PHRASES) {
+                if (lowerTags.contains(phrase)) return true
+            }
             val tagTokens = extractTokens(lowerTags)
             for (token in tagTokens) {
-                if (ADULT_TAG_TOKENS.contains(token)) return true
+                if (ADULT_TAG_TOKENS.contains(token) || EXPLICIT_ADULT_TOKENS.contains(token)) return true
                 if (token == "ecchi" && lowerTitle.contains("18+")) return true
             }
         }
 
         return false
+    }
+
+    /**
+     * Checks if an image buffer exhibits excessive exposed skin tone (> 48%)
+     * using the ultra-fast native Rust chrominance analyzer.
+     */
+    fun isSkinExposureExcessive(rgbBytes: ByteArray, bytesPerPixel: Int = 3): Boolean {
+        return NativeCoreBridge.isSkinExposureExcessive(rgbBytes, bytesPerPixel) ?: false
     }
 
     /**
@@ -111,8 +159,11 @@ object NsfwFilterEngine {
 
         val otherName = (item as? com.lagradost.cloudstream3.AnimeSearchResponse)?.otherName
         val combinedTitle = if (!otherName.isNullOrBlank()) "${item.name} $otherName" else item.name
+        val poster = item.posterUrl ?: ""
 
-        return isNsfwText(combinedTitle, item.url, null)
+        if (poster.isNotBlank() && isNsfwUrl(poster)) return true
+
+        return isNsfwText(combinedTitle, item.url, poster.ifBlank { null })
     }
 
     /**
@@ -134,7 +185,13 @@ object NsfwFilterEngine {
             }
         }
 
-        return isNsfwText(item.name, item.url, tagsStr)
+        val poster = item.posterUrl ?: ""
+        if (poster.isNotBlank() && isNsfwUrl(poster)) return true
+
+        val plotStr = item.plot
+        val metadataCombined = listOfNotNull(tagsStr, plotStr).joinToString(" | ")
+
+        return isNsfwText(item.name, item.url, metadataCombined.ifBlank { null })
     }
 
     /**

@@ -28,6 +28,26 @@ class NsfwFilterEngineTest {
         assertTrue(NsfwFilterEngine.isNsfwText("Futanari Bitch OVA", "https://anime.tv/watch/futanari-bitch"))
         assertTrue(NsfwFilterEngine.isNsfwText("Ahegao Maid", "https://anime.tv/watch/ahegao-maid"))
         assertTrue(NsfwFilterEngine.isNsfwText("Uncensored Doujin Anime", "https://anime.tv/watch/doujin"))
+        // Untagged notorious hentai franchise stems
+        assertTrue(NsfwFilterEngine.isNsfwText("Boku no Pico", "https://anime.tv/watch/boku-no-pico"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Bible Black: La Noche de Walpurgis", "https://anime.tv/watch/bible-black"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Kuroinu: Kedakaki Seishi ni Somaru Yami", "https://anime.tv/watch/kuroinu"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Taimanin Asagi Episode 1", "https://anime.tv/watch/taimanin-asagi"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Oni Chichi: Re-born", "https://anime.tv/watch/oni-chichi"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Seikatsu Shuukan OVA", "https://anime.tv/watch/seikatsu-shuukan"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Euphoria HD", "https://anime.tv/watch/euphoria"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Resort Boin", "https://anime.tv/watch/resort-boin"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Shoujo Ramune", "https://anime.tv/watch/shoujo-ramune"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Otome Dori", "https://anime.tv/watch/otome-dori"))
+        assertTrue(NsfwFilterEngine.isNsfwText("Night Shift Nurses", "https://anime.tv/watch/night-shift-nurses"))
+    }
+
+    @Test
+    fun `test isNsfwUrl detects adult domains and slugs`() {
+        assertTrue(NsfwFilterEngine.isNsfwUrl("https://hanime.tv/poster/123.jpg"))
+        assertTrue(NsfwFilterEngine.isNsfwUrl("https://cdn.anime.com/covers/hentai/pic.png"))
+        assertTrue(NsfwFilterEngine.isNsfwUrl("https://images.site.org/r18/image.webp"))
+        assertFalse(NsfwFilterEngine.isNsfwUrl("https://cdn.anime.com/covers/action/attack-on-titan.jpg"))
     }
 
     @Test
