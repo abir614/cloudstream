@@ -11,6 +11,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.annotation.WorkerThread
 import androidx.core.content.pm.PackageInfoCompat
+import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.services.NativeCoreBridge
 import org.json.JSONObject
 import java.io.File

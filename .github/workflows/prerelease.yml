@@ -108,7 +108,7 @@ jobs:
         COUNT="${{ steps.build_count.outputs.count }}"
         TAG="v${COUNT}"
         cd app/build/outputs/apk/prerelease/release/
-        for apk in *.apk; do
+        for apk in app-prerelease-*.apk; do
           if [ -f "$apk" ]; then
             abi=$(echo "$apk" | sed -E 's/app-prerelease-(.*)-release\.apk/\1/')
             tagged="CloudStream-prerelease-${TAG}-${abi}.apk"

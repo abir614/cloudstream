@@ -139,7 +139,7 @@ jobs:
         run: |
           TAG="${{ steps.release_meta.outputs.tag }}"
           cd app/build/outputs/apk/stable/release/
-          for apk in *.apk; do
+          for apk in app-stable-*.apk; do
             if [ -f "$apk" ]; then
               abi=$(echo "$apk" | sed -E 's/app-stable-(.*)-release\.apk/\1/')
               tagged="CloudStream-${TAG}-${abi}.apk"

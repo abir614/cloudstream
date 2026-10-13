@@ -337,9 +337,7 @@ object InAppUpdater {
                                 .show()
                                 .setDefaultFocus()
                         }
-                        UpdateSecurityGate.executeInstallation(this, outcome.token) { authorizedFile ->
-                            openApk(this, authorizedFile)
-                        }
+                        true
                     }
                     is UpdateSecurityGate.VerificationOutcome.Rejected -> {
                         Log.e(LOG_TAG, "Update rejected by security gate: ${outcome.reason}")
