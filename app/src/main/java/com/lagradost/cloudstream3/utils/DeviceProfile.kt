@@ -47,9 +47,37 @@ data class CoilTierConfig(
 object DeviceProfile {
     @Volatile
     private var cachedTier: DeviceTier? = null
+    @Volatile
+    private var cachedOverride: String? = null
+    @Volatile
+    private var cachedBatteryRestricted: Boolean? = null
 
-    fun tier(ctx: Context): DeviceTier = cachedTier ?: synchronized(this) {
-        cachedTier ?: detect(ctx).also { cachedTier = it }
+    fun tier(ctx: Context): DeviceTier {
+        val override = try {
+            PreferenceManager.getDefaultSharedPreferences(ctx)
+                .getString("performance_profile_override_key", "auto") ?: "auto"
+        } catch (_: Throwable) {
+            "auto"
+        }
+        val isRestricted = BatteryOptimizationChecker.isAppRestricted(ctx)
+
+        val cached = cachedTier
+        if (cached != null && cachedOverride == override && cachedBatteryRestricted == isRestricted) {
+            return cached
+        }
+
+        return synchronized(this) {
+            val doubleCheck = cachedTier
+            if (doubleCheck != null && cachedOverride == override && cachedBatteryRestricted == isRestricted) {
+                doubleCheck
+            } else {
+                val computed = detect(ctx, override, isRestricted)
+                cachedOverride = override
+                cachedBatteryRestricted = isRestricted
+                cachedTier = computed
+                computed
+            }
+        }
     }
 
     fun isLowEnd(ctx: Context): Boolean = tier(ctx) == DeviceTier.LOW
@@ -245,7 +273,11 @@ object DeviceProfile {
     }
 
     fun resetCache() {
-        cachedTier = null
+        synchronized(this) {
+            cachedTier = null
+            cachedOverride = null
+            cachedBatteryRestricted = null
+        }
     }
 
     fun getHardwareSummary(ctx: Context): String {
@@ -268,7 +300,7 @@ object DeviceProfile {
                 Build.BOARD ?: "Generic"
             }
             val tierLabel = when (currentTier) {
-                DeviceTier.LOW -> "Power Safe"
+                DeviceTier.LOW -> "Power Safe / Potato"
                 DeviceTier.MID -> "Balanced / Standard"
                 DeviceTier.HIGH -> "High Performance / Boosted"
             }
@@ -280,15 +312,11 @@ object DeviceProfile {
         }
     }
 
-    private fun detect(ctx: Context): DeviceTier {
-        try {
-            val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
-            val override = prefs.getString("performance_profile_override_key", "auto")
-            when (override) {
-                "mid" -> return DeviceTier.MID
-                "high" -> return DeviceTier.HIGH
-            }
-        } catch (_: Throwable) {
+    private fun detect(ctx: Context, override: String, isRestricted: Boolean): DeviceTier {
+        when (override) {
+            "low" -> return DeviceTier.LOW
+            "mid" -> return DeviceTier.MID
+            "high" -> return DeviceTier.HIGH
         }
 
         return try {
@@ -304,6 +332,10 @@ object DeviceProfile {
 
             val socIdentifier = "$hardware $board $model $manufacturer $product $device $soc"
 
+            val isLowChip = KNOWN_LOW_CHIPS.any { it in socIdentifier }
+            val isFlagshipChip = KNOWN_FLAGSHIP_CHIPS.any { it in socIdentifier }
+            val isMidChip = KNOWN_MID_CHIPS.any { it in socIdentifier }
+
             val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
             val mi = ActivityManager.MemoryInfo()
             val totalMb = if (am != null) {
@@ -315,25 +347,31 @@ object DeviceProfile {
             val isLowRam = am?.isLowRamDevice ?: false
             val has64Bit = Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()
             val cores = Runtime.getRuntime().availableProcessors()
+            val isBrokenGpu = hasBrokenHardwareGpu()
 
-            // Check if battery optimization is disabled ("Disable Battery Optimization" activated)
-            val isBatteryOptimizationDisabled = !BatteryOptimizationChecker.isAppRestricted(ctx)
+            // 1. Weak / Potato hardware check: Keep in LOW tier to prevent stutter and OOM
+            if (isLowChip || isBrokenGpu || isLowRam || totalMb <= 1500 || !has64Bit) {
+                return DeviceTier.LOW
+            }
+
+            // 2. Battery optimization state:
+            // When isRestricted is false ("Disable Battery Optimization" enabled), user wants maximum performance!
+            val isBatteryOptimizationDisabled = !isRestricted
 
             if (isBatteryOptimizationDisabled) {
-                // When "Disable battery optimization" is activated, boost performance!
-                // Capable devices (including MediaTek Helio G100 Ultimate, Dimensity, Snapdragon, Tensor, Exynos) get boosted to HIGH
-                if (isLowRam || totalMb <= 1500) {
-                    DeviceTier.MID
-                } else {
-                    DeviceTier.HIGH
-                }
+                // User explicitly enabled Unrestricted Battery -> BOOST capable devices to HIGH!
+                // Any device with >= 2GB RAM and mid/flagship SoC gets HIGH tier (Boosted Mode)
+                return DeviceTier.HIGH
+            }
+
+            // 3. Battery optimization is active (Balanced / Power Saving mode):
+            if (isFlagshipChip || (totalMb >= 6144 && cores >= 8)) {
+                // High-end flagships have enough headroom to run HIGH smoothly even on standard battery
+                DeviceTier.HIGH
             } else {
-                // Otherwise keep balanced / standard so users don't report high battery consumption
-                if (isLowRam || totalMb <= 1500 || !has64Bit) {
-                    DeviceTier.LOW
-                } else {
-                    DeviceTier.MID
-                }
+                // Mid-tier devices (e.g. Helio G100 Ultimate, Dimensity 7000, Snapdragon 6/7)
+                // stay in MID for optimal battery efficiency until user disables battery optimization
+                DeviceTier.MID
             }
         } catch (_: Throwable) {
             DeviceTier.MID

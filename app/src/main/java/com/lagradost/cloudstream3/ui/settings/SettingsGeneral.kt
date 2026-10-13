@@ -359,19 +359,6 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
             return@setOnPreferenceClickListener true
         }
 
-        fun updatePerformanceProfileSummary() {
-            context?.let { ctx ->
-                val currentProfile =
-                    settingsManager.getString(getString(R.string.performance_profile_key), "auto") ?: "auto"
-                val prefNames = resources.getStringArray(R.array.performance_profile_entries)
-                val prefValues = resources.getStringArray(R.array.performance_profile_values)
-                val index = prefValues.indexOf(currentProfile).coerceAtLeast(0)
-                val label = prefNames.getOrNull(index) ?: currentProfile
-                val summary = com.lagradost.cloudstream3.utils.DeviceProfile.getHardwareSummary(ctx)
-                val statusText = if (currentProfile == "auto") "Active" else "Forced"
-                getPref(R.string.performance_profile_key)?.summary = "$label ($statusText: $summary)"
-            }
-        }
         updatePerformanceProfileSummary()
 
         getPref(R.string.performance_profile_key)?.setOnPreferenceClickListener {
@@ -499,5 +486,25 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    private fun updatePerformanceProfileSummary() {
+        context?.let { ctx ->
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
+            val currentProfile =
+                settingsManager.getString(getString(R.string.performance_profile_key), "auto") ?: "auto"
+            val prefNames = resources.getStringArray(R.array.performance_profile_entries)
+            val prefValues = resources.getStringArray(R.array.performance_profile_values)
+            val index = prefValues.indexOf(currentProfile).coerceAtLeast(0)
+            val label = prefNames.getOrNull(index) ?: currentProfile
+            val summary = com.lagradost.cloudstream3.utils.DeviceProfile.getHardwareSummary(ctx)
+            val statusText = if (currentProfile == "auto") "Active" else "Forced"
+            getPref(R.string.performance_profile_key)?.summary = "$label ($statusText: $summary)"
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updatePerformanceProfileSummary()
     }
 }

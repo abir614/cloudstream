@@ -367,13 +367,15 @@
     <string name="performance_profile_settings_des">Configure resource allocation and hardware optimization mode</string>
     <string-array name="performance_profile_entries">
         <item>Automatic (Chipset &amp; Battery Adaptive)</item>
-        <item>Balanced / Standard (Common Setting)</item>
         <item>High Performance / Boosted</item>
+        <item>Balanced / Standard (Common Setting)</item>
+        <item>Power Safe / Potato Mode (Low Memory)</item>
     </string-array>
     <string-array name="performance_profile_values">
         <item>auto</item>
-        <item>mid</item>
         <item>high</item>
+        <item>mid</item>
+        <item>low</item>
     </string-array>
     <string name="pref_category_bypass">ISP Bypasses</string>
     <string name="pref_category_links">Links</string>
