@@ -60,10 +60,12 @@ abstract class GenerateGitHashTask : DefaultTask() {
             }
         }).ifBlank {
             try {
-                providers.exec {
-                    commandLine("git", "rev-parse", "--short=7", "HEAD")
-                    isIgnoreExitValue = true
-                }.standardOutput.asText.get().trim()
+                val gitProcess = ProcessBuilder("git", "rev-parse", "--short=7", "HEAD")
+                    .redirectErrorStream(true)
+                    .start()
+                val result = gitProcess.inputStream.bufferedReader().readText().trim().take(7)
+                gitProcess.waitFor()
+                result
             } catch (_: Throwable) {
                 ""
             }
