@@ -85,6 +85,9 @@ import com.lagradost.cloudstream3.utils.BatteryOptimizationChecker.openBatteryOp
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
+import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialogInstant
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showDialog
@@ -950,23 +953,32 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                     resultCastText.setText(d.actorsText)
                     resultNextAiring.setText(d.nextAiringEpisode)
                     resultNextAiringTime.setText(d.nextAiringDate)
-                    resultPoster.loadImage(d.posterImage, headers = d.posterHeaders) {
-                        error {
-                            getImageFromDrawable(
-                                context ?: return@error null,
-                                R.drawable.default_cover
-                            )
+                    val isNsfw = !isNsfwGloballyEnabled() && (
+                        NsfwFilterEngine.isNsfwText(d.title, d.url, d.tags.joinToString(" ")) ||
+                        d.posterImage?.let { NsfwFilterEngine.isNsfwUrl(it) } == true
+                    )
+                    if (isNsfw) {
+                        applyCensoredPoster(resultPoster)
+                        applyCensoredPoster(resultPosterBackground)
+                    } else {
+                        resultPoster.loadImage(d.posterImage, headers = d.posterHeaders) {
+                            error {
+                                getImageFromDrawable(
+                                    context ?: return@error null,
+                                    R.drawable.default_cover
+                                )
+                            }
                         }
-                    }
-                    resultPosterBackground.loadImage(
-                        d.posterBackgroundImage,
-                        headers = d.posterHeaders
-                    ) {
-                        error {
-                            getImageFromDrawable(
-                                context ?: return@error null,
-                                R.drawable.default_cover
-                            )
+                        resultPosterBackground.loadImage(
+                            d.posterBackgroundImage,
+                            headers = d.posterHeaders
+                        ) {
+                            error {
+                                getImageFromDrawable(
+                                    context ?: return@error null,
+                                    R.drawable.default_cover
+                                )
+                            }
                         }
                     }
 

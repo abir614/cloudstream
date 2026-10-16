@@ -213,20 +213,16 @@ object ImageLoader {
     }
 
     fun getCensoredDrawable(context: android.content.Context): Drawable? {
-        try {
-            val userFile = File("/home/x/Pictures/images.jpeg")
-            if (userFile.exists() && userFile.canRead()) {
-                val d = Drawable.createFromPath(userFile.absolutePath)
-                if (d != null) return d
-            }
-        } catch (_: Throwable) {
-        }
         return ContextCompat.getDrawable(context, R.drawable.censored_poster)
             ?: ContextCompat.getDrawable(context, R.drawable.default_cover)
     }
 
     fun applyCensoredPoster(imageView: ImageView) {
         val d = getCensoredDrawable(imageView.context)
+        try {
+            imageView.scaleType = ImageView.ScaleType.CENTER_CROP
+        } catch (_: Throwable) {
+        }
         if (d != null) {
             imageView.setImageDrawable(d)
         } else {

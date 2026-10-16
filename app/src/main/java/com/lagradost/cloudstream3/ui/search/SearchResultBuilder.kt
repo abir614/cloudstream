@@ -26,6 +26,9 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.getShortSeasonText
 import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.utils.DataStoreHelper.fixVisual
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
+import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.SubtitleHelper
 import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
 import com.lagradost.cloudstream3.utils.getImageFromDrawable
@@ -132,7 +135,10 @@ object SearchResultBuilder {
         cardText?.text = card.name
         cardText?.isVisible = showTitle
         cardView.isVisible = true
-        if (!card.posterUrl.isNullOrEmpty()) {
+        val isNsfw = !isNsfwGloballyEnabled() && NsfwFilterEngine.isNsfw(card)
+        if (isNsfw) {
+            applyCensoredPoster(cardView)
+        } else if (!card.posterUrl.isNullOrEmpty()) {
             cardView.loadImage(card.posterUrl, card.posterHeaders) {
                 placeholder { getImageFromDrawable(itemView.context, R.drawable.default_cover) }
                 error { getImageFromDrawable(itemView.context, R.drawable.default_cover) }

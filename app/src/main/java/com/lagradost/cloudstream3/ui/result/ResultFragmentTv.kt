@@ -54,6 +54,9 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.updateHasTrailers
 import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper.attachBackPressedCallback
 import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper.detachBackPressedCallback
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
+import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialogInstant
 import com.lagradost.cloudstream3.utils.UIHelper.dismissSafe
@@ -877,7 +880,17 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                         resultMetaContentRating.setText(d.contentRatingText)
                         resultNextAiring.setText(d.nextAiringEpisode)
                         resultNextAiringTime.setText(d.nextAiringDate)
-                        resultPoster.loadImage(d.posterImage, headers = d.posterHeaders)
+                        val isNsfw = !isNsfwGloballyEnabled() && (
+                            NsfwFilterEngine.isNsfwText(d.title, d.url, d.tags.joinToString(" ")) ||
+                            d.posterImage?.let { NsfwFilterEngine.isNsfwUrl(it) } == true ||
+                            d.posterBackgroundImage?.let { NsfwFilterEngine.isNsfwUrl(it) } == true
+                        )
+                        if (isNsfw) {
+                            applyCensoredPoster(resultPoster)
+                            applyCensoredPoster(backgroundPoster)
+                        } else {
+                            resultPoster.loadImage(d.posterImage, headers = d.posterHeaders)
+                        }
 
                         var isExpanded = false
                         resultDescription.apply {
@@ -910,8 +923,10 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                             R.drawable.profile_bg_teal
                         ).random()
 
-                        backgroundPoster.loadImage(d.posterBackgroundImage, headers = d.posterHeaders) {
-                            error { getImageFromDrawable(context ?: return@error null, error) }
+                        if (!isNsfw) {
+                            backgroundPoster.loadImage(d.posterBackgroundImage, headers = d.posterHeaders) {
+                                error { getImageFromDrawable(context ?: return@error null, error) }
+                            }
                         }
 
                         bindLogo(

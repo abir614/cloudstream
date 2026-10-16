@@ -63,7 +63,7 @@ object OnDeviceNsfwClassifier {
     private const val MEAN_R = 123.0f
 
     // Classification threshold for adult / NSFW / ecchi content
-    private const val NSFW_THRESHOLD = 0.65f
+    private const val NSFW_THRESHOLD = 0.50f
 
     // Thread-safe state
     private val isInitializing = AtomicBoolean(false)
@@ -171,9 +171,27 @@ object OnDeviceNsfwClassifier {
         val sBitmap = scratchBitmap ?: return false
         val canvas = scratchCanvas ?: return false
 
+        // Android throws IllegalArgumentException if a Bitmap.Config.HARDWARE bitmap
+        // is drawn onto a software Canvas. Convert to software ARGB_8888 if hardware-backed.
+        var softwareBitmap: Bitmap? = null
+        val sourceBitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+            bitmap.config == Bitmap.Config.HARDWARE
+        ) {
+            try {
+                bitmap.copy(Bitmap.Config.ARGB_8888, false)?.also {
+                    softwareBitmap = it
+                } ?: bitmap
+            } catch (t: Throwable) {
+                Log.w(TAG, "Failed to copy hardware bitmap: ${t.message}")
+                bitmap
+            }
+        } else {
+            bitmap
+        }
+
         return try {
-            // Scale and draw input bitmap onto reusable 224x224 scratch bitmap
-            canvas.drawBitmap(bitmap, null, scratchRect, scratchPaint)
+            // Scale and draw source bitmap onto reusable 224x224 scratch bitmap
+            canvas.drawBitmap(sourceBitmap, null, scratchRect, scratchPaint)
             sBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
 
             buf.rewind()
@@ -198,6 +216,13 @@ object OnDeviceNsfwClassifier {
         } catch (t: Throwable) {
             Log.w(TAG, "Error during NSFW model inference: ${t.message}")
             false
+        } finally {
+            if (softwareBitmap != null && softwareBitmap != bitmap && !softwareBitmap!!.isRecycled) {
+                try {
+                    softwareBitmap!!.recycle()
+                } catch (_: Throwable) {
+                }
+            }
         }
     }
 
@@ -206,7 +231,8 @@ object OnDeviceNsfwClassifier {
      *
      * 1. Checks memory cache for instantaneous response (< 0.001 ms).
      * 2. Offloads inference to a low-priority single worker daemon thread.
-     * 3. Validates view tag before applying censorship to prevent recycling races in lists.
+     * 3. Always stores result in LRU cache so subsequent loads or scrolls hit cache immediately.
+     * 4. Validates view tag before applying censorship to prevent recycling races in lists.
      */
     fun classifyAndApplyAsync(
         imageView: ImageView,
@@ -226,17 +252,6 @@ object OnDeviceNsfwClassifier {
 
         workerExecutor.execute {
             try {
-                // If the view has already been recycled while waiting in the queue, abort early
-                val currentTag = try {
-                    imageView.getTag(R.id.coil_image_url_tag)
-                } catch (_: Throwable) {
-                    null
-                }
-
-                if (currentTag != null && currentTag != imageKey) {
-                    return@execute
-                }
-
                 val isTempBitmap = drawable !is BitmapDrawable
                 val bitmap = when (drawable) {
                     is BitmapDrawable -> drawable.bitmap
@@ -258,7 +273,12 @@ object OnDeviceNsfwClassifier {
 
                 if (isNsfw) {
                     mainHandler.post {
-                        if (imageView.getTag(R.id.coil_image_url_tag) == imageKey) {
+                        val activeTag = try {
+                            imageView.getTag(R.id.coil_image_url_tag)
+                        } catch (_: Throwable) {
+                            null
+                        }
+                        if (activeTag == imageKey) {
                             ImageLoader.applyCensoredPoster(imageView)
                         }
                     }

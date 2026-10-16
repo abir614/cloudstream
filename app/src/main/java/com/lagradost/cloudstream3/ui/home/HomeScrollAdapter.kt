@@ -17,6 +17,9 @@ import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.AppContextUtils.html
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
+import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.getImageFromDrawable
 
 class HomeScrollAdapter(
@@ -58,11 +61,17 @@ class HomeScrollAdapter(
 
         val posterUrl = item.backgroundPosterUrl ?: item.posterUrl
 
+        val isNsfw = !isNsfwGloballyEnabled() && NsfwFilterEngine.isNsfw(item)
+
         when (binding) {
             is HomeScrollViewBinding -> {
-                binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
-                    placeholder { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
-                    error { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                if (isNsfw) {
+                    applyCensoredPoster(binding.homeScrollPreview)
+                } else {
+                    binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
+                        placeholder { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                        error { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                    }
                 }
                 binding.homeScrollPreviewTags.apply {
                     text = item.tags?.joinToString(" • ") ?: ""
@@ -84,9 +93,13 @@ class HomeScrollAdapter(
                 binding.homeScrollPreview.setOnClickListener { view ->
                     callback.invoke(view ?: return@setOnClickListener, position, item)
                 }
-                binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
-                    placeholder { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
-                    error { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                if (isNsfw) {
+                    applyCensoredPoster(binding.homeScrollPreview)
+                } else {
+                    binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
+                        placeholder { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                        error { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                    }
                 }
             }
         }
