@@ -15,7 +15,7 @@ import android.util.Log
 import android.util.LruCache
 import android.widget.ImageView
 import androidx.core.graphics.drawable.toBitmap
-import com.lagradost.cloudstream3.AcraApplication.Companion.context
+import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.DeviceTier
@@ -222,7 +222,7 @@ object OnDeviceNsfwClassifier {
             return
         }
 
-        val appContext = imageView.context.applicationContext ?: context ?: return
+        val appContext = imageView.context.applicationContext ?: CloudStreamApp.context ?: return
 
         workerExecutor.execute {
             try {
