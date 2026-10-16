@@ -88,10 +88,6 @@ object ImageLoader {
         try {
             SingletonImageLoader.reset()
         } catch (_: Throwable) {
-            try {
-                SingletonImageLoader.set { buildImageLoader(context) }
-            } catch (_: Throwable) {
-            }
         }
     }
 
