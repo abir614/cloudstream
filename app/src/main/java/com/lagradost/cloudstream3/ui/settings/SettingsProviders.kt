@@ -16,6 +16,7 @@ import com.lagradost.cloudstream3.ui.settings.SettingsFragment.Companion.setUpTo
 import com.lagradost.cloudstream3.utils.AppContextUtils.getApiDubstatusSettings
 import com.lagradost.cloudstream3.utils.AppContextUtils.getApiProviderLangSettings
 import com.lagradost.cloudstream3.utils.DataStoreHelper
+import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showMultiDialog
 import com.lagradost.cloudstream3.utils.SubtitleHelper.getNameNextToFlagEmoji
 import com.lagradost.cloudstream3.utils.UIHelper.hideKeyboard
@@ -60,8 +61,8 @@ class SettingsProviders : BasePreferenceFragmentCompat() {
                 activeIndex,
                 getString(R.string.nsfw_filter_level_title),
                 true,
-                {}) {
-                val selected = prefValues[it]
+                {}) { index ->
+                val selected = prefValues[index]
                 settingsManager.edit { putString(getString(R.string.nsfw_filter_level_key), selected) }
                 com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
                 com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()

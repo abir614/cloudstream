@@ -24,7 +24,7 @@
 
     <Preference
         android:defaultValue="moderate"
-        android:icon="@drawable/baseline_security_24"
+        android:icon="@drawable/ic_baseline_tune_24"
         android:key="@string/nsfw_filter_level_key"
         android:summary="@string/nsfw_filter_level_summary"
         android:title="@string/nsfw_filter_level_title" />

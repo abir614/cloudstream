@@ -313,25 +313,23 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
         return true;
     }
 
-    if level >= LEVEL_MODERATE {
-        if lower.contains("ecchi")
+    if level >= LEVEL_MODERATE
+        && (lower.contains("ecchi")
             || lower.contains("erotica")
             || lower.contains("bikini")
             || lower.contains("swimsuit")
             || lower.contains("swimwear")
-            || lower.contains("gravure")
-        {
-            return true;
-        }
+            || lower.contains("gravure"))
+    {
+        return true;
     }
 
-    if level >= LEVEL_EXTREME {
-        if lower.contains("fanservice")
+    if level >= LEVEL_EXTREME
+        && (lower.contains("fanservice")
             || lower.contains("harem")
-            || lower.contains("microkini")
-        {
-            return true;
-        }
+            || lower.contains("microkini"))
+    {
+        return true;
     }
 
     // 4. Summer / Beach / Swimsuit contextual triggers
@@ -354,14 +352,13 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
         }
     }
 
-    if level >= LEVEL_EXTREME {
-        if lower.contains("onsen")
+    if level >= LEVEL_EXTREME
+        && (lower.contains("onsen")
             || lower.contains("bathhouse")
             || (lower.contains("hot") && lower.contains("spring"))
-            || (lower.contains("bath") && (lower.contains("girl") || lower.contains("scene") || lower.contains("special")))
-        {
-            return true;
-        }
+            || (lower.contains("bath") && (lower.contains("girl") || lower.contains("scene") || lower.contains("special"))))
+    {
+        return true;
     }
 
     // 5. Delimited token matching (words separated by whitespace, dashes, slashes, etc.)
