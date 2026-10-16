@@ -17,6 +17,7 @@ import android.widget.ImageView
 import androidx.core.graphics.drawable.toBitmap
 import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.R
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.DeviceTier
@@ -263,8 +264,12 @@ object OnDeviceNsfwClassifier {
         // Fast LRU cache hit
         val cachedScore = scoreCache.get(imageKey)
         if (cachedScore != null) {
-            if (cachedScore >= threshold && appContext.shouldCensorPosters()) {
-                ImageLoader.applyCensoredPoster(imageView)
+            if (cachedScore >= threshold) {
+                if (!appContext.isNsfwEnabled()) {
+                    imageView.setImageDrawable(null)
+                } else if (appContext.shouldCensorPosters()) {
+                    ImageLoader.applyCensoredPoster(imageView)
+                }
             }
             return
         }
@@ -291,7 +296,7 @@ object OnDeviceNsfwClassifier {
                 scoreCache.put(imageKey, score)
 
                 val activeThreshold = NsfwFilterEngine.getFilterLevel(appContext).visualThreshold
-                if (score >= activeThreshold && appContext.shouldCensorPosters()) {
+                if (score >= activeThreshold) {
                     mainHandler.post {
                         val activeTag = try {
                             imageView.getTag(R.id.coil_image_url_tag)
@@ -299,7 +304,11 @@ object OnDeviceNsfwClassifier {
                             null
                         }
                         if (activeTag == imageKey) {
-                            ImageLoader.applyCensoredPoster(imageView)
+                            if (!appContext.isNsfwEnabled()) {
+                                imageView.setImageDrawable(null)
+                            } else if (appContext.shouldCensorPosters()) {
+                                ImageLoader.applyCensoredPoster(imageView)
+                            }
                         }
                     }
                 }

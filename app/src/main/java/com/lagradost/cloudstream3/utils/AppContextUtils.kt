@@ -414,11 +414,11 @@ object AppContextUtils {
     }
 
     fun shouldCensorPosters(context: Context? = null): Boolean {
-        val ctx = context ?: CloudStreamApp.context ?: return true
+        val ctx = context ?: CloudStreamApp.context ?: return false
         val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
         val nsfwGloballyEnabled = prefs.getBoolean(ctx.getString(R.string.enable_nsfw_on_providers_key), false)
         if (!nsfwGloballyEnabled) {
-            return true
+            return false
         }
         return prefs.getBoolean(ctx.getString(R.string.censor_nsfw_posters_key), false)
     }

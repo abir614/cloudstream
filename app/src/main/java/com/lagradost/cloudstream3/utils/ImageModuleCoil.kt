@@ -36,6 +36,7 @@ import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.network.SafeDns
@@ -245,22 +246,32 @@ object ImageLoader {
             this.setImageResource(imageData); return
         }
 
-        // 1. Fast text/URL keyword pre-filter: intercept before loading over network
-        if (shouldCensorPosters(context) && imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
-            applyCensoredPoster(this)
-            return
-        }
-
-        // 2. Fast LRU AI model cache check: if already classified as NSFW by on-device model, intercept immediately!
         val imageKey = (imageData as? String) ?: imageData.toString()
-        if (shouldCensorPosters(context) && OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context)) {
-            applyCensoredPoster(this)
-            return
+        val isAdultAllowed = context.isNsfwEnabled()
+
+        // 1. Strict family safe mode: if adult content is disabled, NEVER show adult images or censored badges
+        if (!isAdultAllowed) {
+            if (imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
+                this.setImageDrawable(null)
+                return
+            }
+            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context)) {
+                this.setImageDrawable(null)
+                return
+            }
+        } else if (shouldCensorPosters(context)) {
+            // Adult content allowed AND user explicitly enabled poster censorship badge
+            if (imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
+                applyCensoredPoster(this)
+                return
+            }
+            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context)) {
+                applyCensoredPoster(this)
+                return
+            }
         }
 
-        if (shouldCensorPosters(context)) {
-            this.setTag(R.id.coil_image_url_tag, imageKey)
-        }
+        this.setTag(R.id.coil_image_url_tag, imageKey)
 
         // headers can be overridden by extensions.
         this.load(imageData, SingletonImageLoader.get(context)) {
@@ -270,21 +281,19 @@ object ImageLoader {
                     headerBuilder[key] = value
                 }
             }.build())
-            if (shouldCensorPosters(context)) {
-                listener(
-                    onSuccess = { _, result ->
-                        try {
-                            val drawable = result.image.asDrawable(context.resources)
-                            OnDeviceNsfwClassifier.classifyAndApplyAsync(
-                                imageView = this@loadImageInternal,
-                                imageKey = imageKey,
-                                drawable = drawable
-                            )
-                        } catch (_: Throwable) {
-                        }
+            listener(
+                onSuccess = { _, result ->
+                    try {
+                        val drawable = result.image.asDrawable(context.resources)
+                        OnDeviceNsfwClassifier.classifyAndApplyAsync(
+                            imageView = this@loadImageInternal,
+                            imageKey = imageKey,
+                            drawable = drawable
+                        )
+                    } catch (_: Throwable) {
                     }
-                )
-            }
+                }
+            )
             builder() // if passed
         }
     }
