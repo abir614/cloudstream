@@ -68,58 +68,6 @@ object NativeCoreBridge {
         versionCode: Long
     ): Boolean
 
-    /**
-     * Fast in-memory DEFLATE compression using Android platform zlib (backed by OS libz.so).
-     */
-    fun compressString(text: String): ByteArray? {
-        return try {
-            val bytes = text.toByteArray(Charsets.UTF_8)
-            val deflater = java.util.zip.Deflater(java.util.zip.Deflater.BEST_COMPRESSION)
-            deflater.setInput(bytes)
-            deflater.finish()
-            val baos = java.io.ByteArrayOutputStream(bytes.size)
-            val buffer = ByteArray(4096)
-            while (!deflater.finished()) {
-                val count = deflater.deflate(buffer)
-                baos.write(buffer, 0, count)
-            }
-            deflater.end()
-            baos.toByteArray()
-        } catch (_: Throwable) {
-            null
-        }
-    }
-
-    fun decompressString(bytes: ByteArray): String? {
-        return try {
-            val inflater = java.util.zip.Inflater()
-            inflater.setInput(bytes)
-            val baos = java.io.ByteArrayOutputStream(bytes.size * 2)
-            val buffer = ByteArray(4096)
-            while (!inflater.finished()) {
-                val count = inflater.inflate(buffer)
-                if (count == 0 && inflater.needsInput()) break
-                baos.write(buffer, 0, count)
-            }
-            inflater.end()
-            baos.toString(Charsets.UTF_8.name())
-        } catch (_: Throwable) {
-            null
-        }
-    }
-
-    /**
-     * NSFW text classification evaluated in pure Kotlin (zero JNI overhead).
-     */
-    fun isNsfw(title: String, url: String, tags: String? = null, level: Int = 1): Boolean {
-        val filterLevel = when (level) {
-            0 -> com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel.LOW
-            2 -> com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel.EXTREME
-            else -> com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel.MODERATE
-        }
-        return com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.isNsfwText(title, url, tags, filterLevel)
-    }
-
     // --- Native Capability-Gated WebAssembly Sandbox Execution ---
     external fun nativeRunWasmExtension(
         wasmBytes: ByteArray,

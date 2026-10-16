@@ -54,8 +54,8 @@ pub fn encrypt_backup_payload(data: &[u8], passphrase: &str) -> Result<Vec<u8>, 
     let cipher = ChaCha20Poly1305::new_from_slice(&key)
         .map_err(|e| BackupCipherError::EncryptionError(e.to_string()))?;
 
-    let nonce = Nonce::from_slice(&nonce_bytes);
-    let ciphertext = cipher.encrypt(nonce, data)
+    let nonce = Nonce::from(nonce_bytes);
+    let ciphertext = cipher.encrypt(&nonce, data)
         .map_err(|e| BackupCipherError::EncryptionError(e.to_string()))?;
 
     let mut result = Vec::with_capacity(BACKUP_MAGIC.len() + SALT_LEN + NONCE_LEN + ciphertext.len());
@@ -92,8 +92,9 @@ pub fn decrypt_backup_payload(encrypted_blob: &[u8], passphrase: &str) -> Result
     let cipher = ChaCha20Poly1305::new_from_slice(&key)
         .map_err(|e| BackupCipherError::DecryptionError(e.to_string()))?;
 
-    let nonce = Nonce::from_slice(nonce_bytes);
-    let plaintext = cipher.decrypt(nonce, ciphertext)
+    let nonce = Nonce::try_from(nonce_bytes)
+        .map_err(|e| BackupCipherError::DecryptionError(e.to_string()))?;
+    let plaintext = cipher.decrypt(&nonce, ciphertext)
         .map_err(|e| BackupCipherError::DecryptionError(e.to_string()))?;
 
     Ok(plaintext)

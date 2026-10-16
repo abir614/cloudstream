@@ -56,6 +56,8 @@ object GithubReleases {
         val tagName: String,
         /** Unique node id */
         val nodeId: String,
+        /** Git commit SHA or branch target from GitHub release */
+        val targetCommitish: String? = null,
     )
 
     private val defaultHeaders = mapOf("Accept" to "application/vnd.github.v3+json")
@@ -98,6 +100,8 @@ object GithubReleases {
 
         val apkAssets = latestRelease.assets.filter { asset ->
             asset.contentType == contentType || asset.name.endsWith(".apk")
+        }.sortedByDescending { asset ->
+            InAppUpdater.parseVersionScore(asset.name)
         }
 
         if (apkAssets.isEmpty()) {
@@ -140,7 +144,8 @@ object GithubReleases {
             displayName = latestRelease.tagName,
             changeLog = latestRelease.body,
             tagName = latestRelease.tagName,
-            nodeId = latestRelease.nodeId
+            nodeId = latestRelease.nodeId,
+            targetCommitish = latestRelease.targetCommitish
         )
     }
 }

@@ -232,24 +232,29 @@ class GithubViewModel(
             copy(dialog = baseDialog)
         }
 
+        val release = getRelease(prerelease)
+
         // If on pre-release check if the sha matches, as we do not look at the version
         var oldSha: String? = null
         var newSha: String? = null
         if (prerelease) {
-            val sha = getSha(remotePrereleaseTag)
+            val targetCommit = release.targetCommitish?.trim()
+            val sha = if (!targetCommit.isNullOrBlank() && targetCommit.matches(Regex("^[0-9a-fA-F]{7,40}$"))) {
+                targetCommit
+            } else {
+                safe { getSha(remotePrereleaseTag) } ?: targetCommit ?: ""
+            }
             oldSha = buildSha.take(7)
             newSha = sha.take(7)
 
             // Only match the first 7 chars, as that is what is saved
-            if (oldSha == newSha) {
+            if (oldSha.isNotBlank() && newSha.isNotBlank() && oldSha == newSha) {
                 updateState {
                     copy(dialog = baseDialog.copy(state = GithubUpdateDialogState.NoUpdateFound))
                 }
                 return@dispatchUpdate
             }
         }
-
-        val release = getRelease(prerelease)
 
         // If on stable, check whether remote version is strictly newer than installed version
         if (!prerelease) {

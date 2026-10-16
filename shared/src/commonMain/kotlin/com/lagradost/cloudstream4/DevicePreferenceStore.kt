@@ -211,6 +211,8 @@ class GeneralPreferences(preferences: PreferenceStore) {
 
     /** Content & Family Safety: Allow adult/NSFW 18+ content */
     val enableNsfw = preferences.getBoolean("enable_nsfw_on_providers_key", false)
+    val nsfwFilterLevel = preferences.getString("nsfw_filter_level_key", "moderate")
+    val censorNsfwPosters = preferences.getBoolean("censor_nsfw_posters_key", false)
 
     /** Default is 10 (Resilient Multi-Tier DoH) **/
     val dns = preferences.getInt("dns_key", 10)

@@ -122,8 +122,34 @@ jobs:
           cp "app/build/classes.jar" "app/build/libs/classes.jar"
         fi
 
+    - name: Clean Existing Pre-release Assets & Update Tag
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git tag -f pre-release ${{ github.sha }}
+        git push origin -f pre-release || true
+
+        # Clean old APK and checksum assets from pre-release so builds don't pile up
+        RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository }}/releases/tags/pre-release" | grep -m1 '"id":' | awk -F: '{print $2}' | tr -d ' ,')
+        if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
+          echo "Found existing pre-release ID: $RELEASE_ID. Purging older assets..."
+          ASSET_IDS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | grep '"id":' | awk -F: '{print $2}' | tr -d ' ,')
+          for aid in $ASSET_IDS; do
+            echo "Deleting asset $aid..."
+            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/releases/assets/$aid" || true
+          done
+        fi
+
     - name: Create Pre-release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         tag_name: "pre-release"

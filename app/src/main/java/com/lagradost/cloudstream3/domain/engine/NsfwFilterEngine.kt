@@ -10,23 +10,21 @@ import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
-import com.lagradost.cloudstream3.services.NativeCoreBridge
 import com.lagradost.cloudstream3.ui.APIRepository
 
 /**
  * Configurable Content Safety Sensitivity Levels:
- * - EXTREME (0.12f / native 2): Maximum sensitivity strict family shield.
- * - MODERATE (0.26f / native 1): Default balanced family level.
- * - LOW (0.55f / native 0): Hardcore adult content only.
+ * - EXTREME (0.12f): Maximum sensitivity strict family shield.
+ * - MODERATE (0.26f): Default balanced family level.
+ * - LOW (0.55f): Hardcore adult content only.
  */
 enum class NsfwFilterLevel(
     val key: String,
-    val visualThreshold: Float,
-    val nativeLevel: Int
+    val visualThreshold: Float
 ) {
-    LOW("low", 0.55f, 0),
-    MODERATE("moderate", 0.26f, 1),
-    EXTREME("extreme", 0.12f, 2);
+    LOW("low", 0.55f),
+    MODERATE("moderate", 0.26f),
+    EXTREME("extreme", 0.12f);
 
     companion object {
         fun fromString(value: String?): NsfwFilterLevel {
@@ -97,6 +95,8 @@ object NsfwFilterEngine {
     private val CJK_EXTREME = arrayOf(
         "混浴", "温泉", "お風呂", "ハーレム", "お色気", "水着回", "盗撮"
     )
+
+    private val TOKEN_SPLIT_REGEX = Regex("[^a-z0-9+]+")
 
     /**
      * Resolves the user's active filter sensitivity level.
@@ -185,7 +185,7 @@ object NsfwFilterEngine {
         }
 
         // 4. Delimited token matching (words separated by punctuation/spaces)
-        val tokens = lower.split(Regex("[^a-z0-9+]+"))
+        val tokens = lower.split(TOKEN_SPLIT_REGEX)
         for (token in tokens) {
             if (token.isEmpty()) continue
             if (HARDCORE_KEYWORDS.contains(token)) return true

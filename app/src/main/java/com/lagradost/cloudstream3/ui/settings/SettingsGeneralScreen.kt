@@ -244,6 +244,34 @@ object SettingsGeneralScreen : SearchableSettings {
                         preference = settings.general.enableNsfw,
                         onValueChanged = { enabled ->
                             com.lagradost.cloudstream3.MainAPI.settingsForProvider.enableAdult = enabled
+                            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
+                            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+                            true
+                        }
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        title = stringResource(R.string.nsfw_filter_level_title),
+                        subtitle = "%s",
+                        icon = painterResource(R.drawable.ic_baseline_tune_24),
+                        preference = settings.general.nsfwFilterLevel,
+                        entries = mapOf(
+                            "extreme" to "Extreme (Maximum Sensitivity - Strict Family Shield)",
+                            "moderate" to "Moderate (Medium Sensitivity - Family Level, Recommended)",
+                            "low" to "Low (Lowest Filtering - Hardcore Only)"
+                        ),
+                        onValueChanged = {
+                            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
+                            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+                            true
+                        }
+                    ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        title = stringResource(R.string.censor_nsfw_posters_title),
+                        subtitle = stringResource(R.string.censor_nsfw_posters_summary),
+                        icon = painterResource(R.drawable.ic_baseline_warning_24),
+                        preference = settings.general.censorNsfwPosters,
+                        onValueChanged = {
+                            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
                             com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
                             true
                         }

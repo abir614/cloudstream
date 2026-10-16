@@ -32,19 +32,42 @@ abstract class GenerateGitHashTask : DefaultTask() {
     fun generate() {
         val head = headFile.get().asFile
 
-        val hash = try {
-            if (head.exists()) {
-                // Read the commit hash from .git/HEAD
-                val headContent = head.readText().trim()
-                if (headContent.startsWith("ref:")) {
-                    val refPath = headContent.substring(5) // e.g., refs/heads/main
-                    val commitFile = File(head.parentFile, refPath)
-                    if (commitFile.exists()) commitFile.readText().trim() else ""
-                } else headContent // If it's a detached HEAD (commit hash directly)
-            } else "" // If .git/HEAD doesn't exist
-        } catch (_: Throwable) {
-            "" // Just set to an empty string if any exception occurs
-        }.take(7) // Get the short commit hash
+        val envSha = System.getenv("GITHUB_SHA")
+        val hash = (if (!envSha.isNullOrBlank()) {
+            envSha.trim().take(7)
+        } else {
+            try {
+                if (head.exists()) {
+                    val headContent = head.readText().trim()
+                    if (headContent.startsWith("ref:")) {
+                        val refPath = headContent.substring(5).trim()
+                        val commitFile = File(head.parentFile, refPath)
+                        if (commitFile.exists()) {
+                            commitFile.readText().trim().take(7)
+                        } else {
+                            val packedFile = File(head.parentFile, "packed-refs")
+                            if (packedFile.exists()) {
+                                packedFile.readLines().firstOrNull { it.endsWith(refPath) }
+                                    ?.split(' ')?.firstOrNull()?.trim()?.take(7) ?: ""
+                            } else ""
+                        }
+                    } else {
+                        headContent.take(7)
+                    }
+                } else ""
+            } catch (_: Throwable) {
+                ""
+            }
+        }).ifBlank {
+            try {
+                providers.exec {
+                    commandLine("git", "rev-parse", "--short=7", "HEAD")
+                    isIgnoreExitValue = true
+                }.standardOutput.asText.get().trim()
+            } catch (_: Throwable) {
+                ""
+            }
+        }
 
         val outFile = outputDir.file("git-hash.txt").get().asFile
         outFile.parentFile.mkdirs()

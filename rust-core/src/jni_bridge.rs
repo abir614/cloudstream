@@ -187,12 +187,6 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     }
 }
 
-
-
-
-
-
-
 /// JNI bridge to run a capability-gated WebAssembly extension in native Rust.
 /// Returns a JSON string with format:
 /// {"success": bool, "logs": [String], "error": String?}
@@ -279,8 +273,6 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Err(_) => std::ptr::null_mut(),
     }
 }
-
-
 
 /// JNI bridge to verify an offline Ed25519 signature on an update manifest or artifact
 #[no_mangle]
@@ -400,5 +392,3 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
 
     if crate::crypto::backup_cipher::is_encrypted_backup(&data) { 1 } else { 0 }
 }
-
-

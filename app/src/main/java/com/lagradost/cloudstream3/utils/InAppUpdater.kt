@@ -186,6 +186,8 @@ object InAppUpdater {
         val found = foundList.lastOrNull() ?: return Update(false, null, null, null, null)
         val apkAssets = found.assets.filter {
             it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk")
+        }.sortedByDescending { asset ->
+            parseVersionScore(extractVersionFromFileName(asset.name))
         }
 
         if (apkAssets.isEmpty()) {
@@ -253,8 +255,10 @@ object InAppUpdater {
             rel.prerelease || rel.tagName == "pre-release"
         } ?: return Update(false, null, null, null, null)
 
-        val apkAssets = found.assets.filter { it ->
+        val apkAssets = found.assets.filter {
             it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk")
+        }.sortedByDescending { asset ->
+            parseVersionScore(extractVersionFromFileName(asset.name))
         }
 
         if (apkAssets.isEmpty()) {
@@ -272,8 +276,12 @@ object InAppUpdater {
         } ?: apkAssets.firstOrNull { it.name.contains("universal") }
           ?: apkAssets.first()
 
+        val releaseCommitSha = if (found.targetCommitish.matches(Regex("^[0-9a-fA-F]{7,40}$"))) {
+            found.targetCommitish.trim().take(7)
+        } else null
+
         val tagHttp = app.get(tagUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
-        val updateCommitHash = if (tagHttp.isSuccessful) {
+        val tagCommitSha = if (tagHttp.isSuccessful) {
             try {
                 val tagResponse = parseJson<GithubTag>(tagHttp.text)
                 tagResponse.githubObject.sha.trim().take(7)
@@ -283,13 +291,22 @@ object InAppUpdater {
         } else {
             Log.w(LOG_TAG, "GitHub pre-release tag request returned HTTP ${tagHttp.code}")
             null
-        } ?: found.targetCommitish.take(7)
+        }
 
-        Log.d(LOG_TAG, "Fetched GitHub tag: $updateCommitHash")
+        val updateCommitHash = releaseCommitSha ?: tagCommitSha ?: found.targetCommitish.take(7)
+
+        Log.d(LOG_TAG, "Resolved pre-release target commit hash: $updateCommitHash")
+
+        val currentHash = currentCommitHash()
+        val shouldUpdate = if (currentHash.isNotBlank() && updateCommitHash.isNotBlank()) {
+            currentHash != updateCommitHash
+        } else {
+            false
+        }
 
         val expectedSha256 = extractExpectedSha256(found.assets, foundAsset.name)
         return Update(
-            currentCommitHash() != updateCommitHash,
+            shouldUpdate,
             foundAsset.browserDownloadUrl,
             updateCommitHash,
             found.body,
