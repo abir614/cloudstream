@@ -25,7 +25,7 @@ import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.insecureApp
-import com.lagradost.cloudstream3.network.UnsafeSSL
+import com.lagradost.cloudstream3.UnsafeSSL
 import com.lagradost.cloudstream3.databinding.AddRemoveSitesBinding
 import com.lagradost.cloudstream3.databinding.AddSiteInputBinding
 import com.lagradost.cloudstream3.mvvm.logError
