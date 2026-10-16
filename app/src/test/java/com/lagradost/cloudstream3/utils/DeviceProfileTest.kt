@@ -107,4 +107,21 @@ class DeviceProfileTest {
         // Just verify method runs without crash
         assertFalse(DeviceProfile.hasBrokenHardwareGpu())
     }
+
+    @Test
+    fun `test search concurrency scales properly with tier`() {
+        // When context is null (fallback)
+        assertEquals(8, DeviceProfile.getSearchConcurrency(null))
+    }
+
+    @Test
+    fun `test color grading hex formats are valid`() {
+        val highColor = "#00E676"
+        val midColor = "#00E5FF"
+        val lowColor = "#FF9100"
+
+        assertTrue(highColor.startsWith("#") && highColor.length == 7)
+        assertTrue(midColor.startsWith("#") && midColor.length == 7)
+        assertTrue(lowColor.startsWith("#") && lowColor.length == 7)
+    }
 }

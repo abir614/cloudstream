@@ -24,6 +24,8 @@ import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.insecureApp
+import com.lagradost.cloudstream3.network.UnsafeSSL
 import com.lagradost.cloudstream3.databinding.AddRemoveSitesBinding
 import com.lagradost.cloudstream3.databinding.AddSiteInputBinding
 import com.lagradost.cloudstream3.mvvm.logError
@@ -381,8 +383,10 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
                 settingsManager.edit { putString(getString(R.string.performance_profile_key), selected) }
                 (context ?: CloudStreamApp.context)?.let { ctx ->
                     com.lagradost.cloudstream3.utils.DeviceProfile.resetCache()
-                    com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
-                    app.initClient(ctx)
+                    com.lagradost.cloudstream3.utils.ImageLoader.reconfigure(ctx)
+                    app.initClient(ctx, ignoreSSL = false)
+                    @OptIn(UnsafeSSL::class)
+                    insecureApp.initClient(ctx, ignoreSSL = true)
                 }
                 updatePerformanceProfileSummary()
             }
@@ -506,8 +510,8 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
             val index = prefValues.indexOf(currentProfile).coerceAtLeast(0)
             val label = prefNames.getOrNull(index) ?: currentProfile
             val summary = com.lagradost.cloudstream3.utils.DeviceProfile.getHardwareSummary(ctx)
-            val statusText = if (currentProfile == "auto") "Active" else "Forced"
-            getPref(R.string.performance_profile_key)?.summary = "$label ($statusText: $summary)"
+            val statusText = if (currentProfile == "auto") "Adaptive" else "Manual Override"
+            getPref(R.string.performance_profile_key)?.summary = "$label ($statusText)\n$summary"
         }
     }
 

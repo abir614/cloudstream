@@ -18,6 +18,8 @@ import com.lagradost.cloudstream3.mvvm.launchSafe
 import com.lagradost.cloudstream3.ui.APIRepository
 import com.lagradost.cloudstream3.ui.home.HomeViewModel
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.CloudStreamApp
+import com.lagradost.cloudstream3.utils.DeviceProfile
 
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
@@ -291,12 +293,8 @@ class SearchViewModel : ViewModel() {
             lastQuery = query
 
             withContext(Dispatchers.IO) { // This interrupts UI otherwise
-                // Adaptive hardware concurrency gate based on available device JVM heap RAM
-                val maxConcurrent = when {
-                    Runtime.getRuntime().maxMemory() <= 192 * 1024 * 1024L -> 4 // <= 192MB JVM heap (1GB RAM potato devices)
-                    Runtime.getRuntime().maxMemory() <= 384 * 1024 * 1024L -> 6 // mid-tier TV sticks / phones
-                    else -> 10 // modern high-end devices
-                }
+                // Adaptive hardware concurrency gate driven by centralized DeviceProfile
+                val maxConcurrent = DeviceProfile.getSearchConcurrency(CloudStreamApp.context)
                 val semaphore = Semaphore(maxConcurrent)
 
                 val nsfwEnabled = isNsfwGloballyEnabled()

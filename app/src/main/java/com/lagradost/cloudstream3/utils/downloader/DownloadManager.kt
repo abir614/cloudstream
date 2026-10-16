@@ -132,16 +132,21 @@ object VideoDownloadManager {
      * - <= 384MB JVM heap (mid-range phones/TV sticks): 25MB limit
      * - <= 512MB JVM heap (standard devices): 50MB limit
      * - > 512MB JVM heap (flagships, 8-16GB RAM): 80MB limit (saturates Gigabit Wi-Fi 6 / 5G)
-     */
-    val maxPendingBytesLimit: Long by lazy {
-        val maxHeap = Runtime.getRuntime().maxMemory()
-        when {
-            maxHeap <= 192 * 1024 * 1024L -> 10_000_000L
-            maxHeap <= 384 * 1024 * 1024L -> 25_000_000L
-            maxHeap <= 512 * 1024 * 1024L -> 50_000_000L
-            else -> 80_000_000L
+    val maxPendingBytesLimit: Long
+        get() {
+            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
+            return if (ctx != null) {
+                com.lagradost.cloudstream3.utils.DeviceProfile.getDownloadBufferLimit(ctx)
+            } else {
+                val maxHeap = Runtime.getRuntime().maxMemory()
+                when {
+                    maxHeap <= 192 * 1024 * 1024L -> 10_000_000L
+                    maxHeap <= 384 * 1024 * 1024L -> 25_000_000L
+                    maxHeap <= 512 * 1024 * 1024L -> 50_000_000L
+                    else -> 80_000_000L
+                }
+            }
         }
-    }
 
     private const val USER_AGENT =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Safari/537.36"

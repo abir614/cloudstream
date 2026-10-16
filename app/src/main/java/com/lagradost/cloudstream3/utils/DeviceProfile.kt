@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.R
+import java.io.File
 
 enum class DeviceTier {
     LOW,
@@ -38,10 +39,18 @@ data class CoilTierConfig(
     val useRgb565: Boolean
 )
 
+data class SocMetadata(
+    val name: String,
+    val brand: String,
+    val defaultTier: DeviceTier,
+    val colorHex: String,
+    val badge: String
+)
+
 /**
  * Centralized Hardware-Adaptive Profile Engine.
- * Dynamically computes device capability tier (LOW, MID, HIGH) based on total system RAM,
- * Android Go low-RAM device status, and 64-bit architecture support.
+ * Dynamically computes device capability tier (LOW, MID, HIGH) based on SoC chipset architecture,
+ * total system RAM, Android Go low-RAM status, 64-bit support, and battery optimization state.
  * Drives network concurrency, player buffers, image caching, and UI animations.
  */
 object DeviceProfile {
@@ -210,7 +219,9 @@ object DeviceProfile {
         "exynos 2500", "exynos 2400", "exynos 2200", "exynos 2100", "exynos 990", "exynos 9825", "exynos 9820",
         "s5e9945", "s5e9925", "s5e9815", "s5e9830", "s5e9820",
         // Nvidia Tegra (Shield TV / Pro)
-        "tegra", "tegra210", "foster", "darcy", "mdarcy"
+        "tegra", "tegra210", "foster", "darcy", "mdarcy",
+        // PC / Laptop / Desktop Processor
+        "intel", "amd", "ryzen", "core(tm)", "apple"
     )
 
     private val KNOWN_MID_CHIPS = listOf(
@@ -250,6 +261,28 @@ object DeviceProfile {
         "s922x", "a311d", "s905x4", "s905x3", "s905x2", "t962e", "t968"
     )
 
+    private fun getCpuInfoString(): String {
+        return try {
+            val file = File("/proc/cpuinfo")
+            if (file.exists() && file.canRead()) {
+                file.useLines { lines ->
+                    for (line in lines) {
+                        if (line.startsWith("Hardware", ignoreCase = true) || line.startsWith("model name", ignoreCase = true)) {
+                            val parts = line.split(":")
+                            if (parts.size >= 2) {
+                                val candidate = parts[1].trim()
+                                if (candidate.isNotEmpty()) return candidate
+                            }
+                        }
+                    }
+                }
+            }
+            ""
+        } catch (_: Throwable) {
+            ""
+        }
+    }
+
     fun hasBrokenHardwareGpu(): Boolean {
         val hardware = Build.HARDWARE?.lowercase() ?: ""
         val board = Build.BOARD?.lowercase() ?: ""
@@ -280,35 +313,225 @@ object DeviceProfile {
         }
     }
 
-    fun getHardwareSummary(ctx: Context): String {
+    fun getSocInfo(ctx: Context): SocMetadata {
+        val hardware = Build.HARDWARE?.lowercase() ?: ""
+        val board = Build.BOARD?.lowercase() ?: ""
+        val model = Build.MODEL?.lowercase() ?: ""
+        val manufacturer = Build.MANUFACTURER?.lowercase() ?: ""
+        val product = Build.PRODUCT?.lowercase() ?: ""
+        val device = Build.DEVICE?.lowercase() ?: ""
+        val soc = if (Build.VERSION.SDK_INT >= 31) {
+            "${Build.SOC_MODEL?.lowercase() ?: ""} ${Build.SOC_MANUFACTURER?.lowercase() ?: ""}"
+        } else ""
+        val cpuInfo = getCpuInfoString().lowercase()
+
+        val id = "$hardware $board $model $manufacturer $product $device $soc $cpuInfo"
+
+        return when {
+            // Qualcomm Flagships
+            id.contains("sm8750") || id.contains("8 elite") || id.contains("8 gen 4") ->
+                SocMetadata("Snapdragon 8 Elite", "Qualcomm Snapdragon", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("sm8650") || id.contains("8 gen 3") ->
+                SocMetadata("Snapdragon 8 Gen 3", "Qualcomm Snapdragon", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("sm8550") || id.contains("8 gen 2") ->
+                SocMetadata("Snapdragon 8 Gen 2", "Qualcomm Snapdragon", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("sm8475") || id.contains("8+ gen 1") ->
+                SocMetadata("Snapdragon 8+ Gen 1", "Qualcomm Snapdragon", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("sm8450") || id.contains("8 gen 1") ->
+                SocMetadata("Snapdragon 8 Gen 1", "Qualcomm Snapdragon", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("sm8350") || id.contains("888") ->
+                SocMetadata("Snapdragon 888", "Qualcomm Snapdragon", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("sm8250") || id.contains("870") || id.contains("865") ->
+                SocMetadata("Snapdragon 865 / 870", "Qualcomm Snapdragon", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("sm7675") || id.contains("7+ gen 3") ->
+                SocMetadata("Snapdragon 7+ Gen 3", "Qualcomm Snapdragon", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("sm7475") || id.contains("7+ gen 2") ->
+                SocMetadata("Snapdragon 7+ Gen 2", "Qualcomm Snapdragon", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+
+            // Qualcomm Midrange
+            id.contains("sm7550") || id.contains("7 gen 3") ->
+                SocMetadata("Snapdragon 7 Gen 3", "Qualcomm Snapdragon", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("sm7435") || id.contains("7s gen 2") ->
+                SocMetadata("Snapdragon 7s Gen 2", "Qualcomm Snapdragon", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("sm7325") || id.contains("778g") ->
+                SocMetadata("Snapdragon 778G", "Qualcomm Snapdragon", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("sm6375") || id.contains("695") ->
+                SocMetadata("Snapdragon 695 5G", "Qualcomm Snapdragon", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("sm6225") || id.contains("680") || id.contains("685") ->
+                SocMetadata("Snapdragon 680 / 685", "Qualcomm Snapdragon", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("snapdragon") || id.contains("qcom") || id.contains("qualcomm") ->
+                SocMetadata("Qualcomm Snapdragon", "Qualcomm Snapdragon", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+
+            // MediaTek Flagships
+            id.contains("dimensity 9400") || id.contains("dimensity 9300") || id.contains("dimensity 9200") || id.contains("mt69") ->
+                SocMetadata("Dimensity 9000 Series", "MediaTek Dimensity", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("dimensity 8300") || id.contains("dimensity 8200") || id.contains("dimensity 8100") || id.contains("mt689") ->
+                SocMetadata("Dimensity 8000 Series", "MediaTek Dimensity", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+
+            // MediaTek Midrange & Helio G
+            id.contains("g100") ->
+                SocMetadata("Helio G100 Ultimate", "MediaTek Helio", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("g99") || id.contains("mt6789") ->
+                SocMetadata("Helio G99 / G100", "MediaTek Helio", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("dimensity 7") || id.contains("mt687") ->
+                SocMetadata("Dimensity 7000 Series", "MediaTek Dimensity", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("dimensity 6") || id.contains("mt683") ->
+                SocMetadata("Dimensity 6000 Series", "MediaTek Dimensity", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("dimensity") ->
+                SocMetadata("MediaTek Dimensity", "MediaTek Dimensity", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("helio g") || id.contains("mt6769") || id.contains("mt6785") ->
+                SocMetadata("MediaTek Helio G-Series", "MediaTek Helio", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+
+            // Google Tensor
+            id.contains("tensor g4") ->
+                SocMetadata("Google Tensor G4", "Google Tensor", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("tensor g3") ->
+                SocMetadata("Google Tensor G3", "Google Tensor", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("tensor g2") ->
+                SocMetadata("Google Tensor G2", "Google Tensor", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("tensor") || id.contains("gs101") || id.contains("gs201") || id.contains("zuma") ->
+                SocMetadata("Google Tensor", "Google Tensor", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+
+            // Samsung Exynos
+            id.contains("exynos 2500") || id.contains("exynos 2400") || id.contains("exynos 2200") || id.contains("s5e99") ->
+                SocMetadata("Samsung Exynos Flagship", "Samsung Exynos", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("exynos 1480") || id.contains("exynos 1380") || id.contains("s5e88") ->
+                SocMetadata("Samsung Exynos Midrange", "Samsung Exynos", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("exynos") ->
+                SocMetadata("Samsung Exynos", "Samsung Exynos", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+
+            // Nvidia Tegra
+            id.contains("tegra") || id.contains("foster") || id.contains("darcy") ->
+                SocMetadata("Nvidia Tegra X1 (Shield TV)", "NVIDIA Tegra", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+
+            // Unisoc
+            id.contains("t820") || id.contains("t770") || id.contains("t760") ->
+                SocMetadata("Unisoc T800 Series", "Unisoc", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("t618") || id.contains("t616") || id.contains("t612") || id.contains("t610") || id.contains("ums9230") ->
+                SocMetadata("Unisoc T600 Series", "Unisoc", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("sc9863") || id.contains("sc7731") || id.contains("sprd") ->
+                SocMetadata("Unisoc Entry / Spreadtrum", "Unisoc", DeviceTier.LOW, "#FF9100", "🔋 POWER SAVE")
+
+            // Rockchip
+            id.contains("rk3588") ->
+                SocMetadata("Rockchip RK3588 Octa-Core", "Rockchip", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("rk3566") || id.contains("rk3568") || id.contains("rk3399") ->
+                SocMetadata("Rockchip RK356x Quad-Core", "Rockchip", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("rk3128") || id.contains("rk3229") || id.contains("rk3328") || id.contains("rk3528") ->
+                SocMetadata("Rockchip Budget TV Chip", "Rockchip", DeviceTier.LOW, "#FF9100", "🔋 POWER SAVE")
+
+            // Amlogic
+            id.contains("s922x") || id.contains("a311d") || id.contains("s905x4") ->
+                SocMetadata("Amlogic S900 Series", "Amlogic", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            id.contains("s905") || id.contains("s805") || id.contains("meson") ->
+                SocMetadata("Amlogic Budget TV Chip", "Amlogic", DeviceTier.LOW, "#FF9100", "🔋 POWER SAVE")
+
+            // Allwinner
+            id.contains("h616") || id.contains("h618") || id.contains("h713") || id.contains("h313") || id.contains("allwinner") || id.contains("sun50i") || id.contains("sunxi") ->
+                SocMetadata("Allwinner Quad-Core TV Chip", "Allwinner", DeviceTier.LOW, "#FF9100", "🔋 POWER SAVE")
+
+            // Intel / AMD Desktop & Laptop
+            id.contains("intel") || id.contains("core(tm)") ->
+                SocMetadata("Intel Core Processor", "Intel", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+            id.contains("amd") || id.contains("ryzen") ->
+                SocMetadata("AMD Ryzen Processor", "AMD", DeviceTier.HIGH, "#00E676", "⚡ BOOSTED")
+
+            // Generic fallback
+            else -> {
+                val candidate = if (Build.VERSION.SDK_INT >= 31 && !Build.SOC_MODEL.isNullOrBlank()) {
+                    Build.SOC_MODEL
+                } else if (!Build.HARDWARE.isNullOrBlank()) {
+                    Build.HARDWARE
+                } else if (!Build.BOARD.isNullOrBlank()) {
+                    Build.BOARD
+                } else if (cpuInfo.isNotEmpty()) {
+                    cpuInfo
+                } else {
+                    "Generic Multi-Core"
+                }
+                SocMetadata(candidate, "SoC", DeviceTier.MID, "#00E5FF", "⚙️ BALANCED")
+            }
+        }
+    }
+
+    fun getSocDisplayName(ctx: Context): String = getSocInfo(ctx).name
+
+    fun getProfileBadge(ctx: Context): String {
+        val currentTier = tier(ctx)
+        val isBatteryUnrestricted = !BatteryOptimizationChecker.isAppRestricted(ctx)
+        return when (currentTier) {
+            DeviceTier.HIGH -> if (isBatteryUnrestricted) "⚡ BOOSTED" else "⚡ HIGH PERFORMANCE"
+            DeviceTier.MID -> "⚙️ BALANCED"
+            DeviceTier.LOW -> "🔋 POWER SAVE"
+        }
+    }
+
+    fun getProfileColorHex(ctx: Context): String {
+        return when (tier(ctx)) {
+            DeviceTier.HIGH -> "#00E676" // Vibrant Emerald Green
+            DeviceTier.MID -> "#00E5FF"  // Electric Cyan
+            DeviceTier.LOW -> "#FF9100"  // Sunset Warm Amber
+        }
+    }
+
+    fun getProfileColorInt(ctx: Context): Int {
         return try {
-            val currentTier = tier(ctx)
+            android.graphics.Color.parseColor(getProfileColorHex(ctx))
+        } catch (_: Throwable) {
+            android.graphics.Color.CYAN
+        }
+    }
+
+    fun getSearchConcurrency(ctx: Context?): Int {
+        if (ctx == null) return 8
+        return when (tier(ctx)) {
+            DeviceTier.HIGH -> 16
+            DeviceTier.MID -> 8
+            DeviceTier.LOW -> 3
+        }
+    }
+
+    fun getDownloadBufferLimit(ctx: Context): Long {
+        return when (tier(ctx)) {
+            DeviceTier.HIGH -> 80_000_000L  // 80 MB
+            DeviceTier.MID -> 35_000_000L   // 35 MB
+            DeviceTier.LOW -> 10_000_000L   // 10 MB
+        }
+    }
+
+    fun getTotalRamMb(ctx: Context): Long {
+        return try {
             val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
             val mi = ActivityManager.MemoryInfo()
-            val totalMb = if (am != null) {
+            if (am != null) {
                 am.getMemoryInfo(mi)
                 mi.totalMem / (1024 * 1024)
             } else {
                 Runtime.getRuntime().maxMemory() / (1024 * 1024)
             }
-            val cores = Runtime.getRuntime().availableProcessors()
-            val soc = if (Build.VERSION.SDK_INT >= 31 && !Build.SOC_MODEL.isNullOrBlank()) {
-                Build.SOC_MODEL
-            } else if (!Build.HARDWARE.isNullOrBlank()) {
-                Build.HARDWARE
-            } else {
-                Build.BOARD ?: "Generic"
-            }
-            val tierLabel = when (currentTier) {
-                DeviceTier.LOW -> "Power Safe / Potato"
-                DeviceTier.MID -> "Balanced / Standard"
-                DeviceTier.HIGH -> "High Performance / Boosted"
-            }
-            val isBatteryUnrestricted = !BatteryOptimizationChecker.isAppRestricted(ctx)
-            val batteryLabel = if (isBatteryUnrestricted) "Unrestricted (Boosted)" else "Optimized (Balanced)"
-            "$tierLabel • ${totalMb} MB RAM • $cores Cores • Battery: $batteryLabel • SoC: $soc"
         } catch (_: Throwable) {
-            "Standard Profile"
+            1024L
+        }
+    }
+
+    fun getHardwareSummary(ctx: Context): String {
+        return try {
+            val currentTier = tier(ctx)
+            val socInfo = getSocInfo(ctx)
+            val totalMb = getTotalRamMb(ctx)
+            val cores = Runtime.getRuntime().availableProcessors()
+            val badge = getProfileBadge(ctx)
+            val isBatteryUnrestricted = !BatteryOptimizationChecker.isAppRestricted(ctx)
+            val batteryLabel = if (isBatteryUnrestricted) "Unrestricted (Boosted)" else "Optimized (Power Saver)"
+            val hwMode = when (currentTier) {
+                DeviceTier.HIGH -> "Full Hardware Acceleration • 128MB Buffers"
+                DeviceTier.MID -> "Standard Hardware Acceleration • 48MB Buffers"
+                DeviceTier.LOW -> "Potato Safe Mode • RGB_565 50% RAM Save • 12MB Buffers"
+            }
+
+            "[$badge] ${socInfo.name} • ${totalMb} MB RAM ($cores Cores)\nBattery: $batteryLabel • $hwMode"
+        } catch (_: Throwable) {
+            "[⚙️ BALANCED] Standard Profile"
         }
     }
 
@@ -329,23 +552,18 @@ object DeviceProfile {
             val soc = if (Build.VERSION.SDK_INT >= 31) {
                 "${Build.SOC_MODEL?.lowercase() ?: ""} ${Build.SOC_MANUFACTURER?.lowercase() ?: ""}"
             } else ""
+            val cpuInfo = getCpuInfoString().lowercase()
 
-            val socIdentifier = "$hardware $board $model $manufacturer $product $device $soc"
+            val socIdentifier = "$hardware $board $model $manufacturer $product $device $soc $cpuInfo"
 
             val isLowChip = KNOWN_LOW_CHIPS.any { it in socIdentifier }
             val isFlagshipChip = KNOWN_FLAGSHIP_CHIPS.any { it in socIdentifier }
             val isMidChip = KNOWN_MID_CHIPS.any { it in socIdentifier }
 
+            val totalMb = getTotalRamMb(ctx)
             val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-            val mi = ActivityManager.MemoryInfo()
-            val totalMb = if (am != null) {
-                am.getMemoryInfo(mi)
-                mi.totalMem / (1024 * 1024)
-            } else {
-                Runtime.getRuntime().maxMemory() / (1024 * 1024)
-            }
             val isLowRam = am?.isLowRamDevice ?: false
-            val has64Bit = Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()
+            val has64Bit = try { Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() ?: true } catch (_: Throwable) { true }
             val cores = Runtime.getRuntime().availableProcessors()
             val isBrokenGpu = hasBrokenHardwareGpu()
 

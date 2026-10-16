@@ -210,9 +210,9 @@ object SettingsGeneralScreen : SearchableSettings {
                             val selectedLabel = entries[value] ?: value
                             val summary = DeviceProfile.getHardwareSummary(context)
                             if (value == "auto") {
-                                "$selectedLabel\n(Active: $summary)"
+                                "$selectedLabel (Adaptive)\n$summary"
                             } else {
-                                "$selectedLabel\n(Forced: $summary)"
+                                "$selectedLabel (Manual Override)\n$summary"
                             }
                         },
                         icon = painterResource(R.drawable.memory_24px),
@@ -223,7 +223,7 @@ object SettingsGeneralScreen : SearchableSettings {
                         onValueChanged = {
                             (CloudStreamApp.context ?: context).let { ctx ->
                                 DeviceProfile.resetCache()
-                                ImageLoader.resetImageClient()
+                                ImageLoader.reconfigure(ctx)
                                 app.initClient(ctx, ignoreSSL = false)
                                 @OptIn(UnsafeSSL::class)
                                 insecureApp.initClient(ctx, ignoreSSL = true)

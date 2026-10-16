@@ -78,6 +78,23 @@ object ImageLoader {
         }
     }
 
+    internal fun reconfigure(context: PlatformContext) {
+        resetImageClient()
+        evictConnections()
+        try {
+            SingletonImageLoader.get(context).memoryCache?.clear()
+        } catch (_: Throwable) {
+        }
+        try {
+            SingletonImageLoader.reset()
+        } catch (_: Throwable) {
+            try {
+                SingletonImageLoader.set(buildImageLoader(context))
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
     private fun buildImageHttpClient(context: PlatformContext): OkHttpClient {
         val tier = DeviceProfile.tier(context)
         val dispatcher = Dispatcher().apply {
