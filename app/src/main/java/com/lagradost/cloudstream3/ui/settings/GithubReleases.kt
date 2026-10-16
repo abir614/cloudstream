@@ -3,6 +3,7 @@ package com.lagradost.cloudstream3.ui.settings
 import androidx.compose.runtime.Immutable
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.utils.InAppUpdater
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.jvm.Throws
@@ -100,9 +101,9 @@ object GithubReleases {
 
         val apkAssets = latestRelease.assets.filter { asset ->
             asset.contentType == contentType || asset.name.endsWith(".apk")
-        }.sortedByDescending { asset ->
+        }.sortedWith(compareByDescending { asset ->
             InAppUpdater.parseVersionScore(asset.name)
-        }
+        })
 
         if (apkAssets.isEmpty()) {
             return null

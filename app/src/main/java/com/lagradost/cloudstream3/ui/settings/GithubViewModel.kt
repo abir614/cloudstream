@@ -242,7 +242,11 @@ class GithubViewModel(
             val sha = if (!targetCommit.isNullOrBlank() && targetCommit.matches(Regex("^[0-9a-fA-F]{7,40}$"))) {
                 targetCommit
             } else {
-                safe { getSha(remotePrereleaseTag) } ?: targetCommit ?: ""
+                try {
+                    getSha(remotePrereleaseTag)
+                } catch (_: Throwable) {
+                    targetCommit ?: ""
+                }
             }
             oldSha = buildSha.take(7)
             newSha = sha.take(7)
