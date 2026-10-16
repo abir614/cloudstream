@@ -140,10 +140,10 @@ object NsfwFilterEngine {
             return true
         }
 
-        // 2. If row items contain adult content
+        // 2. If row items predominantly contain adult content
         if (items.isNotEmpty()) {
             val nsfwCount = items.count { isNsfw(it) }
-            if (nsfwCount > 0 && (nsfwCount * 3 >= items.size || nsfwCount >= 2)) {
+            if (nsfwCount > 0 && (nsfwCount * 2 >= items.size || (items.size >= 4 && nsfwCount * 3 >= items.size))) {
                 return true
             }
         }
