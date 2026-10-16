@@ -122,13 +122,17 @@ jobs:
           cp "app/build/classes.jar" "app/build/libs/classes.jar"
         fi
 
-    - name: Create pre-release
-      uses: marvinpinto/action-automatic-releases@latest
+    - name: Create Pre-release
+      uses: softprops/action-gh-release@v2
       with:
-        repo_token: "${{ secrets.GITHUB_TOKEN }}"
-        automatic_release_tag: "pre-release"
+        token: ${{ secrets.GITHUB_TOKEN }}
+        tag_name: "pre-release"
+        target_commitish: ${{ github.sha }}
+        name: "Pre-release Build #${{ steps.build_count.outputs.count }}"
         prerelease: true
-        title: "Pre-release Build #${{ steps.build_count.outputs.count }}"
+        generate_release_notes: true
+        make_latest: false
+        fail_on_unmatched_files: false
         files: |
           app/build/outputs/apk/prerelease/release/*.apk
           app/build/outputs/apk/prerelease/release/SHA256SUMS*

@@ -1,0 +1,4 @@
+[advisories]
+ignore = [
+    "RUSTSEC-2024-0436", # paste is an unmaintained compile-time proc-macro used by wasmi_core
+]
