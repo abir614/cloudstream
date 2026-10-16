@@ -115,6 +115,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showDialog
+import com.lagradost.cloudstream3.utils.SubtitleHelper
 import com.lagradost.cloudstream3.utils.SubtitleHelper.fromTagToEnglishLanguageName
 import com.lagradost.cloudstream3.utils.SubtitleHelper.fromTagToLanguageName
 import com.lagradost.cloudstream3.utils.SubtitleHelper.languages
@@ -252,16 +253,18 @@ class GeneratorPlayer : FullScreenPlayer() {
         if (actualLang?.equals(targetLang, ignoreCase = true) == true) return true
         if (actualLabel?.contains(targetLang, ignoreCase = true) == true) return true
 
-        val targetMetadata = SubtitleHelper.languages.find {
-            it.IETF_tag.equals(targetLang, ignoreCase = true) ||
-            it.ISO_639_1.equals(targetLang, ignoreCase = true) ||
-            it.ISO_639_2_B.equals(targetLang, ignoreCase = true) ||
-            it.ISO_639_3.equals(targetLang, ignoreCase = true) ||
-            it.languageName.equals(targetLang, ignoreCase = true)
-        }
+        val targetMetadata: SubtitleHelper.LanguageMetadata? = SubtitleHelper.getLanguageDataFromCode(targetLang)
+            ?: SubtitleHelper.languages.find {
+                it.IETF_tag.equals(targetLang, ignoreCase = true) ||
+                it.ISO_639_1.equals(targetLang, ignoreCase = true) ||
+                it.ISO_639_2_B.equals(targetLang, ignoreCase = true) ||
+                it.ISO_639_3.equals(targetLang, ignoreCase = true) ||
+                it.languageName.equals(targetLang, ignoreCase = true) ||
+                it.nativeName.equals(targetLang, ignoreCase = true)
+            }
 
         if (targetMetadata != null) {
-            val checkStrings = listOfNotNull(
+            val checkStrings: List<String> = listOfNotNull(
                 targetMetadata.IETF_tag,
                 targetMetadata.ISO_639_1,
                 targetMetadata.ISO_639_2_B,
