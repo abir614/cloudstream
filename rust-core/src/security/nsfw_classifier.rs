@@ -3,8 +3,6 @@
 //! Provides zero-overhead token analysis and domain heuristics to filter adult content
 //! including hentai blended into mainstream anime streams, ecchi feeds, and swimsuit/beach themes.
 
-pub use crate::security::poster_detector::is_skin_exposure_excessive;
-
 /// Static list of explicit adult, ecchi, and swimsuit tokens (matched as whole words/tokens).
 const EXPLICIT_ADULT_TOKENS: &[&str] = &[
     // Core Adult Keywords
@@ -341,34 +339,5 @@ mod tests {
         assert!(!is_nsfw_text("Attack on Titan Season 4", "https://crunchy.com/aot-s4", Some("Action, Fantasy")));
         assert!(!is_nsfw_text("Breaking Bad", "https://netflix.com/title/123", Some("Drama, Crime")));
         assert!(!is_nsfw_text("Spider-Man: Across the Spider-Verse", "https://sony.com/spiderman", None));
-    }
-
-    #[test]
-    fn test_poster_math_delegation() {
-        let mut nsfw_image = Vec::with_capacity(3000);
-        let flesh_palette = [
-            [255, 220, 198],
-            [245, 205, 180],
-            [230, 185, 155],
-            [255, 195, 185],
-            [220, 170, 145],
-        ];
-
-        for i in 0..1000 {
-            let color = flesh_palette[i % flesh_palette.len()];
-            nsfw_image.extend_from_slice(&color);
-        }
-
-        assert!(is_skin_exposure_excessive(&nsfw_image, 3));
-    }
-
-    #[test]
-    fn test_clean_image_delegation() {
-        let mut clean_image = Vec::with_capacity(3000);
-        for _ in 0..1000 {
-            clean_image.extend_from_slice(&[40, 100, 200]);
-        }
-
-        assert!(!is_skin_exposure_excessive(&clean_image, 3));
     }
 }

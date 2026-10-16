@@ -29,8 +29,7 @@ pub use security::apk_verifier::{
     compute_file_sha256, generate_attestation_token, generate_session_nonce, verify_apk_identity,
     verify_attestation_token, ApkVerificationResult, VerifierError,
 };
-pub use security::nsfw_classifier::{is_nsfw_text, is_skin_exposure_excessive};
-pub use security::poster_detector::is_skin_exposure_excessive as detect_poster_excessive_skin;
+pub use security::nsfw_classifier::is_nsfw_text;
 pub use security::ssrf::{validate_ip_safety, validate_url_safety, NetworkSecurityError};
 pub use subtitles::{parse_srt, SubtitleCue};
 

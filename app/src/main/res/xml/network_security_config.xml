@@ -7,10 +7,17 @@
         </trust-anchors>
     </base-config>
 
-    <!-- Control plane: updates, manifests, and repositories require strict HTTPS and system CAs -->
+    <!-- Control plane & Secure Infrastructure: updates, manifests, repositories & DoH resolvers require strict HTTPS and system CAs -->
     <domain-config cleartextTrafficPermitted="false">
         <domain includeSubdomains="true">github.com</domain>
         <domain includeSubdomains="true">githubusercontent.com</domain>
+        <domain includeSubdomains="true">mullvad.net</domain>
+        <domain includeSubdomains="true">quad9.net</domain>
+        <domain includeSubdomains="true">cloudflare-dns.com</domain>
+        <domain includeSubdomains="true">dns.google</domain>
+        <domain includeSubdomains="true">adguard-dns.com</domain>
+        <domain includeSubdomains="true">dns.sb</domain>
+        <domain includeSubdomains="true">cira.ca</domain>
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

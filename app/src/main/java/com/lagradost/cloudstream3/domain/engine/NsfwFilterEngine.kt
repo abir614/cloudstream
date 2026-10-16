@@ -10,11 +10,10 @@ import com.lagradost.cloudstream3.ui.APIRepository
 import com.lagradost.cloudstream3.services.NativeCoreBridge
 
 /**
- * Robust Mathematical Poster & Multi-Vector NSFW Classification Engine.
+ * Robust Multi-Vector NSFW Classification Engine.
  *
  * Integrates:
- * 1. Native Rust ITU-R BT.601 + RGB + HSV skin exposure detector with aggressive thresholds
- *    for erotica, bikini, beach, and summer exposure (`poster_detector.rs`).
+ * 1. On-device lightweight quantized neural network AI model ([OnDeviceNsfwClassifier]) for visual posters.
  * 2. Multi-language explicit adult, ecchi, and beach/summer keyword guardian (`nsfw_classifier.rs`).
  * 3. Autonomous fallback heuristic if native library is temporarily uninitialized.
  */
@@ -32,15 +31,6 @@ object NsfwFilterEngine {
         "エロ", "エッチ", "変態", "成年", "18禁", "無修正", "巨乳", "爆乳",
         "水着", "ビキニ", "グラビア", "痴女", "調教", "下着", "露出", "同人", "熟女"
     )
-
-    /**
-     * Legacy mathematical skin exposure check. Deprecated in favor of [OnDeviceNsfwClassifier]
-     * powered by quantized on-device TensorFlow Lite neural network.
-     */
-    @Deprecated("Replaced by OnDeviceNsfwClassifier on-device AI model")
-    fun isSkinExposureExcessive(rgbBytes: ByteArray, bytesPerPixel: Int = 3): Boolean {
-        return false
-    }
 
     /**
      * Classifies title, URL, or tags against native Rust classifier and fallback heuristics.

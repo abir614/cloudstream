@@ -2,7 +2,7 @@
 //!
 //! Thoroughly tests and benchmarks all 13 modules implemented for the project:
 //! 1. Security & Anti-SSRF URL Enforcement
-//! 2. Mathematical Poster & Excessive Skin Exposure Detection
+//! 2. Text & Multi-Vector Adult/NSFW Token Guardian
 //! 3. Authenticated Argon2id + ChaCha20-Poly1305 Backup Encryption & Tamper Detection
 //! 4. Ed25519 Offline Update Signature Verification
 //! 5. Zero-Trust APK Identity & Attestation Token Verification
@@ -84,77 +84,8 @@ fn test_url_sanitizer_and_resolver() {
 }
 
 // ============================================================================
-// 2. MATHEMATICAL POSTER & IMAGE NSFW CLASSIFIER
+// 2. TEXT & MULTI-VECTOR NSFW GUARDIAN MATRIX
 // ============================================================================
-
-#[test]
-fn test_poster_detector_accuracy() {
-    // 1. Test: Highly exposed cel-shaded anime figure with varying flesh shading gradients
-    let mut anime_erotica = Vec::with_capacity(3072);
-    let flesh_tones = [
-        [255, 222, 200], // Highlight
-        [248, 208, 182], // Mid-tone
-        [235, 188, 158], // Shadow
-        [255, 198, 188], // Rosy blush
-        [222, 172, 148], // Ambient occlusion
-    ];
-    for i in 0..1024 {
-        let rgb = flesh_tones[i % flesh_tones.len()];
-        anime_erotica.extend_from_slice(&rgb);
-    }
-    assert!(
-        is_skin_exposure_excessive(&anime_erotica, 3),
-        "High exposure cel-shaded anime flesh with shading gradients must be detected as excessive exposure"
-    );
-
-    // 2. Test: Non-biological uniform beige wood / sand dune surface (anti-false-positive mechanism)
-    let mut flat_beige_wall = Vec::with_capacity(3072);
-    for _ in 0..1024 {
-        flat_beige_wall.extend_from_slice(&[215, 185, 145]); // Solid flat beige (near-zero variance)
-    }
-    assert!(
-        !is_skin_exposure_excessive(&flat_beige_wall, 3),
-        "Flat solid beige walls or textures must be rejected to prevent false positives"
-    );
-
-    // 3. Test: Clean mainstream content (Deep space, blue sky, green foliage, dark UI)
-    let mut clean_scenery = Vec::with_capacity(3072);
-    for i in 0..1024 {
-        if i < 400 {
-            clean_scenery.extend_from_slice(&[20, 30, 80]); // Deep night sky
-        } else if i < 700 {
-            clean_scenery.extend_from_slice(&[40, 160, 60]); // Forest greenery
-        } else {
-            clean_scenery.extend_from_slice(&[200, 200, 220]); // Cool white clouds
-        }
-    }
-    assert!(
-        !is_skin_exposure_excessive(&clean_scenery, 3),
-        "Clean cinematic landscape must pass cleanly"
-    );
-
-    // 4. Test: Summer beach / swimsuit figure in ocean/sky landscape
-    let mut beach_scene = Vec::with_capacity(3072);
-    let summer_skin = [[255, 225, 205], [245, 210, 185], [235, 190, 160]];
-    for i in 0..1024 {
-        if (300..500).contains(&i) {
-            beach_scene.extend_from_slice(&summer_skin[i % summer_skin.len()]);
-        } else if i < 300 {
-            beach_scene.extend_from_slice(&[70, 130, 240]);
-        } else {
-            beach_scene.extend_from_slice(&[30, 100, 180]);
-        }
-    }
-    assert!(
-        is_skin_exposure_excessive(&beach_scene, 3),
-        "Summer beach / swimsuit exposed figures must trigger excessive exposure"
-    );
-
-    // 5. Test: Edge cases (empty, sub-pixel buffers, mismatched bpp)
-    assert!(!is_skin_exposure_excessive(&[], 3));
-    assert!(!is_skin_exposure_excessive(&[255, 200], 3)); // < 12 bytes
-    assert!(!is_skin_exposure_excessive(&[255, 200, 180, 255, 200, 180], 3)); // 2 pixels only
-}
 
 #[test]
 fn test_nsfw_text_and_guardian_matrix() {
