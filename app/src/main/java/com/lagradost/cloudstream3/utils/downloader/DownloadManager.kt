@@ -132,6 +132,7 @@ object VideoDownloadManager {
      * - <= 384MB JVM heap (mid-range phones/TV sticks): 25MB limit
      * - <= 512MB JVM heap (standard devices): 50MB limit
      * - > 512MB JVM heap (flagships, 8-16GB RAM): 80MB limit (saturates Gigabit Wi-Fi 6 / 5G)
+     */
     val maxPendingBytesLimit: Long
         get() {
             val ctx = com.lagradost.cloudstream3.CloudStreamApp.context

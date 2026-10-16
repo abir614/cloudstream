@@ -238,8 +238,8 @@ fn is_text_nsfw_single(text: &str) -> bool {
     // 4. Summer / Beach contextual triggers:
     // If text contains "summer" or "beach", combined with provocative/lewd markers
     let has_summer_or_beach = lower.contains("summer") || lower.contains("beach");
-    if has_summer_or_beach {
-        if lower.contains("swim")
+    if has_summer_or_beach
+        && (lower.contains("swim")
             || lower.contains("pool")
             || lower.contains("bikini")
             || lower.contains("hot")
@@ -250,10 +250,9 @@ fn is_text_nsfw_single(text: &str) -> bool {
             || lower.contains("edition")
             || lower.contains("island")
             || lower.contains("girl")
-            || lower.contains("girls")
-        {
-            return true;
-        }
+            || lower.contains("girls"))
+    {
+        return true;
     }
 
     // 5. Delimited token matching (words separated by whitespace, dashes, slashes, etc.)
