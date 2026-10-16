@@ -52,6 +52,7 @@ safefile = "0.0.8"
 shimmer = "0.5.0"
 tvprovider = "1.1.0"
 video = "1.0.0"
+tensorflowLite = "2.14.0"
 workRuntimeKtx = "2.11.2" # 2.12.0 requires minSdk 24 (breaks minSdk 23 compatibility)
 zipline = "1.27.0"
 composeMaterial3 = "1.12.0-alpha03"
@@ -153,6 +154,7 @@ compose-ui-tooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.r
 compose-ui-tooling-preview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
 lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+tensorflow-lite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tensorflowLite" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "androidGradlePlugin" }

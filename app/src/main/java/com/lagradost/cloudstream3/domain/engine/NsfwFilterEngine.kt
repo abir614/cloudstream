@@ -34,11 +34,12 @@ object NsfwFilterEngine {
     )
 
     /**
-     * Checks if an image buffer exhibits excessive exposed skin tone
-     * using the high-performance native Rust mathematical analyzer.
+     * Legacy mathematical skin exposure check. Deprecated in favor of [OnDeviceNsfwClassifier]
+     * powered by quantized on-device TensorFlow Lite neural network.
      */
+    @Deprecated("Replaced by OnDeviceNsfwClassifier on-device AI model")
     fun isSkinExposureExcessive(rgbBytes: ByteArray, bytesPerPixel: Int = 3): Boolean {
-        return NativeCoreBridge.isSkinExposureExcessive(rgbBytes, bytesPerPixel) ?: false
+        return false
     }
 
     /**

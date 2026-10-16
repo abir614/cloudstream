@@ -35,6 +35,7 @@ import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.network.SafeDns
 import com.lagradost.cloudstream3.network.addAdGuardDns
@@ -233,42 +234,6 @@ object ImageLoader {
         }
     }
 
-    internal fun checkBitmapSkinExcessive(bitmap: Bitmap): Boolean {
-        return try {
-            val softwareBitmap = if (SDK_INT >= 28 && bitmap.config == Bitmap.Config.HARDWARE) {
-                bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: bitmap
-            } else {
-                bitmap
-            }
-
-            val sampleW = 32
-            val sampleH = 48
-            val smallBitmap = Bitmap.createBitmap(sampleW, sampleH, Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(smallBitmap)
-            val rect = android.graphics.Rect(0, 0, sampleW, sampleH)
-            canvas.drawBitmap(softwareBitmap, null, rect, null)
-
-            val pixels = IntArray(sampleW * sampleH)
-            smallBitmap.getPixels(pixels, 0, sampleW, 0, 0, sampleW, sampleH)
-            smallBitmap.recycle()
-            if (softwareBitmap != bitmap) {
-                softwareBitmap.recycle()
-            }
-
-            val rgbBytes = ByteArray(pixels.size * 3)
-            var idx = 0
-            for (p in pixels) {
-                rgbBytes[idx] = ((p shr 16) and 0xFF).toByte()
-                rgbBytes[idx + 1] = ((p shr 8) and 0xFF).toByte()
-                rgbBytes[idx + 2] = (p and 0xFF).toByte()
-                idx += 3
-            }
-            NsfwFilterEngine.isSkinExposureExcessive(rgbBytes, 3)
-        } catch (_: Throwable) {
-            false
-        }
-    }
-
     /** coil's built in loader attached w/ global synchronized instance **/
     private fun ImageView.loadImageInternal(
         imageData: Any?,
@@ -283,10 +248,21 @@ object ImageLoader {
             this.setImageResource(imageData); return
         }
 
-        // Fast text/URL keyword pre-filter: intercept before loading over network
+        // 1. Fast text/URL keyword pre-filter: intercept before loading over network
         if (!isNsfwGloballyEnabled() && imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
             applyCensoredPoster(this)
             return
+        }
+
+        // 2. Fast LRU AI model cache check: if already classified as NSFW by on-device model, intercept immediately!
+        if (!isNsfwGloballyEnabled() && imageData is String && OnDeviceNsfwClassifier.isCachedNsfw(imageData)) {
+            applyCensoredPoster(this)
+            return
+        }
+
+        val imageKey = (imageData as? String) ?: imageData.toString()
+        if (!isNsfwGloballyEnabled()) {
+            this.setTag(R.id.coil_image_url_tag, imageKey)
         }
 
         // headers can be overridden by extensions.
@@ -302,18 +278,11 @@ object ImageLoader {
                     onSuccess = { _, result ->
                         try {
                             val drawable = result.image.asDrawable(context.resources)
-                            val rawBitmap = drawable.toBitmap()
-                            val softwareBitmap = if (SDK_INT >= 28 && rawBitmap.config == Bitmap.Config.HARDWARE) {
-                                rawBitmap.copy(Bitmap.Config.ARGB_8888, false) ?: rawBitmap
-                            } else {
-                                rawBitmap
-                            }
-                            if (checkBitmapSkinExcessive(softwareBitmap)) {
-                                applyCensoredPoster(this@loadImageInternal)
-                                this@loadImageInternal.post {
-                                    applyCensoredPoster(this@loadImageInternal)
-                                }
-                            }
+                            OnDeviceNsfwClassifier.classifyAndApplyAsync(
+                                imageView = this@loadImageInternal,
+                                imageKey = imageKey,
+                                drawable = drawable
+                            )
                         } catch (_: Throwable) {
                         }
                     }
