@@ -144,7 +144,7 @@ object SubtitleHelper {
      * @param languageCode IETF BCP 47, ISO 639-1, ISO 639-2B/T, ISO 639-3, OpenSubtitles
      * @return [LanguageMetadata] or `null`
     */
-    private fun getLanguageDataFromCode(languageCode: String?): LanguageMetadata?  {
+    fun getLanguageDataFromCode(languageCode: String?): LanguageMetadata?  {
         if (languageCode.isNullOrBlank() || languageCode.length < 2) return null
 
         val lowLangCode = languageCode.lowercase().trim()

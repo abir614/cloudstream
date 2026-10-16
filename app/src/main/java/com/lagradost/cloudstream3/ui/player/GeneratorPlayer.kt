@@ -49,6 +49,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.lagradost.cloudstream3.APIHolder.getApiFromNameNull
 import com.lagradost.cloudstream3.CloudStreamApp
+import com.lagradost.cloudstream3.CloudStreamApp.Companion.getKey
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.setKey
 import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.LoadResponse
@@ -131,7 +132,6 @@ import com.lagradost.cloudstream3.utils.setText
 import com.lagradost.cloudstream3.utils.txt
 import com.lagradost.cloudstream3.utils.videoskip.SkipType
 import com.lagradost.cloudstream3.utils.videoskip.VideoSkipStamp
-import androidx.preference.PreferenceManager
 import android.content.SharedPreferences
 import com.lagradost.safefile.SafeFile
 import kotlinx.coroutines.Job
@@ -1561,8 +1561,10 @@ class GeneratorPlayer : FullScreenPlayer() {
                     if (init) {
                         filteredLinks.getOrNull(sourceIndex)?.let {
                             currentSeriesKey?.let { seriesKey ->
-                                setKey(SHOW_LINK_SOURCE_PREFIX + seriesKey, it.link.source)
-                                setKey(SHOW_LINK_NAME_PREFIX + seriesKey, it.link.name)
+                                it.link.first?.let { extractorLink ->
+                                    setKey(SHOW_LINK_SOURCE_PREFIX + seriesKey, extractorLink.source)
+                                    setKey(SHOW_LINK_NAME_PREFIX + seriesKey, extractorLink.name)
+                                }
                             }
                             loadLink(it.link, true)
                         }
@@ -2539,7 +2541,7 @@ class GeneratorPlayer : FullScreenPlayer() {
                     } else {
                         player.seekTo(timestamp.timestamp.endMs + 100L)
                     }
-                    player.event(TimestampSkippedEvent(timestamp = timestamp, source = PlayerEventSource.Player))
+                    onTimestampSkipped(timestamp)
                     playerBinding?.skipChapterButton?.apply {
                         setText(timestamp.uiText)
                         displayTimeStamp(true)
