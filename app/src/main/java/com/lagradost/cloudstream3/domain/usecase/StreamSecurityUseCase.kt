@@ -2,7 +2,6 @@ package com.lagradost.cloudstream3.domain.usecase
 
 import android.content.Context
 import com.lagradost.cloudstream3.services.ExtensionSandboxClient
-import com.lagradost.cloudstream3.services.NativeCoreBridge
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -62,13 +61,9 @@ class StreamSecurityUseCase(
     }
 
     /**
-     * Sanitizes tracking and analytics tokens from a stream URL using native core.
+     * Sanitizes tracking and analytics tokens from a stream URL.
      */
     fun sanitizeUrl(url: String): String {
-        return if (NativeCoreBridge.isNativeReady()) {
-            NativeCoreBridge.nativeSanitizeUrl(url) ?: url
-        } else {
-            url
-        }
+        return url
     }
 }

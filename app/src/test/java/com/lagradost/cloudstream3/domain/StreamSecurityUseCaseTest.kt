@@ -11,10 +11,9 @@ class StreamSecurityUseCaseTest {
     private val useCase = StreamSecurityUseCase()
 
     @Test
-    fun `test sanitizeUrl returns identical string when native core not loaded`() {
+    fun `test sanitizeUrl returns url`() {
         val rawUrl = "https://example.com/video.m3u8?utm_source=tracker"
         val result = useCase.sanitizeUrl(rawUrl)
-        // If native core is not loaded in unit test JVM, it gracefully returns unchanged url
         assertEquals(rawUrl, result)
     }
 
