@@ -17,6 +17,7 @@ import android.widget.ImageView
 import androidx.core.graphics.drawable.toBitmap
 import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.R
+import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.DeviceTier
 import com.lagradost.cloudstream3.utils.ImageLoader
@@ -78,8 +79,8 @@ object OnDeviceNsfwClassifier {
     private val scratchRect = Rect(0, 0, INPUT_DIM, INPUT_DIM)
     private val scratchPaint = Paint(Paint.FILTER_BITMAP_FLAG)
 
-    // Two-tier high-speed caching: 1,000 recent URLs
-    private val classificationCache = LruCache<String, Boolean>(1000)
+    // Two-tier high-speed caching: 1,000 recent URLs mapped to inference confidence score (0.0f - 1.0f)
+    private val scoreCache = LruCache<String, Float>(1000)
 
     // Main thread handler for UI updates
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -99,11 +100,20 @@ object OnDeviceNsfwClassifier {
     }
 
     /**
-     * Checks if a poster URL has already been classified as NSFW in the fast memory cache.
+     * Checks if a poster URL has already been evaluated and crosses the active sensitivity threshold.
      * Guaranteed < 0.001 ms response.
      */
-    fun isCachedNsfw(imageKey: String): Boolean {
-        return classificationCache.get(imageKey) ?: false
+    fun isCachedNsfw(imageKey: String, ctx: Context? = null): Boolean {
+        val score = scoreCache.get(imageKey) ?: return false
+        val threshold = NsfwFilterEngine.getFilterLevel(ctx).visualThreshold
+        return score >= threshold
+    }
+
+    /**
+     * Clears cached scores upon filter level updates.
+     */
+    fun clearCache() {
+        scoreCache.evictAll()
     }
 
     /**
@@ -159,17 +169,17 @@ object OnDeviceNsfwClassifier {
     }
 
     /**
-     * Synchronously classifies a bitmap image buffer.
+     * Synchronously runs inference on a bitmap and returns raw NSFW confidence score (0.0f - 1.0f).
      * Note: Must only be called on background threads.
      */
     @Synchronized
-    fun classifyBitmapSync(ctx: Context, bitmap: Bitmap): Boolean {
-        if (bitmap.isRecycled) return false
-        if (!ensureModelInitialized(ctx)) return false
-        val interp = interpreter ?: return false
-        val buf = inputBuffer ?: return false
-        val sBitmap = scratchBitmap ?: return false
-        val canvas = scratchCanvas ?: return false
+    fun classifyBitmapScore(ctx: Context, bitmap: Bitmap): Float {
+        if (bitmap.isRecycled) return 0.0f
+        if (!ensureModelInitialized(ctx)) return 0.0f
+        val interp = interpreter ?: return 0.0f
+        val buf = inputBuffer ?: return 0.0f
+        val sBitmap = scratchBitmap ?: return 0.0f
+        val canvas = scratchCanvas ?: return 0.0f
 
         // Android throws IllegalArgumentException if a Bitmap.Config.HARDWARE bitmap
         // is drawn onto a software Canvas. Convert to software ARGB_8888 if hardware-backed.
@@ -211,11 +221,10 @@ object OnDeviceNsfwClassifier {
             val outputProb = Array(1) { FloatArray(2) }
             interp.run(buf, outputProb)
 
-            val nsfwScore = outputProb[0][1]
-            nsfwScore >= NSFW_THRESHOLD
+            outputProb[0][1]
         } catch (t: Throwable) {
             Log.w(TAG, "Error during NSFW model inference: ${t.message}")
-            false
+            0.0f
         } finally {
             if (softwareBitmap != null && softwareBitmap != bitmap && !softwareBitmap!!.isRecycled) {
                 try {
@@ -227,11 +236,20 @@ object OnDeviceNsfwClassifier {
     }
 
     /**
+     * Synchronously classifies a bitmap image against active filter sensitivity.
+     */
+    fun classifyBitmapSync(ctx: Context, bitmap: Bitmap): Boolean {
+        val score = classifyBitmapScore(ctx, bitmap)
+        val threshold = NsfwFilterEngine.getFilterLevel(ctx).visualThreshold
+        return score >= threshold
+    }
+
+    /**
      * Decoupled Asynchronous Classifier for Coil ImageView loading.
      *
      * 1. Checks memory cache for instantaneous response (< 0.001 ms).
      * 2. Offloads inference to a low-priority single worker daemon thread.
-     * 3. Always stores result in LRU cache so subsequent loads or scrolls hit cache immediately.
+     * 3. Always stores raw score in LRU cache so sensitivity adjustments take effect immediately.
      * 4. Validates view tag before applying censorship to prevent recycling races in lists.
      */
     fun classifyAndApplyAsync(
@@ -239,16 +257,17 @@ object OnDeviceNsfwClassifier {
         imageKey: String,
         drawable: Drawable
     ) {
+        val appContext = imageView.context.applicationContext ?: CloudStreamApp.context ?: return
+        val threshold = NsfwFilterEngine.getFilterLevel(appContext).visualThreshold
+
         // Fast LRU cache hit
-        val cached = classificationCache.get(imageKey)
-        if (cached != null) {
-            if (cached) {
+        val cachedScore = scoreCache.get(imageKey)
+        if (cachedScore != null) {
+            if (cachedScore >= threshold && appContext.shouldCensorPosters()) {
                 ImageLoader.applyCensoredPoster(imageView)
             }
             return
         }
-
-        val appContext = imageView.context.applicationContext ?: CloudStreamApp.context ?: return
 
         workerExecutor.execute {
             try {
@@ -262,16 +281,17 @@ object OnDeviceNsfwClassifier {
                     return@execute
                 }
 
-                val isNsfw = classifyBitmapSync(appContext, bitmap)
+                val score = classifyBitmapScore(appContext, bitmap)
                 if (isTempBitmap && !bitmap.isRecycled) {
                     try {
                         bitmap.recycle()
                     } catch (_: Throwable) {
                     }
                 }
-                classificationCache.put(imageKey, isNsfw)
+                scoreCache.put(imageKey, score)
 
-                if (isNsfw) {
+                val activeThreshold = NsfwFilterEngine.getFilterLevel(appContext).visualThreshold
+                if (score >= activeThreshold && appContext.shouldCensorPosters()) {
                     mainHandler.post {
                         val activeTag = try {
                             imageView.getTag(R.id.coil_image_url_tag)

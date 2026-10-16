@@ -403,8 +403,22 @@
     <string name="app_layout">App Layout</string>
     <string name="preferred_media_settings">Preferred media</string>
     <string name="pref_category_content_safety">Content &amp; Family Safety</string>
-    <string name="enable_nsfw_on_providers">Enable NSFW on supported Extensions</string>
-    <string name="enable_nsfw_summary">Allow adult and NSFW 18+ content across search, discovery and extension feeds</string>
+    <string name="enable_nsfw_on_providers">Show Adult (18+) / NSFW Content</string>
+    <string name="enable_nsfw_summary">Allow adult content in searches, categories, and filters (disabled by default)</string>
+    <string name="nsfw_filter_level_title">NSFW Filter Sensitivity</string>
+    <string name="nsfw_filter_level_summary">Configure adult content detection sensitivity level</string>
+    <string-array name="nsfw_filter_level_entries">
+        <item>Extreme (Maximum Sensitivity - Strict Family Shield)</item>
+        <item>Moderate (Medium Sensitivity - Family Level, Recommended)</item>
+        <item>Low (Lowest Filtering - Hardcore Only)</item>
+    </string-array>
+    <string-array name="nsfw_filter_level_values">
+        <item>extreme</item>
+        <item>moderate</item>
+        <item>low</item>
+    </string-array>
+    <string name="censor_nsfw_posters_title">Censor Adult Posters</string>
+    <string name="censor_nsfw_posters_summary">Display NSFW warning badge on adult posters instead of unfiltered images</string>
     <string name="subtitles_encoding">Subtitle encoding</string>
     <string name="category_providers">Providers</string>
     <string name="category_provider_test">Provider test</string>

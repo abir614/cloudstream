@@ -6,6 +6,7 @@ import com.lagradost.cloudstream3.MovieSearchResponse
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -95,5 +96,22 @@ class NsfwFilterEngineTest {
         )
         assertNull(NsfwFilterEngine.filterHomePageList(ecchiRow, isNsfwEnabled = false))
         assertNotNull(NsfwFilterEngine.filterHomePageList(ecchiRow, isNsfwEnabled = true))
+    }
+
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `test sensitivity levels distinguish hardcore vs ecchi vs extreme`() {
+        val hardcoreItem = MovieSearchResponse("Explicit Adult Video", "https://site.to/xxx", "PornProvider", TvType.Movie)
+        assertTrue(NsfwFilterEngine.isNsfw(hardcoreItem, NsfwFilterLevel.LOW))
+        assertTrue(NsfwFilterEngine.isNsfw(hardcoreItem, NsfwFilterLevel.MODERATE))
+        assertTrue(NsfwFilterEngine.isNsfw(hardcoreItem, NsfwFilterLevel.EXTREME))
+
+        val ecchiItem = AnimeSearchResponse("Beach Swimsuit Episode", "https://site.to/swim", "AnimeProvider", TvType.Anime)
+        assertFalse(NsfwFilterEngine.isNsfw(ecchiItem, NsfwFilterLevel.LOW))
+        assertTrue(NsfwFilterEngine.isNsfw(ecchiItem, NsfwFilterLevel.MODERATE))
+        assertTrue(NsfwFilterEngine.isNsfw(ecchiItem, NsfwFilterLevel.EXTREME))
+
+        val borderlineItem = AnimeSearchResponse("Ordinary Show Special", "https://site.to/s1", "AnimeProvider", TvType.Anime, posterUrl = "https://cdn.net/harem_bath.jpg")
+        assertTrue(NsfwFilterEngine.isNsfw(borderlineItem, NsfwFilterLevel.EXTREME))
     }
 }

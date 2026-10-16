@@ -130,12 +130,12 @@ object NativeCoreBridge {
     external fun nativeLevenshtein(s1: String, s2: String): Int
 
     // --- Native NSFW / Hentai Classification ---
-    external fun nativeIsNsfw(title: String, url: String, tags: String?): Boolean
+    external fun nativeIsNsfw(title: String, url: String, tags: String?, level: Int): Boolean
 
-    fun isNsfw(title: String, url: String, tags: String? = null): Boolean? {
+    fun isNsfw(title: String, url: String, tags: String? = null, level: Int = 1): Boolean? {
         return if (isLoaded) {
             try {
-                nativeIsNsfw(title, url, tags)
+                nativeIsNsfw(title, url, tags, level)
             } catch (_: Throwable) {
                 null
             }

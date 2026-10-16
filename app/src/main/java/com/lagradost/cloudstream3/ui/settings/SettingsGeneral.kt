@@ -393,9 +393,43 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
             return@setOnPreferenceClickListener true
         }
 
+        updateNsfwSummary()
+
+        getPref(R.string.nsfw_filter_level_key)?.setOnPreferenceClickListener {
+            val prefNames = resources.getStringArray(R.array.nsfw_filter_level_entries)
+            val prefValues = resources.getStringArray(R.array.nsfw_filter_level_values)
+
+            val currentLevel =
+                settingsManager.getString(getString(R.string.nsfw_filter_level_key), "moderate") ?: "moderate"
+
+            val activeIndex = prefValues.indexOf(currentLevel).coerceAtLeast(0)
+
+            activity?.showBottomDialog(
+                prefNames.toList(),
+                activeIndex,
+                getString(R.string.nsfw_filter_level_title),
+                true,
+                {}) {
+                val selected = prefValues[it]
+                settingsManager.edit { putString(getString(R.string.nsfw_filter_level_key), selected) }
+                com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
+                com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+                updateNsfwSummary()
+            }
+            return@setOnPreferenceClickListener true
+        }
+
         getPref(R.string.enable_nsfw_on_providers_key)?.setOnPreferenceChangeListener { _, newValue ->
             val enabled = newValue as? Boolean ?: false
             MainAPI.settingsForProvider.enableAdult = enabled
+            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
+            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+            updateNsfwSummary()
+            true
+        }
+
+        getPref(R.string.censor_nsfw_posters_key)?.setOnPreferenceChangeListener { _, _ ->
+            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
             com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
             true
         }
@@ -515,8 +549,22 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
         }
     }
 
+    private fun updateNsfwSummary() {
+        context?.let { ctx ->
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
+            val currentLevel =
+                settingsManager.getString(getString(R.string.nsfw_filter_level_key), "moderate") ?: "moderate"
+            val prefNames = resources.getStringArray(R.array.nsfw_filter_level_entries)
+            val prefValues = resources.getStringArray(R.array.nsfw_filter_level_values)
+            val index = prefValues.indexOf(currentLevel).coerceAtLeast(0)
+            val label = prefNames.getOrNull(index) ?: "Moderate (Family Level, Recommended)"
+            getPref(R.string.nsfw_filter_level_key)?.summary = label
+        }
+    }
+
     override fun onResume() {
         super.onResume()
         updatePerformanceProfileSummary()
+        updateNsfwSummary()
     }
 }

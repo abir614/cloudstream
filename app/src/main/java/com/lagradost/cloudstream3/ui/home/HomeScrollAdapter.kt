@@ -20,6 +20,7 @@ import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
 import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
+import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.getImageFromDrawable
 
 class HomeScrollAdapter(
@@ -61,7 +62,7 @@ class HomeScrollAdapter(
 
         val posterUrl = item.backgroundPosterUrl ?: item.posterUrl
 
-        val isNsfw = !isNsfwGloballyEnabled() && NsfwFilterEngine.isNsfw(item)
+        val isNsfw = shouldCensorPosters(holder.itemView.context) && NsfwFilterEngine.isNsfw(item)
 
         when (binding) {
             is HomeScrollViewBinding -> {

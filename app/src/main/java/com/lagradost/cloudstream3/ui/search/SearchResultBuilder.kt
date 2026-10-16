@@ -29,6 +29,7 @@ import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
 import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
+import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.SubtitleHelper
 import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
 import com.lagradost.cloudstream3.utils.getImageFromDrawable
@@ -135,7 +136,7 @@ object SearchResultBuilder {
         cardText?.text = card.name
         cardText?.isVisible = showTitle
         cardView.isVisible = true
-        val isNsfw = !isNsfwGloballyEnabled() && NsfwFilterEngine.isNsfw(card)
+        val isNsfw = shouldCensorPosters(cardView.context) && NsfwFilterEngine.isNsfw(card)
         if (isNsfw) {
             applyCensoredPoster(cardView)
         } else if (!card.posterUrl.isNullOrEmpty()) {

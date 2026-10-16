@@ -71,6 +71,21 @@
             android:key="@string/enable_nsfw_on_providers_key"
             android:summary="@string/enable_nsfw_summary"
             android:title="@string/enable_nsfw_on_providers" />
+
+        <Preference
+            android:defaultValue="moderate"
+            android:icon="@drawable/baseline_security_24"
+            android:key="@string/nsfw_filter_level_key"
+            android:summary="@string/nsfw_filter_level_summary"
+            android:title="@string/nsfw_filter_level_title" />
+
+        <SwitchPreference
+            android:defaultValue="false"
+            android:dependency="@string/enable_nsfw_on_providers_key"
+            android:icon="@drawable/ic_baseline_warning_24"
+            android:key="@string/censor_nsfw_posters_key"
+            android:summary="@string/censor_nsfw_posters_summary"
+            android:title="@string/censor_nsfw_posters_title" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/pref_category_bypass">

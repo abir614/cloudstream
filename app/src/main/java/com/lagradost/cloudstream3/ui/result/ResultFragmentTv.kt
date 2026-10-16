@@ -57,6 +57,7 @@ import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
 import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
+import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialogInstant
 import com.lagradost.cloudstream3.utils.UIHelper.dismissSafe
@@ -880,7 +881,7 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                         resultMetaContentRating.setText(d.contentRatingText)
                         resultNextAiring.setText(d.nextAiringEpisode)
                         resultNextAiringTime.setText(d.nextAiringDate)
-                        val isNsfw = !isNsfwGloballyEnabled() && (
+                        val isNsfw = shouldCensorPosters(context) && (
                             NsfwFilterEngine.isNsfwText(d.title, d.url, d.tags.joinToString(" ")) ||
                             d.posterImage?.let { NsfwFilterEngine.isNsfwUrl(it) } == true ||
                             d.posterBackgroundImage?.let { NsfwFilterEngine.isNsfwUrl(it) } == true

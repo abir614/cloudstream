@@ -1,11 +1,19 @@
-//! High-Performance NSFW, Adult, Ecchi, & Summer/Beach Content Classification Engine.
+//! High-Performance Multi-Level NSFW, Adult, Ecchi, & Family Safety Classification Engine.
 //!
 //! Provides zero-overhead token analysis and domain heuristics to filter adult content
-//! including hentai blended into mainstream anime streams, ecchi feeds, and swimsuit/beach themes.
+//! across three configurable sensitivity tiers:
+//! - Level 0 (LOW): Filters only hardcore explicit adult pornography and raw hentai.
+//! - Level 1 (MODERATE): Default family level. Filters ecchi, swimsuits, bikinis, cleavage,
+//!   lingerie, provocative/sensual poses, adult anime, and hentai.
+//! - Level 2 (EXTREME): Maximum sensitivity family shield. Flags any suggestive romance,
+//!   onsen/bathhouse scenes, fanservice, borderline beach/swimwear, and microkinis.
 
-/// Static list of explicit adult, ecchi, and swimsuit tokens (matched as whole words/tokens).
-const EXPLICIT_ADULT_TOKENS: &[&str] = &[
-    // Core Adult Keywords
+pub const LEVEL_LOW: u8 = 0;
+pub const LEVEL_MODERATE: u8 = 1;
+pub const LEVEL_EXTREME: u8 = 2;
+
+/// Hardcore Adult Tokens (Active in ALL levels: Low, Moderate, Extreme).
+const HARDCORE_ADULT_TOKENS: &[&str] = &[
     "xxx",
     "porn",
     "porno",
@@ -20,20 +28,8 @@ const EXPLICIT_ADULT_TOKENS: &[&str] = &[
     "18plus",
     "erotica",
     "erotic",
-    // Hentai & Anime Adult Terminology
     "hentai",
     "hanime",
-    "ecchi",
-    "ero-anime",
-    "eroanime",
-    "eroge",
-    "ero",
-    "ahegao",
-    "doujin",
-    "doujinshi",
-    "futanari",
-    "netorare",
-    "ntr",
     "chikan",
     "paizuri",
     "nakadashi",
@@ -49,6 +45,60 @@ const EXPLICIT_ADULT_TOKENS: &[&str] = &[
     "incest",
     "uncensored",
     "decensored",
+    "nude",
+    "nudity",
+    "naked",
+    "topless",
+    "fella",
+    "cunnilingus",
+    "pegging",
+    // Hardcore Franchises & Studios
+    "rance",
+    "kuroinu",
+    "taimanin",
+    "mankitsu",
+    "overflow",
+    "euphoria",
+    "futabu",
+    "shoujoramune",
+    "otomedori",
+    "resortboin",
+    "onichichi",
+    "seikatsushuukan",
+    "bunnywalker",
+    "pinkpineapple",
+    "queenbee",
+    "poros",
+    "greenbunny",
+    "whitebear",
+    "naturalhigh",
+    "nhentai",
+    "tsumino",
+    "fakku",
+    "pornhub",
+    "xvideos",
+    "xnxx",
+    "spankbang",
+    "eporner",
+    "missav",
+    "supjav",
+    "javhd",
+    "rule34",
+];
+
+/// Suggestive, Ecchi, Swimsuit & Anatomy Tokens (Active in MODERATE & EXTREME).
+const SUGGESTIVE_ECCHI_TOKENS: &[&str] = &[
+    "ecchi",
+    "ero-anime",
+    "eroanime",
+    "eroge",
+    "ero",
+    "ahegao",
+    "doujin",
+    "doujinshi",
+    "futanari",
+    "netorare",
+    "ntr",
     "smut",
     "lewd",
     "lust",
@@ -72,10 +122,6 @@ const EXPLICIT_ADULT_TOKENS: &[&str] = &[
     "thong",
     "panties",
     "panty",
-    "nude",
-    "nudity",
-    "naked",
-    "topless",
     "cleavage",
     "oppai",
     "boob",
@@ -92,46 +138,31 @@ const EXPLICIT_ADULT_TOKENS: &[&str] = &[
     "peeping",
     "voyeur",
     "chijo",
-    // Specific Notorious Hentai Franchises & Stems
-    "rance",
-    "kuroinu",
-    "taimanin",
-    "mankitsu",
-    "overflow",
-    "euphoria",
-    "futabu",
-    "shoujoramune",
-    "otomedori",
-    "resortboin",
-    "onichichi",
-    "seikatsushuukan",
-    "fella",
-    "cunnilingus",
-    "pegging",
-    // Adult Studios & Platforms
-    "bunnywalker",
-    "pinkpineapple",
-    "queenbee",
-    "poros",
-    "greenbunny",
-    "whitebear",
-    "naturalhigh",
-    "nhentai",
-    "tsumino",
-    "fakku",
-    "pornhub",
-    "xvideos",
-    "xnxx",
-    "spankbang",
-    "eporner",
-    "missav",
-    "supjav",
-    "javhd",
-    "rule34",
 ];
 
-/// Multi-word adult / hentai franchise phrases (matched as case-insensitive substrings).
-const EXPLICIT_ADULT_PHRASES: &[&str] = &[
+/// Extreme Sensitivity / Borderline Fanservice Tokens (Active ONLY in EXTREME).
+const EXTREME_SENSITIVITY_TOKENS: &[&str] = &[
+    "bathing",
+    "bath",
+    "hotspring",
+    "hot-spring",
+    "onsen",
+    "harem",
+    "seductive",
+    "provocative",
+    "fanservice",
+    "fan-service",
+    "waifu",
+    "suggestive",
+    "pantyshot",
+    "microkini",
+    "spank",
+    "spanking",
+    "bathhouse",
+];
+
+/// Hardcore Adult Multi-Word Phrases (Active in ALL levels).
+const HARDCORE_ADULT_PHRASES: &[&str] = &[
     "boku no pico",
     "bible black",
     "oni chichi",
@@ -141,6 +172,10 @@ const EXPLICIT_ADULT_PHRASES: &[&str] = &[
     "resort boin",
     "otome dori",
     "shoujo ramune",
+];
+
+/// Suggestive & Ecchi Franchise Multi-Word Phrases (Active in MODERATE & EXTREME).
+const SUGGESTIVE_ECCHI_PHRASES: &[&str] = &[
     "high school dxd",
     "shinmai maou",
     "yosuga no sora",
@@ -155,14 +190,33 @@ const EXPLICIT_ADULT_PHRASES: &[&str] = &[
     "seikon no qwaser",
 ];
 
-/// CJK Adult & Swimsuit Stems (Japanese Kanji / Katakana / Hiragana, Chinese).
-const CJK_ADULT_STEMS: &[&str] = &[
-    "エロ",
-    "エッチ",
-    "変態",
+/// Extreme Sensitivity Phrases (Active ONLY in EXTREME).
+const EXTREME_SENSITIVITY_PHRASES: &[&str] = &[
+    "hot spring",
+    "fan service",
+    "panty shot",
+    "mixed bath",
+];
+
+/// CJK Hardcore Stems (Active in ALL levels).
+const CJK_HARDCORE_STEMS: &[&str] = &[
     "成年",
     "18禁",
     "無修正",
+    "裏ビデオ",
+    "潮吹き",
+    "乱交",
+    "ポルノ",
+    "パイズリ",
+    "フェラ",
+    "中出し",
+];
+
+/// CJK Suggestive & Ecchi Stems (Active in MODERATE & EXTREME).
+const CJK_SUGGESTIVE_STEMS: &[&str] = &[
+    "エロ",
+    "エッチ",
+    "変態",
     "巨乳",
     "爆乳",
     "水着",
@@ -172,45 +226,75 @@ const CJK_ADULT_STEMS: &[&str] = &[
     "調教",
     "下着",
     "露出",
-    "水着回",
     "同人",
-    "裏ビデオ",
-    "盗撮",
     "熟女",
-    "潮吹き",
-    "乱交",
-    "アダルト",
-    "ポルノ",
-    "パイズリ",
-    "パンチラ",
-    "フェラ",
-    "性愛",
     "性的",
     "美乳",
     "貧乳",
     "微乳",
-    "中出し",
+    "パンチラ",
+    "性愛",
+    "アダルト",
 ];
 
-/// Evaluates whether a single text string contains adult, ecchi, hentai, or summer/beach swimsuit markers.
-fn is_text_nsfw_single(text: &str) -> bool {
+/// CJK Extreme Sensitivity Stems (Active ONLY in EXTREME).
+const CJK_EXTREME_STEMS: &[&str] = &[
+    "混浴",
+    "温泉",
+    "お風呂",
+    "ハーレム",
+    "お色気",
+    "水着回",
+    "盗撮",
+];
+
+/// Evaluates whether a single text string contains adult/NSFW markers according to sensitivity level.
+fn is_text_nsfw_single(text: &str, level: u8) -> bool {
     if text.is_empty() {
         return false;
     }
 
-    // 1. Direct CJK substring matching
-    for &cjk_stem in CJK_ADULT_STEMS {
-        if text.contains(cjk_stem) {
+    // 1. Direct CJK stem checks
+    for &stem in CJK_HARDCORE_STEMS {
+        if text.contains(stem) {
             return true;
+        }
+    }
+    if level >= LEVEL_MODERATE {
+        for &stem in CJK_SUGGESTIVE_STEMS {
+            if text.contains(stem) {
+                return true;
+            }
+        }
+    }
+    if level >= LEVEL_EXTREME {
+        for &stem in CJK_EXTREME_STEMS {
+            if text.contains(stem) {
+                return true;
+            }
         }
     }
 
     let lower = text.to_lowercase();
 
     // 2. Multi-word phrase matching
-    for &phrase in EXPLICIT_ADULT_PHRASES {
+    for &phrase in HARDCORE_ADULT_PHRASES {
         if lower.contains(phrase) {
             return true;
+        }
+    }
+    if level >= LEVEL_MODERATE {
+        for &phrase in SUGGESTIVE_ECCHI_PHRASES {
+            if lower.contains(phrase) {
+                return true;
+            }
+        }
+    }
+    if level >= LEVEL_EXTREME {
+        for &phrase in EXTREME_SENSITIVITY_PHRASES {
+            if lower.contains(phrase) {
+                return true;
+            }
         }
     }
 
@@ -218,38 +302,66 @@ fn is_text_nsfw_single(text: &str) -> bool {
     if lower.contains("hentai")
         || lower.contains("hanime")
         || lower.contains("javhd")
-        || lower.contains("ecchi")
-        || lower.contains("erotica")
-        || lower.contains("bikini")
-        || lower.contains("swimsuit")
-        || lower.contains("swimwear")
-        || lower.contains("gravure")
         || lower.contains("r18")
         || lower.contains("18+")
         || lower.contains("nsfw")
         || lower.contains("uncensored")
+        || lower.contains("pornhub")
+        || lower.contains("xvideos")
+        || lower.contains("xnxx")
     {
         return true;
     }
 
-    // 4. Summer / Beach / Swimsuit contextual triggers:
-    // Only trigger if combined with explicit swimwear or fan-service special/edition/OVA markers,
-    // preventing false positives on clean titles like "Summer Wars", "Summer Time Rendering".
-    let has_summer_or_beach = lower.contains("summer") || lower.contains("beach");
-    if has_summer_or_beach
-        && (lower.contains("swim")
+    if level >= LEVEL_MODERATE {
+        if lower.contains("ecchi")
+            || lower.contains("erotica")
             || lower.contains("bikini")
-            || lower.contains("monokini")
+            || lower.contains("swimsuit")
+            || lower.contains("swimwear")
+            || lower.contains("gravure")
+        {
+            return true;
+        }
+    }
+
+    if level >= LEVEL_EXTREME {
+        if lower.contains("fanservice")
+            || lower.contains("harem")
             || lower.contains("microkini")
-            || lower.contains("lingerie")
-            || lower.contains("topless")
-            || lower.contains("nude")
-            || lower.contains("naked")
-            || lower.contains("edition")
-            || (lower.contains("ova") && lower.contains("special"))
-            || (lower.contains("summer") && lower.contains("beach")))
-    {
-        return true;
+        {
+            return true;
+        }
+    }
+
+    // 4. Summer / Beach / Swimsuit contextual triggers
+    if level >= LEVEL_MODERATE {
+        let has_summer_or_beach = lower.contains("summer") || lower.contains("beach");
+        if has_summer_or_beach
+            && (lower.contains("swim")
+                || lower.contains("bikini")
+                || lower.contains("monokini")
+                || lower.contains("microkini")
+                || lower.contains("lingerie")
+                || lower.contains("topless")
+                || lower.contains("nude")
+                || lower.contains("naked")
+                || lower.contains("edition")
+                || (lower.contains("ova") && lower.contains("special"))
+                || (lower.contains("summer") && lower.contains("beach")))
+        {
+            return true;
+        }
+    }
+
+    if level >= LEVEL_EXTREME {
+        if lower.contains("onsen")
+            || lower.contains("bathhouse")
+            || (lower.contains("hot") && lower.contains("spring"))
+            || (lower.contains("bath") && (lower.contains("girl") || lower.contains("scene") || lower.contains("special")))
+        {
+            return true;
+        }
     }
 
     // 5. Delimited token matching (words separated by whitespace, dashes, slashes, etc.)
@@ -279,9 +391,23 @@ fn is_text_nsfw_single(text: &str) -> bool {
         if clean_token.is_empty() {
             continue;
         }
-        for &adult_token in EXPLICIT_ADULT_TOKENS {
+        for &adult_token in HARDCORE_ADULT_TOKENS {
             if clean_token == adult_token {
                 return true;
+            }
+        }
+        if level >= LEVEL_MODERATE {
+            for &suggestive_token in SUGGESTIVE_ECCHI_TOKENS {
+                if clean_token == suggestive_token {
+                    return true;
+                }
+            }
+        }
+        if level >= LEVEL_EXTREME {
+            for &extreme_token in EXTREME_SENSITIVITY_TOKENS {
+                if clean_token == extreme_token {
+                    return true;
+                }
             }
         }
     }
@@ -289,20 +415,25 @@ fn is_text_nsfw_single(text: &str) -> bool {
     false
 }
 
-/// Classifies title, url, and optional tags to identify adult/NSFW/ecchi/summer-swimsuit media.
-pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
-    if is_text_nsfw_single(title) {
+/// Classifies title, url, and optional tags with a specific sensitivity level.
+pub fn is_nsfw_text_with_level(title: &str, url: &str, tags: Option<&str>, level: u8) -> bool {
+    if is_text_nsfw_single(title, level) {
         return true;
     }
-    if is_text_nsfw_single(url) {
+    if is_text_nsfw_single(url, level) {
         return true;
     }
     if let Some(t) = tags {
-        if is_text_nsfw_single(t) {
+        if is_text_nsfw_single(t, level) {
             return true;
         }
     }
     false
+}
+
+/// Default classification (Moderate - Family Level).
+pub fn is_nsfw_text(title: &str, url: &str, tags: Option<&str>) -> bool {
+    is_nsfw_text_with_level(title, url, tags, LEVEL_MODERATE)
 }
 
 #[cfg(test)]
@@ -332,6 +463,23 @@ mod tests {
         assert!(is_nsfw_text("18禁 成年コミック アニメ化", "https://jp.anime/play", None));
         assert!(is_nsfw_text("ビキニグラビア", "https://jp.anime/play", None));
         assert!(is_nsfw_text("エロマンガ先生", "https://jp.anime/play", None));
+    }
+
+    #[test]
+    fn test_text_classification_sensitivity_levels() {
+        // Hardcore should trigger on LOW, MODERATE, and EXTREME
+        assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_LOW));
+        assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_EXTREME));
+
+        // Ecchi / Swimsuit should NOT trigger on LOW, but MUST trigger on MODERATE and EXTREME
+        assert!(!is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_LOW));
+        assert!(is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_EXTREME));
+
+        // Harem / Fanservice tag should trigger on EXTREME
+        assert!(!is_nsfw_text_with_level("Ordinary Show", "https://site.org", Some("Harem"), LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("Ordinary Show", "https://site.org", Some("Harem"), LEVEL_EXTREME));
     }
 
     #[test]

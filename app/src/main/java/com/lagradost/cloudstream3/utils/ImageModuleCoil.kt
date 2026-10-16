@@ -37,6 +37,7 @@ import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
+import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.network.SafeDns
 import com.lagradost.cloudstream3.network.addAdGuardDns
 import com.lagradost.cloudstream3.network.addCanadianShieldDns
@@ -245,19 +246,19 @@ object ImageLoader {
         }
 
         // 1. Fast text/URL keyword pre-filter: intercept before loading over network
-        if (!isNsfwGloballyEnabled() && imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
+        if (shouldCensorPosters(context) && imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
             applyCensoredPoster(this)
             return
         }
 
         // 2. Fast LRU AI model cache check: if already classified as NSFW by on-device model, intercept immediately!
-        if (!isNsfwGloballyEnabled() && imageData is String && OnDeviceNsfwClassifier.isCachedNsfw(imageData)) {
+        val imageKey = (imageData as? String) ?: imageData.toString()
+        if (shouldCensorPosters(context) && OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context)) {
             applyCensoredPoster(this)
             return
         }
 
-        val imageKey = (imageData as? String) ?: imageData.toString()
-        if (!isNsfwGloballyEnabled()) {
+        if (shouldCensorPosters(context)) {
             this.setTag(R.id.coil_image_url_tag, imageKey)
         }
 
@@ -269,7 +270,7 @@ object ImageLoader {
                     headerBuilder[key] = value
                 }
             }.build())
-            if (!isNsfwGloballyEnabled()) {
+            if (shouldCensorPosters(context)) {
                 listener(
                     onSuccess = { _, result ->
                         try {

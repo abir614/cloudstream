@@ -1,5 +1,5 @@
 use jni::objects::{JByteArray, JClass, JString};
-use jni::sys::{jboolean, jstring};
+use jni::sys::{jboolean, jint, jstring};
 use jni::JNIEnv;
 
 use crate::security::ssrf::validate_url_safety;
@@ -753,7 +753,7 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     }
 }
 
-/// JNI bridge to classify NSFW / Hentai content based on title, url, and optional tags
+/// JNI bridge to classify NSFW / Hentai content based on title, url, optional tags, and sensitivity level
 #[no_mangle]
 pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeIsNsfw(
     mut env: JNIEnv,
@@ -761,6 +761,7 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     title_input: JString,
     url_input: JString,
     tags_input: JString,
+    level: jint,
 ) -> jboolean {
     let title: String = if !title_input.is_null() {
         env.get_string(&title_input).ok().map(|s| s.into()).unwrap_or_default()
@@ -778,8 +779,14 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         None
     };
 
+    let lvl = match level {
+        0 => crate::security::nsfw_classifier::LEVEL_LOW,
+        2 => crate::security::nsfw_classifier::LEVEL_EXTREME,
+        _ => crate::security::nsfw_classifier::LEVEL_MODERATE,
+    };
+
     let safe_res = std::panic::catch_unwind(|| {
-        crate::security::nsfw_classifier::is_nsfw_text(&title, &url, tags.as_deref())
+        crate::security::nsfw_classifier::is_nsfw_text_with_level(&title, &url, tags.as_deref(), lvl)
     });
 
     match safe_res {
