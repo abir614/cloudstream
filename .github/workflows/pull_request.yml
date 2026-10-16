@@ -34,6 +34,18 @@ jobs:
       # If this fails you need to add a @Prerelease annotation to new code.
       run: ./gradlew library:checkKotlinAbi
 
+    - name: Set up Rust & Android targets
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android, armv7-linux-androideabi, x86_64-linux-android, i686-linux-android
+
+    - name: Build Rust Native Core for ARM and x86 Architectures
+      run: |
+        export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-$ANDROID_NDK_LATEST_HOME}"
+        cargo install cargo-ndk --locked
+        cd rust-core
+        cargo ndk -t armeabi-v7a -t arm64-v8a -t x86 -t x86_64 -o ../app/src/main/jniLibs build --release
+
     - name: Run Gradle
       run: ./gradlew assemblePrereleaseDebug lint check
 

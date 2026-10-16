@@ -47,7 +47,7 @@ quickcheck_macros = "1.0.3"
 tempfile = "3.16.0"
 
 [features]
-default = []
+default = ["wasm-sandbox"]
 wasm-sandbox = ["dep:wasmi"]
 
 [profile.release]

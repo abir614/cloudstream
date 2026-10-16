@@ -17,39 +17,13 @@ object NativeCoreBridge {
             isLoaded = true
             Log.i(TAG, "Loaded native core library: ${getCoreInfo()}")
 
-            // Hook native execution providers for zero-GC low-end optimization
-            com.lagradost.cloudstream3.utils.JsUnpacker.nativeUnpacker = { script ->
-                if (isLoaded) nativeUnpackJs(script) else null
-            }
-            com.lagradost.cloudstream3.utils.Levenshtein.nativeFuzzyRatioProvider = { s1, s2 ->
-                if (isLoaded) nativeFuzzyRatio(s1, s2) else null
-            }
-            com.lagradost.cloudstream3.utils.M3u8Helper2.nativeM3u8Parser = { content, baseUrl ->
-                if (!isLoaded) null
-                else try {
-                    val json = nativeParseM3u8Master(content, baseUrl)
-                    if (json != null) {
-                        val arr = org.json.JSONArray(json)
-                        val res = ArrayList<com.lagradost.cloudstream3.utils.M3u8Helper.M3u8Stream>()
-                        for (i in 0 until arr.length()) {
-                            val obj = arr.getJSONObject(i)
-                            val streamUrl = obj.getString("url")
-                            val resStr = if (obj.isNull("resolution")) null else obj.getString("resolution")
-                            val height = resStr?.split("x")?.getOrNull(1)?.toIntOrNull()
-                            res.add(com.lagradost.cloudstream3.utils.M3u8Helper.M3u8Stream(streamUrl, height))
-                        }
-                        res
-                    } else null
-                } catch (_: Throwable) {
-                    null
-                }
-            }
         } catch (t: Throwable) {
             Log.w(TAG, "Native library 'cloudstream_core' not loaded (fallback to JVM): ${t.message}")
         }
     }
 
     fun isNativeReady(): Boolean = isLoaded
+    fun isWasmSandboxEnabled(): Boolean = true
 
     /**
      * Checks if a URL is safe against SSRF attacks (blocks private IPs, loopbacks, AWS metadata).
@@ -94,67 +68,56 @@ object NativeCoreBridge {
         versionCode: Long
     ): Boolean
 
-    // --- Native LRU Cache ---
-    external fun nativeCacheGet(cacheName: String, key: String): String?
-    external fun nativeCachePut(cacheName: String, key: String, value: String)
-    external fun nativeCacheRemove(cacheName: String, key: String): Boolean
-    external fun nativeCacheClear(cacheName: String)
-
-    // --- Native Subtitles ---
-    external fun nativeParseSubtitles(content: String): String?
-
-    // --- Native Network & URL Cleaning ---
-    external fun nativeSanitizeUrl(url: String): String?
-    external fun nativeResolveUrl(base: String, relative: String): String?
-
-    // --- Native Hashing & Crypto ---
-    external fun nativeFastHash64(input: String): Long
-    external fun nativeSha256(input: String): String?
-    external fun nativeMd5(input: String): String?
-    external fun nativeFileSha256(filePath: String): String?
-
-    // --- Native Media & Manifest Parsing ---
-    external fun nativeParseM3u8Master(content: String, baseUrl: String?): String?
-    external fun nativeParseIptv(content: String): String?
-
-    // --- Native JavaScript Unpacking & Extractor ---
-    external fun nativeUnpackJs(script: String): String?
-    external fun nativeExtractStreamUrls(content: String): String?
-
-    // --- Native Fast HTML Media Link Extraction ---
-    external fun nativeExtractMediaLinks(html: String): String?
-    external fun nativeExtractScriptJson(html: String, variableName: String): String?
-
-    // --- Native Levenshtein & Fuzzy Search ---
-    external fun nativeFuzzyRatio(s1: String, s2: String): Int
-    external fun nativeLevenshtein(s1: String, s2: String): Int
-
-    // --- Native NSFW / Hentai Classification ---
-    external fun nativeIsNsfw(title: String, url: String, tags: String?, level: Int): Boolean
-
-    fun isNsfw(title: String, url: String, tags: String? = null, level: Int = 1): Boolean? {
-        return if (isLoaded) {
-            try {
-                nativeIsNsfw(title, url, tags, level)
-            } catch (_: Throwable) {
-                null
+    /**
+     * Fast in-memory DEFLATE compression using Android platform zlib (backed by OS libz.so).
+     */
+    fun compressString(text: String): ByteArray? {
+        return try {
+            val bytes = text.toByteArray(Charsets.UTF_8)
+            val deflater = java.util.zip.Deflater(java.util.zip.Deflater.BEST_COMPRESSION)
+            deflater.setInput(bytes)
+            deflater.finish()
+            val baos = java.io.ByteArrayOutputStream(bytes.size)
+            val buffer = ByteArray(4096)
+            while (!deflater.finished()) {
+                val count = deflater.deflate(buffer)
+                baos.write(buffer, 0, count)
             }
-        } else {
+            deflater.end()
+            baos.toByteArray()
+        } catch (_: Throwable) {
             null
         }
     }
 
-
-    // --- Native Fast In-Memory DEFLATE Compression ---
-    external fun nativeCompressString(text: String): ByteArray?
-    external fun nativeDecompressString(bytes: ByteArray): String?
-
-    fun compressString(text: String): ByteArray? {
-        return if (isLoaded) nativeCompressString(text) else null
+    fun decompressString(bytes: ByteArray): String? {
+        return try {
+            val inflater = java.util.zip.Inflater()
+            inflater.setInput(bytes)
+            val baos = java.io.ByteArrayOutputStream(bytes.size * 2)
+            val buffer = ByteArray(4096)
+            while (!inflater.finished()) {
+                val count = inflater.inflate(buffer)
+                if (count == 0 && inflater.needsInput()) break
+                baos.write(buffer, 0, count)
+            }
+            inflater.end()
+            baos.toString(Charsets.UTF_8.name())
+        } catch (_: Throwable) {
+            null
+        }
     }
 
-    fun decompressString(bytes: ByteArray): String? {
-        return if (isLoaded) nativeDecompressString(bytes) else null
+    /**
+     * NSFW text classification evaluated in pure Kotlin (zero JNI overhead).
+     */
+    fun isNsfw(title: String, url: String, tags: String? = null, level: Int = 1): Boolean {
+        val filterLevel = when (level) {
+            0 -> com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel.LOW
+            2 -> com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel.EXTREME
+            else -> com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel.MODERATE
+        }
+        return com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.isNsfwText(title, url, tags, filterLevel)
     }
 
     // --- Native Capability-Gated WebAssembly Sandbox Execution ---
