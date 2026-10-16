@@ -66,4 +66,34 @@ class NsfwFilterEngineTest {
         assertEquals("Attack on Titan", filteredMixed.list[0].name)
         assertEquals("Hunter x Hunter (2011)", filteredMixed.list[1].name)
     }
+
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `test filterSearchResults catches ecchi and adult titles on mainstream providers`() {
+        val results: List<SearchResponse> = listOf(
+            AnimeSearchResponse("High School DxD", "https://anime.tv/hsdxd", "AnimePahe", TvType.Anime),
+            AnimeSearchResponse("Demon Slayer", "https://anime.tv/ds", "AnimePahe", TvType.Anime),
+            MovieSearchResponse("Summer Bikini Vacation OVA", "https://anime.tv/summer-bikini", "AnimePahe", TvType.Anime),
+            AnimeSearchResponse("Frieren: Beyond Journey's End", "https://anime.tv/frieren", "AnimePahe", TvType.Anime)
+        )
+
+        val filtered = NsfwFilterEngine.filterSearchResults(results, isNsfwEnabled = false)
+        assertEquals(2, filtered.size)
+        assertEquals("Demon Slayer", filtered[0].name)
+        assertEquals("Frieren: Beyond Journey's End", filtered[1].name)
+    }
+
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `test filterHomePageList eliminates row with adult or ecchi category name`() {
+        val ecchiRow = HomePageList(
+            name = "Top Ecchi Anime",
+            list = listOf(
+                AnimeSearchResponse("Show 1", "https://anime.tv/s1", "AnimePahe", TvType.Anime),
+                AnimeSearchResponse("Show 2", "https://anime.tv/s2", "AnimePahe", TvType.Anime)
+            )
+        )
+        assertNull(NsfwFilterEngine.filterHomePageList(ecchiRow, isNsfwEnabled = false))
+        assertNotNull(NsfwFilterEngine.filterHomePageList(ecchiRow, isNsfwEnabled = true))
+    }
 }

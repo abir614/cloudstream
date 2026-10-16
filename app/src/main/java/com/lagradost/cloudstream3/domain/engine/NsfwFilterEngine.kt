@@ -10,13 +10,28 @@ import com.lagradost.cloudstream3.ui.APIRepository
 import com.lagradost.cloudstream3.services.NativeCoreBridge
 
 /**
- * Mathematical Poster & Image NSFW Classification Engine.
+ * Robust Mathematical Poster & Multi-Vector NSFW Classification Engine.
  *
- * Per user architecture, text-based keyword dictionaries and domain filters have been removed.
- * Visual adult content detection relies purely on the native Rust mathematical poster detector
- * (`poster_detector.rs`), operating in sub-microseconds with zero heap allocations on low-end hardware.
+ * Integrates:
+ * 1. Native Rust ITU-R BT.601 + RGB + HSV skin exposure detector with aggressive thresholds
+ *    for erotica, bikini, beach, and summer exposure (`poster_detector.rs`).
+ * 2. Multi-language explicit adult, ecchi, and beach/summer keyword guardian (`nsfw_classifier.rs`).
+ * 3. Autonomous fallback heuristic if native library is temporarily uninitialized.
  */
 object NsfwFilterEngine {
+
+    private val FALLBACK_KEYWORDS = hashSetOf(
+        "hentai", "hanime", "ecchi", "erotica", "erotic", "xxx", "porn", "porno",
+        "nsfw", "jav", "r18", "18+", "uncensored", "bikini", "swimsuit", "swimwear",
+        "beachwear", "monokini", "gravure", "lingerie", "nude", "nudity", "naked",
+        "topless", "cleavage", "oppai", "busty", "milf", "smut", "lewd", "sensual",
+        "sex", "sexy", "playboy", "dxd", "overflow", "ahegao", "doujin", "doujinshi"
+    )
+
+    private val FALLBACK_CJK_STEMS = arrayOf(
+        "エロ", "エッチ", "変態", "成年", "18禁", "無修正", "巨乳", "爆乳",
+        "水着", "ビキニ", "グラビア", "痴女", "調教", "下着", "露出", "同人", "熟女"
+    )
 
     /**
      * Checks if an image buffer exhibits excessive exposed skin tone
@@ -27,21 +42,49 @@ object NsfwFilterEngine {
     }
 
     /**
-     * Text classification stub: text/keyword filters removed per user design to rely on mathematical poster detection.
+     * Classifies title, URL, or tags against native Rust classifier and fallback heuristics.
      */
     fun isNsfwText(title: String, url: String, tags: String? = null): Boolean {
-        return NativeCoreBridge.isNsfw(title, url, tags) ?: false
+        val nativeRes = NativeCoreBridge.isNsfw(title, url, tags)
+        if (nativeRes != null) {
+            return nativeRes
+        }
+
+        // Fallback heuristic if native bridge is not yet loaded
+        return fallbackIsNsfw(title) || fallbackIsNsfw(url) || (tags != null && fallbackIsNsfw(tags))
     }
 
-    /**
-     * URL classification stub: URL slug filters removed per user design.
-     */
-    fun isNsfwUrl(url: String): Boolean {
+    private fun fallbackIsNsfw(text: String): Boolean {
+        if (text.isEmpty()) return false
+        for (stem in FALLBACK_CJK_STEMS) {
+            if (text.contains(stem)) return true
+        }
+        val lower = text.lowercase()
+        if (lower.contains("summer") || lower.contains("beach")) {
+            if (lower.contains("swim") || lower.contains("pool") || lower.contains("bikini") ||
+                lower.contains("hot") || lower.contains("special") || lower.contains("ova") ||
+                lower.contains("vacation") || lower.contains("girl") || lower.contains("island")
+            ) {
+                return true
+            }
+        }
+        val tokens = lower.split(Regex("[^a-z0-9+]+"))
+        for (token in tokens) {
+            if (FALLBACK_KEYWORDS.contains(token)) return true
+        }
         return false
     }
 
     /**
+     * URL classification helper.
+     */
+    fun isNsfwUrl(url: String): Boolean {
+        return isNsfwText("", url, null)
+    }
+
+    /**
      * Checks if a SearchResponse item is classified as adult/NSFW.
+     * Evaluates item type, provider declaration, and metadata (name, URL, poster URL).
      */
     fun isNsfw(item: SearchResponse): Boolean {
         if (item.type == TvType.NSFW) return true
@@ -49,6 +92,11 @@ object NsfwFilterEngine {
         // Check if provider itself is inherently an adult/NSFW provider
         APIHolder.getApiFromNameNull(item.apiName)?.let { provider ->
             if (isNsfwProvider(provider)) return true
+        }
+
+        // Multi-vector text check on title, item URL, and poster URL
+        if (isNsfwText(item.name, item.url, item.posterUrl)) {
+            return true
         }
 
         return false
@@ -62,6 +110,11 @@ object NsfwFilterEngine {
 
         APIHolder.getApiFromNameNull(item.apiName)?.let { provider ->
             if (isNsfwProvider(provider)) return true
+        }
+
+        val tagsStr = item.tags?.joinToString(" ")
+        if (isNsfwText(item.name, item.url, tagsStr ?: item.posterUrl)) {
+            return true
         }
 
         return false
@@ -79,12 +132,18 @@ object NsfwFilterEngine {
     }
 
     /**
-     * Checks if a home feed row is an adult/NSFW row.
+     * Checks if a home feed row is an adult/NSFW row based on category name or row contents.
      */
     fun isNsfwFeedRow(name: String, items: List<SearchResponse>): Boolean {
+        // 1. If the row category name itself indicates adult, ecchi, or summer/beach swimsuit, eliminate the row
+        if (isNsfwText(name, "", null)) {
+            return true
+        }
+
+        // 2. If row items contain adult content
         if (items.isNotEmpty()) {
             val nsfwCount = items.count { isNsfw(it) }
-            if (nsfwCount * 2 > items.size) {
+            if (nsfwCount > 0 && (nsfwCount * 3 >= items.size || nsfwCount >= 2)) {
                 return true
             }
         }

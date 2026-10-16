@@ -8,6 +8,7 @@ import android.os.Build.VERSION.SDK_INT
 import android.util.Log
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import coil3.asDrawable
 import coil3.EventListener
@@ -197,18 +198,49 @@ object ImageLoader {
         }
     }
 
+    fun getCensoredDrawable(context: android.content.Context): Drawable? {
+        try {
+            val userFile = File("/home/x/Pictures/images.jpeg")
+            if (userFile.exists() && userFile.canRead()) {
+                val d = Drawable.createFromPath(userFile.absolutePath)
+                if (d != null) return d
+            }
+        } catch (_: Throwable) {
+        }
+        return ContextCompat.getDrawable(context, R.drawable.censored_poster)
+            ?: ContextCompat.getDrawable(context, R.drawable.default_cover)
+    }
+
+    fun applyCensoredPoster(imageView: ImageView) {
+        val d = getCensoredDrawable(imageView.context)
+        if (d != null) {
+            imageView.setImageDrawable(d)
+        } else {
+            imageView.setImageResource(R.drawable.censored_poster)
+        }
+    }
+
     internal fun checkBitmapSkinExcessive(bitmap: Bitmap): Boolean {
         return try {
+            val softwareBitmap = if (SDK_INT >= 28 && bitmap.config == Bitmap.Config.HARDWARE) {
+                bitmap.copy(Bitmap.Config.ARGB_8888, false) ?: bitmap
+            } else {
+                bitmap
+            }
+
             val sampleW = 32
             val sampleH = 48
             val smallBitmap = Bitmap.createBitmap(sampleW, sampleH, Bitmap.Config.ARGB_8888)
             val canvas = android.graphics.Canvas(smallBitmap)
             val rect = android.graphics.Rect(0, 0, sampleW, sampleH)
-            canvas.drawBitmap(bitmap, null, rect, null)
+            canvas.drawBitmap(softwareBitmap, null, rect, null)
 
             val pixels = IntArray(sampleW * sampleH)
             smallBitmap.getPixels(pixels, 0, sampleW, 0, 0, sampleW, sampleH)
             smallBitmap.recycle()
+            if (softwareBitmap != bitmap) {
+                softwareBitmap.recycle()
+            }
 
             val rgbBytes = ByteArray(pixels.size * 3)
             var idx = 0
@@ -237,6 +269,13 @@ object ImageLoader {
         if (imageData is Int) {
             this.setImageResource(imageData); return
         }
+
+        // Fast text/URL keyword pre-filter: intercept before loading over network
+        if (!isNsfwGloballyEnabled() && imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
+            applyCensoredPoster(this)
+            return
+        }
+
         // headers can be overridden by extensions.
         this.load(imageData, SingletonImageLoader.get(context)) {
             this.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
@@ -249,9 +288,18 @@ object ImageLoader {
                 listener(
                     onSuccess = { _, result ->
                         try {
-                            val bitmap = result.image.asDrawable(context.resources).toBitmap()
-                            if (checkBitmapSkinExcessive(bitmap)) {
-                                this@loadImageInternal.setImageResource(R.drawable.default_cover)
+                            val drawable = result.image.asDrawable(context.resources)
+                            val rawBitmap = drawable.toBitmap()
+                            val softwareBitmap = if (SDK_INT >= 28 && rawBitmap.config == Bitmap.Config.HARDWARE) {
+                                rawBitmap.copy(Bitmap.Config.ARGB_8888, false) ?: rawBitmap
+                            } else {
+                                rawBitmap
+                            }
+                            if (checkBitmapSkinExcessive(softwareBitmap)) {
+                                applyCensoredPoster(this@loadImageInternal)
+                                this@loadImageInternal.post {
+                                    applyCensoredPoster(this@loadImageInternal)
+                                }
                             }
                         } catch (_: Throwable) {
                         }

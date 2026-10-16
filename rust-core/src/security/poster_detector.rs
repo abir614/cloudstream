@@ -50,26 +50,26 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
         let g = rgb_bytes[offset + 1] as f32;
         let b = rgb_bytes[offset + 2] as f32;
 
-        // 1. ITU-R BT.601 YCbCr transformation
+        // 1. ITU-R BT.601 YCbCr transformation (tuned for bright beach/sunlight & cel-shading)
         let y = 0.299 * r + 0.587 * g + 0.114 * b;
         let cb = 128.0 - 0.168736 * r - 0.331264 * g + 0.5 * b;
         let cr = 128.0 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
-        let ycbcr_match = (80.0..=135.0).contains(&cb)
-            && (133.0..=180.0).contains(&cr)
-            && (35.0..=245.0).contains(&y);
+        let ycbcr_match = (75.0..=140.0).contains(&cb)
+            && (128.0..=185.0).contains(&cr)
+            && (30.0..=252.0).contains(&y);
 
         // 2. Normalized RGB / Chromaticity constraint
         let sum_rgb = r + g + b + 0.001;
         let norm_r = r / sum_rgb;
-        let rgb_match = r > g && (r - b) >= 8.0 && norm_r >= 0.35;
+        let rgb_match = r > g && (r - b) >= 4.0 && norm_r >= 0.33;
 
-        // 3. HSV Saturation & Hue Bounds
+        // 3. HSV Saturation & Hue Bounds (supports bright sunlight and delicate blush)
         let max_c = r.max(g).max(b);
         let min_c = r.min(g).min(b);
         let delta = max_c - min_c;
         let sat = if max_c > 0.0 { delta / max_c } else { 0.0 };
-        let sat_match = (0.10..=0.75).contains(&sat);
+        let sat_match = (0.06..=0.88).contains(&sat);
 
         let hue = if delta <= 0.001 {
             0.0
@@ -81,14 +81,14 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
         } else {
             60.0 * (((r - g) / delta) + 4.0)
         };
-        let hue_match = (0.0..=50.0).contains(&hue) || (335.0..=360.0).contains(&hue);
+        let hue_match = (0.0..=50.0).contains(&hue) || (330.0..=360.0).contains(&hue);
 
         // Combined Multi-Space Flesh Tone Classification
         let is_skin = ycbcr_match && rgb_match && sat_match && hue_match;
 
         // 4. Spatial Centroid / Anatomical Weighting (Central 60% torso/pelvic region)
         let pos_ratio = (i as f32) / (total_pixels as f32);
-        let is_core_anatomy = (0.22..=0.82).contains(&pos_ratio);
+        let is_core_anatomy = (0.20..=0.82).contains(&pos_ratio);
 
         if is_core_anatomy {
             core_sampled_count += 1;
@@ -121,7 +121,7 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
         0.0
     };
 
-    // 5. Chrominance Variance Calculation (Rejects flat beige wallpapers and sand)
+    // 5. Chrominance Variance Calculation (Rejects flat solid color fills and sand)
     let total_variance = if skin_count > 1 {
         let n = skin_count as f32;
         let cb_var = (cb_sq_sum / n) - ((cb_sum / n) * (cb_sum / n));
@@ -132,20 +132,24 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
     };
 
     // 6. Flat Solid Color Fill Rejection
-    // An illustrated living body / cel-shaded anime figure has shading gradients, highlights,
-    // and contours (variance >= 8.0). If variance is near-zero, it is a synthetic flat wall,
-    // solid painted box, or uniform wood/sand texture.
-    if total_variance < 8.0 {
+    // Pure flat synthetic blocks or walls have near-zero variance (< 1.5).
+    // Living human skin and cel-shaded anime contours exhibit natural shading gradients.
+    if total_variance < 1.5 {
         return false;
     }
 
-    // High global exposure with natural skin shading variance
-    if global_ratio >= 0.42 {
+    // High global exposure (bikini, swimwear, summer, or high-exposure art >= 15%)
+    if global_ratio >= 0.15 {
         return true;
     }
 
-    // Central torso / pelvic erotica exposure (core focus >= 38% and global >= 28%)
-    if core_ratio >= 0.38 && global_ratio >= 0.28 {
+    // Central torso / pelvic erotica or swimsuit exposure
+    if core_ratio >= 0.18 && global_ratio >= 0.10 {
+        return true;
+    }
+
+    // Concentrated core anatomical exposure
+    if core_ratio >= 0.25 {
         return true;
     }
 
@@ -200,5 +204,30 @@ mod tests {
         }
 
         assert!(!is_skin_exposure_excessive(&clean_landscape, 3));
+    }
+
+    #[test]
+    fn test_detects_summer_beach_swimsuit_exposure() {
+        // Beach scenery (blue ocean/sky 80%) with a swimsuit/bikini figure (20% exposed skin in core)
+        let mut beach_poster = Vec::with_capacity(3000);
+        let skin_palette = [
+            [255, 225, 205],
+            [245, 210, 185],
+            [235, 190, 160],
+        ];
+
+        for i in 0..1000 {
+            // Put 200 skin pixels in the core anatomy region (positions 300..500)
+            if (300..500).contains(&i) {
+                let color = skin_palette[i % skin_palette.len()];
+                beach_poster.extend_from_slice(&color);
+            } else if i < 300 {
+                beach_poster.extend_from_slice(&[70, 130, 240]); // Blue sky
+            } else {
+                beach_poster.extend_from_slice(&[30, 100, 180]); // Ocean water
+            }
+        }
+
+        assert!(is_skin_exposure_excessive(&beach_poster, 3));
     }
 }

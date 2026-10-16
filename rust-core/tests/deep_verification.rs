@@ -133,10 +133,50 @@ fn test_poster_detector_accuracy() {
         "Clean cinematic landscape must pass cleanly"
     );
 
-    // 4. Test: Edge cases (empty, sub-pixel buffers, mismatched bpp)
+    // 4. Test: Summer beach / swimsuit figure in ocean/sky landscape
+    let mut beach_scene = Vec::with_capacity(3072);
+    let summer_skin = [[255, 225, 205], [245, 210, 185], [235, 190, 160]];
+    for i in 0..1024 {
+        if (300..500).contains(&i) {
+            beach_scene.extend_from_slice(&summer_skin[i % summer_skin.len()]);
+        } else if i < 300 {
+            beach_scene.extend_from_slice(&[70, 130, 240]);
+        } else {
+            beach_scene.extend_from_slice(&[30, 100, 180]);
+        }
+    }
+    assert!(
+        is_skin_exposure_excessive(&beach_scene, 3),
+        "Summer beach / swimsuit exposed figures must trigger excessive exposure"
+    );
+
+    // 5. Test: Edge cases (empty, sub-pixel buffers, mismatched bpp)
     assert!(!is_skin_exposure_excessive(&[], 3));
     assert!(!is_skin_exposure_excessive(&[255, 200], 3)); // < 12 bytes
     assert!(!is_skin_exposure_excessive(&[255, 200, 180, 255, 200, 180], 3)); // 2 pixels only
+}
+
+#[test]
+fn test_nsfw_text_and_guardian_matrix() {
+    // 1. Explicit anime & hentai titles
+    assert!(is_nsfw_text("High School DxD Born", "https://stream.to/ep1", None));
+    assert!(is_nsfw_text("Overflow Uncensored", "https://stream.to/ep2", None));
+    assert!(is_nsfw_text("Episode 1", "https://site.to/video", Some("Ecchi, Harem")));
+    assert!(is_nsfw_text("Random", "https://site.to/r18/video.m3u8", None));
+
+    // 2. Summer, Beach & Swimwear keywords
+    assert!(is_nsfw_text("Summer Beach OVA", "https://site.to/ova", None));
+    assert!(is_nsfw_text("Hot Bikini Special", "https://site.to/special", None));
+    assert!(is_nsfw_text("Swimsuit Edition", "https://site.to/stream", None));
+
+    // 3. CJK Unicode adult stems
+    assert!(is_nsfw_text("水着の彼女", "https://jp.to/v1", None));
+    assert!(is_nsfw_text("18禁 成年向け", "https://jp.to/v2", None));
+    assert!(is_nsfw_text("エロマンガ", "https://jp.to/v3", None));
+
+    // 4. Clean mainstream titles pass cleanly
+    assert!(!is_nsfw_text("Interstellar", "https://imdb.com/title/tt0816692", Some("Sci-Fi, Adventure")));
+    assert!(!is_nsfw_text("Demon Slayer: Kimetsu no Yaiba", "https://site.to/ds", Some("Action, Shounen")));
 }
 
 // ============================================================================
