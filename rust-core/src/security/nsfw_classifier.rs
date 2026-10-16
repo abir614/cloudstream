@@ -174,7 +174,6 @@ const CJK_ADULT_STEMS: &[&str] = &[
     "調教",
     "下着",
     "露出",
-    "海辺",
     "水着回",
     "同人",
     "裏ビデオ",
@@ -235,22 +234,22 @@ fn is_text_nsfw_single(text: &str) -> bool {
         return true;
     }
 
-    // 4. Summer / Beach contextual triggers:
-    // If text contains "summer" or "beach", combined with provocative/lewd markers
+    // 4. Summer / Beach / Swimsuit contextual triggers:
+    // Only trigger if combined with explicit swimwear or fan-service special/edition/OVA markers,
+    // preventing false positives on clean titles like "Summer Wars", "Summer Time Rendering".
     let has_summer_or_beach = lower.contains("summer") || lower.contains("beach");
     if has_summer_or_beach
         && (lower.contains("swim")
-            || lower.contains("pool")
             || lower.contains("bikini")
-            || lower.contains("hot")
-            || lower.contains("sun")
-            || lower.contains("vacation")
-            || lower.contains("special")
-            || lower.contains("ova")
+            || lower.contains("monokini")
+            || lower.contains("microkini")
+            || lower.contains("lingerie")
+            || lower.contains("topless")
+            || lower.contains("nude")
+            || lower.contains("naked")
             || lower.contains("edition")
-            || lower.contains("island")
-            || lower.contains("girl")
-            || lower.contains("girls"))
+            || (lower.contains("ova") && lower.contains("special"))
+            || (lower.contains("summer") && lower.contains("beach")))
     {
         return true;
     }

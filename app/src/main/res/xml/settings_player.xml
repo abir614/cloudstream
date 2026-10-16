@@ -55,6 +55,66 @@
             app:summary="@string/chromecast_subtitles_settings_des" />
     </PreferenceCategory>
 
+    <PreferenceCategory
+        android:key="@string/pref_category_tracks_key"
+        android:title="@string/pref_category_tracks">
+        <Preference
+            android:icon="@drawable/audio_capture_24px"
+            android:key="@string/primary_audio_language_key"
+            android:summary="@string/primary_audio_track_des"
+            android:title="@string/primary_audio_track" />
+        <Preference
+            android:icon="@drawable/audio_capture_24px"
+            android:key="@string/secondary_audio_language_key"
+            android:summary="@string/secondary_audio_track_des"
+            android:title="@string/secondary_audio_track" />
+        <Preference
+            android:icon="@drawable/ic_outline_subtitles_24"
+            android:key="@string/primary_sub_language_key"
+            android:summary="@string/primary_sub_track_des"
+            android:title="@string/primary_sub_track" />
+        <Preference
+            android:icon="@drawable/ic_outline_subtitles_24"
+            android:key="@string/secondary_sub_language_key"
+            android:summary="@string/secondary_sub_track_des"
+            android:title="@string/secondary_sub_track" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="@string/pref_category_skip_parts_key"
+        android:title="@string/pref_category_skip_parts">
+        <SwitchPreference
+            android:icon="@drawable/ic_baseline_skip_next_24"
+            android:summary="@string/enable_skip_op_from_database_des"
+            android:title="@string/video_skip_op"
+            app:defaultValue="true"
+            app:key="@string/enable_skip_op_from_database" />
+        <ListPreference
+            android:defaultValue="1"
+            android:entries="@array/skip_part_mode_names"
+            android:entryValues="@array/skip_part_mode_values"
+            android:icon="@drawable/ic_baseline_skip_next_24"
+            android:key="@string/skip_intro_mode_key"
+            android:summary="%s"
+            android:title="@string/skip_intro" />
+        <ListPreference
+            android:defaultValue="1"
+            android:entries="@array/skip_part_mode_names"
+            android:entryValues="@array/skip_part_mode_values"
+            android:icon="@drawable/ic_baseline_skip_next_24"
+            android:key="@string/skip_outro_mode_key"
+            android:summary="%s"
+            android:title="@string/skip_outro" />
+        <ListPreference
+            android:defaultValue="2"
+            android:entries="@array/skip_part_mode_names"
+            android:entryValues="@array/skip_part_mode_values"
+            android:icon="@drawable/ic_baseline_skip_next_24"
+            android:key="@string/skip_recap_mode_key"
+            android:summary="%s"
+            android:title="@string/skip_recap" />
+    </PreferenceCategory>
+
 
     <PreferenceCategory android:title="@string/pref_category_player_features">
         <Preference
@@ -98,12 +158,6 @@
             android:title="@string/autoplay_next_settings"
             app:defaultValue="true"
             app:key="@string/autoplay_next_key" />
-        <SwitchPreference
-            android:icon="@drawable/ic_baseline_skip_next_24"
-            android:summary="@string/enable_skip_op_from_database_des"
-            android:title="@string/video_skip_op"
-            app:defaultValue="true"
-            app:key="@string/enable_skip_op_from_database" />
         <SwitchPreference
             android:icon="@drawable/screen_rotation"
             android:summary="@string/rotate_video_desc"

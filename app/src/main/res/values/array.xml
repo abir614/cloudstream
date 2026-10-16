@@ -427,4 +427,22 @@
         <item>VISCII</item>
         <item>Windows-1258</item>
     </string-array>
+
+    <string-array name="skip_part_mode_names">
+        <item>@string/skip_mode_off</item>
+        <item>@string/skip_mode_button</item>
+        <item>@string/skip_mode_auto</item>
+    </string-array>
+
+    <string-array name="skip_part_mode_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
+    <integer-array name="skip_part_mode_int_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </integer-array>
 </resources>

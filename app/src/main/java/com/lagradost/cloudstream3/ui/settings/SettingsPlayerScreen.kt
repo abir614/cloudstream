@@ -21,6 +21,7 @@ import com.lagradost.cloudstream3.ui.settings.SettingsFragment.Companion.getFold
 import com.lagradost.cloudstream3.ui.subtitles.ChromecastSubtitlesFragment
 import com.lagradost.cloudstream3.ui.subtitles.SubtitlesFragment
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
+import com.lagradost.cloudstream3.utils.SubtitleHelper
 import com.lagradost.cloudstream4.compose.EMULATOR
 import com.lagradost.cloudstream4.compose.PHONE
 import com.lagradost.cloudstream4.compose.TV
@@ -60,6 +61,18 @@ object SettingsPlayerScreen : SearchableSettings {
             }
         }
 
+        val defaultSourcesText = stringResource(R.string.source_original_or_default)
+        val noneText = stringResource(R.string.source_none)
+        val languageEntries = remember(context) {
+            val list = mutableListOf("" to defaultSourcesText, "none" to noneText)
+            list.addAll(
+                SubtitleHelper.languages
+                    .map { it.IETF_tag to it.nameNextToFlagEmoji() }
+                    .sortedBy { it.second.substringAfter("\u00a0").lowercase() }
+            )
+            list.toMap()
+        }
+
         return persistentListOf(
             Preference.PreferenceGroup(
                 title = stringResource(R.string.pref_category_subtitles),
@@ -78,6 +91,77 @@ object SettingsPlayerScreen : SearchableSettings {
                         onClick = {
                             ChromecastSubtitlesFragment.push(activity, false)
                         }),
+                ),
+            ),
+            Preference.PreferenceGroup(
+                title = stringResource(R.string.pref_category_tracks),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.ListPreference(
+                        preference = settings.player.primaryAudioLanguage,
+                        title = stringResource(R.string.primary_audio_track),
+                        subtitle = stringResource(R.string.primary_audio_track_des),
+                        icon = painterResource(R.drawable.audio_capture_24px),
+                        entries = languageEntries,
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        preference = settings.player.secondaryAudioLanguage,
+                        title = stringResource(R.string.secondary_audio_track),
+                        subtitle = stringResource(R.string.secondary_audio_track_des),
+                        icon = painterResource(R.drawable.audio_capture_24px),
+                        entries = languageEntries,
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        preference = settings.player.primarySubLanguage,
+                        title = stringResource(R.string.primary_sub_track),
+                        subtitle = stringResource(R.string.primary_sub_track_des),
+                        icon = painterResource(R.drawable.subtitles_gear_24px),
+                        entries = languageEntries,
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        preference = settings.player.secondarySubLanguage,
+                        title = stringResource(R.string.secondary_sub_track),
+                        subtitle = stringResource(R.string.secondary_sub_track_des),
+                        icon = painterResource(R.drawable.subtitles_gear_24px),
+                        entries = languageEntries,
+                    ),
+                ),
+            ),
+            Preference.PreferenceGroup(
+                title = stringResource(R.string.pref_category_skip_parts),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.SwitchPreference(
+                        preference = settings.player.skipOpEnabled,
+                        title = stringResource(R.string.video_skip_op),
+                        subtitle = stringResource(R.string.enable_skip_op_from_database_des),
+                        icon = painterResource(R.drawable.keyboard_double_arrow_right_24px),
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        preference = settings.player.skipIntroMode,
+                        title = stringResource(R.string.skip_intro),
+                        subtitle = stringResource(R.string.skip_intro_des),
+                        icon = painterResource(R.drawable.skip_next_24px),
+                        entries = integerArrayResource(R.array.skip_part_mode_int_values).zip(
+                            stringArrayResource(R.array.skip_part_mode_names)
+                        ).toMap()
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        preference = settings.player.skipOutroMode,
+                        title = stringResource(R.string.skip_outro),
+                        subtitle = stringResource(R.string.skip_outro_des),
+                        icon = painterResource(R.drawable.skip_next_24px),
+                        entries = integerArrayResource(R.array.skip_part_mode_int_values).zip(
+                            stringArrayResource(R.array.skip_part_mode_names)
+                        ).toMap()
+                    ),
+                    Preference.PreferenceItem.ListPreference(
+                        preference = settings.player.skipRecapMode,
+                        title = stringResource(R.string.skip_recap),
+                        subtitle = stringResource(R.string.skip_recap_des),
+                        icon = painterResource(R.drawable.skip_next_24px),
+                        entries = integerArrayResource(R.array.skip_part_mode_int_values).zip(
+                            stringArrayResource(R.array.skip_part_mode_names)
+                        ).toMap()
+                    ),
                 ),
             ),
             Preference.PreferenceGroup(
@@ -159,12 +243,6 @@ object SettingsPlayerScreen : SearchableSettings {
                         title = stringResource(R.string.resume_playback_settings),
                         subtitle = stringResource(R.string.resume_playback_settings_des),
                         icon = painterResource(R.drawable.ic_baseline_replay_24),
-                    ),
-                    Preference.PreferenceItem.SwitchPreference(
-                        preference = settings.player.skipOpEnabled,
-                        title = stringResource(R.string.video_skip_op),
-                        subtitle = stringResource(R.string.enable_skip_op_from_database_des),
-                        icon = painterResource(R.drawable.keyboard_double_arrow_right_24px),
                     ),
                     Preference.PreferenceItem.SwitchPreference(
                         preference = settings.player.autoRotateEnabled,

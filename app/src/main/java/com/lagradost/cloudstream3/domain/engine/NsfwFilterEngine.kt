@@ -61,9 +61,9 @@ object NsfwFilterEngine {
         }
         val lower = text.lowercase()
         if (lower.contains("summer") || lower.contains("beach")) {
-            if (lower.contains("swim") || lower.contains("pool") || lower.contains("bikini") ||
-                lower.contains("hot") || lower.contains("special") || lower.contains("ova") ||
-                lower.contains("vacation") || lower.contains("girl") || lower.contains("island")
+            if (lower.contains("swim") || lower.contains("bikini") || lower.contains("monokini") ||
+                lower.contains("edition") || (lower.contains("ova") && lower.contains("special")) ||
+                (lower.contains("summer") && lower.contains("beach"))
             ) {
                 return true
             }

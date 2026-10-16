@@ -831,4 +831,29 @@
     <string name="player_is_live">Live</string>
     <string name="switching_to_next_mirror">Source failed. Switching to next mirror&#8230;</string>
     <string name="switching_to_mirror_format">Source failed. Switching to %s&#8230;</string>
+
+    <!-- Source & Track Selection Preferences -->
+    <string name="pref_category_tracks">Preferred Audio &amp; Subtitle Sources</string>
+    <string name="primary_audio_track">Primary Audio Language</string>
+    <string name="primary_audio_track_des">Preferred audio stream language. Falls back to Secondary if unavailable.</string>
+    <string name="secondary_audio_track">Secondary Audio Language</string>
+    <string name="secondary_audio_track_des">Alternative audio stream language if Primary is not available.</string>
+    <string name="primary_sub_track">Primary Subtitle Language</string>
+    <string name="primary_sub_track_des">Preferred subtitle language. Falls back to Secondary if unavailable.</string>
+    <string name="secondary_sub_track">Secondary Subtitle Language</string>
+    <string name="secondary_sub_track_des">Alternative subtitle language if Primary is not available.</string>
+    <string name="source_original_or_default">Default / Stream Original</string>
+    <string name="source_none">None (Disabled)</string>
+
+    <!-- Skip Parts (Intro, Outro, Recap) -->
+    <string name="pref_category_skip_parts">Skip Parts (Intro, Outro, Recap)</string>
+    <string name="skip_mode_off">Disabled</string>
+    <string name="skip_mode_button">Show Skip Button</string>
+    <string name="skip_mode_auto">Always Auto-Skip</string>
+    <string name="skip_intro">Skip Intro / Opening</string>
+    <string name="skip_intro_des">How the player handles opening sequences</string>
+    <string name="skip_outro">Skip Outro / Ending</string>
+    <string name="skip_outro_des">How the player handles ending and credits sequences</string>
+    <string name="skip_recap">Skip Recap</string>
+    <string name="skip_recap_des">How the player handles recap sequences</string>
 </resources>

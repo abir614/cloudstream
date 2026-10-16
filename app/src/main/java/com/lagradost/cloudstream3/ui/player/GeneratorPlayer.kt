@@ -129,7 +129,10 @@ import com.lagradost.cloudstream3.utils.UIHelper.toPx
 import com.lagradost.cloudstream3.utils.downloader.DownloadUtils.getImageBitmapFromUrl
 import com.lagradost.cloudstream3.utils.setText
 import com.lagradost.cloudstream3.utils.txt
+import com.lagradost.cloudstream3.utils.videoskip.SkipType
 import com.lagradost.cloudstream3.utils.videoskip.VideoSkipStamp
+import androidx.preference.PreferenceManager
+import android.content.SharedPreferences
 import com.lagradost.safefile.SafeFile
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -148,6 +151,18 @@ class GeneratorPlayer : FullScreenPlayer() {
         const val NOTIFICATION_ID = 2326
         const val CHANNEL_ID = 7340
         const val STOP_ACTION = "stopcs3"
+
+        const val SHOW_AUDIO_ID_PREFIX = "pref_audio_show_id_"
+        const val SHOW_AUDIO_LABEL_PREFIX = "pref_audio_show_label_"
+        const val SHOW_AUDIO_LANG_PREFIX = "pref_audio_show_lang_"
+
+        const val SHOW_SUB_DISABLED_PREFIX = "pref_sub_show_disabled_"
+        const val SHOW_SUB_ID_PREFIX = "pref_sub_show_id_"
+        const val SHOW_SUB_NAME_PREFIX = "pref_sub_show_name_"
+        const val SHOW_SUB_LANG_PREFIX = "pref_sub_show_lang_"
+
+        const val SHOW_LINK_SOURCE_PREFIX = "pref_link_show_source_"
+        const val SHOW_LINK_NAME_PREFIX = "pref_link_show_name_"
 
         private val generators = ConcurrentHashMap<String, VideoGenerator<*>>()
         private const val MAX_CACHED_GENERATORS = 4
@@ -220,14 +235,72 @@ class GeneratorPlayer : FullScreenPlayer() {
                 } ?: episode
             }
 
+    private val currentSeriesKey: String?
+        get() {
+            val meta = currentMeta
+            return when (meta) {
+                is ResultEpisode -> if (meta.parentId > 0) "show_${meta.parentId}" else "show_${meta.headerName.hashCode()}"
+                is ExtractorUri -> "uri_${meta.headerName.hashCode()}"
+                else -> viewModel.state.generatorState?.id?.let { "gen_$it" }
+            }
+        }
+
+    private fun matchesLanguage(actualLang: String?, actualLabel: String?, targetLang: String?): Boolean {
+        if (targetLang.isNullOrBlank()) return false
+        if (actualLang.isNullOrBlank() && actualLabel.isNullOrBlank()) return false
+
+        if (actualLang?.equals(targetLang, ignoreCase = true) == true) return true
+        if (actualLabel?.contains(targetLang, ignoreCase = true) == true) return true
+
+        val targetMetadata = SubtitleHelper.languages.find {
+            it.IETF_tag.equals(targetLang, ignoreCase = true) ||
+            it.ISO_639_1.equals(targetLang, ignoreCase = true) ||
+            it.ISO_639_2_B.equals(targetLang, ignoreCase = true) ||
+            it.ISO_639_3.equals(targetLang, ignoreCase = true) ||
+            it.languageName.equals(targetLang, ignoreCase = true)
+        }
+
+        if (targetMetadata != null) {
+            val checkStrings = listOfNotNull(
+                targetMetadata.IETF_tag,
+                targetMetadata.ISO_639_1,
+                targetMetadata.ISO_639_2_B,
+                targetMetadata.ISO_639_3,
+                targetMetadata.languageName,
+                targetMetadata.nativeName
+            )
+            if (actualLang != null && checkStrings.any { actualLang.equals(it, ignoreCase = true) || actualLang.startsWith("$it-") || actualLang.startsWith("${it}_") }) {
+                return true
+            }
+            if (actualLabel != null && checkStrings.any { actualLabel.contains(it, ignoreCase = true) }) {
+                return true
+            }
+        }
+        return false
+    }
+
     private fun setSubtitles(subtitle: SubtitleData?, userInitiated: Boolean): Boolean {
         if (userInitiated) {
             hasAutoSelectedSubtitlesForCurrentPlayback = true
+            currentSeriesKey?.let { seriesKey ->
+                if (subtitle == null) {
+                    setKey(SHOW_SUB_DISABLED_PREFIX + seriesKey, true)
+                    setKey(SHOW_SUB_ID_PREFIX + seriesKey, "")
+                    setKey(SHOW_SUB_NAME_PREFIX + seriesKey, "")
+                    setKey(SHOW_SUB_LANG_PREFIX + seriesKey, "")
+                } else {
+                    setKey(SHOW_SUB_DISABLED_PREFIX + seriesKey, false)
+                    setKey(SHOW_SUB_ID_PREFIX + seriesKey, subtitle.getId())
+                    setKey(SHOW_SUB_NAME_PREFIX + seriesKey, subtitle.name)
+                    val langTag = subtitle.getIETF_tag() ?: subtitle.languageCode ?: ""
+                    setKey(SHOW_SUB_LANG_PREFIX + seriesKey, langTag)
+                }
+            }
         }
         // If subtitle is changed and user initiated -> Save the language
         if (subtitle != currentSelectedSubtitles && userInitiated) {
             val subtitleLanguageTagIETF = if (subtitle == null) {
-                "" // -> No Subtitles
+                "" // -> No Subtitles
             } else {
                 subtitle.getIETF_tag()
             }
@@ -252,12 +325,70 @@ class GeneratorPlayer : FullScreenPlayer() {
         val tracks = player.getVideoTracks()
         playerBinding?.playerTracksBtt?.isVisible =
             tracks.allVideoTracks.size > 1 || tracks.allAudioTracks.size > 1
-        // Only set the preferred language if it is available.
-        // Otherwise, it may give some users audio track init failed!
-        if (tracks.allAudioTracks.any { it.language == preferredAudioTrackLanguage }) {
+
+        applyHierarchicalAudioTrackSelection(tracks)
+        updatePlayerInfo()
+    }
+
+    private fun applyHierarchicalAudioTrackSelection(tracks: CurrentTracks) {
+        val audioTracks = tracks.allAudioTracks
+        if (audioTracks.isEmpty()) return
+
+        // 1. Series-remembered track selection:
+        val seriesKey = currentSeriesKey
+        if (seriesKey != null) {
+            val remId = getKey<String>(SHOW_AUDIO_ID_PREFIX + seriesKey)
+            val remLabel = getKey<String>(SHOW_AUDIO_LABEL_PREFIX + seriesKey)
+            val remLang = getKey<String>(SHOW_AUDIO_LANG_PREFIX + seriesKey)
+
+            if (!remId.isNullOrEmpty() || !remLabel.isNullOrEmpty() || !remLang.isNullOrEmpty()) {
+                // Exact match (by id or label)
+                val exactMatch = audioTracks.find {
+                    (!remId.isNullOrEmpty() && it.id == remId) ||
+                    (!remLabel.isNullOrEmpty() && it.label.equals(remLabel, ignoreCase = true))
+                }
+                if (exactMatch != null) {
+                    player.setPreferredAudioTrack(exactMatch.language, exactMatch.id, exactMatch.formatIndex)
+                    return
+                }
+
+                // Same language match
+                if (!remLang.isNullOrEmpty()) {
+                    val langMatch = audioTracks.find { matchesLanguage(it.language, it.label, remLang) }
+                    if (langMatch != null) {
+                        player.setPreferredAudioTrack(langMatch.language, langMatch.id, langMatch.formatIndex)
+                        return
+                    }
+                }
+            }
+        }
+
+        // 2. Global Primary Audio Language preference
+        val ctx = context ?: return
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
+        val primaryAudio = settingsManager.getString(ctx.getString(R.string.primary_audio_language_key), null)
+        if (!primaryAudio.isNullOrBlank() && primaryAudio != "none") {
+            val primaryMatch = audioTracks.find { matchesLanguage(it.language, it.label, primaryAudio) }
+            if (primaryMatch != null) {
+                player.setPreferredAudioTrack(primaryMatch.language, primaryMatch.id, primaryMatch.formatIndex)
+                return
+            }
+        }
+
+        // 3. Global Secondary Audio Language preference
+        val secondaryAudio = settingsManager.getString(ctx.getString(R.string.secondary_audio_language_key), null)
+        if (!secondaryAudio.isNullOrBlank() && secondaryAudio != "none") {
+            val secondaryMatch = audioTracks.find { matchesLanguage(it.language, it.label, secondaryAudio) }
+            if (secondaryMatch != null) {
+                player.setPreferredAudioTrack(secondaryMatch.language, secondaryMatch.id, secondaryMatch.formatIndex)
+                return
+            }
+        }
+
+        // 4. Default / Original Stream Audio Track
+        if (preferredAudioTrackLanguage != null && audioTracks.any { it.language == preferredAudioTrackLanguage }) {
             player.setPreferredAudioTrack(preferredAudioTrackLanguage)
         }
-        updatePlayerInfo()
     }
 
     override fun playerStatusChanged() {
@@ -1429,6 +1560,10 @@ class GeneratorPlayer : FullScreenPlayer() {
                     }
                     if (init) {
                         filteredLinks.getOrNull(sourceIndex)?.let {
+                            currentSeriesKey?.let { seriesKey ->
+                                setKey(SHOW_LINK_SOURCE_PREFIX + seriesKey, it.link.source)
+                                setKey(SHOW_LINK_NAME_PREFIX + seriesKey, it.link.name)
+                            }
                             loadLink(it.link, true)
                         }
                     }
@@ -1580,6 +1715,13 @@ class GeneratorPlayer : FullScreenPlayer() {
                         currentTrack?.id,
                         currentTrack?.formatIndex,
                     )
+                    currentSeriesKey?.let { seriesKey ->
+                        currentTrack?.let { track ->
+                            setKey(SHOW_AUDIO_ID_PREFIX + seriesKey, track.id ?: "")
+                            setKey(SHOW_AUDIO_LABEL_PREFIX + seriesKey, track.label ?: "")
+                            setKey(SHOW_AUDIO_LANG_PREFIX + seriesKey, track.language ?: "")
+                        }
+                    }
 
                     val currentVideo = currentVideoTracks.getOrNull(videoIndex)
                     val width = currentVideo?.width ?: NO_VALUE
@@ -1976,32 +2118,91 @@ class GeneratorPlayer : FullScreenPlayer() {
     }
 
     private fun autoSelectFromSettings(): Boolean {
-        // auto select subtitle based on settings
-        val langCode = preferredAutoSelectSubtitles
-        val current = player.getCurrentPreferredSubtitle()
-        if (BuildConfig.DEBUG) Log.d(TAG, "autoSelectFromSettings = $current")
-        context?.let { ctx ->
-            // Only use the player preferred subtitle if it matches the available language
-            if (current != null && (langCode == null || current.matchesLanguageCode(langCode))) {
-                if (setSubtitles(current, false)) {
+        val ctx = context ?: return false
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
+        val availableSubs = viewModel.state.subtitles
+        if (availableSubs.isEmpty()) return false
+
+        // 1. Series-remembered subtitle selection
+        val seriesKey = currentSeriesKey
+        if (seriesKey != null) {
+            val isDisabled = getKey<Boolean>(SHOW_SUB_DISABLED_PREFIX + seriesKey) ?: false
+            if (isDisabled) {
+                // User explicitly turned off subtitles for this series
+                return setSubtitles(null, false)
+            }
+
+            val remId = getKey<String>(SHOW_SUB_ID_PREFIX + seriesKey)
+            val remName = getKey<String>(SHOW_SUB_NAME_PREFIX + seriesKey)
+            val remLang = getKey<String>(SHOW_SUB_LANG_PREFIX + seriesKey)
+
+            if (!remId.isNullOrEmpty() || !remName.isNullOrEmpty() || !remLang.isNullOrEmpty()) {
+                // First: exact ID or name match
+                val exactMatch = availableSubs.find {
+                    (!remId.isNullOrEmpty() && it.getId() == remId) ||
+                    (!remName.isNullOrEmpty() && it.name.equals(remName, ignoreCase = true))
+                }
+                if (exactMatch != null && setSubtitles(exactMatch, false)) {
                     player.saveData()
                     player.reloadPlayer(ctx)
                     player.handleEvent(CSPlayerEvent.Play)
+                    return true
                 }
-                return true
-            } else if (!langCode.isNullOrEmpty()) {
-                getAutoSelectSubtitle(
-                    viewModel.state.subtitles, settings = true, downloads = false
-                )?.let { sub ->
-                    if (setSubtitles(sub, false)) {
+
+                // Second: same language match
+                if (!remLang.isNullOrEmpty()) {
+                    val langMatch = sortSubs(availableSubs).firstOrNull {
+                        it.matchesLanguageCode(remLang) || matchesLanguage(it.languageCode, it.originalName, remLang)
+                    }
+                    if (langMatch != null && setSubtitles(langMatch, false)) {
                         player.saveData()
                         player.reloadPlayer(ctx)
                         player.handleEvent(CSPlayerEvent.Play)
+                        return true
                     }
-                    return true
                 }
             }
         }
+
+        // 2. Global Primary Subtitle Language Preference
+        val primarySub = settingsManager.getString(ctx.getString(R.string.primary_sub_language_key), null)
+            ?: preferredAutoSelectSubtitles
+            ?: "en"
+        if (!primarySub.isNullOrBlank() && primarySub != "none") {
+            val primaryMatch = sortSubs(availableSubs).firstOrNull {
+                it.matchesLanguageCode(primarySub) || matchesLanguage(it.languageCode, it.originalName, primarySub)
+            }
+            if (primaryMatch != null && setSubtitles(primaryMatch, false)) {
+                player.saveData()
+                player.reloadPlayer(ctx)
+                player.handleEvent(CSPlayerEvent.Play)
+                return true
+            }
+        }
+
+        // 3. Global Secondary Subtitle Language Preference
+        val secondarySub = settingsManager.getString(ctx.getString(R.string.secondary_sub_language_key), null)
+        if (!secondarySub.isNullOrBlank() && secondarySub != "none") {
+            val secondaryMatch = sortSubs(availableSubs).firstOrNull {
+                it.matchesLanguageCode(secondarySub) || matchesLanguage(it.languageCode, it.originalName, secondarySub)
+            }
+            if (secondaryMatch != null && setSubtitles(secondaryMatch, false)) {
+                player.saveData()
+                player.reloadPlayer(ctx)
+                player.handleEvent(CSPlayerEvent.Play)
+                return true
+            }
+        }
+
+        // 4. Default / Original Stream Subtitle
+        val current = player.getCurrentPreferredSubtitle()
+        if (current != null && setSubtitles(current, false)) {
+            player.saveData()
+            player.reloadPlayer(ctx)
+            player.handleEvent(CSPlayerEvent.Play)
+            return true
+        }
+
         return false
     }
 
@@ -2280,21 +2481,81 @@ class GeneratorPlayer : FullScreenPlayer() {
         }
     }
 
+    private var lastAutoSkippedEndMs: Long? = null
+
+    private fun getSkipMode(settingsManager: SharedPreferences, key: String, default: Int): Int {
+        return try {
+            settingsManager.getString(key, null)?.toIntOrNull()
+                ?: settingsManager.getInt(key, default)
+        } catch (_: Throwable) {
+            try {
+                settingsManager.getInt(key, default)
+            } catch (_: Throwable) {
+                default
+            }
+        }
+    }
+
     override fun onTimestampSkipped(timestamp: VideoSkipStamp) {
         displayTimeStamp(false)
     }
 
     override fun onTimestamp(timestamp: VideoSkipStamp?) {
-        if (timestamp != null) {
-            playerBinding?.skipChapterButton?.setText(timestamp.uiText)
-            displayTimeStamp(true)
-            val currentIndex = skipIndex
-            playerBinding?.skipChapterButton?.handler?.postDelayed({
-                if (skipIndex == currentIndex)
-                    displayTimeStamp(false)
-            }, 6000)
-        } else {
+        if (timestamp == null) {
             displayTimeStamp(false)
+            return
+        }
+
+        val ctx = context ?: return
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
+        val masterSkipEnabled = settingsManager.getBoolean(
+            ctx.getString(R.string.enable_skip_op_from_database), true
+        )
+        if (!masterSkipEnabled) {
+            displayTimeStamp(false)
+            return
+        }
+
+        // Mode: 0 = Off, 1 = Show Button, 2 = Auto Skip
+        val mode = when (timestamp.timestamp.type) {
+            SkipType.Intro, SkipType.Opening, SkipType.MixedOpening ->
+                getSkipMode(settingsManager, ctx.getString(R.string.skip_intro_mode_key), 1)
+            SkipType.Ending, SkipType.MixedEnding, SkipType.Credits, SkipType.Preview ->
+                getSkipMode(settingsManager, ctx.getString(R.string.skip_outro_mode_key), 1)
+            SkipType.Recap ->
+                getSkipMode(settingsManager, ctx.getString(R.string.skip_recap_mode_key), 2)
+        }
+
+        when (mode) {
+            0 -> { // Off
+                displayTimeStamp(false)
+            }
+            2 -> { // Always Auto Skip
+                displayTimeStamp(false)
+                if (lastAutoSkippedEndMs != timestamp.timestamp.endMs) {
+                    lastAutoSkippedEndMs = timestamp.timestamp.endMs
+                    if (timestamp.skipToNextEpisode) {
+                        player.handleEvent(CSPlayerEvent.NextEpisode)
+                    } else {
+                        player.seekTo(timestamp.timestamp.endMs + 100L)
+                    }
+                    player.event(TimestampSkippedEvent(timestamp = timestamp, source = PlayerEventSource.Player))
+                    playerBinding?.skipChapterButton?.apply {
+                        setText(timestamp.uiText)
+                        displayTimeStamp(true)
+                        postDelayed({ displayTimeStamp(false) }, 1500)
+                    }
+                }
+            }
+            else -> { // 1 = Show Button (Manual prompt)
+                playerBinding?.skipChapterButton?.setText(timestamp.uiText)
+                displayTimeStamp(true)
+                val currentIndex = skipIndex
+                playerBinding?.skipChapterButton?.handler?.postDelayed({
+                    if (skipIndex == currentIndex)
+                        displayTimeStamp(false)
+                }, 6000)
+            }
         }
     }
 

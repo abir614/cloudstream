@@ -29,8 +29,12 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
     // Sample up to 1,024 pixels with uniform stride for sub-microsecond evaluation (~15 μs)
     let step = (total_pixels / 1024).max(1);
     let mut sampled_count = 0usize;
+    let mut upper_sampled_count = 0usize;
+    let mut lower_sampled_count = 0usize;
     let mut core_sampled_count = 0usize;
     let mut skin_count = 0usize;
+    let mut upper_skin_count = 0usize;
+    let mut lower_skin_count = 0usize;
     let mut core_skin_count = 0usize;
 
     // Running sums for chrominance variance (anti-false-positive mechanism for sand/wood)
@@ -86,10 +90,18 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
         // Combined Multi-Space Flesh Tone Classification
         let is_skin = ycbcr_match && rgb_match && sat_match && hue_match;
 
-        // 4. Spatial Centroid / Anatomical Weighting (Central 60% torso/pelvic region)
+    // 4. Anatomical Partitioning (Head/Face upper canvas vs Torso/Pelvic lower canvas)
         let pos_ratio = (i as f32) / (total_pixels as f32);
-        let is_core_anatomy = (0.20..=0.82).contains(&pos_ratio);
+        let is_upper = pos_ratio < 0.38;
+        let is_lower = pos_ratio >= 0.38;
+        let is_core_anatomy = (0.35..=0.80).contains(&pos_ratio);
 
+        if is_upper {
+            upper_sampled_count += 1;
+        }
+        if is_lower {
+            lower_sampled_count += 1;
+        }
         if is_core_anatomy {
             core_sampled_count += 1;
         }
@@ -101,6 +113,12 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
             cb_sq_sum += cb * cb;
             cr_sq_sum += cr * cr;
 
+            if is_upper {
+                upper_skin_count += 1;
+            }
+            if is_lower {
+                lower_skin_count += 1;
+            }
             if is_core_anatomy {
                 core_skin_count += 1;
             }
@@ -115,6 +133,16 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
     }
 
     let global_ratio = (skin_count as f32) / (sampled_count as f32);
+    let _upper_ratio = if upper_sampled_count > 0 {
+        (upper_skin_count as f32) / (upper_sampled_count as f32)
+    } else {
+        0.0
+    };
+    let lower_ratio = if lower_sampled_count > 0 {
+        (lower_skin_count as f32) / (lower_sampled_count as f32)
+    } else {
+        0.0
+    };
     let core_ratio = if core_sampled_count > 0 {
         (core_skin_count as f32) / (core_sampled_count as f32)
     } else {
@@ -138,18 +166,27 @@ pub fn is_skin_exposure_excessive(rgb_bytes: &[u8], bytes_per_pixel: usize) -> b
         return false;
     }
 
-    // High global exposure (bikini, swimwear, summer, or high-exposure art >= 15%)
-    if global_ratio >= 0.15 {
+    // 7. Clothed Headshot / Face Portrait Anti-False-Positive Shield:
+    // If the mid-to-lower canvas (torso, abdomen, legs) has little or no exposed skin (< 12%),
+    // and overall exposure is below 38%, this is a clothed person's portrait/headshot.
+    // Protects actor/character face close-ups from false censoring.
+    if lower_ratio < 0.12 && global_ratio < 0.38 {
+        return false;
+    }
+
+    // 8. Extreme Global Nudity / Explicit Artwork (>= 38% exposed skin across full frame)
+    if global_ratio >= 0.38 {
         return true;
     }
 
-    // Central torso / pelvic erotica or swimsuit exposure
-    if core_ratio >= 0.18 && global_ratio >= 0.10 {
+    // 9. Central Torso / Pelvic / Swimsuit / Cleavage Exposure
+    // Significant skin in core torso/pelvic region (>= 22%) combined with global exposure (>= 18%)
+    if core_ratio >= 0.22 && global_ratio >= 0.18 {
         return true;
     }
 
-    // Concentrated core anatomical exposure
-    if core_ratio >= 0.25 {
+    // 10. Concentrated Lower Torso / Pelvic Nudity (>= 28% exposed skin below neck)
+    if lower_ratio >= 0.28 {
         return true;
     }
 
@@ -230,4 +267,36 @@ mod tests {
 
         assert!(is_skin_exposure_excessive(&beach_poster, 3));
     }
+
+    #[test]
+    fn test_rejects_clothed_actor_headshot_portrait() {
+        // Clothed actor / anime portrait: face occupies upper canvas (25% skin),
+        // but lower canvas is clothed (dark jacket / suit / uniform).
+        let mut portrait = Vec::with_capacity(3000);
+        let skin_palette = [
+            [255, 220, 195],
+            [245, 205, 180],
+            [235, 190, 165],
+        ];
+
+        for i in 0..1000 {
+            if i < 260 {
+                // Face / neck in top 26% of canvas
+                let color = skin_palette[i % skin_palette.len()];
+                portrait.extend_from_slice(&color);
+            } else if i < 350 {
+                // Collar / tie
+                portrait.extend_from_slice(&[240, 240, 245]);
+            } else {
+                // Clothed lower torso: black/navy jacket or armor
+                portrait.extend_from_slice(&[25, 28, 38]);
+            }
+        }
+
+        assert!(
+            !is_skin_exposure_excessive(&portrait, 3),
+            "Clothed actor or anime character headshot must never be falsely marked as NSFW"
+        );
+    }
 }
+

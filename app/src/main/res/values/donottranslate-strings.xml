@@ -157,6 +157,18 @@
         responsibility of user to avoid any actions that might violate the laws governing his/her locality. Use
         CloudStream at your own risk.
     </string>
+    <!-- Preferred Audio & Subtitle Source Selection Keys -->
+    <string name="pref_category_tracks_key">pref_category_tracks_key</string>
+    <string name="primary_audio_language_key">primary_audio_language_key</string>
+    <string name="secondary_audio_language_key">secondary_audio_language_key</string>
+    <string name="primary_sub_language_key">primary_sub_language_key</string>
+    <string name="secondary_sub_language_key">secondary_sub_language_key</string>
+
+    <!-- Skip Parts (Intro, Outro, Recap) Keys -->
+    <string name="pref_category_skip_parts_key">pref_category_skip_parts_key</string>
+    <string name="skip_intro_mode_key">skip_intro_mode_key</string>
+    <string name="skip_outro_mode_key">skip_outro_mode_key</string>
+    <string name="skip_recap_mode_key">skip_recap_mode_key</string>
 
     <plurals name="episodes">
         <item quantity="one">@string/episode</item>

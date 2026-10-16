@@ -24,6 +24,7 @@ import com.lagradost.cloudstream3.ui.subtitles.ChromecastSubtitlesFragment
 import com.lagradost.cloudstream3.ui.subtitles.SubtitlesFragment
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.Qualities
+import com.lagradost.cloudstream3.utils.SubtitleHelper
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showDialog
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showMultiDialog
@@ -246,6 +247,67 @@ class SettingsPlayer : BasePreferenceFragmentCompat() {
             ChromecastSubtitlesFragment.push(activity, false)
             return@setOnPreferenceClickListener true
         }
+
+        fun setupLanguagePreference(
+            prefKey: Int,
+            titleRes: Int,
+            allowNone: Boolean,
+            defaultTag: String = ""
+        ) {
+            val pref = getPref(prefKey) ?: return
+            fun updateSummary() {
+                val current = settingsManager.getString(getString(prefKey), defaultTag) ?: defaultTag
+                pref.summary = when {
+                    current.isEmpty() -> getString(R.string.source_original_or_default)
+                    current == "none" -> getString(R.string.source_none)
+                    else -> SubtitleHelper.getLanguageDataFromCode(current)?.nameNextToFlagEmoji()
+                        ?: current
+                }
+            }
+            updateSummary()
+
+            pref.setOnPreferenceClickListener {
+                val langList = mutableListOf<Pair<String, String>>()
+                if (!allowNone) {
+                    langList.add("" to getString(R.string.source_original_or_default))
+                } else {
+                    langList.add("" to getString(R.string.source_original_or_default))
+                    langList.add("none" to getString(R.string.source_none))
+                }
+                langList.addAll(
+                    SubtitleHelper.languages
+                        .map { Pair(it.IETF_tag, it.nameNextToFlagEmoji()) }
+                        .sortedBy { it.second.substringAfter("\u00a0").lowercase() }
+                )
+                val (tags, names) = langList.unzip()
+                val current = settingsManager.getString(getString(prefKey), defaultTag) ?: defaultTag
+                val currentIndex = tags.indexOf(current).coerceAtLeast(0)
+
+                activity?.showDialog(
+                    names,
+                    currentIndex,
+                    getString(titleRes),
+                    true,
+                    {}
+                ) { index ->
+                    val chosenTag = tags[index]
+                    settingsManager.edit {
+                        putString(getString(prefKey), chosenTag)
+                        // If setting primary subtitle language, keep legacy subs_auto_select synced
+                        if (prefKey == R.string.primary_sub_language_key) {
+                            putString("subs_auto_select", if (chosenTag.isEmpty()) "en" else chosenTag)
+                        }
+                    }
+                    updateSummary()
+                }
+                return@setOnPreferenceClickListener true
+            }
+        }
+
+        setupLanguagePreference(R.string.primary_audio_language_key, R.string.primary_audio_track, allowNone = false)
+        setupLanguagePreference(R.string.secondary_audio_language_key, R.string.secondary_audio_track, allowNone = true)
+        setupLanguagePreference(R.string.primary_sub_language_key, R.string.primary_sub_track, allowNone = true, defaultTag = "en")
+        setupLanguagePreference(R.string.secondary_sub_language_key, R.string.secondary_sub_track, allowNone = true)
 
         getPref(R.string.player_source_priority_key)?.setOnPreferenceClickListener {
             ioSafe {

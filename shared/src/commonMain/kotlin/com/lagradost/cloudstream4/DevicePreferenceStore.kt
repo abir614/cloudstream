@@ -178,6 +178,16 @@ class PlayerPreferences(preferences: PreferenceStore) {
     val autoRotateEnabled = preferences.getBoolean("auto_rotate_video_key", true)
     val rotateButtonEnabled = preferences.getBoolean("rotate_video_key", false)
     val previewBarEnabled = preferences.getBoolean("preview_seekbar_key", true)
+
+    val primaryAudioLanguage = preferences.getString("primary_audio_language_key", "")
+    val secondaryAudioLanguage = preferences.getString("secondary_audio_language_key", "")
+    val primarySubLanguage = preferences.getString("primary_sub_language_key", "en")
+    val secondarySubLanguage = preferences.getString("secondary_sub_language_key", "")
+
+    val skipIntroMode = preferences.getInt("skip_intro_mode_key", 1)
+    val skipOutroMode = preferences.getInt("skip_outro_mode_key", 1)
+    val skipRecapMode = preferences.getInt("skip_recap_mode_key", 2)
+
     val softwareDecoding = preferences.getInt("software_decoding_key2", -1)
     val extraBrightnessEnabled = preferences.getBoolean("extra_brightness_key", false)
     val swipeHorizontalEnabled = preferences.getBoolean("swipe_enabled_key", true)
