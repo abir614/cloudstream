@@ -111,13 +111,6 @@ const SUGGESTIVE_ECCHI_TOKENS: &[&str] = &[
     "softcore",
     "hardcore",
     // Anatomy & Swimwear / Beach / Summer exposure
-    "bikini",
-    "swimsuit",
-    "swimwear",
-    "beachwear",
-    "monokini",
-    "gravure",
-    "mizugi",
     "lingerie",
     "thong",
     "panties",
@@ -142,6 +135,27 @@ const SUGGESTIVE_ECCHI_TOKENS: &[&str] = &[
 
 /// Extreme Sensitivity / Borderline Fanservice Tokens (Active ONLY in EXTREME).
 const EXTREME_SENSITIVITY_TOKENS: &[&str] = &[
+    "beach",
+    "summer",
+    "bikini",
+    "swimsuit",
+    "swimwear",
+    "beachwear",
+    "monokini",
+    "microkini",
+    "mizugi",
+    "pool",
+    "swimming",
+    "halfbody",
+    "half-body",
+    "exposed",
+    "topless",
+    "bare",
+    "bareback",
+    "barechested",
+    "underboob",
+    "sideboob",
+    "gravure",
     "bathing",
     "bath",
     "hotspring",
@@ -155,7 +169,7 @@ const EXTREME_SENSITIVITY_TOKENS: &[&str] = &[
     "waifu",
     "suggestive",
     "pantyshot",
-    "microkini",
+    "panty-shot",
     "spank",
     "spanking",
     "bathhouse",
@@ -219,9 +233,6 @@ const CJK_SUGGESTIVE_STEMS: &[&str] = &[
     "変態",
     "巨乳",
     "爆乳",
-    "水着",
-    "ビキニ",
-    "グラビア",
     "痴女",
     "調教",
     "下着",
@@ -239,6 +250,9 @@ const CJK_SUGGESTIVE_STEMS: &[&str] = &[
 
 /// CJK Extreme Sensitivity Stems (Active ONLY in EXTREME).
 const CJK_EXTREME_STEMS: &[&str] = &[
+    "水着",
+    "ビキニ",
+    "グラビア",
     "混浴",
     "温泉",
     "お風呂",
@@ -316,10 +330,8 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
     if level >= LEVEL_MODERATE
         && (lower.contains("ecchi")
             || lower.contains("erotica")
-            || lower.contains("bikini")
-            || lower.contains("swimsuit")
-            || lower.contains("swimwear")
-            || lower.contains("gravure"))
+            || lower.contains("hentai")
+            || lower.contains("smut"))
     {
         return true;
     }
@@ -327,38 +339,38 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
     if level >= LEVEL_EXTREME
         && (lower.contains("fanservice")
             || lower.contains("harem")
-            || lower.contains("microkini"))
+            || lower.contains("bikini")
+            || lower.contains("swimsuit")
+            || lower.contains("swimwear")
+            || lower.contains("gravure")
+            || lower.contains("microkini")
+            || lower.contains("halfbody")
+            || lower.contains("half-body")
+            || lower.contains("exposed"))
     {
         return true;
     }
 
-    // 4. Summer / Beach / Swimsuit contextual triggers
-    if level >= LEVEL_MODERATE {
-        let has_summer_or_beach = lower.contains("summer") || lower.contains("beach");
-        if has_summer_or_beach
-            && (lower.contains("swim")
-                || lower.contains("bikini")
-                || lower.contains("monokini")
-                || lower.contains("microkini")
-                || lower.contains("lingerie")
-                || lower.contains("topless")
-                || lower.contains("nude")
-                || lower.contains("naked")
-                || lower.contains("edition")
-                || (lower.contains("ova") && lower.contains("special"))
-                || (lower.contains("summer") && lower.contains("beach")))
+    // 4. Summer / Beach / Swimsuit contextual triggers (Active ONLY in EXTREME)
+    if level >= LEVEL_EXTREME {
+        let has_summer_or_beach = lower.contains("summer")
+            || lower.contains("beach")
+            || lower.contains("swim")
+            || lower.contains("bikini")
+            || lower.contains("halfbody")
+            || lower.contains("half-body")
+            || lower.contains("exposed");
+        if has_summer_or_beach {
+            return true;
+        }
+
+        if lower.contains("onsen")
+            || lower.contains("bathhouse")
+            || (lower.contains("hot") && lower.contains("spring"))
+            || (lower.contains("bath") && (lower.contains("girl") || lower.contains("scene") || lower.contains("special")))
         {
             return true;
         }
-    }
-
-    if level >= LEVEL_EXTREME
-        && (lower.contains("onsen")
-            || lower.contains("bathhouse")
-            || (lower.contains("hot") && lower.contains("spring"))
-            || (lower.contains("bath") && (lower.contains("girl") || lower.contains("scene") || lower.contains("special"))))
-    {
-        return true;
     }
 
     // 5. Delimited token matching (words separated by whitespace, dashes, slashes, etc.)
@@ -448,17 +460,19 @@ mod tests {
 
     #[test]
     fn test_text_classification_beach_and_summer() {
-        assert!(is_nsfw_text("Summer Beach Special OVA", "https://stream.to/v1", None));
-        assert!(is_nsfw_text("Hot Spring & Bikini Vacation", "https://stream.to/v2", None));
-        assert!(is_nsfw_text("Girl in Swimsuit", "https://stream.to/v3", None));
-        assert!(is_nsfw_text("Island Summer Edition", "https://stream.to/v4", None));
+        assert!(!is_nsfw_text_with_level("Summer Beach Special OVA", "https://stream.to/v1", None, LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("Summer Beach Special OVA", "https://stream.to/v1", None, LEVEL_EXTREME));
+        assert!(is_nsfw_text_with_level("Hot Spring & Bikini Vacation", "https://stream.to/v2", None, LEVEL_EXTREME));
+        assert!(is_nsfw_text_with_level("Girl in Swimsuit", "https://stream.to/v3", None, LEVEL_EXTREME));
+        assert!(is_nsfw_text_with_level("Island Summer Edition", "https://stream.to/v4", None, LEVEL_EXTREME));
     }
 
     #[test]
     fn test_text_classification_cjk_stems() {
-        assert!(is_nsfw_text("水着の美少女", "https://jp.anime/play", None));
+        assert!(!is_nsfw_text_with_level("水着の美少女", "https://jp.anime/play", None, LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("水着の美少女", "https://jp.anime/play", None, LEVEL_EXTREME));
         assert!(is_nsfw_text("18禁 成年コミック アニメ化", "https://jp.anime/play", None));
-        assert!(is_nsfw_text("ビキニグラビア", "https://jp.anime/play", None));
+        assert!(is_nsfw_text_with_level("ビキニグラビア", "https://jp.anime/play", None, LEVEL_EXTREME));
         assert!(is_nsfw_text("エロマンガ先生", "https://jp.anime/play", None));
     }
 
@@ -469,9 +483,14 @@ mod tests {
         assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_MODERATE));
         assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_EXTREME));
 
-        // Ecchi / Swimsuit should NOT trigger on LOW, but MUST trigger on MODERATE and EXTREME
+        // Ecchi should trigger on MODERATE and EXTREME
+        assert!(!is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_LOW));
+        assert!(is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_EXTREME));
+
+        // Beach / Swimsuit is KEPT in MODERATE, strictly filtered in EXTREME
         assert!(!is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_LOW));
-        assert!(is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_MODERATE));
+        assert!(!is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_MODERATE));
         assert!(is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_EXTREME));
 
         // Harem / Fanservice tag should trigger on EXTREME

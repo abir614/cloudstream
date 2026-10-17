@@ -85,6 +85,7 @@ object SettingsGeneralScreen : SearchableSettings {
 
         val bananas by settings.general.bananas.collectAsState()
         val downloadPathVisual by settings.general.downloadPathVisual.collectAsState()
+        val nsfwGloballyEnabled by settings.general.enableNsfw.collectAsState()
         //val downloadPath by settings.general.downloadPath.collectAsState()
 
         var isBatteryShown by remember { mutableStateOf(false) }
@@ -254,10 +255,11 @@ object SettingsGeneralScreen : SearchableSettings {
                         subtitle = "%s",
                         icon = painterResource(R.drawable.ic_baseline_tune_24),
                         preference = settings.general.nsfwFilterLevel,
+                        enabled = !nsfwGloballyEnabled,
                         entries = mapOf(
-                            "extreme" to "Extreme (Maximum Sensitivity - Strict Family Shield)",
-                            "moderate" to "Moderate (Medium Sensitivity - Family Level, Recommended)",
-                            "low" to "Low (Lowest Filtering - Hardcore Only)"
+                            "extreme" to "Extreme",
+                            "moderate" to "Moderate",
+                            "low" to "Low"
                         ),
                         onValueChanged = {
                             com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
@@ -270,6 +272,7 @@ object SettingsGeneralScreen : SearchableSettings {
                         subtitle = stringResource(R.string.censor_nsfw_posters_summary),
                         icon = painterResource(R.drawable.ic_baseline_warning_24),
                         preference = settings.general.censorNsfwPosters,
+                        enabled = !nsfwGloballyEnabled,
                         onValueChanged = {
                             com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
                             com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()

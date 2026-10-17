@@ -36,12 +36,16 @@ class SettingsProviders : BasePreferenceFragmentCompat() {
 
         fun updateNsfwSummary() {
             context?.let { ctx ->
+                val isAdult = settingsManager.getBoolean(getString(R.string.enable_nsfw_on_providers_key), false)
+                getPref(R.string.nsfw_filter_level_key)?.isEnabled = !isAdult
+                getPref(R.string.censor_nsfw_posters_key)?.isEnabled = !isAdult
+
                 val currentLevel =
                     settingsManager.getString(getString(R.string.nsfw_filter_level_key), "moderate") ?: "moderate"
                 val prefNames = resources.getStringArray(R.array.nsfw_filter_level_entries)
                 val prefValues = resources.getStringArray(R.array.nsfw_filter_level_values)
                 val index = prefValues.indexOf(currentLevel).coerceAtLeast(0)
-                val label = prefNames.getOrNull(index) ?: "Moderate (Family Level, Recommended)"
+                val label = prefNames.getOrNull(index) ?: "Moderate"
                 getPref(R.string.nsfw_filter_level_key)?.summary = label
             }
         }

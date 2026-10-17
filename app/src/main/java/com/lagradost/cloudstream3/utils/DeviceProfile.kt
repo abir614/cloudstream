@@ -153,14 +153,14 @@ object DeviceProfile {
             DeviceTier.MID -> CoilTierConfig(
                 memoryCachePercent = 0.20, // ~20% of app memory
                 diskCacheMaxBytes = 512L * 1024 * 1024,
-                crossfadeMs = 150,
+                crossfadeMs = 0,
                 allowHardwareBitmaps = true,
                 useRgb565 = false
             )
             DeviceTier.HIGH -> CoilTierConfig(
                 memoryCachePercent = 0.25, // ~25% of app memory
                 diskCacheMaxBytes = 1024L * 1024 * 1024,
-                crossfadeMs = 250,
+                crossfadeMs = 0,
                 allowHardwareBitmaps = true,
                 useRgb565 = false
             )

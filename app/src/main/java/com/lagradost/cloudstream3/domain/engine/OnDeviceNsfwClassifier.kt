@@ -75,6 +75,7 @@ object OnDeviceNsfwClassifier {
 
     // Single direct allocation for scratch bitmap & pixel extraction
     private val scratchPixels = IntArray(INPUT_DIM * INPUT_DIM)
+    private val scratchFloatArray = FloatArray(INPUT_DIM * INPUT_DIM * BGR_CHANNELS)
     private var scratchBitmap: Bitmap? = null
     private var scratchCanvas: Canvas? = null
     private val scratchRect = Rect(0, 0, INPUT_DIM, INPUT_DIM)
@@ -104,9 +105,9 @@ object OnDeviceNsfwClassifier {
      * Checks if a poster URL has already been evaluated and crosses the active sensitivity threshold.
      * Guaranteed < 0.001 ms response.
      */
-    fun isCachedNsfw(imageKey: String, ctx: Context? = null): Boolean {
+    fun isCachedNsfw(imageKey: String, ctx: Context? = null, overrideLevel: NsfwFilterLevel? = null): Boolean {
         val score = scoreCache.get(imageKey) ?: return false
-        val threshold = NsfwFilterEngine.getFilterLevel(ctx).visualThreshold
+        val threshold = overrideLevel?.visualThreshold ?: NsfwFilterEngine.getFilterLevel(ctx).visualThreshold
         return score >= threshold
     }
 
@@ -183,17 +184,27 @@ object OnDeviceNsfwClassifier {
         val canvas = scratchCanvas ?: return 0.0f
 
         // Android throws IllegalArgumentException if a Bitmap.Config.HARDWARE bitmap
-        // is drawn onto a software Canvas. Convert to software ARGB_8888 if hardware-backed.
+        // is drawn onto a software Canvas. Convert to software ARGB_8888 scaled directly to 224x224.
         var softwareBitmap: Bitmap? = null
         val sourceBitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
             bitmap.config == Bitmap.Config.HARDWARE
         ) {
             try {
-                bitmap.copy(Bitmap.Config.ARGB_8888, false)?.also {
-                    softwareBitmap = it
-                } ?: bitmap
+                // Direct downscale to 224x224 (0.2MB) instead of full-res (6-8MB) copy
+                val scaled = Bitmap.createScaledBitmap(bitmap, INPUT_DIM, INPUT_DIM, true)
+                if (scaled.config == Bitmap.Config.HARDWARE) {
+                    scaled.copy(Bitmap.Config.ARGB_8888, false)?.also {
+                        if (scaled != bitmap && !scaled.isRecycled) {
+                            try { scaled.recycle() } catch (_: Throwable) {}
+                        }
+                        softwareBitmap = it
+                    } ?: scaled
+                } else {
+                    softwareBitmap = scaled
+                    scaled
+                }
             } catch (t: Throwable) {
-                Log.w(TAG, "Failed to copy hardware bitmap: ${t.message}")
+                Log.w(TAG, "Failed to downscale hardware bitmap: ${t.message}")
                 bitmap
             }
         } else {
@@ -205,19 +216,21 @@ object OnDeviceNsfwClassifier {
             canvas.drawBitmap(sourceBitmap, null, scratchRect, scratchPaint)
             sBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
 
-            buf.rewind()
-            var pixelIdx = 0
+            // Fast pure-register float normalization without 150k JNI putFloat calls
+            var floatIdx = 0
             for (i in 0 until (INPUT_DIM * INPUT_DIM)) {
-                val pixel = scratchPixels[pixelIdx++]
+                val pixel = scratchPixels[i]
                 val r = (pixel shr 16) and 0xFF
                 val g = (pixel shr 8) and 0xFF
                 val b = pixel and 0xFF
 
-                // Write BGR floats with OpenNSFW mean subtraction
-                buf.putFloat(b.toFloat() - MEAN_B)
-                buf.putFloat(g.toFloat() - MEAN_G)
-                buf.putFloat(r.toFloat() - MEAN_R)
+                scratchFloatArray[floatIdx++] = b.toFloat() - MEAN_B
+                scratchFloatArray[floatIdx++] = g.toFloat() - MEAN_G
+                scratchFloatArray[floatIdx++] = r.toFloat() - MEAN_R
             }
+
+            buf.rewind()
+            buf.asFloatBuffer().put(scratchFloatArray)
 
             val outputProb = Array(1) { FloatArray(2) }
             interp.run(buf, outputProb)
@@ -276,6 +289,16 @@ object OnDeviceNsfwClassifier {
 
         workerExecutor.execute {
             try {
+                // Drop task immediately if view has already been recycled or rebound to another URL
+                val earlyTag = try {
+                    imageView.getTag(R.id.coil_image_url_tag)
+                } catch (_: Throwable) {
+                    null
+                }
+                if (earlyTag != imageKey) {
+                    return@execute
+                }
+
                 val isTempBitmap = drawable !is BitmapDrawable
                 val bitmap = when (drawable) {
                     is BitmapDrawable -> drawable.bitmap

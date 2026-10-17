@@ -408,9 +408,9 @@
     <string name="nsfw_filter_level_title">NSFW Filter Sensitivity</string>
     <string name="nsfw_filter_level_summary">Configure adult content detection sensitivity level</string>
     <string-array name="nsfw_filter_level_entries">
-        <item>Extreme (Maximum Sensitivity - Strict Family Shield)</item>
-        <item>Moderate (Medium Sensitivity - Family Level, Recommended)</item>
-        <item>Low (Lowest Filtering - Hardcore Only)</item>
+        <item>Extreme</item>
+        <item>Moderate</item>
+        <item>Low</item>
     </string-array>
     <string-array name="nsfw_filter_level_values">
         <item>extreme</item>

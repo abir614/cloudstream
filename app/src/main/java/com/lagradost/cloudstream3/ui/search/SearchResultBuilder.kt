@@ -133,18 +133,33 @@ object SearchResultBuilder {
             textQuality?.isVisible = false
         }
 
+        val context = cardView.context
+        val isAdultAllowed = context.isNsfwEnabled()
+        val filterLevel = NsfwFilterEngine.getFilterLevel(context)
+        val isCardNsfw = NsfwFilterEngine.isNsfw(card, filterLevel)
+
+        if (!isAdultAllowed && isCardNsfw) {
+            itemView.isVisible = false
+            cardView.setImageDrawable(null)
+            return
+        }
+
+        itemView.isVisible = true
         cardText?.text = card.name
         cardText?.isVisible = showTitle
         cardView.isVisible = true
-        val isNsfw = shouldCensorPosters(cardView.context) && NsfwFilterEngine.isNsfw(card)
-        if (isNsfw) {
+
+        val shouldCensor = isAdultAllowed && shouldCensorPosters(context) && isCardNsfw
+        if (shouldCensor) {
             applyCensoredPoster(cardView)
         } else if (!card.posterUrl.isNullOrEmpty()) {
             cardView.loadImage(card.posterUrl, card.posterHeaders) {
                 placeholder { getImageFromDrawable(itemView.context, R.drawable.default_cover) }
                 error { getImageFromDrawable(itemView.context, R.drawable.default_cover) }
             }
-        } else cardView.loadImage(R.drawable.default_cover)
+        } else {
+            cardView.loadImage(R.drawable.default_cover)
+        }
 
         fun click(view: View?) {
             clickCallback.invoke(
