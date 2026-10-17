@@ -214,6 +214,8 @@ object SearchResultBuilder {
                 longClick(it)
                 return@setOnLongClickListener true
             }
+        }
+
         itemView.setOnClickListener {
             click(it)
         }
