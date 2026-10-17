@@ -2,11 +2,9 @@
 //!
 //! Provides zero-overhead token analysis and domain heuristics to filter adult content
 //! across three configurable sensitivity tiers:
-//! - Level 0 (LOW): Filters only hardcore explicit adult pornography and raw hentai.
-//! - Level 1 (MODERATE): Default family level. Filters ecchi, swimsuits, bikinis, cleavage,
-//!   lingerie, provocative/sensual poses, adult anime, and hentai.
-//! - Level 2 (EXTREME): Maximum sensitivity family shield. Flags any suggestive romance,
-//!   onsen/bathhouse scenes, fanservice, borderline beach/swimwear, and microkinis.
+//! - Level 0 (LOW): Filters only hardcore explicit adult pornography.
+//! - Level 1 (MODERATE): Balanced family level. Filters explicit adult content, ecchi, nudity, and suggestive themes while allowing standard summer/beach content.
+//! - Level 2 (EXTREME): Maximum sensitivity family shield. Filters beach/summer/swimwear, half-body exposed, onsen, and fanservice.
 
 pub const LEVEL_LOW: u8 = 0;
 pub const LEVEL_MODERATE: u8 = 1;

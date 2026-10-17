@@ -64,9 +64,6 @@ object OnDeviceNsfwClassifier {
     private const val MEAN_G = 117.0f
     private const val MEAN_R = 123.0f
 
-    // Classification threshold for adult / NSFW / ecchi content
-    private const val NSFW_THRESHOLD = 0.50f
-
     // Thread-safe state
     private val isInitializing = AtomicBoolean(false)
     private var interpreter: Interpreter? = null
@@ -287,11 +284,14 @@ object OnDeviceNsfwClassifier {
             return
         }
 
+        val weakImageView = java.lang.ref.WeakReference(imageView)
+
         workerExecutor.execute {
             try {
-                // Drop task immediately if view has already been recycled or rebound to another URL
+                // Drop task immediately if view has been garbage-collected, recycled, or rebound
+                val currentView = weakImageView.get() ?: return@execute
                 val earlyTag = try {
-                    imageView.getTag(R.id.coil_image_url_tag)
+                    currentView.getTag(R.id.coil_image_url_tag)
                 } catch (_: Throwable) {
                     null
                 }
@@ -321,16 +321,17 @@ object OnDeviceNsfwClassifier {
                 val activeThreshold = NsfwFilterEngine.getFilterLevel(appContext).visualThreshold
                 if (score >= activeThreshold) {
                     mainHandler.post {
+                        val activeView = weakImageView.get() ?: return@post
                         val activeTag = try {
-                            imageView.getTag(R.id.coil_image_url_tag)
+                            activeView.getTag(R.id.coil_image_url_tag)
                         } catch (_: Throwable) {
                             null
                         }
                         if (activeTag == imageKey) {
                             if (!appContext.isNsfwEnabled()) {
-                                imageView.setImageDrawable(null)
+                                activeView.setImageDrawable(null)
                             } else if (appContext.shouldCensorPosters()) {
-                                ImageLoader.applyCensoredPoster(imageView)
+                                ImageLoader.applyCensoredPoster(activeView)
                             }
                         }
                     }

@@ -141,11 +141,18 @@ object SearchResultBuilder {
 
         if (!isAdultAllowed && isCardNsfw) {
             itemView.isVisible = false
+            itemView.isFocusable = false
+            itemView.isFocusableInTouchMode = false
+            itemView.isClickable = false
+            itemView.setOnClickListener(null)
+            itemView.setOnLongClickListener(null)
+            itemView.onFocusChangeListener = null
             cardView.setImageDrawable(null)
             return
         }
 
         itemView.isVisible = true
+        itemView.isClickable = true
         cardText?.text = card.name
         cardText?.isVisible = showTitle
         cardView.isVisible = true
@@ -207,11 +214,6 @@ object SearchResultBuilder {
                 longClick(it)
                 return@setOnLongClickListener true
             }
-        }
-        //
-        //
-        //
-
         itemView.setOnClickListener {
             click(it)
         }
@@ -223,43 +225,15 @@ object SearchResultBuilder {
             itemView.nextFocusDownId = nextFocusDown
         }
 
-        /*when (nextFocusBehavior) {
-            true -> itemView.nextFocusLeftId = bg.id
-            false -> itemView.nextFocusRightId = bg.id
-            null -> {
-                bg.nextFocusRightId = -1
-                bg.nextFocusLeftId = -1
-            }
-        }*/
-
-        /*if (nextFocusUp != null) {
-            bg.nextFocusUpId = nextFocusUp
-        }
-
-        if (nextFocusDown != null) {
-            bg.nextFocusDownId = nextFocusDown
-        }
-
-        */
-
         if (isLayout(TV)) {
-            // bg.isFocusable = true
-            // bg.isFocusableInTouchMode = true
-            // bg.touchscreenBlocksFocus = false
             itemView.isFocusableInTouchMode = true
             itemView.isFocusable = true
         }
-
-        /**/
 
         itemView.setOnLongClickListener {
             longClick(it)
             return@setOnLongClickListener true
         }
-
-        /*bg.setOnFocusChangeListener { view, b ->
-            focus(view, b)
-        }*/
 
         itemView.setOnFocusChangeListener { view, b ->
             focus(view, b)

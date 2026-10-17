@@ -14,9 +14,9 @@ import com.lagradost.cloudstream3.ui.APIRepository
 
 /**
  * Configurable Content Safety Sensitivity Levels:
- * - EXTREME (0.12f): Maximum sensitivity strict family shield.
- * - MODERATE (0.26f): Default balanced family level.
- * - LOW (0.55f): Hardcore adult content only.
+ * - EXTREME (0.10f): Maximum sensitivity strict family shield.
+ * - MODERATE (0.35f): Default balanced family level.
+ * - LOW (0.65f): Hardcore adult content only.
  */
 enum class NsfwFilterLevel(
     val key: String,
