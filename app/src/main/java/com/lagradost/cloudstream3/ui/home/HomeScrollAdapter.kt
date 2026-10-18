@@ -60,6 +60,7 @@ class HomeScrollAdapter(
         item: LoadResponse,
         position: Int,
     ) {
+        val binding = holder.view
         val context = holder.itemView.context
         val isAdultAllowed = context.isNsfwEnabled()
         val filterLevel = NsfwFilterEngine.getFilterLevel(context)
