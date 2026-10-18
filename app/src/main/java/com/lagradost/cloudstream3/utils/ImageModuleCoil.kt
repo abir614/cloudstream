@@ -260,13 +260,22 @@ object ImageLoader {
 
         // 1. Strict family safe mode: if adult content is disabled, NEVER show adult images or censored badges
         if (!isAdultAllowed) {
-            if (imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
+            val level = NsfwFilterEngine.getFilterLevel(context)
+            if (level >= NsfwFilterLevel.MODERATE && (imageData is String)) {
+                if (imageData.isBlank() || imageData == "null" || (!imageData.startsWith("http://") && !imageData.startsWith("https://"))) {
+                    this.setImageDrawable(null)
+                    this.setTag(R.id.coil_image_url_tag, imageKey)
+                    OnDeviceNsfwClassifier.hideParentItem(this)
+                    return
+                }
+            }
+            if (imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) {
                 this.setImageDrawable(null)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
                 OnDeviceNsfwClassifier.hideParentItem(this)
                 return
             }
-            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context)) {
+            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)) {
                 this.setImageDrawable(null)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
                 OnDeviceNsfwClassifier.hideParentItem(this)
@@ -274,12 +283,13 @@ object ImageLoader {
             }
         } else if (shouldCensorPosters(context)) {
             // Adult content allowed AND user explicitly enabled poster censorship badge
-            if (imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
+            val level = NsfwFilterEngine.getFilterLevel(context)
+            if (imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) {
                 applyCensoredPoster(this)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
                 return
             }
-            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context)) {
+            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)) {
                 applyCensoredPoster(this)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
                 return
@@ -307,6 +317,14 @@ object ImageLoader {
                                 drawable = drawable
                             )
                         } catch (_: Throwable) {
+                        }
+                    },
+                    onError = { _, _ ->
+                        if (!isAdultAllowed) {
+                            val level = NsfwFilterEngine.getFilterLevel(context)
+                            if (level >= NsfwFilterLevel.MODERATE) {
+                                OnDeviceNsfwClassifier.hideParentItem(this@loadImageInternal)
+                            }
                         }
                     }
                 )

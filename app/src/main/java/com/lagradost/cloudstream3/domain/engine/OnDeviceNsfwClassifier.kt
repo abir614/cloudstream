@@ -281,6 +281,7 @@ object OnDeviceNsfwClassifier {
             if (cachedScore >= threshold) {
                 if (!appContext.isNsfwEnabled()) {
                     imageView.setImageDrawable(null)
+                    hideParentItem(imageView)
                 } else if (appContext.shouldCensorPosters()) {
                     ImageLoader.applyCensoredPoster(imageView)
                 }

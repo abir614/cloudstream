@@ -106,37 +106,54 @@ class NsfwFilterEngineTest {
         assertTrue(NsfwFilterEngine.isNsfw(hardcoreItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(hardcoreItem, NsfwFilterLevel.EXTREME))
 
+        // Ecchi is caught in LOW, MODERATE, and EXTREME (Low hardened to Moderate)
         val suggestiveItem = AnimeSearchResponse("High School DxD", "https://site.to/dxd", "AnimeProvider", TvType.Anime)
-        assertFalse(NsfwFilterEngine.isNsfw(suggestiveItem, NsfwFilterLevel.LOW))
+        assertTrue(NsfwFilterEngine.isNsfw(suggestiveItem, NsfwFilterLevel.LOW))
         assertTrue(NsfwFilterEngine.isNsfw(suggestiveItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(suggestiveItem, NsfwFilterLevel.EXTREME))
 
-        // Summer / beach / swimsuit is KEPT in Moderate, strictly filtered out in Extreme
+        // Summer / beach / swimsuit is allowed on LOW, and strictly filtered in MODERATE and EXTREME (Moderate hardened to Extreme)
         val beachItem = AnimeSearchResponse("Beach Swimsuit Episode", "https://site.to/swim", "AnimeProvider", TvType.Anime, posterUrl = "https://cdn.net/swim.jpg")
         assertFalse(NsfwFilterEngine.isNsfw(beachItem, NsfwFilterLevel.LOW))
-        assertFalse(NsfwFilterEngine.isNsfw(beachItem, NsfwFilterLevel.MODERATE))
+        assertTrue(NsfwFilterEngine.isNsfw(beachItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(beachItem, NsfwFilterLevel.EXTREME))
 
-        // Empty poster items must be strictly filtered out in Extreme filter
+        // Empty poster items must be strictly filtered out in both Moderate and Extreme
         val emptyPosterItem = MovieSearchResponse("Show Without Poster", "https://site.to/noposter", "Provider", TvType.Movie, posterUrl = null)
-        assertFalse(NsfwFilterEngine.isNsfw(emptyPosterItem, NsfwFilterLevel.MODERATE))
+        assertTrue(NsfwFilterEngine.isNsfw(emptyPosterItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(emptyPosterItem, NsfwFilterLevel.EXTREME))
 
         val nonHttpPosterItem = MovieSearchResponse("Show With Bad Poster", "https://site.to/badposter", "Provider", TvType.Movie, posterUrl = "file:///local/bad.png")
+        assertTrue(NsfwFilterEngine.isNsfw(nonHttpPosterItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(nonHttpPosterItem, NsfwFilterLevel.EXTREME))
 
         val borderlineItem = AnimeSearchResponse("Ordinary Show Special", "https://site.to/s1", "AnimeProvider", TvType.Anime, posterUrl = "https://cdn.net/harem_bath.jpg")
+        assertTrue(NsfwFilterEngine.isNsfw(borderlineItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(borderlineItem, NsfwFilterLevel.EXTREME))
+
+        // Super Extreme romance/ecchi tropes caught in EXTREME
+        val superExtremeItem = AnimeSearchResponse("Domestic Girlfriend Special", "https://site.to/dg", "AnimeProvider", TvType.Anime, posterUrl = "https://cdn.net/p.jpg")
+        assertFalse(NsfwFilterEngine.isNsfw(superExtremeItem, NsfwFilterLevel.LOW))
+        assertFalse(NsfwFilterEngine.isNsfw(superExtremeItem, NsfwFilterLevel.MODERATE))
+        assertTrue(NsfwFilterEngine.isNsfw(superExtremeItem, NsfwFilterLevel.EXTREME))
 
         // Compound word detection
         val compoundHentai = AnimeSearchResponse("HentaiVideoSpecial", "https://site.to/v1", "Provider", TvType.Anime, posterUrl = "https://cdn.net/p1.jpg")
         assertTrue(NsfwFilterEngine.isNsfw(compoundHentai, NsfwFilterLevel.LOW))
 
         val compoundEcchi = AnimeSearchResponse("EcchiGirlOVA", "https://site.to/v2", "Provider", TvType.Anime, posterUrl = "https://cdn.net/p2.jpg")
+        assertTrue(NsfwFilterEngine.isNsfw(compoundEcchi, NsfwFilterLevel.LOW))
         assertTrue(NsfwFilterEngine.isNsfw(compoundEcchi, NsfwFilterLevel.MODERATE))
 
         val compoundBikini = AnimeSearchResponse("SummerBikiniParty", "https://site.to/v3", "Provider", TvType.Anime, posterUrl = "https://cdn.net/p3.jpg")
-        assertFalse(NsfwFilterEngine.isNsfw(compoundBikini, NsfwFilterLevel.MODERATE))
+        assertFalse(NsfwFilterEngine.isNsfw(compoundBikini, NsfwFilterLevel.LOW))
+        assertTrue(NsfwFilterEngine.isNsfw(compoundBikini, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(compoundBikini, NsfwFilterLevel.EXTREME))
+
+        // Clean mainstream show not filtered at any level
+        val cleanItem = AnimeSearchResponse("Attack on Titan", "https://site.to/aot", "AnimeProvider", TvType.Anime, posterUrl = "https://cdn.net/aot.jpg")
+        assertFalse(NsfwFilterEngine.isNsfw(cleanItem, NsfwFilterLevel.LOW))
+        assertFalse(NsfwFilterEngine.isNsfw(cleanItem, NsfwFilterLevel.MODERATE))
+        assertFalse(NsfwFilterEngine.isNsfw(cleanItem, NsfwFilterLevel.EXTREME))
     }
 }

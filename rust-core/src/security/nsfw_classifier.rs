@@ -2,9 +2,9 @@
 //!
 //! Provides zero-overhead token analysis and domain heuristics to filter adult content
 //! across three configurable sensitivity tiers:
-//! - Level 0 (LOW): Filters only hardcore explicit adult pornography.
-//! - Level 1 (MODERATE): Balanced family level. Filters explicit adult content, ecchi, nudity, and suggestive themes while allowing standard summer/beach content.
-//! - Level 2 (EXTREME): Maximum sensitivity family shield. Filters beach/summer/swimwear, half-body exposed, onsen, and fanservice.
+//! - Level 0 (LOW): Hardened Moderate sensitivity. Filters explicit adult content, ecchi, smut, lewd, and suggestive content.
+//! - Level 1 (MODERATE): Hardened Extreme sensitivity. Filters beach/summer/swimwear, half-body exposed, onsen, and fanservice.
+//! - Level 2 (EXTREME): Super Extreme peak shield. Filters provocative adult romance tropes, erotic themes, and suggestive tags.
 
 pub const LEVEL_LOW: u8 = 0;
 pub const LEVEL_MODERATE: u8 = 1;
@@ -84,7 +84,7 @@ const HARDCORE_ADULT_TOKENS: &[&str] = &[
     "rule34",
 ];
 
-/// Suggestive, Ecchi, Swimsuit & Anatomy Tokens (Active in MODERATE & EXTREME).
+/// Suggestive, Ecchi, Swimsuit & Anatomy Tokens (Active in ALL levels - LOW hardened to Moderate).
 const SUGGESTIVE_ECCHI_TOKENS: &[&str] = &[
     "ecchi",
     "ero-anime",
@@ -129,9 +129,10 @@ const SUGGESTIVE_ECCHI_TOKENS: &[&str] = &[
     "peeping",
     "voyeur",
     "chijo",
+    "dxd",
 ];
 
-/// Extreme Sensitivity / Borderline Fanservice Tokens (Active ONLY in EXTREME).
+/// Extreme Sensitivity / Borderline Fanservice Tokens (Active in MODERATE & EXTREME).
 const EXTREME_SENSITIVITY_TOKENS: &[&str] = &[
     "beach",
     "summer",
@@ -173,6 +174,55 @@ const EXTREME_SENSITIVITY_TOKENS: &[&str] = &[
     "bathhouse",
 ];
 
+/// Super Extreme Sensitivity / Adult & Provocative Romance Tropes (Active ONLY in EXTREME).
+const SUPER_EXTREME_TOKENS: &[&str] = &[
+    "succubus",
+    "incubus",
+    "peeping",
+    "voyeur",
+    "voyeurism",
+    "exhibitionism",
+    "upskirt",
+    "downblouse",
+    "nudist",
+    "nudism",
+    "naturist",
+    "naturism",
+    "bunnygirl",
+    "crossdress",
+    "crossdressing",
+    "femboy",
+    "otokonoko",
+    "concubine",
+    "courtesan",
+    "brothel",
+    "prostitute",
+    "prostitution",
+    "escort",
+    "callgirl",
+    "redlight",
+    "soapland",
+    "aphrodisiac",
+    "seductress",
+    "temptress",
+    "mistress",
+    "nightwear",
+    "sleepwear",
+    "babydoll",
+    "negligee",
+    "corset",
+    "fishnet",
+    "stockings",
+    "garter",
+    "nukige",
+    "galge",
+    "tentacle",
+    "tentacles",
+    "pantsu",
+    "monmusu",
+    "tsugumomo",
+];
+
 /// Hardcore Adult Multi-Word Phrases (Active in ALL levels).
 const HARDCORE_ADULT_PHRASES: &[&str] = &[
     "boku no pico",
@@ -186,7 +236,7 @@ const HARDCORE_ADULT_PHRASES: &[&str] = &[
     "shoujo ramune",
 ];
 
-/// Suggestive & Ecchi Franchise Multi-Word Phrases (Active in MODERATE & EXTREME).
+/// Suggestive & Ecchi Franchise Multi-Word Phrases (Active in ALL levels - LOW hardened to Moderate).
 const SUGGESTIVE_ECCHI_PHRASES: &[&str] = &[
     "high school dxd",
     "shinmai maou",
@@ -202,12 +252,44 @@ const SUGGESTIVE_ECCHI_PHRASES: &[&str] = &[
     "seikon no qwaser",
 ];
 
-/// Extreme Sensitivity Phrases (Active ONLY in EXTREME).
+/// Extreme Sensitivity Phrases (Active in MODERATE & EXTREME).
 const EXTREME_SENSITIVITY_PHRASES: &[&str] = &[
     "hot spring",
     "fan service",
     "panty shot",
     "mixed bath",
+];
+
+/// Super Extreme Adult Franchise Multi-Word Phrases (Active ONLY in EXTREME).
+const SUPER_EXTREME_PHRASES: &[&str] = &[
+    "domestic girlfriend",
+    "domestic na kanojo",
+    "kuzu no honkai",
+    "scum's wish",
+    "valkyrie drive",
+    "masou gakuen",
+    "hybrid x heart",
+    "manyuu hikenchou",
+    "ladies versus butlers",
+    "prison school",
+    "shimoneta",
+    "seikon no qwaser",
+    "to love ru darkness",
+    "motto to love ru",
+    "peter grill",
+    "monster musume",
+    "ishuzoku reviewers",
+    "ayane de battle",
+    "kiss x sis",
+    "kissxsis",
+    "erotic romance",
+    "sensual romance",
+    "massage parlor",
+    "adult video",
+    "mature content",
+    "adult anime",
+    "18+ anime",
+    "eromanga sensei",
 ];
 
 /// CJK Hardcore Stems (Active in ALL levels).
@@ -224,7 +306,7 @@ const CJK_HARDCORE_STEMS: &[&str] = &[
     "中出し",
 ];
 
-/// CJK Suggestive & Ecchi Stems (Active in MODERATE & EXTREME).
+/// CJK Suggestive & Ecchi Stems (Active in ALL levels - LOW hardened to Moderate).
 const CJK_SUGGESTIVE_STEMS: &[&str] = &[
     "エロ",
     "エッチ",
@@ -246,7 +328,7 @@ const CJK_SUGGESTIVE_STEMS: &[&str] = &[
     "アダルト",
 ];
 
-/// CJK Extreme Sensitivity Stems (Active ONLY in EXTREME).
+/// CJK Extreme Sensitivity Stems (Active in MODERATE & EXTREME).
 const CJK_EXTREME_STEMS: &[&str] = &[
     "水着",
     "ビキニ",
@@ -260,6 +342,14 @@ const CJK_EXTREME_STEMS: &[&str] = &[
     "盗撮",
 ];
 
+/// CJK Super Extreme Stems (Active ONLY in EXTREME).
+const CJK_SUPER_EXTREME_STEMS: &[&str] = &[
+    "裏垢", "パパ活", "援助交際", "援交", "買春", "売春", "風俗", "ソープ", "ピンサロ", "セクキャバ",
+    "デリヘル", "出会い系", "官能", "夜這い", "近親相姦", "義母", "義妹", "義姉", "義父", "催眠",
+    "触手", "露出狂", "女体盛り", "媚薬", "肉感", "巨尻", "美尻", "谷間", "パンスト", "下着姿",
+    "半裸", "全裸", "裸体", "肢体", "艶", "秘部", "水着姿", "エロアニメ", "エロ動画",
+];
+
 /// Hardcore Adult Substring Stems (Active in ALL levels).
 const HARDCORE_STEMS: &[&str] = &[
     "hentai", "hanime", "porn", "porno", "xxx", "r18", "+18", "18+", "eroti", "bukkake",
@@ -270,19 +360,29 @@ const HARDCORE_STEMS: &[&str] = &[
     "playboy", "playmate", "nhentai", "tsumino", "spankbang", "eporner", "missav", "supjav", "javhd",
 ];
 
-/// Suggestive & Ecchi Substring Stems (Active in MODERATE & EXTREME).
+/// Suggestive & Ecchi Substring Stems (Active in ALL levels - LOW hardened to Moderate).
 const SUGGESTIVE_STEMS: &[&str] = &[
     "ecchi", "ero-anime", "eroanime", "eroge", "ahegao", "doujin", "futanari", "netorare",
     "smut", "lewd", "oppai", "boob", "busty", "lingerie", "milf", "thong", "panty", "panties",
-    "fetish", "bdsm", "bondage", "sensual", "chijo", "eromanga",
+    "fetish", "bdsm", "bondage", "sensual", "chijo", "eromanga", "dxd",
 ];
 
-/// Extreme Sensitivity Substring Stems (Active ONLY in EXTREME).
+/// Extreme Sensitivity Substring Stems (Active in MODERATE & EXTREME).
 const EXTREME_STEMS: &[&str] = &[
     "summer", "beach", "swim", "bikini", "monokini", "microkini", "mizugi", "halfbody",
     "half-body", "half body", "exposed", "topless", "bareback", "barechested",
     "underboob", "sideboob", "cleavage", "onsen", "bathhouse", "hotspring", "harem",
     "fanservice", "fan-service", "waifu", "pantyshot", "panty-shot", "spank", "seductive", "provocative",
+];
+
+/// Super Extreme Substring Stems (Active ONLY in EXTREME).
+const SUPER_EXTREME_STEMS: &[&str] = &[
+    "succubus", "incubus", "peeping", "voyeur", "upskirt", "downblouse", "nudis", "naturis",
+    "bunnygirl", "bunny-girl", "bunny girl", "crossdress", "femboy", "otokonoko", "concubine",
+    "courtesan", "brothel", "prostitut", "callgirl", "redlight", "soapland", "aphrodisiac",
+    "seductress", "temptress", "negligee", "babydoll", "fishnet", "nukige", "galge", "tentacle",
+    "pantsu", "monmusu", "tsugumomo", "step-sister", "step-brother", "step-mother", "step-father",
+    "step-daughter", "step-son",
 ];
 
 /// Evaluates whether a single text string contains adult/NSFW markers according to sensitivity level.
@@ -297,15 +397,23 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
             return true;
         }
     }
+    // Suggestive CJK stems active in ALL levels (LOW hardened to Moderate)
+    for &stem in CJK_SUGGESTIVE_STEMS {
+        if text.contains(stem) {
+            return true;
+        }
+    }
+    // Extreme CJK stems active in MODERATE & EXTREME
     if level >= LEVEL_MODERATE {
-        for &stem in CJK_SUGGESTIVE_STEMS {
+        for &stem in CJK_EXTREME_STEMS {
             if text.contains(stem) {
                 return true;
             }
         }
     }
+    // Super Extreme CJK stems active in EXTREME
     if level >= LEVEL_EXTREME {
-        for &stem in CJK_EXTREME_STEMS {
+        for &stem in CJK_SUPER_EXTREME_STEMS {
             if text.contains(stem) {
                 return true;
             }
@@ -320,15 +428,23 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
             return true;
         }
     }
+    // Suggestive phrases active in ALL levels (LOW hardened to Moderate)
+    for &phrase in SUGGESTIVE_ECCHI_PHRASES {
+        if lower.contains(phrase) {
+            return true;
+        }
+    }
+    // Extreme phrases active in MODERATE & EXTREME
     if level >= LEVEL_MODERATE {
-        for &phrase in SUGGESTIVE_ECCHI_PHRASES {
+        for &phrase in EXTREME_SENSITIVITY_PHRASES {
             if lower.contains(phrase) {
                 return true;
             }
         }
     }
+    // Super Extreme phrases active in EXTREME
     if level >= LEVEL_EXTREME {
-        for &phrase in EXTREME_SENSITIVITY_PHRASES {
+        for &phrase in SUPER_EXTREME_PHRASES {
             if lower.contains(phrase) {
                 return true;
             }
@@ -341,22 +457,30 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
             return true;
         }
     }
-    if level >= LEVEL_MODERATE {
-        for &stem in SUGGESTIVE_STEMS {
-            if lower.contains(stem) {
-                return true;
-            }
+    // Suggestive stems active in ALL levels (LOW hardened to Moderate)
+    for &stem in SUGGESTIVE_STEMS {
+        if lower.contains(stem) {
+            return true;
         }
     }
-    if level >= LEVEL_EXTREME {
+    // Extreme stems active in MODERATE & EXTREME
+    if level >= LEVEL_MODERATE {
         for &stem in EXTREME_STEMS {
             if lower.contains(stem) {
                 return true;
             }
         }
     }
+    // Super Extreme stems active in EXTREME
+    if level >= LEVEL_EXTREME {
+        for &stem in SUPER_EXTREME_STEMS {
+            if lower.contains(stem) {
+                return true;
+            }
+        }
+    }
 
-    // 5. Delimited token matching (words separated by whitespace, dashes, slashes, etc.)
+    // 4. Delimited token matching (words separated by whitespace, dashes, slashes, etc.)
     let tokens = lower.split(|c: char| {
         c.is_whitespace()
             || c == '-'
@@ -388,16 +512,24 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
                 return true;
             }
         }
+        // Suggestive tokens active in ALL levels (LOW hardened to Moderate)
+        for &suggestive_token in SUGGESTIVE_ECCHI_TOKENS {
+            if clean_token == suggestive_token {
+                return true;
+            }
+        }
+        // Extreme tokens active in MODERATE & EXTREME
         if level >= LEVEL_MODERATE {
-            for &suggestive_token in SUGGESTIVE_ECCHI_TOKENS {
-                if clean_token == suggestive_token {
+            for &extreme_token in EXTREME_SENSITIVITY_TOKENS {
+                if clean_token == extreme_token {
                     return true;
                 }
             }
         }
+        // Super Extreme tokens active in EXTREME
         if level >= LEVEL_EXTREME {
-            for &extreme_token in EXTREME_SENSITIVITY_TOKENS {
-                if clean_token == extreme_token {
+            for &super_token in SUPER_EXTREME_TOKENS {
+                if clean_token == super_token {
                     return true;
                 }
             }
@@ -443,20 +575,23 @@ mod tests {
 
     #[test]
     fn test_text_classification_beach_and_summer() {
-        assert!(!is_nsfw_text_with_level("Summer Beach Special OVA", "https://stream.to/v1", None, LEVEL_MODERATE));
+        assert!(!is_nsfw_text_with_level("Summer Beach Special OVA", "https://stream.to/v1", None, LEVEL_LOW));
+        assert!(is_nsfw_text_with_level("Summer Beach Special OVA", "https://stream.to/v1", None, LEVEL_MODERATE));
         assert!(is_nsfw_text_with_level("Summer Beach Special OVA", "https://stream.to/v1", None, LEVEL_EXTREME));
-        assert!(is_nsfw_text_with_level("Hot Spring & Bikini Vacation", "https://stream.to/v2", None, LEVEL_EXTREME));
-        assert!(is_nsfw_text_with_level("Girl in Swimsuit", "https://stream.to/v3", None, LEVEL_EXTREME));
-        assert!(is_nsfw_text_with_level("Island Summer Edition", "https://stream.to/v4", None, LEVEL_EXTREME));
+        assert!(is_nsfw_text_with_level("Hot Spring & Bikini Vacation", "https://stream.to/v2", None, LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("Girl in Swimsuit", "https://stream.to/v3", None, LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("Island Summer Edition", "https://stream.to/v4", None, LEVEL_MODERATE));
     }
 
     #[test]
     fn test_text_classification_cjk_stems() {
-        assert!(!is_nsfw_text_with_level("水着の美少女", "https://jp.anime/play", None, LEVEL_MODERATE));
+        assert!(!is_nsfw_text_with_level("水着の美少女", "https://jp.anime/play", None, LEVEL_LOW));
+        assert!(is_nsfw_text_with_level("水着の美少女", "https://jp.anime/play", None, LEVEL_MODERATE));
         assert!(is_nsfw_text_with_level("水着の美少女", "https://jp.anime/play", None, LEVEL_EXTREME));
         assert!(is_nsfw_text("18禁 成年コミック アニメ化", "https://jp.anime/play", None));
-        assert!(is_nsfw_text_with_level("ビキニグラビア", "https://jp.anime/play", None, LEVEL_EXTREME));
+        assert!(is_nsfw_text_with_level("ビキニグラビア", "https://jp.anime/play", None, LEVEL_MODERATE));
         assert!(is_nsfw_text("エロマンガ先生", "https://jp.anime/play", None));
+        assert!(is_nsfw_text_with_level("裏垢女子の秘密", "https://jp.anime/play", None, LEVEL_EXTREME));
     }
 
     #[test]
@@ -466,19 +601,25 @@ mod tests {
         assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_MODERATE));
         assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_EXTREME));
 
-        // Ecchi should trigger on MODERATE and EXTREME
-        assert!(!is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_LOW));
+        // Ecchi should trigger on ALL levels (LOW hardened to Moderate)
+        assert!(is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_LOW));
         assert!(is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_MODERATE));
         assert!(is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_EXTREME));
 
-        // Beach / Swimsuit is KEPT in MODERATE, strictly filtered in EXTREME
+        // Beach / Swimsuit is allowed on LOW, and strictly filtered in MODERATE and EXTREME (MODERATE hardened to Extreme)
         assert!(!is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_LOW));
-        assert!(!is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_MODERATE));
         assert!(is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_EXTREME));
 
-        // Harem / Fanservice tag should trigger on EXTREME
-        assert!(!is_nsfw_text_with_level("Ordinary Show", "https://site.org", Some("Harem"), LEVEL_MODERATE));
+        // Harem / Fanservice tag should trigger on MODERATE and EXTREME
+        assert!(!is_nsfw_text_with_level("Ordinary Show", "https://site.org", Some("Harem"), LEVEL_LOW));
+        assert!(is_nsfw_text_with_level("Ordinary Show", "https://site.org", Some("Harem"), LEVEL_MODERATE));
         assert!(is_nsfw_text_with_level("Ordinary Show", "https://site.org", Some("Harem"), LEVEL_EXTREME));
+
+        // Super Extreme romance/ecchi tropes trigger on EXTREME
+        assert!(!is_nsfw_text_with_level("Domestic Girlfriend Special", "https://site.org", None, LEVEL_LOW));
+        assert!(!is_nsfw_text_with_level("Domestic Girlfriend Special", "https://site.org", None, LEVEL_MODERATE));
+        assert!(is_nsfw_text_with_level("Domestic Girlfriend Special", "https://site.org", None, LEVEL_EXTREME));
     }
 
     #[test]
