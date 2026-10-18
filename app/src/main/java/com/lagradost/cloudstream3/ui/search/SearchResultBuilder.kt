@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.ColorStateList
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -148,11 +149,24 @@ object SearchResultBuilder {
             itemView.setOnLongClickListener(null)
             itemView.onFocusChangeListener = null
             cardView.setImageDrawable(null)
+            val lp = itemView.layoutParams
+            if (lp != null) {
+                lp.width = 0
+                lp.height = 0
+                itemView.layoutParams = lp
+            }
             return
         }
 
         itemView.isVisible = true
         itemView.isClickable = true
+        val lp = itemView.layoutParams
+        if (lp != null && (lp.width == 0 || lp.height == 0)) {
+            lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
+            lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            itemView.layoutParams = lp
+        }
+        cardView.setTag(R.id.parent_view_tag, java.lang.ref.WeakReference(itemView))
         cardText?.text = card.name
         cardText?.isVisible = showTitle
         cardView.isVisible = true

@@ -100,7 +100,23 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             com.lagradost.cloudstream3.di.ServiceLocator.telemetry.recordBreadcrumb("App", "Application initialized successfully")
         } catch (_: Throwable) {
         }
+
+        try {
+            val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
+            val nsfwLevelKey = getString(R.string.nsfw_filter_level_key)
+            val enableNsfwKey = getString(R.string.enable_nsfw_on_providers_key)
+            val censorPostersKey = getString(R.string.censor_nsfw_posters_key)
+            prefChangeListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == nsfwLevelKey || key == enableNsfwKey || key == censorPostersKey) {
+                    com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.onFilterConfigChanged()
+                }
+            }
+            prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
+        } catch (_: Throwable) {
+        }
     }
+
+    private var prefChangeListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)

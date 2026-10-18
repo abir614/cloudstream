@@ -155,6 +155,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
         super.onResume()
         searchViewModel.clearSuggestions()
         afterPluginsLoadedEvent += ::reloadRepos
+        searchViewModel.rescanSearchFilters()
     }
 
     override fun onStop() {

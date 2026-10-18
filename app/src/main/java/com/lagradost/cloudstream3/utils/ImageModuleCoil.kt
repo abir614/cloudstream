@@ -263,11 +263,13 @@ object ImageLoader {
             if (imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null)) {
                 this.setImageDrawable(null)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
+                OnDeviceNsfwClassifier.hideParentItem(this)
                 return
             }
             if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context)) {
                 this.setImageDrawable(null)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
+                OnDeviceNsfwClassifier.hideParentItem(this)
                 return
             }
         } else if (shouldCensorPosters(context)) {

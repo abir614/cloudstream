@@ -12,6 +12,7 @@ import com.lagradost.cloudstream3.CloudStreamApp.Companion.getKey
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.setKey
 import com.lagradost.cloudstream3.CommonActivity.activity
 import com.lagradost.cloudstream3.HomePageList
+import com.lagradost.cloudstream3.HomePageResponse
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.MainActivity
@@ -296,8 +297,17 @@ class HomeViewModel : ViewModel() {
         val add = addItems.amap { searchResponse ->
             repo?.load(searchResponse.url)
         }.mapNotNull { if (it != null && it is Resource.Success) it.value else null }
-        current.addAll(add)
-        return add.size
+
+        val nsfwEnabled = context?.isNsfwEnabled() ?: false
+        val filterLevel = NsfwFilterEngine.getFilterLevel(context)
+        val validAdd = if (!nsfwEnabled) {
+            add.filterNot { NsfwFilterEngine.isNsfw(it, filterLevel) }
+        } else {
+            add
+        }
+
+        current.addAll(validAdd)
+        return validAdd.size
     }
 
     private var addJob: Job? = null
@@ -305,6 +315,85 @@ class HomeViewModel : ViewModel() {
         addJob = ioSafe {
             updatePreviewResponses(previewResponses, previewResponsesAdded, currentShuffledList, 1)
             _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
+        }
+    }
+
+    private var rawHomeData: List<HomePageResponse?>? = null
+
+    fun rescanLoadedSources() {
+        val data = rawHomeData ?: return
+        ioSafe {
+            populateHomeFromData(data)
+        }
+    }
+
+    private suspend fun populateHomeFromData(homeData: List<HomePageResponse?>) {
+        try {
+            expandable.clear()
+            val nsfwEnabled = context?.isNsfwEnabled() ?: false
+            homeData.forEach { home ->
+                home?.items?.forEach { list ->
+                    val nsfwFiltered = NsfwFilterEngine.filterHomePageList(list, nsfwEnabled)
+                    if (nsfwFiltered != null) {
+                        val filteredList =
+                            context?.filterHomePageListByFilmQuality(nsfwFiltered) ?: nsfwFiltered
+                        expandable[list.name] =
+                            ExpandableHomepageList(
+                                filteredList.copy(
+                                    list = CopyOnWriteArrayList(
+                                        filteredList.list
+                                    )
+                                ), 1, home.hasNext
+                            )
+                    }
+                }
+            }
+
+            // Render home sections IMMEDIATELY without waiting for preview banner detail scrapes!
+            _page.postValue(Resource.Success(expandable))
+
+            val items = homeData.mapNotNull { it?.items }.flatten()
+
+            previewResponses.clear()
+            previewResponsesAdded.clear()
+
+            if (items.isNotEmpty()) {
+                val currentList =
+                    items.shuffled().filter { it.list.isNotEmpty() }
+                        .flatMap { it.list }
+                        .distinctBy { it.url }.toList()
+
+                val nsfwFilteredCurrentList = NsfwFilterEngine.filterSearchResults(currentList, nsfwEnabled)
+                if (nsfwFilteredCurrentList.isNotEmpty()) {
+                    val randomItems =
+                        context?.filterSearchResultByFilmQuality(nsfwFilteredCurrentList.shuffled())
+                            ?: nsfwFilteredCurrentList.shuffled()
+
+                    updatePreviewResponses(
+                        previewResponses,
+                        previewResponsesAdded,
+                        randomItems,
+                        3
+                    )
+
+                    _randomItems.postValue(randomItems)
+                    currentShuffledList = randomItems
+                }
+            }
+
+            if (previewResponses.isEmpty()) {
+                _preview.postValue(
+                    Resource.Failure(
+                        false,
+                        "No homepage responses"
+                    )
+                )
+            } else {
+                _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
+            }
+        } catch (e: Exception) {
+            _randomItems.postValue(emptyList())
+            logError(e)
         }
     }
 
@@ -324,7 +413,6 @@ class HomeViewModel : ViewModel() {
             return@ioSafe
         }
 
-
         _page.postValue(Resource.Loading())
         _preview.postValue(Resource.Loading())
         // cancel the current preview expand as that is no longer relevant
@@ -332,75 +420,8 @@ class HomeViewModel : ViewModel() {
 
         when (val data = repo?.getMainPage(1, null, forceReload)) {
             is Resource.Success -> {
-                try {
-                    expandable.clear()
-                    val nsfwEnabled = context?.isNsfwEnabled() ?: false
-                    data.value.forEach { home ->
-                        home?.items?.forEach { list ->
-                            val nsfwFiltered = NsfwFilterEngine.filterHomePageList(list, nsfwEnabled)
-                            if (nsfwFiltered != null) {
-                                val filteredList =
-                                    context?.filterHomePageListByFilmQuality(nsfwFiltered) ?: nsfwFiltered
-                                expandable[list.name] =
-                                    ExpandableHomepageList(
-                                        filteredList.copy(
-                                            list = CopyOnWriteArrayList(
-                                                filteredList.list
-                                            )
-                                        ), 1, home.hasNext
-                                    )
-                            }
-                        }
-                    }
-
-                    // Render home sections IMMEDIATELY without waiting for preview banner detail scrapes!
-                    _page.postValue(Resource.Success(expandable))
-
-                    val items = data.value.mapNotNull { it?.items }.flatten()
-
-
-                    previewResponses.clear()
-                    previewResponsesAdded.clear()
-
-                    //val home = data.value
-                    if (items.isNotEmpty()) {
-                        val currentList =
-                            items.shuffled().filter { it.list.isNotEmpty() }
-                                .flatMap { it.list }
-                                .distinctBy { it.url }.toList()
-
-                        val nsfwFilteredCurrentList = NsfwFilterEngine.filterSearchResults(currentList, nsfwEnabled)
-                        if (nsfwFilteredCurrentList.isNotEmpty()) {
-                            val randomItems =
-                                context?.filterSearchResultByFilmQuality(nsfwFilteredCurrentList.shuffled())
-                                    ?: nsfwFilteredCurrentList.shuffled()
-
-                            updatePreviewResponses(
-                                previewResponses,
-                                previewResponsesAdded,
-                                randomItems,
-                                3
-                            )
-
-                            _randomItems.postValue(randomItems)
-                            currentShuffledList = randomItems
-                        }
-                    }
-
-                    if (previewResponses.isEmpty()) {
-                        _preview.postValue(
-                            Resource.Failure(
-                                false,
-                                "No homepage responses"
-                            )
-                        )
-                    } else {
-                        _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
-                    }
-                } catch (e: Exception) {
-                    _randomItems.postValue(emptyList())
-                    logError(e)
-                }
+                rawHomeData = data.value
+                populateHomeFromData(data.value)
             }
 
             is Resource.Failure -> {
@@ -459,6 +480,14 @@ class HomeViewModel : ViewModel() {
         MainActivity.mainPluginsLoadedEvent += ::afterMainPluginsLoaded
         MainActivity.reloadHomeEvent += ::reloadHome
         MainActivity.reloadAccountEvent += ::reloadAccount
+
+        viewModelScope.launchSafe {
+            NsfwFilterEngine.configVersion.collect { version ->
+                if (version > 0) {
+                    rescanLoadedSources()
+                }
+            }
+        }
     }
 
     override fun onCleared() {

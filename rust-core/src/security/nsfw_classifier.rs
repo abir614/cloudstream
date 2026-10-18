@@ -260,6 +260,31 @@ const CJK_EXTREME_STEMS: &[&str] = &[
     "盗撮",
 ];
 
+/// Hardcore Adult Substring Stems (Active in ALL levels).
+const HARDCORE_STEMS: &[&str] = &[
+    "hentai", "hanime", "porn", "porno", "xxx", "r18", "+18", "18+", "eroti", "bukkake",
+    "nakadashi", "paizuri", "chikan", "shibari", "creampie", "blowjob", "deepthroat", "swinger",
+    "cuckold", "cunnilingus", "pegging", "gangbang", "incest", "stepmom", "stepmother",
+    "stepsister", "stepdaughter", "stepson", "stepbrother", "nudity", "topless",
+    "uncensor", "decensor", "rule34", "onlyfans", "fansly", "striptease", "stripper", "camgirl",
+    "playboy", "playmate", "nhentai", "tsumino", "spankbang", "eporner", "missav", "supjav", "javhd",
+];
+
+/// Suggestive & Ecchi Substring Stems (Active in MODERATE & EXTREME).
+const SUGGESTIVE_STEMS: &[&str] = &[
+    "ecchi", "ero-anime", "eroanime", "eroge", "ahegao", "doujin", "futanari", "netorare",
+    "smut", "lewd", "oppai", "boob", "busty", "lingerie", "milf", "thong", "panty", "panties",
+    "fetish", "bdsm", "bondage", "sensual", "chijo", "eromanga",
+];
+
+/// Extreme Sensitivity Substring Stems (Active ONLY in EXTREME).
+const EXTREME_STEMS: &[&str] = &[
+    "summer", "beach", "swim", "bikini", "monokini", "microkini", "mizugi", "halfbody",
+    "half-body", "half body", "exposed", "topless", "bareback", "barechested",
+    "underboob", "sideboob", "cleavage", "onsen", "bathhouse", "hotspring", "harem",
+    "fanservice", "fan-service", "waifu", "pantyshot", "panty-shot", "spank", "seductive", "provocative",
+];
+
 /// Evaluates whether a single text string contains adult/NSFW markers according to sensitivity level.
 fn is_text_nsfw_single(text: &str, level: u8) -> bool {
     if text.is_empty() {
@@ -310,64 +335,24 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
         }
     }
 
-    // 3. Substring checks for definitive adult URL/domain markers
-    if lower.contains("hentai")
-        || lower.contains("hanime")
-        || lower.contains("javhd")
-        || lower.contains("r18")
-        || lower.contains("18+")
-        || lower.contains("nsfw")
-        || lower.contains("uncensored")
-        || lower.contains("pornhub")
-        || lower.contains("xvideos")
-        || lower.contains("xnxx")
-    {
-        return true;
-    }
-
-    if level >= LEVEL_MODERATE
-        && (lower.contains("ecchi")
-            || lower.contains("erotica")
-            || lower.contains("hentai")
-            || lower.contains("smut"))
-    {
-        return true;
-    }
-
-    if level >= LEVEL_EXTREME
-        && (lower.contains("fanservice")
-            || lower.contains("harem")
-            || lower.contains("bikini")
-            || lower.contains("swimsuit")
-            || lower.contains("swimwear")
-            || lower.contains("gravure")
-            || lower.contains("microkini")
-            || lower.contains("halfbody")
-            || lower.contains("half-body")
-            || lower.contains("exposed"))
-    {
-        return true;
-    }
-
-    // 4. Summer / Beach / Swimsuit contextual triggers (Active ONLY in EXTREME)
-    if level >= LEVEL_EXTREME {
-        let has_summer_or_beach = lower.contains("summer")
-            || lower.contains("beach")
-            || lower.contains("swim")
-            || lower.contains("bikini")
-            || lower.contains("halfbody")
-            || lower.contains("half-body")
-            || lower.contains("exposed");
-        if has_summer_or_beach {
+    // 3. Substring checks for stems
+    for &stem in HARDCORE_STEMS {
+        if lower.contains(stem) {
             return true;
         }
-
-        if lower.contains("onsen")
-            || lower.contains("bathhouse")
-            || (lower.contains("hot") && lower.contains("spring"))
-            || (lower.contains("bath") && (lower.contains("girl") || lower.contains("scene") || lower.contains("special")))
-        {
-            return true;
+    }
+    if level >= LEVEL_MODERATE {
+        for &stem in SUGGESTIVE_STEMS {
+            if lower.contains(stem) {
+                return true;
+            }
+        }
+    }
+    if level >= LEVEL_EXTREME {
+        for &stem in EXTREME_STEMS {
+            if lower.contains(stem) {
+                return true;
+            }
         }
     }
 

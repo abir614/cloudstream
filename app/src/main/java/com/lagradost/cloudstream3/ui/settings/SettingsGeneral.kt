@@ -412,8 +412,7 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
                 {}) {
                 val selected = prefValues[it]
                 settingsManager.edit { putString(getString(R.string.nsfw_filter_level_key), selected) }
-                com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
-                com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+                com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.onFilterConfigChanged()
                 updateNsfwSummary()
             }
             return@setOnPreferenceClickListener true
@@ -422,15 +421,13 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
         getPref(R.string.enable_nsfw_on_providers_key)?.setOnPreferenceChangeListener { _, newValue ->
             val enabled = newValue as? Boolean ?: false
             MainAPI.settingsForProvider.enableAdult = enabled
-            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
-            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+            com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.onFilterConfigChanged()
             updateNsfwSummary()
             true
         }
 
         getPref(R.string.censor_nsfw_posters_key)?.setOnPreferenceChangeListener { _, _ ->
-            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
-            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+            com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.onFilterConfigChanged()
             true
         }
 

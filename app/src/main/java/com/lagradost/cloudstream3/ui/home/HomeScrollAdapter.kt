@@ -4,6 +4,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.isGone
+import androidx.core.view.isVisible
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.databinding.HomeScrollViewBinding
@@ -19,6 +20,7 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.html
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
 import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.getImageFromDrawable
@@ -58,15 +60,24 @@ class HomeScrollAdapter(
         item: LoadResponse,
         position: Int,
     ) {
-        val binding = holder.view
+        val context = holder.itemView.context
+        val isAdultAllowed = context.isNsfwEnabled()
+        val filterLevel = NsfwFilterEngine.getFilterLevel(context)
+        val isNsfw = NsfwFilterEngine.isNsfw(item, filterLevel)
 
+        if (!isAdultAllowed && isNsfw) {
+            holder.itemView.isVisible = false
+            holder.itemView.layoutParams = ViewGroup.LayoutParams(0, 0)
+            return
+        }
+
+        holder.itemView.isVisible = true
         val posterUrl = item.backgroundPosterUrl ?: item.posterUrl
-
-        val isNsfw = shouldCensorPosters(holder.itemView.context) && NsfwFilterEngine.isNsfw(item)
+        val shouldCensor = isAdultAllowed && shouldCensorPosters(context) && isNsfw
 
         when (binding) {
             is HomeScrollViewBinding -> {
-                if (isNsfw) {
+                if (shouldCensor) {
                     applyCensoredPoster(binding.homeScrollPreview)
                 } else {
                     binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
@@ -94,7 +105,7 @@ class HomeScrollAdapter(
                 binding.homeScrollPreview.setOnClickListener { view ->
                     callback.invoke(view ?: return@setOnClickListener, position, item)
                 }
-                if (isNsfw) {
+                if (shouldCensor) {
                     applyCensoredPoster(binding.homeScrollPreview)
                 } else {
                     binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {

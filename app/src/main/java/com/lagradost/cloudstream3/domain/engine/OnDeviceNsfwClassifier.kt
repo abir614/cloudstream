@@ -13,8 +13,12 @@ import android.os.Looper
 import android.os.Process
 import android.util.Log
 import android.util.LruCache
+import android.view.View
 import android.widget.ImageView
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.view.isVisible
+import androidx.recyclerview.widget.RecyclerView
+import androidx.viewpager2.widget.ViewPager2
 import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
@@ -330,6 +334,7 @@ object OnDeviceNsfwClassifier {
                         if (activeTag == imageKey) {
                             if (!appContext.isNsfwEnabled()) {
                                 activeView.setImageDrawable(null)
+                                hideParentItem(activeView)
                             } else if (appContext.shouldCensorPosters()) {
                                 ImageLoader.applyCensoredPoster(activeView)
                             }
@@ -340,6 +345,42 @@ object OnDeviceNsfwClassifier {
                 Log.w(TAG, "Background poster classification error: ${t.message}")
             }
         }
+    }
+
+    /**
+     * Completely hides the parent card/item view when its poster is classified as NSFW in safe mode.
+     */
+    fun hideParentItem(view: View) {
+        try {
+            val weak = view.getTag(R.id.parent_view_tag) as? java.lang.ref.WeakReference<*>
+            val root = (weak?.get() as? View) ?: findRootItemView(view)
+            root.isVisible = false
+            root.isFocusable = false
+            root.isFocusableInTouchMode = false
+            root.isClickable = false
+            root.setOnClickListener(null)
+            root.setOnLongClickListener(null)
+            root.onFocusChangeListener = null
+            val lp = root.layoutParams
+            if (lp != null) {
+                lp.width = 0
+                lp.height = 0
+                root.layoutParams = lp
+            }
+        } catch (_: Throwable) {
+        }
+    }
+
+    private fun findRootItemView(view: View): View {
+        var current: View = view
+        while (current.parent is View) {
+            val parent = current.parent as View
+            if (parent is RecyclerView || parent is ViewPager2) {
+                return current
+            }
+            current = parent
+        }
+        return current
     }
 
     /**

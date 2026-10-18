@@ -38,6 +38,7 @@ import com.lagradost.cloudstream3.AllLanguagesName
 import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.R
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.databinding.FragmentHomeBinding
@@ -611,6 +612,17 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
     ): View? {
         bottomSheetDialog?.ownShow()
         return super.onCreateView(inflater, container, savedInstanceState)
+    }
+
+    private var lastObservedFilterVersion = NsfwFilterEngine.configVersion.value
+
+    override fun onResume() {
+        super.onResume()
+        val currentVersion = NsfwFilterEngine.configVersion.value
+        if (lastObservedFilterVersion != currentVersion) {
+            lastObservedFilterVersion = currentVersion
+            homeViewModel.rescanLoadedSources()
+        }
     }
 
     override fun onDestroyView() {

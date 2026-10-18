@@ -14,17 +14,17 @@ import com.lagradost.cloudstream3.ui.APIRepository
 
 /**
  * Configurable Content Safety Sensitivity Levels:
- * - EXTREME (0.10f): Maximum sensitivity strict family shield.
- * - MODERATE (0.35f): Default balanced family level.
- * - LOW (0.65f): Hardcore adult content only.
+ * - EXTREME (0.04f): Maximum sensitivity strict shield (summer, beach, swim, bikini, exposure, empty posters).
+ * - MODERATE (0.18f): Balanced family level (allows summer/beach, strictly blocks adult, ecchi, nudity, smut).
+ * - LOW (0.40f): Hardcore adult content only.
  */
 enum class NsfwFilterLevel(
     val key: String,
     val visualThreshold: Float
 ) {
-    LOW("low", 0.65f),
-    MODERATE("moderate", 0.35f),
-    EXTREME("extreme", 0.10f);
+    LOW("low", 0.40f),
+    MODERATE("moderate", 0.18f),
+    EXTREME("extreme", 0.04f);
 
     companion object {
         fun fromString(value: String?): NsfwFilterLevel {
@@ -42,23 +42,36 @@ enum class NsfwFilterLevel(
  */
 object NsfwFilterEngine {
 
+    private val _configVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
+    val configVersion: kotlinx.coroutines.flow.StateFlow<Int> = _configVersion
+
+    fun onFilterConfigChanged() {
+        OnDeviceNsfwClassifier.clearCache()
+        ImageLoader.resetImageClient()
+        _configVersion.value += 1
+    }
+
     private val HARDCORE_KEYWORDS = hashSetOf(
         "xxx", "porn", "porno", "pornography", "nsfw", "jav", "r18", "r-18", "r18+", "+18", "18+", "18plus",
-        "erotica", "erotic", "hentai", "hanime", "chikan", "paizuri", "nakadashi", "shibari", "bukkake",
-        "creampie", "blowjob", "gangbang", "deepthroat", "swinger", "cuckold", "masturbation", "incest",
-        "uncensored", "decensored", "nude", "nudity", "naked", "topless", "fella", "cunnilingus", "pegging",
-        "rance", "kuroinu", "taimanin", "mankitsu", "overflow", "euphoria", "futabu", "shoujoramune",
-        "otomedori", "resortboin", "onichichi", "seikatsushuukan", "bunnywalker", "pinkpineapple", "queenbee",
-        "poros", "greenbunny", "whitebear", "naturalhigh", "nhentai", "tsumino", "fakku", "pornhub", "xvideos",
-        "xnxx", "spankbang", "eporner", "missav", "supjav", "javhd", "rule34"
+        "over18", "18only", "adult", "erotica", "erotic", "hentai", "hanime", "chikan", "paizuri", "nakadashi",
+        "shibari", "bukkake", "creampie", "blowjob", "gangbang", "deepthroat", "swinger", "cuckold", "masturbation",
+        "incest", "uncensored", "decensored", "nude", "nudity", "naked", "topless", "fella", "cunnilingus",
+        "pegging", "stepmom", "stepmother", "stepsister", "stepdaughter", "stepson", "stepbrother", "taboo",
+        "voyeur", "upskirt", "onlyfans", "fansly", "striptease", "stripper", "camgirl", "playboy", "playmate",
+        "penthouse", "orgy", "rance", "kuroinu", "taimanin", "mankitsu", "overflow", "euphoria", "futabu",
+        "shoujoramune", "otomedori", "resortboin", "onichichi", "seikatsushuukan", "bunnywalker", "pinkpineapple",
+        "queenbee", "poros", "greenbunny", "whitebear", "naturalhigh", "nhentai", "tsumino", "fakku", "pornhub",
+        "xvideos", "xnxx", "spankbang", "eporner", "missav", "supjav", "javhd", "rule34", "hitomi"
     )
 
     private val SUGGESTIVE_KEYWORDS = hashSetOf(
         "ecchi", "ero-anime", "eroanime", "eroge", "ero", "ahegao", "doujin", "doujinshi", "futanari",
-        "netorare", "ntr", "smut", "lewd", "lust", "sensual", "sex", "sexy", "yuri", "yaoi", "playboy",
+        "netorare", "ntr", "smut", "lewd", "lust", "sensual", "sex", "sexy", "yuri", "yaoi",
         "softcore", "hardcore", "gravure", "lingerie", "cleavage", "oppai", "boob", "boobs", "breast",
         "breasts", "busty", "milf", "thong", "panties", "panty", "fetish", "bdsm", "bondage", "sadism",
-        "masochism", "dxd", "shinmai", "valkyrie", "interspecies", "chijo"
+        "masochism", "dxd", "shinmai", "valkyrie", "interspecies", "chijo", "seduce", "seduction",
+        "submissive", "dominant", "virgin", "eromanga", "bathhouse", "harem", "waifu", "fanservice",
+        "fan-service"
     )
 
     private val EXTREME_KEYWORDS = hashSetOf(
@@ -68,6 +81,28 @@ object NsfwFilterEngine {
         "bathing", "bath", "hotspring", "hot-spring", "onsen", "harem", "seductive", "provocative",
         "fanservice", "fan-service", "waifu", "suggestive", "pantyshot", "panty-shot", "spank", "spanking",
         "bathhouse"
+    )
+
+    private val HARDCORE_STEMS = arrayOf(
+        "hentai", "hanime", "porn", "porno", "xxx", "jav", "r18", "+18", "18+", "eroti", "bukkake",
+        "nakadashi", "paizuri", "chikan", "shibari", "creampie", "blowjob", "deepthroat", "swinger",
+        "cuckold", "cunnilingus", "pegging", "gangbang", "incest", "stepmom", "stepmother",
+        "stepsister", "stepdaughter", "stepson", "stepbrother", "nude", "nudity", "topless",
+        "uncensor", "decensor", "rule34", "onlyfans", "fansly", "striptease", "stripper", "camgirl",
+        "playboy", "playmate", "nhentai", "tsumino", "spankbang", "eporner", "missav", "supjav"
+    )
+
+    private val SUGGESTIVE_STEMS = arrayOf(
+        "ecchi", "ero-anime", "eroanime", "eroge", "ahegao", "doujin", "futanari", "netorare",
+        "smut", "lewd", "oppai", "boob", "busty", "lingerie", "milf", "thong", "panty", "panties",
+        "fetish", "bdsm", "bondage", "sensual", "futanari", "chijo", "eromanga"
+    )
+
+    private val EXTREME_STEMS = arrayOf(
+        "summer", "beach", "swim", "bikini", "monokini", "microkini", "mizugi", "halfbody",
+        "half-body", "half body", "exposed", "topless", "bare", "bareback", "barechested",
+        "underboob", "sideboob", "cleavage", "onsen", "bathhouse", "hotspring", "harem",
+        "fanservice", "fan-service", "waifu", "pantyshot", "panty-shot", "spank", "seductive", "provocative"
     )
 
     private val HARDCORE_PHRASES = arrayOf(
@@ -98,7 +133,8 @@ object NsfwFilterEngine {
         "水着", "ビキニ", "グラビア", "混浴", "温泉", "お風呂", "ハーレム", "お色気", "水着回", "盗撮"
     )
 
-    private val TOKEN_SPLIT_REGEX = Regex("[^a-z0-9+]+")
+    private val CAMEL_CASE_REGEX = Regex("([a-z])([A-Z])")
+    private val DELIM_REGEX = Regex("[^a-z0-9+]+")
 
     /**
      * Resolves the user's active filter sensitivity level.
@@ -147,46 +183,42 @@ object NsfwFilterEngine {
             }
         }
 
-        val lower = text.lowercase()
+        val spaced = text.replace(CAMEL_CASE_REGEX, "$1 $2")
+        val lower = spaced.lowercase()
+        val normalized = lower.replace(DELIM_REGEX, " ")
 
         // 2. Multi-word phrases
         for (phrase in HARDCORE_PHRASES) {
-            if (lower.contains(phrase)) return true
+            if (lower.contains(phrase) || normalized.contains(phrase)) return true
         }
         if (level >= NsfwFilterLevel.MODERATE) {
             for (phrase in SUGGESTIVE_PHRASES) {
-                if (lower.contains(phrase)) return true
+                if (lower.contains(phrase) || normalized.contains(phrase)) return true
             }
         }
         if (level >= NsfwFilterLevel.EXTREME) {
             for (phrase in EXTREME_PHRASES) {
-                if (lower.contains(phrase)) return true
+                if (lower.contains(phrase) || normalized.contains(phrase)) return true
             }
         }
 
-        // 3. Summer / Beach / Exposure triggers (Active ONLY in EXTREME mode, keeping them allowed in MODERATE)
-        if (level >= NsfwFilterLevel.EXTREME) {
-            val hasSummerOrBeachOrExposure = lower.contains("summer") || lower.contains("beach") ||
-                lower.contains("swim") || lower.contains("bikini") || lower.contains("monokini") ||
-                lower.contains("microkini") || lower.contains("halfbody") || lower.contains("half-body") ||
-                lower.contains("half body") || lower.contains("exposed") || lower.contains("topless") ||
-                lower.contains("bare") || lower.contains("cleavage") || lower.contains("lingerie") ||
-                lower.contains("panties") || lower.contains("panty") || lower.contains("underboob") ||
-                lower.contains("sideboob")
-            if (hasSummerOrBeachOrExposure) {
-                return true
+        // 3. Substring stem checks (catches compound words without spaces)
+        for (stem in HARDCORE_STEMS) {
+            if (lower.contains(stem)) return true
+        }
+        if (level >= NsfwFilterLevel.MODERATE) {
+            for (stem in SUGGESTIVE_STEMS) {
+                if (lower.contains(stem)) return true
             }
-
-            if (lower.contains("onsen") || lower.contains("bathhouse") ||
-                (lower.contains("hot") && lower.contains("spring")) ||
-                (lower.contains("bath") && (lower.contains("girl") || lower.contains("scene") || lower.contains("special")))
-            ) {
-                return true
+        }
+        if (level >= NsfwFilterLevel.EXTREME) {
+            for (stem in EXTREME_STEMS) {
+                if (lower.contains(stem)) return true
             }
         }
 
         // 4. Delimited token matching (words separated by punctuation/spaces)
-        val tokens = lower.split(TOKEN_SPLIT_REGEX)
+        val tokens = normalized.split(' ')
         for (token in tokens) {
             if (token.isEmpty()) continue
             if (HARDCORE_KEYWORDS.contains(token)) return true
@@ -210,9 +242,12 @@ object NsfwFilterEngine {
     fun isNsfw(item: SearchResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
 
-        // In EXTREME filter level, contents with empty/missing/blank posters are strictly filtered out
-        if (level == NsfwFilterLevel.EXTREME && (item.posterUrl.isNullOrBlank() || item.posterUrl == "null")) {
-            return true
+        // In EXTREME filter level, contents with empty/missing/blank/non-http posters are strictly filtered out
+        if (level == NsfwFilterLevel.EXTREME) {
+            val poster = item.posterUrl
+            if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://"))) {
+                return true
+            }
         }
 
         // Check if provider itself is inherently an adult/NSFW provider
@@ -239,9 +274,12 @@ object NsfwFilterEngine {
     fun isNsfw(item: LoadResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
 
-        // In EXTREME filter level, contents with empty/missing/blank posters are strictly filtered out
-        if (level == NsfwFilterLevel.EXTREME && (item.posterUrl.isNullOrBlank() || item.posterUrl == "null")) {
-            return true
+        // In EXTREME filter level, contents with empty/missing/blank/non-http posters are strictly filtered out
+        if (level == NsfwFilterLevel.EXTREME) {
+            val poster = item.posterUrl ?: item.backgroundPosterUrl
+            if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://"))) {
+                return true
+            }
         }
 
         APIHolder.getApiFromNameNull(item.apiName)?.let { provider ->
@@ -251,11 +289,16 @@ object NsfwFilterEngine {
         item.posterUrl?.let { url ->
             if (OnDeviceNsfwClassifier.isCachedNsfw(url, null, level)) return true
         }
+        item.backgroundPosterUrl?.let { url ->
+            if (OnDeviceNsfwClassifier.isCachedNsfw(url, null, level)) return true
+        }
 
         val tagsStr = item.tags?.joinToString(" ")
-        if (isNsfwText(item.name, item.url, tagsStr ?: item.posterUrl, level)) {
+        if (isNsfwText(item.name, item.url, tagsStr, level)) {
             return true
         }
+        item.posterUrl?.let { if (isNsfwUrl(it, level)) return true }
+        item.backgroundPosterUrl?.let { if (isNsfwUrl(it, level)) return true }
 
         return false
     }

@@ -81,6 +81,34 @@ class SearchViewModel : ViewModel() {
     private var currentSearchIndex = 0
     private var onGoingSearch: Job? = null
 
+    init {
+        viewModelScope.launchSafe {
+            NsfwFilterEngine.configVersion.collect { version ->
+                if (version > 0) {
+                    rescanSearchFilters()
+                }
+            }
+        }
+    }
+
+    fun rescanSearchFilters() {
+        val nsfwEnabled = isNsfwGloballyEnabled()
+        val current = expandableSearches.toMap()
+        if (current.isEmpty()) return
+
+        val updatedMap = current.mapValues { (_, expandableList) ->
+            expandableList.copy(
+                list = NsfwFilterEngine.filterSearchResults(expandableList.list, nsfwEnabled)
+            )
+        }.filterValues { it.list.isNotEmpty() }
+
+        expandableSearches.clear()
+        expandableSearches.putAll(updatedMap)
+        _currentSearch.postValue(updatedMap)
+        val bundled = bundleSearch(updatedMap, lastQuery, nsfwEnabled)
+        _searchResponse.postValue(Resource.Success(bundled))
+    }
+
     fun reloadRepos() {
         repos = apis.withLock { apis.map { APIRepository(it) } }
     }

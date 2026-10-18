@@ -122,7 +122,21 @@ class NsfwFilterEngineTest {
         assertFalse(NsfwFilterEngine.isNsfw(emptyPosterItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(emptyPosterItem, NsfwFilterLevel.EXTREME))
 
+        val nonHttpPosterItem = MovieSearchResponse("Show With Bad Poster", "https://site.to/badposter", "Provider", TvType.Movie, posterUrl = "file:///local/bad.png")
+        assertTrue(NsfwFilterEngine.isNsfw(nonHttpPosterItem, NsfwFilterLevel.EXTREME))
+
         val borderlineItem = AnimeSearchResponse("Ordinary Show Special", "https://site.to/s1", "AnimeProvider", TvType.Anime, posterUrl = "https://cdn.net/harem_bath.jpg")
         assertTrue(NsfwFilterEngine.isNsfw(borderlineItem, NsfwFilterLevel.EXTREME))
+
+        // Compound word detection
+        val compoundHentai = AnimeSearchResponse("HentaiVideoSpecial", "https://site.to/v1", "Provider", TvType.Anime, posterUrl = "https://cdn.net/p1.jpg")
+        assertTrue(NsfwFilterEngine.isNsfw(compoundHentai, NsfwFilterLevel.LOW))
+
+        val compoundEcchi = AnimeSearchResponse("EcchiGirlOVA", "https://site.to/v2", "Provider", TvType.Anime, posterUrl = "https://cdn.net/p2.jpg")
+        assertTrue(NsfwFilterEngine.isNsfw(compoundEcchi, NsfwFilterLevel.MODERATE))
+
+        val compoundBikini = AnimeSearchResponse("SummerBikiniParty", "https://site.to/v3", "Provider", TvType.Anime, posterUrl = "https://cdn.net/p3.jpg")
+        assertFalse(NsfwFilterEngine.isNsfw(compoundBikini, NsfwFilterLevel.MODERATE))
+        assertTrue(NsfwFilterEngine.isNsfw(compoundBikini, NsfwFilterLevel.EXTREME))
     }
 }
