@@ -184,42 +184,43 @@ object NsfwFilterEngine {
             }
         }
 
-        val spaced = text.replace(CAMEL_CASE_REGEX, "$1 $2")
-        val lower = spaced.lowercase()
+        val lower = text.lowercase()
+        val spaced = text.replace(CAMEL_CASE_REGEX, "$1 $2").lowercase()
         val normalized = lower.replace(DELIM_REGEX, " ")
+        val spacedNormalized = spaced.replace(DELIM_REGEX, " ")
 
         // 2. Multi-word phrases
         for (phrase in HARDCORE_PHRASES) {
-            if (lower.contains(phrase) || normalized.contains(phrase)) return true
+            if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
         }
         if (level >= NsfwFilterLevel.MODERATE) {
             for (phrase in SUGGESTIVE_PHRASES) {
-                if (lower.contains(phrase) || normalized.contains(phrase)) return true
+                if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
             }
         }
         if (level >= NsfwFilterLevel.EXTREME) {
             for (phrase in EXTREME_PHRASES) {
-                if (lower.contains(phrase) || normalized.contains(phrase)) return true
+                if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
             }
         }
 
         // 3. Substring stem checks (catches compound words without spaces)
         for (stem in HARDCORE_STEMS) {
-            if (lower.contains(stem)) return true
+            if (lower.contains(stem) || spaced.contains(stem)) return true
         }
         if (level >= NsfwFilterLevel.MODERATE) {
             for (stem in SUGGESTIVE_STEMS) {
-                if (lower.contains(stem)) return true
+                if (lower.contains(stem) || spaced.contains(stem)) return true
             }
         }
         if (level >= NsfwFilterLevel.EXTREME) {
             for (stem in EXTREME_STEMS) {
-                if (lower.contains(stem)) return true
+                if (lower.contains(stem) || spaced.contains(stem)) return true
             }
         }
 
         // 4. Delimited token matching (words separated by punctuation/spaces)
-        val tokens = normalized.split(' ')
+        val tokens = (normalized + " " + spacedNormalized).split(' ')
         for (token in tokens) {
             if (token.isEmpty()) continue
             if (HARDCORE_KEYWORDS.contains(token)) return true

@@ -481,12 +481,15 @@ class HomeViewModel : ViewModel() {
         MainActivity.reloadHomeEvent += ::reloadHome
         MainActivity.reloadAccountEvent += ::reloadAccount
 
-        viewModelScope.launchSafe {
-            NsfwFilterEngine.configVersion.collect { version ->
-                if (version > 0) {
-                    rescanLoadedSources()
+        try {
+            ioSafe {
+                NsfwFilterEngine.configVersion.collect { version ->
+                    if (version > 0) {
+                        rescanLoadedSources()
+                    }
                 }
             }
+        } catch (_: Throwable) {
         }
     }
 

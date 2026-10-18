@@ -82,12 +82,15 @@ class SearchViewModel : ViewModel() {
     private var onGoingSearch: Job? = null
 
     init {
-        viewModelScope.launchSafe {
-            NsfwFilterEngine.configVersion.collect { version ->
-                if (version > 0) {
-                    rescanSearchFilters()
+        try {
+            ioSafe {
+                NsfwFilterEngine.configVersion.collect { version ->
+                    if (version > 0) {
+                        rescanSearchFilters()
+                    }
                 }
             }
+        } catch (_: Throwable) {
         }
     }
 
