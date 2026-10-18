@@ -88,6 +88,7 @@ import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
 import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialogInstant
@@ -954,14 +955,25 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                     resultCastText.setText(d.actorsText)
                     resultNextAiring.setText(d.nextAiringEpisode)
                     resultNextAiringTime.setText(d.nextAiringDate)
-                    val isNsfw = shouldCensorPosters(context) && (
-                        NsfwFilterEngine.isNsfwText(d.title, d.url, d.tags.joinToString(" ")) ||
-                        d.posterImage?.let { NsfwFilterEngine.isNsfwUrl(it) } == true
-                    )
-                    if (isNsfw) {
+                    val isAdultAllowed = context?.isNsfwEnabled() == true
+                    val filterLevel = NsfwFilterEngine.getFilterLevel(context)
+                    val isNsfw = NsfwFilterEngine.isNsfwText(d.title, d.url, d.tags.joinToString(" "), filterLevel) ||
+                        d.posterImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true ||
+                        d.posterBackgroundImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true
+
+                    if (!isAdultAllowed && isNsfw) {
+                        resultPoster.setImageDrawable(null)
+                        resultPoster.isVisible = false
+                        resultPosterBackground.setImageDrawable(null)
+                        resultPosterBackground.isVisible = false
+                    } else if (isAdultAllowed && shouldCensorPosters(context) && isNsfw) {
+                        resultPoster.isVisible = true
+                        resultPosterBackground.isVisible = true
                         applyCensoredPoster(resultPoster)
                         applyCensoredPoster(resultPosterBackground)
                     } else {
+                        resultPoster.isVisible = true
+                        resultPosterBackground.isVisible = true
                         resultPoster.loadImage(d.posterImage, headers = d.posterHeaders) {
                             error {
                                 getImageFromDrawable(

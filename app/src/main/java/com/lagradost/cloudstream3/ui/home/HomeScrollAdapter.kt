@@ -66,15 +66,23 @@ class HomeScrollAdapter(
         val filterLevel = NsfwFilterEngine.getFilterLevel(context)
         val isNsfw = NsfwFilterEngine.isNsfw(item, filterLevel)
 
-        if (!isAdultAllowed && isNsfw) {
-            holder.itemView.isVisible = false
-            holder.itemView.layoutParams = ViewGroup.LayoutParams(0, 0)
-            return
+        val posterUrl = item.backgroundPosterUrl ?: item.posterUrl
+        if (!isAdultAllowed) {
+            val hasInvalidPoster = filterLevel == NsfwFilterLevel.EXTREME && (
+                posterUrl.isNullOrBlank() ||
+                posterUrl == "null" ||
+                (!posterUrl.startsWith("http://") && !posterUrl.startsWith("https://"))
+            )
+            if (isNsfw || hasInvalidPoster) {
+                holder.itemView.isVisible = false
+                holder.itemView.layoutParams = ViewGroup.LayoutParams(0, 0)
+                return
+            }
         }
 
         holder.itemView.isVisible = true
-        val posterUrl = item.backgroundPosterUrl ?: item.posterUrl
         val shouldCensor = isAdultAllowed && shouldCensorPosters(context) && isNsfw
+        binding.root.findViewById<android.widget.ImageView>(R.id.home_scroll_preview)?.setTag(R.id.parent_view_tag, java.lang.ref.WeakReference(holder.itemView))
 
         when (binding) {
             is HomeScrollViewBinding -> {

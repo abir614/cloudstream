@@ -290,6 +290,20 @@ const SUPER_EXTREME_PHRASES: &[&str] = &[
     "adult anime",
     "18+ anime",
     "eromanga sensei",
+    "world's end harem",
+    "shuumatsu no harem",
+    "immoral guild",
+    "futoku no guild",
+    "dokyuu hentai hxeros",
+    "okusan ga seitokaichou",
+    "my wife is the student council president",
+    "miru tights",
+    "peter grill and the philosopher's time",
+    "why the hell are you here teacher",
+    "nande koko ni sensei ga",
+    "super hxeros",
+    "valkyrie drive mermaid",
+    "masou gakuen hxh",
 ];
 
 /// CJK Hardcore Stems (Active in ALL levels).

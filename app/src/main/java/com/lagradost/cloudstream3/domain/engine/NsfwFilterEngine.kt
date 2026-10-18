@@ -23,9 +23,9 @@ enum class NsfwFilterLevel(
     val key: String,
     val visualThreshold: Float
 ) {
-    LOW("low", 0.18f),
-    MODERATE("moderate", 0.04f),
-    EXTREME("extreme", 0.015f);
+    LOW("low", 0.04f),
+    MODERATE("moderate", 0.015f),
+    EXTREME("extreme", 0.005f);
 
     companion object {
         fun fromString(value: String?): NsfwFilterLevel {
@@ -48,7 +48,7 @@ object NsfwFilterEngine {
 
     fun onFilterConfigChanged() {
         OnDeviceNsfwClassifier.clearCache()
-        ImageLoader.resetImageClient()
+        CloudStreamApp.context?.let { ImageLoader.reconfigure(it) } ?: ImageLoader.resetImageClient()
         _configVersion.value += 1
     }
 
@@ -90,7 +90,9 @@ object NsfwFilterEngine {
         "femboy", "otokonoko", "concubine", "courtesan", "brothel", "prostitute", "prostitution", "escort",
         "callgirl", "redlight", "soapland", "aphrodisiac", "seductress", "temptress", "mistress", "nightwear",
         "sleepwear", "babydoll", "negligee", "corset", "fishnet", "stockings", "garter", "eromanga", "nukige",
-        "galge", "tentacle", "tentacles", "pantsu", "monmusu", "tsugumomo", "sensual", "erotic"
+        "galge", "tentacle", "tentacles", "pantsu", "monmusu", "tsugumomo", "sensual", "erotic",
+        "harem", "onsen", "hotspring", "hot-spring", "mixedbath", "mixed-bath", "waifu", "fanservice",
+        "fan-service", "bikini", "swimsuit", "monokini", "microkini", "halfbody", "exposed"
     )
 
     private val HARDCORE_STEMS = arrayOf(
@@ -121,7 +123,7 @@ object NsfwFilterEngine {
         "courtesan", "brothel", "prostitut", "callgirl", "redlight", "soapland", "aphrodisiac",
         "seductress", "temptress", "negligee", "babydoll", "fishnet", "nukige", "galge", "tentacle",
         "pantsu", "monmusu", "tsugumomo", "step-sister", "step-brother", "step-mother", "step-father",
-        "step-daughter", "step-son"
+        "step-daughter", "step-son", "hxeros", "immoral-guild", "futoku"
     )
 
     private val HARDCORE_PHRASES = arrayOf(
@@ -146,7 +148,11 @@ object NsfwFilterEngine {
         "to love ru darkness", "motto to love ru", "peter grill", "monster musume",
         "ishuzoku reviewers", "ayane de battle", "kiss x sis", "kissxsis",
         "erotic romance", "sensual romance", "massage parlor", "adult video",
-        "mature content", "adult anime", "18+ anime", "eromanga sensei"
+        "mature content", "adult anime", "18+ anime", "eromanga sensei",
+        "world's end harem", "shuumatsu no harem", "immoral guild", "futoku no guild",
+        "dokyuu hentai hxeros", "okusan ga seitokaichou", "my wife is the student council president",
+        "miru tights", "peter grill and the philosopher's time", "why the hell are you here teacher",
+        "nande koko ni sensei ga", "super hxeros", "valkyrie drive mermaid", "masou gakuen hxh"
     )
 
     private val CJK_HARDCORE = arrayOf(

@@ -149,6 +149,9 @@ object SearchResultBuilder {
             itemView.setOnLongClickListener(null)
             itemView.onFocusChangeListener = null
             cardView.setImageDrawable(null)
+            itemView.findViewById<View>(R.id.background_card)?.isVisible = false
+            itemView.findViewById<View>(R.id.imageText)?.isVisible = false
+            itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
             val lp = itemView.layoutParams
             if (lp != null) {
                 lp.width = 0
@@ -160,6 +163,7 @@ object SearchResultBuilder {
 
         itemView.isVisible = true
         itemView.isClickable = true
+        itemView.findViewById<View>(R.id.background_card)?.isVisible = true
         val lp = itemView.layoutParams
         if (lp != null && (lp.width == 0 || lp.height == 0)) {
             lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -180,7 +184,20 @@ object SearchResultBuilder {
                 error { getImageFromDrawable(itemView.context, R.drawable.default_cover) }
             }
         } else {
-            cardView.loadImage(R.drawable.default_cover)
+            if (!isAdultAllowed && filterLevel == NsfwFilterLevel.EXTREME) {
+                itemView.isVisible = false
+                itemView.findViewById<View>(R.id.background_card)?.isVisible = false
+                itemView.findViewById<View>(R.id.imageText)?.isVisible = false
+                itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
+                val emptyLp = itemView.layoutParams
+                if (emptyLp != null) {
+                    emptyLp.width = 0
+                    emptyLp.height = 0
+                    itemView.layoutParams = emptyLp
+                }
+            } else {
+                cardView.loadImage(R.drawable.default_cover)
+            }
         }
 
         fun click(view: View?) {

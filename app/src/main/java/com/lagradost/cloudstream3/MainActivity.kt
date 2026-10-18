@@ -131,6 +131,10 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.html
 import com.lagradost.cloudstream3.utils.AppContextUtils.isCastApiAvailable
 import com.lagradost.cloudstream3.utils.AppContextUtils.isLtr
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNetworkAvailable
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
+import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
+import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.isRtl
 import com.lagradost.cloudstream3.utils.AppContextUtils.loadCache
 import com.lagradost.cloudstream3.utils.AppContextUtils.loadRepository
@@ -1526,16 +1530,30 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                         resultviewPreviewMetaRating.setText(d.ratingText)
 
                         resultviewPreviewDescription.setTextHtml(d.plotText)
-                        if (isLayout(PHONE)) {
-                            resultviewPreviewPoster.loadImage(
-                                d.posterImage ?: d.posterBackgroundImage,
-                                headers = d.posterHeaders
-                            )
+                        val isAdultAllowed = isNsfwEnabled()
+                        val filterLevel = NsfwFilterEngine.getFilterLevel(this)
+                        val isNsfw = NsfwFilterEngine.isNsfwText(d.title, d.url, d.tags.joinToString(" "), filterLevel) ||
+                            (d.posterImage ?: d.posterBackgroundImage)?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true
+
+                        if (!isAdultAllowed && isNsfw) {
+                            resultviewPreviewPoster.setImageDrawable(null)
+                            resultviewPreviewPoster.isVisible = false
+                        } else if (isAdultAllowed && shouldCensorPosters(this) && isNsfw) {
+                            resultviewPreviewPoster.isVisible = true
+                            applyCensoredPoster(resultviewPreviewPoster)
                         } else {
-                            resultviewPreviewPoster.loadImage(
-                                d.posterBackgroundImage ?: d.posterImage,
-                                headers = d.posterHeaders
-                            )
+                            resultviewPreviewPoster.isVisible = true
+                            if (isLayout(PHONE)) {
+                                resultviewPreviewPoster.loadImage(
+                                    d.posterImage ?: d.posterBackgroundImage,
+                                    headers = d.posterHeaders
+                                )
+                            } else {
+                                resultviewPreviewPoster.loadImage(
+                                    d.posterBackgroundImage ?: d.posterImage,
+                                    headers = d.posterHeaders
+                                )
+                            }
                         }
 
                         setUserData(syncViewModel.userData.value)
