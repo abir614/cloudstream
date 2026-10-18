@@ -1530,15 +1530,16 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                         resultviewPreviewMetaRating.setText(d.ratingText)
 
                         resultviewPreviewDescription.setTextHtml(d.plotText)
-                        val isAdultAllowed = isNsfwEnabled()
-                        val filterLevel = NsfwFilterEngine.getFilterLevel(this)
+                        val ctx = root.context
+                        val isAdultAllowed = ctx.isNsfwEnabled()
+                        val filterLevel = NsfwFilterEngine.getFilterLevel(ctx)
                         val isNsfw = NsfwFilterEngine.isNsfwText(d.title, d.url, d.tags.joinToString(" "), filterLevel) ||
                             (d.posterImage ?: d.posterBackgroundImage)?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true
 
                         if (!isAdultAllowed && isNsfw) {
                             resultviewPreviewPoster.setImageDrawable(null)
                             resultviewPreviewPoster.isVisible = false
-                        } else if (isAdultAllowed && shouldCensorPosters(this) && isNsfw) {
+                        } else if (isAdultAllowed && shouldCensorPosters(ctx) && isNsfw) {
                             resultviewPreviewPoster.isVisible = true
                             applyCensoredPoster(resultviewPreviewPoster)
                         } else {
