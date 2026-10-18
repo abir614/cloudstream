@@ -95,16 +95,19 @@ fn test_nsfw_text_and_guardian_matrix() {
     assert!(is_nsfw_text("Episode 1", "https://site.to/video", Some("Ecchi, Harem")));
     assert!(is_nsfw_text("Random", "https://site.to/r18/video.m3u8", None));
 
-    // 2. Summer, Beach & Swimwear keywords (Allowed in Low, Filtered in Moderate & Extreme)
+    // 2. Summer, Beach & Swimwear keywords (Allowed in Low & Moderate, Filtered in Extreme)
     assert!(!is_nsfw_text_with_level("Summer Beach OVA", "https://site.to/ova", None, LEVEL_LOW));
-    assert!(is_nsfw_text_with_level("Summer Beach OVA", "https://site.to/ova", None, LEVEL_MODERATE));
+    assert!(!is_nsfw_text_with_level("Summer Beach OVA", "https://site.to/ova", None, LEVEL_MODERATE));
     assert!(is_nsfw_text_with_level("Summer Beach OVA", "https://site.to/ova", None, LEVEL_EXTREME));
-    assert!(is_nsfw_text_with_level("Hot Bikini Special", "https://site.to/special", None, LEVEL_MODERATE));
-    assert!(is_nsfw_text_with_level("Swimsuit Edition", "https://site.to/stream", None, LEVEL_MODERATE));
+    assert!(!is_nsfw_text_with_level("Hot Bikini Special", "https://site.to/special", None, LEVEL_MODERATE));
+    assert!(is_nsfw_text_with_level("Hot Bikini Special", "https://site.to/special", None, LEVEL_EXTREME));
+    assert!(!is_nsfw_text_with_level("Swimsuit Edition", "https://site.to/stream", None, LEVEL_MODERATE));
+    assert!(is_nsfw_text_with_level("Swimsuit Edition", "https://site.to/stream", None, LEVEL_EXTREME));
+    assert!(!is_nsfw_text_with_level("Summer Time Rendering", "https://site.to/str", None, LEVEL_MODERATE));
 
     // 3. CJK Unicode adult stems
     assert!(!is_nsfw_text_with_level("水着の彼女", "https://jp.to/v1", None, LEVEL_LOW));
-    assert!(is_nsfw_text_with_level("水着の彼女", "https://jp.to/v1", None, LEVEL_MODERATE));
+    assert!(!is_nsfw_text_with_level("水着の彼女", "https://jp.to/v1", None, LEVEL_MODERATE));
     assert!(is_nsfw_text_with_level("水着の彼女", "https://jp.to/v1", None, LEVEL_EXTREME));
     assert!(is_nsfw_text("18禁 成年向け", "https://jp.to/v2", None));
     assert!(is_nsfw_text("エロマンガ", "https://jp.to/v3", None));

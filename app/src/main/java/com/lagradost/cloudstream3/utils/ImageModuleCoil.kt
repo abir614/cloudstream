@@ -29,7 +29,6 @@ import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.request.bitmapConfig
 import coil3.request.crossfade
-import coil3.request.target
 import coil3.util.DebugLogger
 import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.BuildConfig
@@ -309,14 +308,8 @@ object ImageLoader {
                 }
             }.build())
             if (!isAdultAllowed || shouldCensorPosters(context)) {
-                target(
-                    onStart = { placeholder ->
-                        val d = placeholder?.asDrawable(context.resources)
-                        this@loadImageInternal.setImageDrawable(d)
-                    },
-                    onError = { error ->
-                        val d = error?.asDrawable(context.resources)
-                        this@loadImageInternal.setImageDrawable(d)
+                listener(
+                    onError = { _, _ ->
                         if (!isAdultAllowed) {
                             val level = NsfwFilterEngine.getFilterLevel(context)
                             if (level == NsfwFilterLevel.EXTREME) {
@@ -324,9 +317,9 @@ object ImageLoader {
                             }
                         }
                     },
-                    onSuccess = { image ->
+                    onSuccess = { _, result ->
                         try {
-                            val drawable = image.asDrawable(context.resources)
+                            val drawable = result.image.asDrawable(context.resources)
                             OnDeviceNsfwClassifier.classifyAndApplyAsync(
                                 imageView = this@loadImageInternal,
                                 imageKey = imageKey,

@@ -15,17 +15,17 @@ import com.lagradost.cloudstream3.utils.ImageLoader
 
 /**
  * Configurable Content Safety Sensitivity Levels:
- * - EXTREME (0.015f): Super Extreme peak shield (detects exposure > 1.5%, provocative/romance adult tropes, empty posters, mature ratings).
- * - MODERATE (0.04f): Hardened Extreme sensitivity (strictly blocks adult, ecchi, summer, beach, swim, bikini, exposure, empty posters).
- * - LOW (0.18f): Hardened Moderate sensitivity (strictly blocks all explicit adult, ecchi, smut, lewd, suggestive content).
+ * - EXTREME (0.08f): Super Extreme peak shield (strictly blocks all adult, ecchi, beach, summer, swim, bikini, exposure, empty posters, provocative tropes).
+ * - MODERATE (0.20f): Family Level sensitivity (strictly blocks explicit adult, ecchi, lewd, smut; preserves clean anime and summer/beach titles).
+ * - LOW (0.45f): Hardcore sensitivity (strictly blocks explicit adult, pornography, hentai, and hardcore content).
  */
 enum class NsfwFilterLevel(
     val key: String,
     val visualThreshold: Float
 ) {
-    LOW("low", 0.04f),
-    MODERATE("moderate", 0.015f),
-    EXTREME("extreme", 0.005f);
+    LOW("low", 0.45f),
+    MODERATE("moderate", 0.20f),
+    EXTREME("extreme", 0.08f);
 
     companion object {
         fun fromString(value: String?): NsfwFilterLevel {
@@ -71,8 +71,7 @@ object NsfwFilterEngine {
         "softcore", "hardcore", "gravure", "lingerie", "cleavage", "oppai", "boob", "boobs", "breast",
         "breasts", "busty", "milf", "thong", "panties", "panty", "fetish", "bdsm", "bondage", "sadism",
         "masochism", "dxd", "shinmai", "valkyrie", "interspecies", "chijo", "seduce", "seduction",
-        "submissive", "dominant", "virgin", "eromanga", "bathhouse", "harem", "waifu", "fanservice",
-        "fan-service"
+        "submissive", "dominant", "virgin", "eromanga"
     )
 
     private val EXTREME_KEYWORDS = hashSetOf(
@@ -111,10 +110,10 @@ object NsfwFilterEngine {
     )
 
     private val EXTREME_STEMS = arrayOf(
-        "summer", "beach", "swim", "bikini", "monokini", "microkini", "mizugi", "halfbody",
-        "half-body", "half body", "exposed", "topless", "bare", "bareback", "barechested",
-        "underboob", "sideboob", "cleavage", "onsen", "bathhouse", "hotspring", "harem",
-        "fanservice", "fan-service", "waifu", "pantyshot", "panty-shot", "spank", "seductive", "provocative"
+        "bikini", "monokini", "microkini", "mizugi", "halfbody",
+        "half-body", "half body", "exposed", "topless", "bareback", "barechested",
+        "underboob", "sideboob", "cleavage", "onsen", "bathhouse", "hotspring",
+        "pantyshot", "panty-shot", "spank", "seductive", "provocative"
     )
 
     private val SUPER_EXTREME_STEMS = arrayOf(
@@ -211,21 +210,21 @@ object NsfwFilterEngine {
         if (text.isEmpty()) return false
 
         // 1. CJK stem checks
-        // Hardcore & Suggestive stems active in ALL levels (LOW hardened to Moderate)
+        // Hardcore CJK active in ALL levels (LOW, MODERATE, EXTREME)
         for (stem in CJK_HARDCORE) {
             if (text.contains(stem)) return true
         }
-        for (stem in CJK_SUGGESTIVE) {
-            if (text.contains(stem)) return true
-        }
-        // Extreme stems active in MODERATE & EXTREME (MODERATE hardened to Extreme)
+        // Suggestive CJK active in MODERATE & EXTREME
         if (level >= NsfwFilterLevel.MODERATE) {
-            for (stem in CJK_EXTREME) {
+            for (stem in CJK_SUGGESTIVE) {
                 if (text.contains(stem)) return true
             }
         }
-        // Super Extreme stems active in EXTREME
+        // Extreme & Super Extreme CJK active ONLY in EXTREME
         if (level >= NsfwFilterLevel.EXTREME) {
+            for (stem in CJK_EXTREME) {
+                if (text.contains(stem)) return true
+            }
             for (stem in CJK_SUPER_EXTREME) {
                 if (text.contains(stem)) return true
             }
@@ -237,42 +236,42 @@ object NsfwFilterEngine {
         val spacedNormalized = spaced.replace(DELIM_REGEX, " ")
 
         // 2. Multi-word phrases
-        // Hardcore & Suggestive phrases active in ALL levels
+        // Hardcore phrases active in ALL levels
         for (phrase in HARDCORE_PHRASES) {
             if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
         }
-        for (phrase in SUGGESTIVE_PHRASES) {
-            if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
-        }
-        // Extreme phrases active in MODERATE & EXTREME
+        // Suggestive phrases active in MODERATE & EXTREME
         if (level >= NsfwFilterLevel.MODERATE) {
-            for (phrase in EXTREME_PHRASES) {
+            for (phrase in SUGGESTIVE_PHRASES) {
                 if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
             }
         }
-        // Super Extreme phrases active in EXTREME
+        // Extreme & Super Extreme phrases active ONLY in EXTREME
         if (level >= NsfwFilterLevel.EXTREME) {
+            for (phrase in EXTREME_PHRASES) {
+                if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
+            }
             for (phrase in SUPER_EXTREME_PHRASES) {
                 if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
             }
         }
 
         // 3. Substring stem checks (catches compound words without spaces)
-        // Hardcore & Suggestive stems active in ALL levels
+        // Hardcore stems active in ALL levels
         for (stem in HARDCORE_STEMS) {
             if (lower.contains(stem) || spaced.contains(stem)) return true
         }
-        for (stem in SUGGESTIVE_STEMS) {
-            if (lower.contains(stem) || spaced.contains(stem)) return true
-        }
-        // Extreme stems active in MODERATE & EXTREME
+        // Suggestive stems active in MODERATE & EXTREME
         if (level >= NsfwFilterLevel.MODERATE) {
-            for (stem in EXTREME_STEMS) {
+            for (stem in SUGGESTIVE_STEMS) {
                 if (lower.contains(stem) || spaced.contains(stem)) return true
             }
         }
-        // Super Extreme stems active in EXTREME
+        // Extreme & Super Extreme stems active ONLY in EXTREME
         if (level >= NsfwFilterLevel.EXTREME) {
+            for (stem in EXTREME_STEMS) {
+                if (lower.contains(stem) || spaced.contains(stem)) return true
+            }
             for (stem in SUPER_EXTREME_STEMS) {
                 if (lower.contains(stem) || spaced.contains(stem)) return true
             }
@@ -289,9 +288,8 @@ object NsfwFilterEngine {
             while (end < len && combined[end] != ' ') end++
             val token = combined.substring(start, end)
             if (HARDCORE_KEYWORDS.contains(token) ||
-                SUGGESTIVE_KEYWORDS.contains(token) ||
-                (level >= NsfwFilterLevel.MODERATE && EXTREME_KEYWORDS.contains(token)) ||
-                (level >= NsfwFilterLevel.EXTREME && SUPER_EXTREME_KEYWORDS.contains(token))
+                (level >= NsfwFilterLevel.MODERATE && SUGGESTIVE_KEYWORDS.contains(token)) ||
+                (level >= NsfwFilterLevel.EXTREME && (EXTREME_KEYWORDS.contains(token) || SUPER_EXTREME_KEYWORDS.contains(token)))
             ) {
                 return true
             }
