@@ -93,13 +93,14 @@ object OnDeviceNsfwClassifier {
     // Main thread handler for UI updates
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // Single-threaded background executor with bounded queue (8) and DiscardOldestPolicy to prevent memory leaks during fast scroll
+    // Dedicated background executor with bounded queue (64) to prevent memory leaks during fast scroll
+    // while ensuring visible on-screen items are always evaluated and never left on placeholder.
     private val workerExecutor = ThreadPoolExecutor(
         1,
         1,
         0L,
         TimeUnit.MILLISECONDS,
-        LinkedBlockingQueue<Runnable>(8),
+        LinkedBlockingQueue<Runnable>(64),
         { runnable ->
             Thread {
                 try {
