@@ -29,6 +29,7 @@ import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.request.bitmapConfig
 import coil3.request.crossfade
+import coil3.request.target
 import coil3.util.DebugLogger
 import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.BuildConfig
@@ -307,9 +308,16 @@ object ImageLoader {
                     headerBuilder[key] = value
                 }
             }.build())
+            builder() // if passed
             if (!isAdultAllowed || shouldCensorPosters(context)) {
-                listener(
-                    onError = { _, _ ->
+                target(
+                    onStart = { placeholder ->
+                        val defaultPlaceholder = ContextCompat.getDrawable(context, R.drawable.default_cover)
+                        this@loadImageInternal.setImageDrawable(placeholder?.asDrawable(context.resources) ?: defaultPlaceholder)
+                    },
+                    onError = { error ->
+                        val defaultError = ContextCompat.getDrawable(context, R.drawable.default_cover)
+                        this@loadImageInternal.setImageDrawable(error?.asDrawable(context.resources) ?: defaultError)
                         if (!isAdultAllowed) {
                             val level = NsfwFilterEngine.getFilterLevel(context)
                             if (level == NsfwFilterLevel.EXTREME) {
@@ -317,9 +325,9 @@ object ImageLoader {
                             }
                         }
                     },
-                    onSuccess = { _, result ->
+                    onSuccess = { result ->
                         try {
-                            val drawable = result.image.asDrawable(context.resources)
+                            val drawable = result.asDrawable(context.resources)
                             OnDeviceNsfwClassifier.classifyAndApplyAsync(
                                 imageView = this@loadImageInternal,
                                 imageKey = imageKey,
@@ -330,7 +338,6 @@ object ImageLoader {
                     }
                 )
             }
-            builder() // if passed
         }
     }
 

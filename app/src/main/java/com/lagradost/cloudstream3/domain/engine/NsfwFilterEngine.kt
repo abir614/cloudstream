@@ -15,17 +15,17 @@ import com.lagradost.cloudstream3.utils.ImageLoader
 
 /**
  * Configurable Content Safety Sensitivity Levels:
- * - EXTREME (0.08f): Super Extreme peak shield (strictly blocks all adult, ecchi, beach, summer, swim, bikini, exposure, empty posters, provocative tropes).
- * - MODERATE (0.20f): Family Level sensitivity (strictly blocks explicit adult, ecchi, lewd, smut; preserves clean anime and summer/beach titles).
- * - LOW (0.45f): Hardcore sensitivity (strictly blocks explicit adult, pornography, hentai, and hardcore content).
+ * - EXTREME (0.06f): Super Extreme peak shield (strictly blocks all adult, ecchi, beach, summer, swim, bikini, exposure, empty posters, provocative tropes).
+ * - MODERATE (0.15f): Family Level sensitivity (strictly blocks explicit adult, ecchi, lewd, smut; preserves clean anime and summer/beach titles).
+ * - LOW (0.30f): Hardcore sensitivity (strictly blocks explicit adult, pornography, hentai, and hardcore content).
  */
 enum class NsfwFilterLevel(
     val key: String,
     val visualThreshold: Float
 ) {
-    LOW("low", 0.45f),
-    MODERATE("moderate", 0.20f),
-    EXTREME("extreme", 0.08f);
+    LOW("low", 0.30f),
+    MODERATE("moderate", 0.15f),
+    EXTREME("extreme", 0.06f);
 
     companion object {
         fun fromString(value: String?): NsfwFilterLevel {
@@ -47,7 +47,8 @@ object NsfwFilterEngine {
     val configVersion: kotlinx.coroutines.flow.StateFlow<Int> = _configVersion
 
     fun onFilterConfigChanged() {
-        OnDeviceNsfwClassifier.clearCache()
+        // Retain raw AI scores in LRU cache so sensitivity adjustments take effect immediately
+        // during rescan without re-running heavy neural network inference.
         CloudStreamApp.context?.let { ImageLoader.reconfigure(it) } ?: ImageLoader.resetImageClient()
         _configVersion.value += 1
     }
@@ -88,10 +89,8 @@ object NsfwFilterEngine {
         "nudist", "nudism", "naturist", "naturism", "maid", "bunnygirl", "crossdress", "crossdressing",
         "femboy", "otokonoko", "concubine", "courtesan", "brothel", "prostitute", "prostitution", "escort",
         "callgirl", "redlight", "soapland", "aphrodisiac", "seductress", "temptress", "mistress", "nightwear",
-        "sleepwear", "babydoll", "negligee", "corset", "fishnet", "stockings", "garter", "eromanga", "nukige",
-        "galge", "tentacle", "tentacles", "pantsu", "monmusu", "tsugumomo", "sensual", "erotic",
-        "harem", "onsen", "hotspring", "hot-spring", "mixedbath", "mixed-bath", "waifu", "fanservice",
-        "fan-service", "bikini", "swimsuit", "monokini", "microkini", "halfbody", "exposed"
+        "sleepwear", "babydoll", "negligee", "corset", "fishnet", "stockings", "garter", "nukige",
+        "galge", "tentacle", "tentacles", "pantsu", "monmusu", "tsugumomo", "mixedbath", "mixed-bath"
     )
 
     private val HARDCORE_STEMS = arrayOf(
@@ -142,10 +141,9 @@ object NsfwFilterEngine {
 
     private val SUPER_EXTREME_PHRASES = arrayOf(
         "domestic girlfriend", "domestic na kanojo", "kuzu no honkai", "scum's wish",
-        "valkyrie drive", "masou gakuen", "hybrid x heart", "manyuu hikenchou",
-        "ladies versus butlers", "prison school", "shimoneta", "seikon no qwaser",
-        "to love ru darkness", "motto to love ru", "peter grill", "monster musume",
-        "ishuzoku reviewers", "ayane de battle", "kiss x sis", "kissxsis",
+        "masou gakuen", "hybrid x heart", "manyuu hikenchou", "ladies versus butlers",
+        "shimoneta", "to love ru darkness", "motto to love ru", "peter grill",
+        "monster musume", "ishuzoku reviewers", "ayane de battle", "kissxsis",
         "erotic romance", "sensual romance", "massage parlor", "adult video",
         "mature content", "adult anime", "18+ anime", "eromanga sensei",
         "world's end harem", "shuumatsu no harem", "immoral guild", "futoku no guild",

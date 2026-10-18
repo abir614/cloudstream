@@ -160,4 +160,11 @@ class NsfwFilterEngineTest {
         assertFalse(NsfwFilterEngine.isNsfw(summerCleanItem, NsfwFilterLevel.LOW))
         assertFalse(NsfwFilterEngine.isNsfw(summerCleanItem, NsfwFilterLevel.MODERATE))
     }
+
+    @Test
+    fun `test calibrated visual sensitivity thresholds`() {
+        assertEquals(0.30f, NsfwFilterLevel.LOW.visualThreshold, 0.001f)
+        assertEquals(0.15f, NsfwFilterLevel.MODERATE.visualThreshold, 0.001f)
+        assertEquals(0.06f, NsfwFilterLevel.EXTREME.visualThreshold, 0.001f)
+    }
 }
