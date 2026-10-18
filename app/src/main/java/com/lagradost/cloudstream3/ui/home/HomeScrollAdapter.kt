@@ -81,8 +81,8 @@ class HomeScrollAdapter(
                     applyCensoredPoster(binding.homeScrollPreview)
                 } else {
                     binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
-                        placeholder { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
-                        error { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                        placeholder { getImageFromDrawable(context, R.drawable.default_cover) }
+                        error { getImageFromDrawable(context, R.drawable.default_cover) }
                     }
                 }
                 binding.homeScrollPreviewTags.apply {
@@ -109,8 +109,8 @@ class HomeScrollAdapter(
                     applyCensoredPoster(binding.homeScrollPreview)
                 } else {
                     binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
-                        placeholder { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
-                        error { getImageFromDrawable(binding.root.context, R.drawable.default_cover) }
+                        placeholder { getImageFromDrawable(context, R.drawable.default_cover) }
+                        error { getImageFromDrawable(context, R.drawable.default_cover) }
                     }
                 }
             }

@@ -11,6 +11,7 @@ import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.ui.APIRepository
+import com.lagradost.cloudstream3.utils.ImageLoader
 
 /**
  * Configurable Content Safety Sensitivity Levels:
