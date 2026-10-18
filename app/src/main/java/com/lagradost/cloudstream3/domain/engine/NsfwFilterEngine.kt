@@ -308,8 +308,8 @@ object NsfwFilterEngine {
     fun isNsfw(item: SearchResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
 
-        // In MODERATE and EXTREME filter level, contents with empty/missing/blank/non-http posters are strictly filtered out
-        if (level >= NsfwFilterLevel.MODERATE) {
+        // In EXTREME filter level, contents with empty/missing/blank/non-http posters are strictly filtered out
+        if (level == NsfwFilterLevel.EXTREME) {
             val poster = item.posterUrl
             if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://"))) {
                 return true
@@ -341,8 +341,8 @@ object NsfwFilterEngine {
     fun isNsfw(item: LoadResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
 
-        // In MODERATE and EXTREME filter level, contents with empty/missing/blank/non-http posters are strictly filtered out
-        if (level >= NsfwFilterLevel.MODERATE) {
+        // In EXTREME filter level, contents with empty/missing/blank/non-http posters are strictly filtered out
+        if (level == NsfwFilterLevel.EXTREME) {
             val poster = item.posterUrl ?: item.backgroundPosterUrl
             if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://"))) {
                 return true

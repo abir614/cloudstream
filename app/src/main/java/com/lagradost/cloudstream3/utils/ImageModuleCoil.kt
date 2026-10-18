@@ -262,7 +262,7 @@ object ImageLoader {
         // 1. Strict family safe mode: if adult content is disabled, NEVER show adult images or censored badges
         if (!isAdultAllowed) {
             val level = NsfwFilterEngine.getFilterLevel(context)
-            if (level >= NsfwFilterLevel.MODERATE && (imageData is String)) {
+            if (level == NsfwFilterLevel.EXTREME && (imageData is String)) {
                 if (imageData.isBlank() || imageData == "null" || (!imageData.startsWith("http://") && !imageData.startsWith("https://"))) {
                     this.setImageDrawable(null)
                     this.setTag(R.id.coil_image_url_tag, imageKey)
@@ -323,7 +323,7 @@ object ImageLoader {
                     onError = { _, _ ->
                         if (!isAdultAllowed) {
                             val level = NsfwFilterEngine.getFilterLevel(context)
-                            if (level >= NsfwFilterLevel.MODERATE) {
+                            if (level == NsfwFilterLevel.EXTREME) {
                                 OnDeviceNsfwClassifier.hideParentItem(this@loadImageInternal)
                             }
                         }

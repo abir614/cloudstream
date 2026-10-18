@@ -118,13 +118,13 @@ class NsfwFilterEngineTest {
         assertTrue(NsfwFilterEngine.isNsfw(beachItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(beachItem, NsfwFilterLevel.EXTREME))
 
-        // Empty poster items must be strictly filtered out in both Moderate and Extreme
+        // Empty poster items must be strictly filtered out in Extreme filter
         val emptyPosterItem = MovieSearchResponse("Show Without Poster", "https://site.to/noposter", "Provider", TvType.Movie, posterUrl = null)
-        assertTrue(NsfwFilterEngine.isNsfw(emptyPosterItem, NsfwFilterLevel.MODERATE))
+        assertFalse(NsfwFilterEngine.isNsfw(emptyPosterItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(emptyPosterItem, NsfwFilterLevel.EXTREME))
 
         val nonHttpPosterItem = MovieSearchResponse("Show With Bad Poster", "https://site.to/badposter", "Provider", TvType.Movie, posterUrl = "file:///local/bad.png")
-        assertTrue(NsfwFilterEngine.isNsfw(nonHttpPosterItem, NsfwFilterLevel.MODERATE))
+        assertFalse(NsfwFilterEngine.isNsfw(nonHttpPosterItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(nonHttpPosterItem, NsfwFilterLevel.EXTREME))
 
         val borderlineItem = AnimeSearchResponse("Ordinary Show Special", "https://site.to/s1", "AnimeProvider", TvType.Anime, posterUrl = "https://cdn.net/harem_bath.jpg")
