@@ -14,6 +14,7 @@ import android.os.Process
 import android.util.Log
 import android.util.LruCache
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.isVisible
@@ -428,9 +429,7 @@ object OnDeviceNsfwClassifier {
             if (lp != null) {
                 lp.width = 0
                 lp.height = 0
-                if (lp is ViewGroup.MarginLayoutParams) {
-                    lp.setMargins(0, 0, 0, 0)
-                }
+                (lp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
                 root.layoutParams = lp
             }
             root.requestLayout()

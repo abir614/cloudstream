@@ -157,6 +157,7 @@ object SearchResultBuilder {
             if (lp != null) {
                 lp.width = 0
                 lp.height = 0
+                (lp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
                 itemView.layoutParams = lp
             }
             return
@@ -194,6 +195,7 @@ object SearchResultBuilder {
                 if (emptyLp != null) {
                     emptyLp.width = 0
                     emptyLp.height = 0
+                    (emptyLp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
                     itemView.layoutParams = emptyLp
                 }
             } else {
