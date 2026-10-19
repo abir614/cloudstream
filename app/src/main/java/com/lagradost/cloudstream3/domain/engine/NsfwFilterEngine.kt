@@ -184,6 +184,7 @@ object NsfwFilterEngine {
      * Displays an interactive dialog with live scales for Extreme, Moderate, and Low sensitivities.
      */
     fun showSensitivityThresholdsDialog(activity: Activity, onDismissCallback: () -> Unit = {}) {
+        if (activity.isFinishing || (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed)) return
         val context = activity
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
         val currentLevelStr = settingsManager.getString(context.getString(R.string.nsfw_filter_level_key), "moderate") ?: "moderate"
@@ -299,7 +300,13 @@ object NsfwFilterEngine {
         }
 
         updateUI()
-        dialog.show()
+        try {
+            if (!activity.isFinishing && !(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed)) {
+                dialog.show()
+            }
+        } catch (_: Exception) {
+            // Guard against window manager race conditions on older/backgrounded devices
+        }
     }
 
     private val HARDCORE_KEYWORDS = hashSetOf(

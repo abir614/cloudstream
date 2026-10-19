@@ -419,11 +419,15 @@
     </string-array>
     <string name="censor_nsfw_posters_title">Censor Adult Posters</string>
     <string name="censor_nsfw_posters_summary">Display NSFW warning badge on adult posters instead of unfiltered images</string>
+    <string name="apply">Apply</string>
     <string name="nsfw_threshold_dialog_title">Filter Sensitivity &amp; Visual Thresholds</string>
     <string name="nsfw_threshold_dialog_description">Calibrate detection thresholds (0.01 – 1.00). Constraints: Extreme &lt; Moderate &lt; Low.</string>
     <string name="nsfw_threshold_reset">Reset Defaults</string>
+    <string name="nsfw_threshold_extreme_label">Extreme</string>
     <string name="nsfw_threshold_extreme_desc">Peak shield (Borderline &amp; exposure)</string>
+    <string name="nsfw_threshold_moderate_label">Moderate</string>
     <string name="nsfw_threshold_moderate_desc">Family level (Default protection)</string>
+    <string name="nsfw_threshold_low_label">Low</string>
     <string name="nsfw_threshold_low_desc">Hardcore only (Strict explicit filter)</string>
     <string name="subtitles_encoding">Subtitle encoding</string>
     <string name="category_providers">Providers</string>
