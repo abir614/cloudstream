@@ -188,11 +188,17 @@ class NsfwFilterEngineTest {
         assertEquals(0.99f, adjM2, 0.001f)
         assertEquals(1.00f, adjL2, 0.001f)
 
-        // When Low is decreased below Moderate
-        val (adjE3, adjM3, adjL3) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.30f, 0.20f, NsfwFilterLevel.LOW)
+        // When Low is decreased below Moderate and pushes both Moderate and Extreme down
+        val (adjE3, adjM3, adjL3) = NsfwFilterEngine.enforceThresholdConstraints(0.25f, 0.30f, 0.20f, NsfwFilterLevel.LOW)
         assertEquals(0.20f, adjL3, 0.001f)
         assertEquals(0.19f, adjM3, 0.001f)
         assertEquals(0.18f, adjE3, 0.001f)
+
+        // When Low is decreased below Moderate but Extreme is already lower
+        val (adjE3b, adjM3b, adjL3b) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.30f, 0.20f, NsfwFilterLevel.LOW)
+        assertEquals(0.20f, adjL3b, 0.001f)
+        assertEquals(0.19f, adjM3b, 0.001f)
+        assertEquals(0.15f, adjE3b, 0.001f)
 
         // When Low is pushed near the bottom
         val (adjE4, adjM4, adjL4) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.30f, 0.01f, NsfwFilterLevel.LOW)
