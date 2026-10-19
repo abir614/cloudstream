@@ -644,7 +644,6 @@
     <string name="install_permission_button">Settings</string>
     <string name="install_ready_title">Update Ready to Install</string>
     <string name="install_ready_message">The update has been downloaded and verified. Would you like to install it now?</string>
-    <string name="background">Background</string>
     <string name="apk_installer_legacy">Legacy</string>
     <string name="apk_installer_package_installer">PackageInstaller</string>
     <string name="delayed_update_notice">App will be updated upon exit</string>
