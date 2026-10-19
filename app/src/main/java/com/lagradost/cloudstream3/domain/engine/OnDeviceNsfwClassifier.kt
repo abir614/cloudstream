@@ -411,8 +411,13 @@ object OnDeviceNsfwClassifier {
 
     private fun setSmoothPosterDrawable(view: ImageView, newDrawable: Drawable, animate: Boolean) {
         val oldDrawable = view.drawable
-        if (animate && oldDrawable != null && oldDrawable != newDrawable) {
-            val transition = android.graphics.drawable.TransitionDrawable(arrayOf(oldDrawable, newDrawable)).apply {
+        val actualOld = if (oldDrawable is android.graphics.drawable.TransitionDrawable && oldDrawable.numberOfLayers > 0) {
+            oldDrawable.getDrawable(oldDrawable.numberOfLayers - 1)
+        } else {
+            oldDrawable
+        }
+        if (animate && actualOld != null && actualOld != newDrawable) {
+            val transition = android.graphics.drawable.TransitionDrawable(arrayOf(actualOld, newDrawable)).apply {
                 isCrossFadeEnabled = true
             }
             view.setImageDrawable(transition)

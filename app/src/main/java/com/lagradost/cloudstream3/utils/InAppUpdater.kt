@@ -361,8 +361,13 @@ object InAppUpdater {
         }
     }
 
+    private val isPromptingResume = AtomicBoolean(false)
+    private var lastDismissedInstallPromptMs = 0L
+
     fun checkAndResumePendingInstall(activity: Activity) {
         if (isPromptingResume.get()) return
+        if (activity.isFinishing || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed)) return
+        if (System.currentTimeMillis() - lastDismissedInstallPromptMs < 45_000L) return
         val pending = getPendingInstall(activity) ?: return
         val (apkFile, expectedSha256) = pending
 
@@ -396,6 +401,10 @@ object InAppUpdater {
 
         activity.runOnUiThread {
             try {
+                if (activity.isFinishing || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed)) {
+                    isPromptingResume.set(false)
+                    return@runOnUiThread
+                }
                 AlertDialog.Builder(activity, R.style.AlertDialogCustom)
                     .setTitle(R.string.install_ready_title)
                     .setMessage(R.string.install_ready_message)
@@ -434,6 +443,7 @@ object InAppUpdater {
                         }
                     }
                     .setNegativeButton(R.string.cancel) { _, _ ->
+                        lastDismissedInstallPromptMs = System.currentTimeMillis()
                         isPromptingResume.set(false)
                     }
                     .setOnDismissListener {
@@ -452,41 +462,55 @@ object InAppUpdater {
         outcome: UpdateSecurityGate.VerificationOutcome.Authorized,
         expectedSha256: String?
     ) {
+        val targetAct = com.lagradost.cloudstream3.CommonActivity.activity ?: this
         val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            !packageManager.canRequestPackageInstalls()
+            !targetAct.packageManager.canRequestPackageInstalls()
+
+        setPendingInstall(targetAct, outcome.authorizedFile, expectedSha256)
+
+        if (targetAct.isFinishing || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && targetAct.isDestroyed)) {
+            return
+        }
 
         if (needsPermission) {
-            setPendingInstall(this, outcome.authorizedFile, expectedSha256)
-            runOnUiThread {
-                AlertDialog.Builder(this, R.style.AlertDialogCustom)
-                    .setTitle(R.string.install_permission_title)
-                    .setMessage(R.string.install_permission_message)
-                    .setPositiveButton(R.string.install_permission_button) { _, _ ->
-                        val intent = Intent(
-                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                            Uri.parse("package:$packageName")
-                        ).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            targetAct.runOnUiThread {
+                try {
+                    AlertDialog.Builder(targetAct, R.style.AlertDialogCustom)
+                        .setTitle(R.string.install_permission_title)
+                        .setMessage(R.string.install_permission_message)
+                        .setPositiveButton(R.string.install_permission_button) { _, _ ->
+                            val intent = Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:${targetAct.packageName}")
+                            ).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            targetAct.startActivity(intent)
                         }
-                        startActivity(intent)
-                    }
-                    .setNegativeButton(R.string.cancel, null)
-                    .show()
-                    .setDefaultFocus()
+                        .setNegativeButton(R.string.cancel, null)
+                        .show()
+                        .setDefaultFocus()
+                } catch (t: Throwable) {
+                    logError(t)
+                }
             }
         } else {
-            runOnUiThread {
-                AlertDialog.Builder(this, R.style.AlertDialogCustom)
-                    .setTitle(R.string.install_ready_title)
-                    .setMessage(R.string.install_ready_message)
-                    .setPositiveButton(R.string.update) { _, _ ->
-                        UpdateSecurityGate.executeInstallation(this, outcome.token) { authorizedFile ->
-                            openApk(this, authorizedFile)
+            targetAct.runOnUiThread {
+                try {
+                    AlertDialog.Builder(targetAct, R.style.AlertDialogCustom)
+                        .setTitle(R.string.install_ready_title)
+                        .setMessage(R.string.install_ready_message)
+                        .setPositiveButton(R.string.update) { _, _ ->
+                            UpdateSecurityGate.executeInstallation(targetAct, outcome.token) { authorizedFile ->
+                                openApk(targetAct, authorizedFile)
+                            }
                         }
-                    }
-                    .setNegativeButton(R.string.cancel, null)
-                    .show()
-                    .setDefaultFocus()
+                        .setNegativeButton(R.string.cancel, null)
+                        .show()
+                        .setDefaultFocus()
+                } catch (t: Throwable) {
+                    logError(t)
+                }
             }
         }
     }
@@ -541,7 +565,8 @@ object InAppUpdater {
             }
             val progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
                 max = 100
-                isIndeterminate = true
+                isIndeterminate = false
+                progress = 0
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -641,15 +666,28 @@ object InAppUpdater {
                         }
                     } catch (_: Throwable) {}
                 }
-                notificationManager?.cancel(PackageInstallerService.UPDATE_NOTIFICATION_ID)
 
                 val outcome = UpdateSecurityGate.verifyAndAuthorize(this, downloadedFile, expectedSha256)
                 when (outcome) {
                     is UpdateSecurityGate.VerificationOutcome.Authorized -> {
+                        val completionNotif = NotificationCompat.Builder(this, PackageInstallerService.UPDATE_CHANNEL_ID)
+                            .setAutoCancel(true)
+                            .setOngoing(false)
+                            .setOnlyAlertOnce(true)
+                            .setPriority(NotificationCompat.PRIORITY_HIGH)
+                            .setColor(this.colorFromAttribute(R.attr.colorPrimary))
+                            .setContentTitle(getString(R.string.install_ready_title))
+                            .setContentText(getString(R.string.install_ready_message))
+                            .setSmallIcon(R.drawable.rdload)
+                            .setContentIntent(pendingIntent)
+                            .build()
+                        notificationManager?.notify(PackageInstallerService.UPDATE_NOTIFICATION_ID, completionNotif)
+
                         handleAuthorizedUpdate(outcome, expectedSha256)
                         true
                     }
                     is UpdateSecurityGate.VerificationOutcome.Rejected -> {
+                        notificationManager?.cancel(PackageInstallerService.UPDATE_NOTIFICATION_ID)
                         Log.e(LOG_TAG, "Update rejected by security gate: ${outcome.reason}")
                         runOnUiThread {
                             showToast("Update verification failed: ${outcome.reason}", Toast.LENGTH_LONG)
@@ -694,6 +732,8 @@ object InAppUpdater {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
         }
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        notificationManager?.cancel(PackageInstallerService.UPDATE_NOTIFICATION_ID)
         val act = com.lagradost.cloudstream3.CommonActivity.activity ?: (context as? Activity)
         if (act != null && !act.isFinishing && !act.isDestroyed) {
             act.runOnUiThread {
