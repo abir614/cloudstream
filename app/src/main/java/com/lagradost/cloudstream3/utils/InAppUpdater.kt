@@ -361,7 +361,6 @@ object InAppUpdater {
         }
     }
 
-    private val isPromptingResume = AtomicBoolean(false)
     private var lastDismissedInstallPromptMs = 0L
 
     fun checkAndResumePendingInstall(activity: Activity) {
