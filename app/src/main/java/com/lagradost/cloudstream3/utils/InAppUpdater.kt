@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.utils
 
 import android.app.Activity
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager.NameNotFoundException
@@ -8,25 +9,35 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.app.NotificationCompat
+import androidx.core.app.PendingIntentCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.content.edit
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.preference.PreferenceManager
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.CommonActivity.showToast
+import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.MainActivity.Companion.deleteFileOnExit
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.mvvm.safe
 import com.lagradost.cloudstream3.services.PackageInstallerService
+import com.lagradost.cloudstream3.utils.AppContextUtils.createNotificationChannel
 import com.lagradost.cloudstream3.utils.AppContextUtils.setDefaultFocus
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.GitInfo.currentCommitHash
+import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
@@ -38,7 +49,9 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
 import java.io.InputStreamReader
+import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 object InAppUpdater {
     private const val GITHUB_USER_NAME = "abir614"
@@ -316,44 +329,324 @@ object InAppUpdater {
     }
 
     private val updateLock = Mutex()
+    private val isPromptingResume = AtomicBoolean(false)
+
+    const val PREF_KEY_PENDING_UPDATE_FILE = "pending_update_apk_path"
+    const val PREF_KEY_PENDING_UPDATE_SHA256 = "pending_update_expected_sha256"
+
+    fun getPendingInstall(context: Context): Pair<File, String?>? {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+        val path = prefs.getString(PREF_KEY_PENDING_UPDATE_FILE, null) ?: return null
+        val expectedSha = prefs.getString(PREF_KEY_PENDING_UPDATE_SHA256, null)
+        val file = File(path)
+        return if (file.exists() && file.isFile && file.length() > 1024 * 1024) {
+            Pair(file, expectedSha)
+        } else {
+            clearPendingInstall(context)
+            null
+        }
+    }
+
+    fun setPendingInstall(context: Context, file: File, expectedSha256: String?) {
+        PreferenceManager.getDefaultSharedPreferences(context).edit {
+            putString(PREF_KEY_PENDING_UPDATE_FILE, file.absolutePath)
+            putString(PREF_KEY_PENDING_UPDATE_SHA256, expectedSha256)
+        }
+    }
+
+    fun clearPendingInstall(context: Context) {
+        PreferenceManager.getDefaultSharedPreferences(context).edit {
+            remove(PREF_KEY_PENDING_UPDATE_FILE)
+            remove(PREF_KEY_PENDING_UPDATE_SHA256)
+        }
+    }
+
+    fun checkAndResumePendingInstall(activity: Activity) {
+        if (isPromptingResume.get()) return
+        val pending = getPendingInstall(activity) ?: return
+        val (apkFile, expectedSha256) = pending
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (!activity.packageManager.canRequestPackageInstalls()) {
+                return
+            }
+        }
+
+        val installedVersionCode = try {
+            val pInfo = activity.packageManager.getPackageInfo(activity.packageName, 0)
+            PackageInfoCompat.getLongVersionCode(pInfo)
+        } catch (_: Throwable) {
+            0L
+        }
+        val archivePkgInfo = try {
+            activity.packageManager.getPackageArchiveInfo(apkFile.absolutePath, 0)
+        } catch (_: Throwable) {
+            null
+        }
+        if (archivePkgInfo != null) {
+            val archiveVersionCode = PackageInfoCompat.getLongVersionCode(archivePkgInfo)
+            if (archiveVersionCode <= installedVersionCode) {
+                apkFile.delete()
+                clearPendingInstall(activity)
+                return
+            }
+        }
+
+        if (!isPromptingResume.compareAndSet(false, true)) return
+
+        activity.runOnUiThread {
+            try {
+                AlertDialog.Builder(activity, R.style.AlertDialogCustom)
+                    .setTitle(R.string.install_ready_title)
+                    .setMessage(R.string.install_ready_message)
+                    .setPositiveButton(R.string.update) { _, _ ->
+                        ioSafe {
+                            try {
+                                UpdateSecurityGate.requestUpdateChallenge()
+                                val outcome = UpdateSecurityGate.verifyAndAuthorize(
+                                    activity, apkFile, expectedSha256
+                                )
+                                when (outcome) {
+                                    is UpdateSecurityGate.VerificationOutcome.Authorized -> {
+                                        val success = UpdateSecurityGate.executeInstallation(
+                                            activity, outcome.token
+                                        ) { authorizedFile ->
+                                            openApk(activity, authorizedFile)
+                                        }
+                                        if (success) {
+                                            clearPendingInstall(activity)
+                                        }
+                                    }
+                                    is UpdateSecurityGate.VerificationOutcome.Rejected -> {
+                                        Log.e(LOG_TAG, "Pending update verification failed: ${outcome.reason}")
+                                        clearPendingInstall(activity)
+                                        activity.runOnUiThread {
+                                            showToast(
+                                                "Update verification failed: ${outcome.reason}",
+                                                Toast.LENGTH_LONG
+                                            )
+                                        }
+                                    }
+                                }
+                            } finally {
+                                isPromptingResume.set(false)
+                            }
+                        }
+                    }
+                    .setNegativeButton(R.string.cancel) { _, _ ->
+                        isPromptingResume.set(false)
+                    }
+                    .setOnDismissListener {
+                        isPromptingResume.set(false)
+                    }
+                    .show()
+                    .setDefaultFocus()
+            } catch (t: Throwable) {
+                logError(t)
+                isPromptingResume.set(false)
+            }
+        }
+    }
+
+    private fun Activity.handleAuthorizedUpdate(
+        outcome: UpdateSecurityGate.VerificationOutcome.Authorized,
+        expectedSha256: String?
+    ) {
+        val needsPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !packageManager.canRequestPackageInstalls()
+
+        if (needsPermission) {
+            setPendingInstall(this, outcome.authorizedFile, expectedSha256)
+            runOnUiThread {
+                AlertDialog.Builder(this, R.style.AlertDialogCustom)
+                    .setTitle(R.string.install_permission_title)
+                    .setMessage(R.string.install_permission_message)
+                    .setPositiveButton(R.string.install_permission_button) { _, _ ->
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:$packageName")
+                        ).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        startActivity(intent)
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+                    .setDefaultFocus()
+            }
+        } else {
+            runOnUiThread {
+                AlertDialog.Builder(this, R.style.AlertDialogCustom)
+                    .setTitle(R.string.install_ready_title)
+                    .setMessage(R.string.install_ready_message)
+                    .setPositiveButton(R.string.update) { _, _ ->
+                        UpdateSecurityGate.executeInstallation(this, outcome.token) { authorizedFile ->
+                            openApk(this, authorizedFile)
+                        }
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+                    .setDefaultFocus()
+            }
+        }
+    }
 
     private suspend fun Activity.downloadUpdate(url: String, expectedSha256: String? = null): Boolean {
+        var progressDialog: AlertDialog? = null
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
         try {
             Log.d(LOG_TAG, "Downloading update: $url")
-            val appUpdateName = "CloudStream"
-            val appUpdateSuffix = "apk"
+            val updatesDir = File(filesDir, "updates").apply { mkdirs() }
+            val downloadedFile = File(updatesDir, "CloudStream-Update.apk")
 
-            // Request ephemeral challenge nonce from isolated UpdateSecurityGate
+            // Check if existing file matches and is valid
+            val pending = getPendingInstall(this)
+            if (pending != null && downloadedFile.exists() && downloadedFile.length() > 1024 * 1024) {
+                if (expectedSha256.isNullOrBlank() || expectedSha256.equals(pending.second, ignoreCase = true)) {
+                    UpdateSecurityGate.requestUpdateChallenge()
+                    val outcome = UpdateSecurityGate.verifyAndAuthorize(this, downloadedFile, expectedSha256)
+                    if (outcome is UpdateSecurityGate.VerificationOutcome.Authorized) {
+                        Log.i(LOG_TAG, "Using existing verified pending update without re-downloading.")
+                        handleAuthorizedUpdate(outcome, expectedSha256)
+                        return true
+                    }
+                }
+            }
+
+            // Create notification channel
+            createNotificationChannel(
+                PackageInstallerService.UPDATE_CHANNEL_ID,
+                PackageInstallerService.UPDATE_CHANNEL_NAME,
+                PackageInstallerService.UPDATE_CHANNEL_DESCRIPTION
+            )
+
+            val notifIntent = Intent(this, MainActivity::class.java)
+            val pendingIntent = PendingIntentCompat.getActivity(this, 0, notifIntent, 0, false)
+            val notifBuilder = NotificationCompat.Builder(this, PackageInstallerService.UPDATE_CHANNEL_ID)
+                .setAutoCancel(false)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setSilent(true)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setColor(this.colorFromAttribute(R.attr.colorPrimary))
+                .setContentTitle(getString(R.string.update_notification_downloading))
+                .setSmallIcon(R.drawable.rdload)
+                .setContentIntent(pendingIntent)
+
+            // Setup in-app progress dialog
+            val padding = (16 * resources.displayMetrics.density).toInt()
+            val layout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(padding, padding / 2, padding, padding / 2)
+            }
+            val progressBar = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                max = 100
+                isIndeterminate = true
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(0, padding / 2, 0, padding / 2)
+                }
+            }
+            val progressText = TextView(this).apply {
+                text = getString(R.string.update_notification_downloading)
+                gravity = Gravity.END
+            }
+            layout.addView(progressBar)
+            layout.addView(progressText)
+
+            runOnUiThread {
+                try {
+                    progressDialog = AlertDialog.Builder(this, R.style.AlertDialogCustom)
+                        .setTitle(R.string.update_notification_downloading)
+                        .setView(layout)
+                        .setCancelable(false)
+                        .setPositiveButton(R.string.background) { d, _ ->
+                            d.dismiss()
+                        }
+                        .show()
+                        .apply { setDefaultFocus() }
+                } catch (t: Throwable) {
+                    logError(t)
+                }
+            }
+
+            if (downloadedFile.exists()) {
+                downloadedFile.delete()
+            }
+
             UpdateSecurityGate.requestUpdateChallenge()
 
-            // Delete all old updates
-            this.cacheDir.listFiles()?.filter {
-                it.name.startsWith(appUpdateName) && it.extension == appUpdateSuffix
-            }?.forEach { deleteFileOnExit(it) }
-
-            val downloadedFile = File.createTempFile(appUpdateName, ".$appUpdateSuffix", this.cacheDir)
-
             val isInstalled = updateLock.withLock {
-                downloadedFile.sink().buffer().use { sink ->
-                    sink.writeAll(app.get(url).body.source())
+                val response = app.get(url)
+                val body = response.body
+                val totalBytes = body.contentLength()
+                var downloadedBytes = 0L
+                val buf = ByteArray(64 * 1024)
+                var lastUpdateMs = 0L
+
+                downloadedFile.outputStream().use { fileOut ->
+                    body.byteStream().use { netIn ->
+                        var read: Int
+                        while (netIn.read(buf).also { read = it } != -1) {
+                            fileOut.write(buf, 0, read)
+                            downloadedBytes += read
+
+                            val now = System.currentTimeMillis()
+                            if (now - lastUpdateMs >= 120 || (totalBytes > 0 && downloadedBytes == totalBytes)) {
+                                lastUpdateMs = now
+                                val percent = if (totalBytes > 0) {
+                                    ((downloadedBytes * 100) / totalBytes).toInt().coerceIn(0, 100)
+                                } else 0
+                                val downloadedMb = downloadedBytes.toDouble() / (1024.0 * 1024.0)
+                                val totalMb = totalBytes.toDouble() / (1024.0 * 1024.0)
+                                val progressStr = if (totalBytes > 0) {
+                                    String.format(Locale.ROOT, "%.1f MB / %.1f MB (%d%%)", downloadedMb, totalMb, percent)
+                                } else {
+                                    String.format(Locale.ROOT, "%.1f MB", downloadedMb)
+                                }
+
+                                notificationManager?.notify(
+                                    PackageInstallerService.UPDATE_NOTIFICATION_ID,
+                                    notifBuilder
+                                        .setContentText(progressStr)
+                                        .setProgress(100, percent, totalBytes <= 0)
+                                        .build()
+                                )
+
+                                runOnUiThread {
+                                    try {
+                                        if (progressDialog?.isShowing == true) {
+                                            if (totalBytes > 0) {
+                                                progressBar.isIndeterminate = false
+                                                progressBar.progress = percent
+                                            } else {
+                                                progressBar.isIndeterminate = true
+                                            }
+                                            progressText.text = progressStr
+                                        }
+                                    } catch (_: Throwable) {}
+                                }
+                            }
+                        }
+                        fileOut.flush()
+                    }
                 }
+
+                runOnUiThread {
+                    try {
+                        if (progressDialog?.isShowing == true) {
+                            progressDialog?.dismiss()
+                        }
+                    } catch (_: Throwable) {}
+                }
+                notificationManager?.cancel(PackageInstallerService.UPDATE_NOTIFICATION_ID)
 
                 val outcome = UpdateSecurityGate.verifyAndAuthorize(this, downloadedFile, expectedSha256)
                 when (outcome) {
                     is UpdateSecurityGate.VerificationOutcome.Authorized -> {
-                        runOnUiThread {
-                            AlertDialog.Builder(this, R.style.AlertDialogCustom)
-                                .setTitle(R.string.update)
-                                .setMessage(R.string.update_notification_installing)
-                                .setPositiveButton(R.string.update) { _, _ ->
-                                    UpdateSecurityGate.executeInstallation(this, outcome.token) { authorizedFile ->
-                                        openApk(this, authorizedFile)
-                                    }
-                                }
-                                .setNegativeButton(R.string.cancel, null)
-                                .show()
-                                .setDefaultFocus()
-                        }
+                        handleAuthorizedUpdate(outcome, expectedSha256)
                         true
                     }
                     is UpdateSecurityGate.VerificationOutcome.Rejected -> {
@@ -370,16 +663,26 @@ object InAppUpdater {
         } catch (e: Exception) {
             logError(e)
             UpdateSecurityGate.lockGate()
+            runOnUiThread {
+                try {
+                    if (progressDialog?.isShowing == true) {
+                        progressDialog?.dismiss()
+                    }
+                } catch (_: Throwable) {}
+            }
+            notificationManager?.cancel(PackageInstallerService.UPDATE_NOTIFICATION_ID)
             return false
         }
     }
 
     private fun openApk(context: Context, file: File) = safe {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
+            setPendingInstall(context, file, null)
             val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}")).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
+            return@safe
         }
         val contentUri = FileProvider.getUriForFile(
             context, BuildConfig.APPLICATION_ID + ".provider", file

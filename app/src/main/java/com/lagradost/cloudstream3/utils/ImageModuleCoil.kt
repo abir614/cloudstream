@@ -312,8 +312,16 @@ object ImageLoader {
             if (!isAdultAllowed || shouldCensorPosters(context)) {
                 target(
                     onStart = { placeholder ->
-                        val defaultPlaceholder = ContextCompat.getDrawable(context, R.drawable.default_cover)
-                        this@loadImageInternal.setImageDrawable(placeholder?.asDrawable(context.resources) ?: defaultPlaceholder)
+                        val hasMemory = try {
+                            SingletonImageLoader.get(context).memoryCache?.get(coil3.memory.MemoryCache.Key(imageKey)) != null
+                        } catch (_: Throwable) {
+                            false
+                        }
+                        if (!hasMemory && this@loadImageInternal.drawable == null) {
+                            val defaultPlaceholder = placeholder?.asDrawable(context.resources)
+                                ?: ContextCompat.getDrawable(context, R.drawable.default_cover)
+                            this@loadImageInternal.setImageDrawable(defaultPlaceholder)
+                        }
                     },
                     onError = { error ->
                         val defaultError = ContextCompat.getDrawable(context, R.drawable.default_cover)

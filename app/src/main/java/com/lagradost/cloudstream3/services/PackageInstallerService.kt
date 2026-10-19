@@ -18,12 +18,14 @@ import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.ApkInstaller
 import com.lagradost.cloudstream3.utils.AppContextUtils.createNotificationChannel
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
+import com.lagradost.cloudstream3.utils.InAppUpdater
 import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
 import com.lagradost.cloudstream3.utils.UpdateSecurityGate
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
+import java.util.Locale
 import kotlin.math.roundToInt
 
 class PackageInstallerService : Service() {
@@ -69,16 +71,12 @@ class PackageInstallerService : Service() {
             // Request ephemeral challenge from UpdateSecurityGate
             UpdateSecurityGate.requestUpdateChallenge()
 
-            // Delete all old updates
-            ioSafe {
-                this@PackageInstallerService.cacheDir.listFiles()?.filter {
-                    it.name.startsWith(appUpdateName) && it.extension == appUpdateSuffix
-                }?.forEach {
-                    deleteFileOnExit(it)
-                }
+            // Prepare persistent updates directory
+            val updatesDir = File(this@PackageInstallerService.filesDir, "updates").apply { mkdirs() }
+            val stagedFile = File(updatesDir, "CloudStream-Update.apk")
+            if (stagedFile.exists()) {
+                stagedFile.delete()
             }
-
-            val stagedFile = File.createTempFile(appUpdateName, ".$appUpdateSuffix", this@PackageInstallerService.cacheDir)
 
             val success = updateLock.withLock {
                 updateNotificationProgress(
@@ -89,6 +87,7 @@ class PackageInstallerService : Service() {
                 val body = app.get(url).body
                 val totalSize = body.contentLength()
                 var currentSize = 0L
+                var lastUpdateMs = 0L
 
                 stagedFile.outputStream().use { fileOut ->
                     body.byteStream().use { netIn ->
@@ -97,14 +96,26 @@ class PackageInstallerService : Service() {
                         while (netIn.read(buf).also { read = it } != -1) {
                             fileOut.write(buf, 0, read)
                             currentSize += read
-                            if (totalSize > 0) {
-                                val percentage = currentSize / totalSize.toFloat()
+
+                            val now = System.currentTimeMillis()
+                            if (now - lastUpdateMs >= 120 || (totalSize > 0 && currentSize == totalSize)) {
+                                lastUpdateMs = now
+                                val percentage = if (totalSize > 0) currentSize / totalSize.toFloat() else 0f
+                                val downloadedMb = currentSize.toDouble() / (1024.0 * 1024.0)
+                                val totalMb = totalSize.toDouble() / (1024.0 * 1024.0)
+                                val progressText = if (totalSize > 0) {
+                                    String.format(Locale.ROOT, "%.1f MB / %.1f MB (%d%%)", downloadedMb, totalMb, (percentage * 100).toInt())
+                                } else {
+                                    String.format(Locale.ROOT, "%.1f MB", downloadedMb)
+                                }
                                 updateNotificationProgress(
                                     percentage,
-                                    ApkInstaller.InstallProgressStatus.Downloading
+                                    ApkInstaller.InstallProgressStatus.Downloading,
+                                    progressText
                                 )
                             }
                         }
+                        fileOut.flush()
                     }
                 }
 
@@ -116,6 +127,9 @@ class PackageInstallerService : Service() {
                     updateNotificationProgress(0f, ApkInstaller.InstallProgressStatus.Failed)
                     return false
                 }
+
+                // Register pending install so that if install permission is needed, onResume can resume
+                InAppUpdater.setPendingInstall(this@PackageInstallerService, stagedFile, expectedSha256)
 
                 installer = ApkInstaller(this@PackageInstallerService)
                 val installSuccessful = UpdateSecurityGate.executeInstallation(
@@ -144,7 +158,8 @@ class PackageInstallerService : Service() {
 
     private fun updateNotificationProgress(
         percentage: Float,
-        state: ApkInstaller.InstallProgressStatus
+        state: ApkInstaller.InstallProgressStatus,
+        contentText: String? = null
     ) {
 //        Log.d(LOG_TAG, "Downloading app update progress $percentage | $state")
         val text = when (state) {
@@ -156,6 +171,9 @@ class PackageInstallerService : Service() {
         val newNotification = baseNotification
             .setContentTitle(getString(text))
             .apply {
+                if (contentText != null) {
+                    setContentText(contentText)
+                }
                 if (state == ApkInstaller.InstallProgressStatus.Failed) {
                     setSmallIcon(R.drawable.rderror)
                     setAutoCancel(true)

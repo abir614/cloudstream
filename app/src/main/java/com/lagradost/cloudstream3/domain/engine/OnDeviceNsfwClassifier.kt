@@ -333,7 +333,7 @@ object OnDeviceNsfwClassifier {
                     ImageLoader.applyCensoredPoster(imageView)
                 }
             } else {
-                imageView.setImageDrawable(drawable)
+                setSmoothPosterDrawable(imageView, drawable, DeviceProfile.tier(imageView.context) != DeviceTier.LOW)
             }
             return
         }
@@ -399,13 +399,26 @@ object OnDeviceNsfwClassifier {
                                 ImageLoader.applyCensoredPoster(activeView)
                             }
                         } else {
-                            activeView.setImageDrawable(drawable)
+                            setSmoothPosterDrawable(activeView, drawable, DeviceProfile.tier(activeView.context) != DeviceTier.LOW)
                         }
                     }
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Background poster classification error: ${t.message}")
             }
+        }
+    }
+
+    private fun setSmoothPosterDrawable(view: ImageView, newDrawable: Drawable, animate: Boolean) {
+        val oldDrawable = view.drawable
+        if (animate && oldDrawable != null && oldDrawable != newDrawable) {
+            val transition = android.graphics.drawable.TransitionDrawable(arrayOf(oldDrawable, newDrawable)).apply {
+                isCrossFadeEnabled = true
+            }
+            view.setImageDrawable(transition)
+            transition.startTransition(150)
+        } else {
+            view.setImageDrawable(newDrawable)
         }
     }
 

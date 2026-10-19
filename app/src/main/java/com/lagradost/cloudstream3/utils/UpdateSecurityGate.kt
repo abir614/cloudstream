@@ -297,6 +297,7 @@ object UpdateSecurityGate {
             return false
         }
 
+        var executed = false
         try {
             // Android 8.0+ (Oreo, API 26+) Unknown Sources Permission Check
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -315,10 +316,13 @@ object UpdateSecurityGate {
 
             // Run installer action
             onExecuteInstall(token.authorizedFile)
+            executed = true
             return true
         } finally {
             // Relock gate immediately after execution
-            lockGate()
+            if (executed) {
+                lockGate()
+            }
         }
     }
 
