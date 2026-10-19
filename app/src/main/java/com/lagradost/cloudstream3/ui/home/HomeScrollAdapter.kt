@@ -75,10 +75,37 @@ class HomeScrollAdapter(
                 (!posterUrl.startsWith("http://") && !posterUrl.startsWith("https://"))
             )
             if (isNsfw || hasInvalidPoster) {
-                holder.itemView.isVisible = false
-                holder.itemView.layoutParams = ViewGroup.LayoutParams(0, 0)
+                // ViewPager2 strictly enforces MATCH_PARENT on its child pages.
+                // Do NOT set 0x0 layoutParams, which throws java.lang.IllegalStateException: Pages must fill the whole ViewPager2 (use match_parent).
+                // Safely blank out the carousel page views instead.
+                when (binding) {
+                    is HomeScrollViewBinding -> {
+                        clearImage(binding.homeScrollPreview)
+                        binding.homeScrollPreview.setImageResource(R.drawable.default_cover)
+                        binding.homeScrollPreviewTags.isVisible = false
+                        binding.homeScrollPreviewTitle.text = ""
+                        binding.homePreviewLogo.isVisible = false
+                    }
+                    is HomeScrollViewTvBinding -> {
+                        clearImage(binding.homeScrollPreview)
+                        binding.homeScrollPreview.setImageResource(R.drawable.default_cover)
+                    }
+                }
+                val lp = holder.itemView.layoutParams
+                if (lp != null && (lp.width != ViewGroup.LayoutParams.MATCH_PARENT || lp.height != ViewGroup.LayoutParams.MATCH_PARENT)) {
+                    lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+                    lp.height = ViewGroup.LayoutParams.MATCH_PARENT
+                    holder.itemView.layoutParams = lp
+                }
                 return
             }
+        }
+
+        val lp = holder.itemView.layoutParams
+        if (lp != null && (lp.width != ViewGroup.LayoutParams.MATCH_PARENT || lp.height != ViewGroup.LayoutParams.MATCH_PARENT)) {
+            lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+            lp.height = ViewGroup.LayoutParams.MATCH_PARENT
+            holder.itemView.layoutParams = lp
         }
 
         holder.itemView.isVisible = true

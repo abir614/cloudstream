@@ -16,6 +16,7 @@ import android.util.LruCache
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.TextView
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
@@ -415,6 +416,28 @@ object OnDeviceNsfwClassifier {
         try {
             val weak = view.getTag(R.id.parent_view_tag) as? java.lang.ref.WeakReference<*>
             val root = (weak?.get() as? View) ?: findRootItemView(view)
+
+            if (isInsideViewPager2(root)) {
+                // ViewPager2 strictly enforces MATCH_PARENT on its child pages.
+                // Setting lp.width or lp.height to 0 causes IllegalStateException: Pages must fill the whole ViewPager2 (use match_parent).
+                // Safely sanitize child views without altering page dimensions.
+                root.findViewById<ImageView>(R.id.home_scroll_preview)?.let { preview ->
+                    preview.setImageDrawable(null)
+                    preview.setImageResource(R.drawable.default_cover)
+                }
+                root.findViewById<View>(R.id.home_scroll_preview_tags)?.isVisible = false
+                root.findViewById<TextView>(R.id.home_scroll_preview_title)?.text = ""
+                root.findViewById<View>(R.id.home_preview_logo)?.isVisible = false
+
+                val lp = root.layoutParams
+                if (lp != null && (lp.width != ViewGroup.LayoutParams.MATCH_PARENT || lp.height != ViewGroup.LayoutParams.MATCH_PARENT)) {
+                    lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+                    lp.height = ViewGroup.LayoutParams.MATCH_PARENT
+                    root.layoutParams = lp
+                }
+                return
+            }
+
             root.isVisible = false
             root.isFocusable = false
             root.isFocusableInTouchMode = false
@@ -435,6 +458,17 @@ object OnDeviceNsfwClassifier {
             root.requestLayout()
         } catch (_: Throwable) {
         }
+    }
+
+    private fun isInsideViewPager2(view: View): Boolean {
+        if (view.findViewById<View>(R.id.home_scroll_preview) != null) return true
+        var current: View? = view
+        while (current != null) {
+            if (current is ViewPager2) return true
+            val parent = current.parent
+            current = parent as? View
+        }
+        return false
     }
 
     private fun findRootItemView(view: View): View {

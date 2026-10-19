@@ -35,6 +35,7 @@ import com.lagradost.cloudstream3.ui.search.SearchHelper
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel
 import com.lagradost.cloudstream3.utils.AppContextUtils.addProgramsToContinueWatching
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterHomePageListByFilmQuality
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterProviderByPreferredMedia
@@ -301,7 +302,15 @@ class HomeViewModel : ViewModel() {
         val nsfwEnabled = context?.isNsfwEnabled() ?: false
         val filterLevel = NsfwFilterEngine.getFilterLevel(context)
         val validAdd = if (!nsfwEnabled) {
-            add.filterNot { NsfwFilterEngine.isNsfw(it, filterLevel) }
+            add.filterNot { item ->
+                val posterUrl = item.backgroundPosterUrl ?: item.posterUrl
+                val hasInvalidPoster = filterLevel == NsfwFilterLevel.EXTREME && (
+                    posterUrl.isNullOrBlank() ||
+                    posterUrl == "null" ||
+                    (!posterUrl.startsWith("http://") && !posterUrl.startsWith("https://"))
+                )
+                NsfwFilterEngine.isNsfw(item, filterLevel) || hasInvalidPoster
+            }
         } else {
             add
         }

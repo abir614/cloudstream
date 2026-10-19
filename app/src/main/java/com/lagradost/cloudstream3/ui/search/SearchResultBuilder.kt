@@ -10,6 +10,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.core.view.isVisible
+import androidx.viewpager2.widget.ViewPager2
 import androidx.palette.graphics.Palette
 import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.AnimeSearchResponse
@@ -153,12 +154,14 @@ object SearchResultBuilder {
             itemView.findViewById<View>(R.id.background_card)?.isVisible = false
             itemView.findViewById<View>(R.id.imageText)?.isVisible = false
             itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
-            val lp = itemView.layoutParams
-            if (lp != null) {
-                lp.width = 0
-                lp.height = 0
-                (lp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-                itemView.layoutParams = lp
+            if (!isInsideViewPager2(itemView)) {
+                val lp = itemView.layoutParams
+                if (lp != null) {
+                    lp.width = 0
+                    lp.height = 0
+                    (lp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
+                    itemView.layoutParams = lp
+                }
             }
             return
         }
@@ -191,12 +194,14 @@ object SearchResultBuilder {
                 itemView.findViewById<View>(R.id.background_card)?.isVisible = false
                 itemView.findViewById<View>(R.id.imageText)?.isVisible = false
                 itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
-                val emptyLp = itemView.layoutParams
-                if (emptyLp != null) {
-                    emptyLp.width = 0
-                    emptyLp.height = 0
-                    (emptyLp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-                    itemView.layoutParams = emptyLp
+                if (!isInsideViewPager2(itemView)) {
+                    val emptyLp = itemView.layoutParams
+                    if (emptyLp != null) {
+                        emptyLp.width = 0
+                        emptyLp.height = 0
+                        (emptyLp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
+                        itemView.layoutParams = emptyLp
+                    }
                 }
             } else {
                 cardView.loadImage(R.drawable.default_cover)
@@ -360,5 +365,16 @@ object SearchResultBuilder {
         textIsDub?.apply {
             backgroundTintList = ColorStateList.valueOf(context.colorFromAttribute(R.attr.textColor))
         }
+    }
+
+    private fun isInsideViewPager2(view: View): Boolean {
+        if (view.findViewById<View>(R.id.home_scroll_preview) != null) return true
+        var current: View? = view
+        while (current != null) {
+            if (current is ViewPager2) return true
+            val parent = current.parent
+            current = parent as? View
+        }
+        return false
     }
 }
