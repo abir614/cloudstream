@@ -433,7 +433,23 @@ object OnDeviceNsfwClassifier {
     fun hideParentItem(view: View) {
         try {
             val weak = view.getTag(R.id.parent_view_tag) as? java.lang.ref.WeakReference<*>
-            val root = (weak?.get() as? View) ?: findRootItemView(view)
+            val root = (weak?.get() as? View) ?: findRootItemView(view) ?: run {
+                // If view is not part of a RecyclerView or ViewPager2 item (e.g. details screen poster in ResultFragment),
+                // replace with clean default cover and never collapse or alter the screen layout!
+                if (view is ImageView) {
+                    view.setImageResource(R.drawable.default_cover)
+                }
+                return
+            }
+
+            // Safety guard: Ensure root is truly a child item inside a container, never a Fragment/Activity root
+            val parent = root.parent
+            if (parent !is RecyclerView && parent !is ViewPager2 && !isInsideViewPager2(root)) {
+                if (view is ImageView) {
+                    view.setImageResource(R.drawable.default_cover)
+                }
+                return
+            }
 
             if (isInsideViewPager2(root)) {
                 // ViewPager2 strictly enforces MATCH_PARENT on its child pages.
@@ -489,7 +505,7 @@ object OnDeviceNsfwClassifier {
         return false
     }
 
-    private fun findRootItemView(view: View): View {
+    private fun findRootItemView(view: View): View? {
         var current: View = view
         while (current.parent is View) {
             val parent = current.parent as View
@@ -498,7 +514,7 @@ object OnDeviceNsfwClassifier {
             }
             current = parent
         }
-        return current
+        return null
     }
 
     /**

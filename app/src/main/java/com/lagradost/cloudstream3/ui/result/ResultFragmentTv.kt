@@ -889,10 +889,10 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                             d.posterBackgroundImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true
 
                         if (!isAdultAllowed && isNsfw) {
-                            resultPoster.setImageDrawable(null)
-                            resultPoster.isVisible = false
-                            backgroundPoster.setImageDrawable(null)
-                            backgroundPoster.isVisible = false
+                            resultPoster.setImageResource(R.drawable.default_cover)
+                            resultPoster.isVisible = true
+                            backgroundPoster.setImageResource(R.drawable.default_cover)
+                            backgroundPoster.isVisible = true
                         } else if (isAdultAllowed && shouldCensorPosters(context) && isNsfw) {
                             resultPoster.isVisible = true
                             backgroundPoster.isVisible = true

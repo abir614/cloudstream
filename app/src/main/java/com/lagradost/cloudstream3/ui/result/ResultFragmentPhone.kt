@@ -962,10 +962,10 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                         d.posterBackgroundImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true
 
                     if (!isAdultAllowed && isNsfw) {
-                        resultPoster.setImageDrawable(null)
-                        resultPoster.isVisible = false
-                        resultPosterBackground.setImageDrawable(null)
-                        resultPosterBackground.isVisible = false
+                        resultPoster.setImageResource(R.drawable.default_cover)
+                        resultPoster.isVisible = true
+                        resultPosterBackground.setImageResource(R.drawable.default_cover)
+                        resultPosterBackground.isVisible = true
                     } else if (isAdultAllowed && shouldCensorPosters(context) && isNsfw) {
                         resultPoster.isVisible = true
                         resultPosterBackground.isVisible = true
