@@ -396,24 +396,10 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
         updateNsfwSummary()
 
         getPref(R.string.nsfw_filter_level_key)?.setOnPreferenceClickListener {
-            val prefNames = resources.getStringArray(R.array.nsfw_filter_level_entries)
-            val prefValues = resources.getStringArray(R.array.nsfw_filter_level_values)
-
-            val currentLevel =
-                settingsManager.getString(getString(R.string.nsfw_filter_level_key), "moderate") ?: "moderate"
-
-            val activeIndex = prefValues.indexOf(currentLevel).coerceAtLeast(0)
-
-            activity?.showBottomDialog(
-                prefNames.toList(),
-                activeIndex,
-                getString(R.string.nsfw_filter_level_title),
-                true,
-                {}) {
-                val selected = prefValues[it]
-                settingsManager.edit { putString(getString(R.string.nsfw_filter_level_key), selected) }
-                com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.onFilterConfigChanged()
-                updateNsfwSummary()
+            activity?.let { act ->
+                com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.showSensitivityThresholdsDialog(act) {
+                    updateNsfwSummary()
+                }
             }
             return@setOnPreferenceClickListener true
         }
@@ -559,7 +545,19 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
             val prefValues = resources.getStringArray(R.array.nsfw_filter_level_values)
             val index = prefValues.indexOf(currentLevel).coerceAtLeast(0)
             val label = prefNames.getOrNull(index) ?: "Moderate"
-            getPref(R.string.nsfw_filter_level_key)?.summary = label
+
+            val (e, m, l) = com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.getAllVisualThresholds(ctx)
+            val activeThreshold = when (currentLevel) {
+                "extreme" -> e
+                "low" -> l
+                else -> m
+            }
+            val summary = String.format(
+                java.util.Locale.ROOT,
+                "%s (Visual Threshold: %.2f | E: %.2f, M: %.2f, L: %.2f)",
+                label, activeThreshold, e, m, l
+            )
+            getPref(R.string.nsfw_filter_level_key)?.summary = summary
         }
     }
 

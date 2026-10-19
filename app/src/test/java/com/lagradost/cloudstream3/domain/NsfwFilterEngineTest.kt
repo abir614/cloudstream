@@ -163,8 +163,47 @@ class NsfwFilterEngineTest {
 
     @Test
     fun `test calibrated visual sensitivity thresholds`() {
-        assertEquals(0.30f, NsfwFilterLevel.LOW.visualThreshold, 0.001f)
-        assertEquals(0.15f, NsfwFilterLevel.MODERATE.visualThreshold, 0.001f)
-        assertEquals(0.06f, NsfwFilterLevel.EXTREME.visualThreshold, 0.001f)
+        assertEquals(0.55f, NsfwFilterLevel.LOW.defaultVisualThreshold, 0.001f)
+        assertEquals(0.30f, NsfwFilterLevel.MODERATE.defaultVisualThreshold, 0.001f)
+        assertEquals(0.15f, NsfwFilterLevel.EXTREME.defaultVisualThreshold, 0.001f)
+    }
+
+    @Test
+    fun `test threshold ordering constraints and dynamic scaling`() {
+        // Default values
+        val (defE, defM, defL) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.30f, 0.55f)
+        assertEquals(0.15f, defE, 0.001f)
+        assertEquals(0.30f, defM, 0.001f)
+        assertEquals(0.55f, defL, 0.001f)
+
+        // When Extreme is increased above Moderate
+        val (adjE1, adjM1, adjL1) = NsfwFilterEngine.enforceThresholdConstraints(0.40f, 0.30f, 0.55f, NsfwFilterLevel.EXTREME)
+        assertEquals(0.40f, adjE1, 0.001f)
+        assertTrue(adjM1 > adjE1)
+        assertTrue(adjL1 > adjM1)
+
+        // When Extreme is pushed near the top
+        val (adjE2, adjM2, adjL2) = NsfwFilterEngine.enforceThresholdConstraints(0.99f, 0.30f, 0.55f, NsfwFilterLevel.EXTREME)
+        assertEquals(0.98f, adjE2, 0.001f) // Capped at 0.98 to allow M=0.99, L=1.00
+        assertEquals(0.99f, adjM2, 0.001f)
+        assertEquals(1.00f, adjL2, 0.001f)
+
+        // When Low is decreased below Moderate
+        val (adjE3, adjM3, adjL3) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.30f, 0.20f, NsfwFilterLevel.LOW)
+        assertEquals(0.20f, adjL3, 0.001f)
+        assertEquals(0.19f, adjM3, 0.001f)
+        assertEquals(0.18f, adjE3, 0.001f)
+
+        // When Low is pushed near the bottom
+        val (adjE4, adjM4, adjL4) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.30f, 0.01f, NsfwFilterLevel.LOW)
+        assertEquals(0.03f, adjL4, 0.001f) // Capped at 0.03 to allow M=0.02, E=0.01
+        assertEquals(0.02f, adjM4, 0.001f)
+        assertEquals(0.01f, adjE4, 0.001f)
+
+        // When Moderate is shifted up and down
+        val (adjE5, adjM5, adjL5) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.60f, 0.55f, NsfwFilterLevel.MODERATE)
+        assertEquals(0.60f, adjM5, 0.001f)
+        assertTrue(adjE5 < adjM5)
+        assertTrue(adjL5 > adjM5)
     }
 }

@@ -1,6 +1,11 @@
 package com.lagradost.cloudstream3.domain.engine
 
+import android.app.Activity
 import android.content.Context
+import android.view.LayoutInflater
+import android.widget.SeekBar
+import androidx.appcompat.app.AlertDialog
+import androidx.core.content.edit
 import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.APIHolder
 import com.lagradost.cloudstream3.CloudStreamApp
@@ -10,22 +15,30 @@ import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
+import com.lagradost.cloudstream3.databinding.DialogNsfwSensitivityThresholdsBinding
 import com.lagradost.cloudstream3.ui.APIRepository
 import com.lagradost.cloudstream3.utils.ImageLoader
+import java.util.Locale
 
 /**
  * Configurable Content Safety Sensitivity Levels:
- * - EXTREME (0.06f): Super Extreme peak shield (strictly blocks all adult, ecchi, beach, summer, swim, bikini, exposure, empty posters, provocative tropes).
- * - MODERATE (0.15f): Family Level sensitivity (strictly blocks explicit adult, ecchi, lewd, smut; preserves clean anime and summer/beach titles).
- * - LOW (0.30f): Hardcore sensitivity (strictly blocks explicit adult, pornography, hentai, and hardcore content).
+ * - EXTREME (default 0.15f): Super Extreme peak shield (strictly blocks all adult, ecchi, beach, summer, swim, bikini, exposure, empty posters, provocative tropes).
+ * - MODERATE (default 0.30f): Family Level sensitivity (strictly blocks explicit adult, ecchi, lewd, smut; preserves clean anime and summer/beach titles).
+ * - LOW (default 0.55f): Hardcore sensitivity (strictly blocks explicit adult, pornography, hentai, and hardcore content).
+ *
+ * Each sensitivity level has a configurable Visual Detection Threshold (0.01f – 1.00f).
+ * Invariant constraint: Extreme < Moderate < Low.
  */
 enum class NsfwFilterLevel(
     val key: String,
-    val visualThreshold: Float
+    val defaultVisualThreshold: Float
 ) {
-    LOW("low", 0.30f),
-    MODERATE("moderate", 0.15f),
-    EXTREME("extreme", 0.06f);
+    LOW("low", 0.55f),
+    MODERATE("moderate", 0.30f),
+    EXTREME("extreme", 0.15f);
+
+    val visualThreshold: Float
+        get() = NsfwFilterEngine.getVisualThreshold(null, this)
 
     companion object {
         fun fromString(value: String?): NsfwFilterLevel {
@@ -40,8 +53,17 @@ enum class NsfwFilterLevel(
  * Integrates:
  * 1. On-device lightweight quantized neural network AI model ([OnDeviceNsfwClassifier]) for visual posters.
  * 2. Multi-tier pure Kotlin adult, ecchi, and extreme sensitivity keyword guardian.
+ * 3. Dynamic visual threshold scales (0.01 – 1.00) with strict constraint ordering.
  */
 object NsfwFilterEngine {
+
+    const val DEFAULT_THRESHOLD_EXTREME = 0.15f
+    const val DEFAULT_THRESHOLD_MODERATE = 0.30f
+    const val DEFAULT_THRESHOLD_LOW = 0.55f
+
+    const val PREF_KEY_THRESHOLD_EXTREME = "nsfw_visual_threshold_extreme_key"
+    const val PREF_KEY_THRESHOLD_MODERATE = "nsfw_visual_threshold_moderate_key"
+    const val PREF_KEY_THRESHOLD_LOW = "nsfw_visual_threshold_low_key"
 
     private val _configVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
     val configVersion: kotlinx.coroutines.flow.StateFlow<Int> = _configVersion
@@ -51,6 +73,233 @@ object NsfwFilterEngine {
         // during rescan without re-running heavy neural network inference.
         CloudStreamApp.context?.let { ImageLoader.reconfigure(it) } ?: ImageLoader.resetImageClient()
         _configVersion.value += 1
+    }
+
+    /**
+     * Resolves the configured visual threshold for a sensitivity level.
+     * Guaranteed bounds: 0.01f <= threshold <= 1.00f.
+     */
+    fun getVisualThreshold(context: Context? = null, level: NsfwFilterLevel = getFilterLevel(context)): Float {
+        val ctx = context ?: CloudStreamApp.context ?: return level.defaultVisualThreshold
+        return try {
+            val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
+            val key = when (level) {
+                NsfwFilterLevel.EXTREME -> ctx.getString(R.string.nsfw_visual_threshold_extreme_key)
+                NsfwFilterLevel.MODERATE -> ctx.getString(R.string.nsfw_visual_threshold_moderate_key)
+                NsfwFilterLevel.LOW -> ctx.getString(R.string.nsfw_visual_threshold_low_key)
+            }
+            val raw = prefs.getFloat(key, level.defaultVisualThreshold)
+            raw.coerceIn(0.01f, 1.00f)
+        } catch (_: Throwable) {
+            level.defaultVisualThreshold
+        }
+    }
+
+    /**
+     * Returns the current (Extreme, Moderate, Low) visual thresholds as a Triple.
+     */
+    fun getAllVisualThresholds(context: Context? = null): Triple<Float, Float, Float> {
+        val extreme = getVisualThreshold(context, NsfwFilterLevel.EXTREME)
+        val moderate = getVisualThreshold(context, NsfwFilterLevel.MODERATE)
+        val low = getVisualThreshold(context, NsfwFilterLevel.LOW)
+        return Triple(extreme, moderate, low)
+    }
+
+    /**
+     * Persists new visual thresholds, strictly enforcing Extreme < Moderate < Low in [0.01, 1.00].
+     */
+    fun setVisualThresholds(
+        context: Context,
+        extremeIn: Float,
+        moderateIn: Float,
+        lowIn: Float,
+        modifiedTier: NsfwFilterLevel? = null
+    ): Triple<Float, Float, Float> {
+        val (e, m, l) = enforceThresholdConstraints(extremeIn, moderateIn, lowIn, modifiedTier)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+        prefs.edit {
+            putFloat(context.getString(R.string.nsfw_visual_threshold_extreme_key), e)
+            putFloat(context.getString(R.string.nsfw_visual_threshold_moderate_key), m)
+            putFloat(context.getString(R.string.nsfw_visual_threshold_low_key), l)
+        }
+        onFilterConfigChanged()
+        return Triple(e, m, l)
+    }
+
+    /**
+     * Resets visual thresholds to defaults (0.15, 0.30, 0.55).
+     */
+    fun resetVisualThresholdsToDefault(context: Context): Triple<Float, Float, Float> {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+        prefs.edit {
+            putFloat(context.getString(R.string.nsfw_visual_threshold_extreme_key), DEFAULT_THRESHOLD_EXTREME)
+            putFloat(context.getString(R.string.nsfw_visual_threshold_moderate_key), DEFAULT_THRESHOLD_MODERATE)
+            putFloat(context.getString(R.string.nsfw_visual_threshold_low_key), DEFAULT_THRESHOLD_LOW)
+        }
+        onFilterConfigChanged()
+        return Triple(DEFAULT_THRESHOLD_EXTREME, DEFAULT_THRESHOLD_MODERATE, DEFAULT_THRESHOLD_LOW)
+    }
+
+    /**
+     * Mathematically enforces:
+     * 0.01 <= Extreme < Moderate < Low <= 1.00
+     * Dynamically shifts neighboring thresholds when one is adjusted.
+     */
+    fun enforceThresholdConstraints(
+        extremeIn: Float,
+        moderateIn: Float,
+        lowIn: Float,
+        modifiedTier: NsfwFilterLevel? = null
+    ): Triple<Float, Float, Float> {
+        var e = (Math.round(extremeIn * 100f) / 100f).coerceIn(0.01f, 0.98f)
+        var m = (Math.round(moderateIn * 100f) / 100f).coerceIn(0.02f, 0.99f)
+        var l = (Math.round(lowIn * 100f) / 100f).coerceIn(0.03f, 1.00f)
+
+        when (modifiedTier) {
+            NsfwFilterLevel.EXTREME -> {
+                if (m <= e) m = (e + 0.01f).coerceAtMost(0.99f)
+                if (l <= m) l = (m + 0.01f).coerceAtMost(1.00f)
+            }
+            NsfwFilterLevel.LOW -> {
+                if (m >= l) m = (l - 0.01f).coerceAtLeast(0.02f)
+                if (e >= m) e = (m - 0.01f).coerceAtLeast(0.01f)
+            }
+            NsfwFilterLevel.MODERATE, null -> {
+                if (e >= m) e = (m - 0.01f).coerceAtLeast(0.01f)
+                if (l <= m) l = (m + 0.01f).coerceAtMost(1.00f)
+            }
+        }
+
+        if (e >= m) e = (m - 0.01f).coerceAtLeast(0.01f)
+        if (l <= m) l = (m + 0.01f).coerceAtMost(1.00f)
+
+        return Triple(
+            Math.round(e * 100f) / 100f,
+            Math.round(m * 100f) / 100f,
+            Math.round(l * 100f) / 100f
+        )
+    }
+
+    /**
+     * Displays an interactive dialog with live scales for Extreme, Moderate, and Low sensitivities.
+     */
+    fun showSensitivityThresholdsDialog(activity: Activity, onDismissCallback: () -> Unit = {}) {
+        val context = activity
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+        val currentLevelStr = settingsManager.getString(context.getString(R.string.nsfw_filter_level_key), "moderate") ?: "moderate"
+        var selectedLevel = NsfwFilterLevel.fromString(currentLevelStr)
+
+        val (initE, initM, initL) = getAllVisualThresholds(context)
+        var curE = initE
+        var curM = initM
+        var curL = initL
+
+        val binding = DialogNsfwSensitivityThresholdsBinding.inflate(
+            LayoutInflater.from(context), null, false
+        )
+
+        val builder = AlertDialog.Builder(context, R.style.AlertDialogCustom).setView(binding.root)
+        val dialog = builder.create()
+
+        fun updateUI() {
+            binding.radioExtreme.isChecked = (selectedLevel == NsfwFilterLevel.EXTREME)
+            binding.radioModerate.isChecked = (selectedLevel == NsfwFilterLevel.MODERATE)
+            binding.radioLow.isChecked = (selectedLevel == NsfwFilterLevel.LOW)
+
+            binding.valueExtreme.text = String.format(Locale.ROOT, "%.2f", curE)
+            binding.valueModerate.text = String.format(Locale.ROOT, "%.2f", curM)
+            binding.valueLow.text = String.format(Locale.ROOT, "%.2f", curL)
+
+            val pE = Math.round(curE * 100f).coerceIn(1, 100)
+            val pM = Math.round(curM * 100f).coerceIn(1, 100)
+            val pL = Math.round(curL * 100f).coerceIn(1, 100)
+
+            if (binding.seekbarExtreme.progress != pE) binding.seekbarExtreme.progress = pE
+            if (binding.seekbarModerate.progress != pM) binding.seekbarModerate.progress = pM
+            if (binding.seekbarLow.progress != pL) binding.seekbarLow.progress = pL
+        }
+
+        binding.containerExtreme.setOnClickListener {
+            selectedLevel = NsfwFilterLevel.EXTREME
+            updateUI()
+        }
+        binding.containerModerate.setOnClickListener {
+            selectedLevel = NsfwFilterLevel.MODERATE
+            updateUI()
+        }
+        binding.containerLow.setOnClickListener {
+            selectedLevel = NsfwFilterLevel.LOW
+            updateUI()
+        }
+
+        var isUpdating = false
+        fun handleSeekChange(tier: NsfwFilterLevel) {
+            if (isUpdating) return
+            isUpdating = true
+            try {
+                val rawE = binding.seekbarExtreme.progress.coerceAtLeast(1) / 100f
+                val rawM = binding.seekbarModerate.progress.coerceAtLeast(1) / 100f
+                val rawL = binding.seekbarLow.progress.coerceAtLeast(1) / 100f
+
+                val (adjE, adjM, adjL) = enforceThresholdConstraints(rawE, rawM, rawL, tier)
+                curE = adjE
+                curM = adjM
+                curL = adjL
+                updateUI()
+            } finally {
+                isUpdating = false
+            }
+        }
+
+        binding.seekbarExtreme.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) handleSeekChange(NsfwFilterLevel.EXTREME)
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+
+        binding.seekbarModerate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) handleSeekChange(NsfwFilterLevel.MODERATE)
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+
+        binding.seekbarLow.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) handleSeekChange(NsfwFilterLevel.LOW)
+            }
+            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStopTrackingTouch(sb: SeekBar?) {}
+        })
+
+        binding.btnReset.setOnClickListener {
+            curE = DEFAULT_THRESHOLD_EXTREME
+            curM = DEFAULT_THRESHOLD_MODERATE
+            curL = DEFAULT_THRESHOLD_LOW
+            updateUI()
+        }
+
+        binding.btnCancel.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        binding.btnApply.setOnClickListener {
+            settingsManager.edit {
+                putString(context.getString(R.string.nsfw_filter_level_key), selectedLevel.key)
+            }
+            setVisualThresholds(context, curE, curM, curL)
+            dialog.dismiss()
+        }
+
+        dialog.setOnDismissListener {
+            onDismissCallback()
+        }
+
+        updateUI()
+        dialog.show()
     }
 
     private val HARDCORE_KEYWORDS = hashSetOf(

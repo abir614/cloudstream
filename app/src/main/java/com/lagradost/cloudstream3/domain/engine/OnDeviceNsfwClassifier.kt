@@ -124,7 +124,7 @@ object OnDeviceNsfwClassifier {
      */
     fun isCachedNsfw(imageKey: String, ctx: Context? = null, overrideLevel: NsfwFilterLevel? = null): Boolean {
         val score = scoreCache.get(imageKey) ?: return false
-        val threshold = overrideLevel?.visualThreshold ?: NsfwFilterEngine.getFilterLevel(ctx).visualThreshold
+        val threshold = overrideLevel?.let { NsfwFilterEngine.getVisualThreshold(ctx, it) } ?: NsfwFilterEngine.getVisualThreshold(ctx)
         return score >= threshold
     }
 
@@ -301,7 +301,7 @@ object OnDeviceNsfwClassifier {
      */
     fun classifyBitmapSync(ctx: Context, bitmap: Bitmap): Boolean {
         val score = classifyBitmapScore(ctx, bitmap)
-        val threshold = NsfwFilterEngine.getFilterLevel(ctx).visualThreshold
+        val threshold = NsfwFilterEngine.getVisualThreshold(ctx)
         return score >= threshold
     }
 
@@ -320,7 +320,7 @@ object OnDeviceNsfwClassifier {
         drawable: Drawable
     ) {
         val appContext = imageView.context.applicationContext ?: CloudStreamApp.context ?: return
-        val threshold = NsfwFilterEngine.getFilterLevel(appContext).visualThreshold
+        val threshold = NsfwFilterEngine.getVisualThreshold(appContext)
 
         // Fast LRU cache hit
         val cachedScore = scoreCache.get(imageKey)
@@ -382,7 +382,7 @@ object OnDeviceNsfwClassifier {
                 }
                 scoreCache.put(imageKey, score)
 
-                val activeThreshold = NsfwFilterEngine.getFilterLevel(appContext).visualThreshold
+                val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
                 mainHandler.post {
                     val activeView = weakImageView.get() ?: return@post
                     val checkTag = try {
