@@ -41,6 +41,7 @@
             android:layout_height="wrap_content"
             android:background="?selectableItemBackground"
             android:clickable="true"
+            android:descendantFocusability="afterDescendants"
             android:focusable="true"
             android:orientation="vertical"
             android:padding="8dp">
@@ -75,14 +76,22 @@
                     android:layout_height="1dp"
                     android:layout_weight="1" />
 
-                <TextView
-                    android:id="@+id/value_extreme"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                <EditText
+                    android:id="@+id/input_extreme"
+                    android:layout_width="64dp"
+                    android:layout_height="36dp"
+                    android:autofillHints="no"
+                    android:background="@drawable/bg_threshold_input_box"
+                    android:gravity="center"
+                    android:imeOptions="actionDone"
+                    android:inputType="numberDecimal"
+                    android:maxLength="5"
+                    android:paddingHorizontal="4dp"
                     android:text="0.15"
                     android:textColor="?attr/colorPrimary"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
+                    tools:ignore="LabelFor"
                     tools:text="0.15" />
             </LinearLayout>
 
@@ -116,6 +125,7 @@
             android:layout_marginTop="10dp"
             android:background="?selectableItemBackground"
             android:clickable="true"
+            android:descendantFocusability="afterDescendants"
             android:focusable="true"
             android:orientation="vertical"
             android:padding="8dp">
@@ -150,14 +160,22 @@
                     android:layout_height="1dp"
                     android:layout_weight="1" />
 
-                <TextView
-                    android:id="@+id/value_moderate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                <EditText
+                    android:id="@+id/input_moderate"
+                    android:layout_width="64dp"
+                    android:layout_height="36dp"
+                    android:autofillHints="no"
+                    android:background="@drawable/bg_threshold_input_box"
+                    android:gravity="center"
+                    android:imeOptions="actionDone"
+                    android:inputType="numberDecimal"
+                    android:maxLength="5"
+                    android:paddingHorizontal="4dp"
                     android:text="0.30"
                     android:textColor="?attr/colorPrimary"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
+                    tools:ignore="LabelFor"
                     tools:text="0.30" />
             </LinearLayout>
 
@@ -191,6 +209,7 @@
             android:layout_marginTop="10dp"
             android:background="?selectableItemBackground"
             android:clickable="true"
+            android:descendantFocusability="afterDescendants"
             android:focusable="true"
             android:orientation="vertical"
             android:padding="8dp">
@@ -225,14 +244,22 @@
                     android:layout_height="1dp"
                     android:layout_weight="1" />
 
-                <TextView
-                    android:id="@+id/value_low"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                <EditText
+                    android:id="@+id/input_low"
+                    android:layout_width="64dp"
+                    android:layout_height="36dp"
+                    android:autofillHints="no"
+                    android:background="@drawable/bg_threshold_input_box"
+                    android:gravity="center"
+                    android:imeOptions="actionDone"
+                    android:inputType="numberDecimal"
+                    android:maxLength="5"
+                    android:paddingHorizontal="4dp"
                     android:text="0.55"
                     android:textColor="?attr/colorPrimary"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
+                    tools:ignore="LabelFor"
                     tools:text="0.55" />
             </LinearLayout>
 

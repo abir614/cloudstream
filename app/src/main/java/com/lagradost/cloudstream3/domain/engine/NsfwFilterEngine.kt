@@ -2,7 +2,12 @@ package com.lagradost.cloudstream3.domain.engine
 
 import android.app.Activity
 import android.content.Context
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.widget.EditText
 import android.widget.SeekBar
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.edit
@@ -202,14 +207,21 @@ object NsfwFilterEngine {
         val builder = AlertDialog.Builder(context, R.style.AlertDialogCustom).setView(binding.root)
         val dialog = builder.create()
 
+        fun updateText(et: EditText, value: Float) {
+            val formatted = String.format(Locale.ROOT, "%.2f", value)
+            if (et.text.toString() != formatted && !et.hasFocus()) {
+                et.setText(formatted)
+            }
+        }
+
         fun updateUI() {
             binding.radioExtreme.isChecked = (selectedLevel == NsfwFilterLevel.EXTREME)
             binding.radioModerate.isChecked = (selectedLevel == NsfwFilterLevel.MODERATE)
             binding.radioLow.isChecked = (selectedLevel == NsfwFilterLevel.LOW)
 
-            binding.valueExtreme.text = String.format(Locale.ROOT, "%.2f", curE)
-            binding.valueModerate.text = String.format(Locale.ROOT, "%.2f", curM)
-            binding.valueLow.text = String.format(Locale.ROOT, "%.2f", curL)
+            updateText(binding.inputExtreme, curE)
+            updateText(binding.inputModerate, curM)
+            updateText(binding.inputLow, curL)
 
             val pE = Math.round(curE * 100f).coerceIn(1, 100)
             val pM = Math.round(curM * 100f).coerceIn(1, 100)
@@ -252,11 +264,89 @@ object NsfwFilterEngine {
             }
         }
 
+        fun handleInputChange(tier: NsfwFilterLevel) {
+            if (isUpdating) return
+            isUpdating = true
+            try {
+                val inputView = when (tier) {
+                    NsfwFilterLevel.EXTREME -> binding.inputExtreme
+                    NsfwFilterLevel.MODERATE -> binding.inputModerate
+                    NsfwFilterLevel.LOW -> binding.inputLow
+                }
+                val rawVal = inputView.text.toString().trim().toFloatOrNull()
+                if (rawVal != null) {
+                    val (adjE, adjM, adjL) = when (tier) {
+                        NsfwFilterLevel.EXTREME -> enforceThresholdConstraints(rawVal, curM, curL, tier)
+                        NsfwFilterLevel.MODERATE -> enforceThresholdConstraints(curE, rawVal, curL, tier)
+                        NsfwFilterLevel.LOW -> enforceThresholdConstraints(curE, curM, rawVal, tier)
+                    }
+                    curE = adjE
+                    curM = adjM
+                    curL = adjL
+                }
+                updateUI()
+            } finally {
+                isUpdating = false
+            }
+        }
+
+        fun setupInputBox(tier: NsfwFilterLevel, et: EditText) {
+            et.setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_NEXT) {
+                    handleInputChange(tier)
+                    et.clearFocus()
+                    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                    imm?.hideSoftInputFromWindow(et.windowToken, 0)
+                    true
+                } else {
+                    false
+                }
+            }
+            et.setOnFocusChangeListener { _, hasFocus ->
+                if (!hasFocus) {
+                    handleInputChange(tier)
+                    et.setText(String.format(Locale.ROOT, "%.2f", when (tier) {
+                        NsfwFilterLevel.EXTREME -> curE
+                        NsfwFilterLevel.MODERATE -> curM
+                        NsfwFilterLevel.LOW -> curL
+                    }))
+                }
+            }
+            et.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                override fun afterTextChanged(s: Editable?) {
+                    if (isUpdating) return
+                    val str = s?.toString()?.trim() ?: return
+                    if (str.length >= 4 || str == "1" || str == "1.0" || str == "1.00") {
+                        val parsed = str.toFloatOrNull()
+                        if (parsed != null && parsed in 0.01f..1.00f) {
+                            handleInputChange(tier)
+                        }
+                    }
+                }
+            })
+        }
+
+        setupInputBox(NsfwFilterLevel.EXTREME, binding.inputExtreme)
+        setupInputBox(NsfwFilterLevel.MODERATE, binding.inputModerate)
+        setupInputBox(NsfwFilterLevel.LOW, binding.inputLow)
+
+        fun dismissKeyboard() {
+            binding.inputExtreme.clearFocus()
+            binding.inputModerate.clearFocus()
+            binding.inputLow.clearFocus()
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+            imm?.hideSoftInputFromWindow(binding.root.windowToken, 0)
+        }
+
         binding.seekbarExtreme.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) handleSeekChange(NsfwFilterLevel.EXTREME)
             }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStartTrackingTouch(sb: SeekBar?) {
+                dismissKeyboard()
+            }
             override fun onStopTrackingTouch(sb: SeekBar?) {}
         })
 
@@ -264,7 +354,9 @@ object NsfwFilterEngine {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) handleSeekChange(NsfwFilterLevel.MODERATE)
             }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStartTrackingTouch(sb: SeekBar?) {
+                dismissKeyboard()
+            }
             override fun onStopTrackingTouch(sb: SeekBar?) {}
         })
 
@@ -272,11 +364,24 @@ object NsfwFilterEngine {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) handleSeekChange(NsfwFilterLevel.LOW)
             }
-            override fun onStartTrackingTouch(sb: SeekBar?) {}
+            override fun onStartTrackingTouch(sb: SeekBar?) {
+                dismissKeyboard()
+            }
             override fun onStopTrackingTouch(sb: SeekBar?) {}
         })
 
+        fun commitAllInputs() {
+            val eVal = binding.inputExtreme.text.toString().trim().toFloatOrNull() ?: curE
+            val mVal = binding.inputModerate.text.toString().trim().toFloatOrNull() ?: curM
+            val lVal = binding.inputLow.text.toString().trim().toFloatOrNull() ?: curL
+            val (adjE, adjM, adjL) = enforceThresholdConstraints(eVal, mVal, lVal, selectedLevel)
+            curE = adjE
+            curM = adjM
+            curL = adjL
+        }
+
         binding.btnReset.setOnClickListener {
+            dismissKeyboard()
             curE = DEFAULT_THRESHOLD_EXTREME
             curM = DEFAULT_THRESHOLD_MODERATE
             curL = DEFAULT_THRESHOLD_LOW
@@ -284,10 +389,13 @@ object NsfwFilterEngine {
         }
 
         binding.btnCancel.setOnClickListener {
+            dismissKeyboard()
             dialog.dismiss()
         }
 
         binding.btnApply.setOnClickListener {
+            commitAllInputs()
+            dismissKeyboard()
             settingsManager.edit {
                 putString(context.getString(R.string.nsfw_filter_level_key), selectedLevel.key)
             }
