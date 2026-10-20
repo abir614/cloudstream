@@ -404,15 +404,6 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
             return@setOnPreferenceClickListener true
         }
 
-        getPref(R.string.nsfw_visual_thresholds_menu_key)?.setOnPreferenceClickListener {
-            activity?.let { act ->
-                com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.showSensitivityThresholdsDialog(act) {
-                    updateNsfwSummary()
-                }
-            }
-            return@setOnPreferenceClickListener true
-        }
-
         getPref(R.string.enable_nsfw_on_providers_key)?.setOnPreferenceChangeListener { _, newValue ->
             val enabled = newValue as? Boolean ?: false
             MainAPI.settingsForProvider.enableAdult = enabled
@@ -546,7 +537,6 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
             val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
             val isAdult = settingsManager.getBoolean(getString(R.string.enable_nsfw_on_providers_key), false)
             getPref(R.string.nsfw_filter_level_key)?.isEnabled = !isAdult
-            getPref(R.string.nsfw_visual_thresholds_menu_key)?.isEnabled = !isAdult
             getPref(R.string.censor_nsfw_posters_key)?.isEnabled = !isAdult
 
             val currentLevel =
@@ -568,11 +558,6 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
                 label, activeThreshold, e, m, l
             )
             getPref(R.string.nsfw_filter_level_key)?.summary = summary
-            getPref(R.string.nsfw_visual_thresholds_menu_key)?.summary = String.format(
-                java.util.Locale.ROOT,
-                "Extreme: %.2f | Moderate: %.2f | Low: %.2f (Tap to configure)",
-                e, m, l
-            )
         }
     }
 

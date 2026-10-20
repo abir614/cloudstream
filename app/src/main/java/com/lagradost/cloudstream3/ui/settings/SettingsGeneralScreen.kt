@@ -108,11 +108,6 @@ object SettingsGeneralScreen : SearchableSettings {
             "%s (Visual Threshold: %.2f | E: %.2f, M: %.2f, L: %.2f)",
             levelLabel, activeThreshold, thresholdExtreme, thresholdModerate, thresholdLow
         )
-        val thresholdsSummary = String.format(
-            java.util.Locale.ROOT,
-            "Extreme: %.2f | Moderate: %.2f | Low: %.2f (Tap to configure)",
-            thresholdExtreme, thresholdModerate, thresholdLow
-        )
         //val downloadPath by settings.general.downloadPath.collectAsState()
 
         var isBatteryShown by remember { mutableStateOf(false) }
@@ -281,27 +276,6 @@ object SettingsGeneralScreen : SearchableSettings {
                         title = stringResource(R.string.nsfw_filter_level_title),
                         subtitle = sensitivitySummary,
                         icon = painterResource(R.drawable.ic_baseline_tune_24),
-                        enabled = !nsfwGloballyEnabled,
-                        onClick = {
-                            val act = (context as? Activity)
-                                ?: com.lagradost.cloudstream3.CommonActivity.activity
-                                ?: run {
-                                    var c = context
-                                    while (c is ContextWrapper) {
-                                        if (c is Activity) return@run c
-                                        c = c.baseContext
-                                    }
-                                    null
-                                }
-                            act?.let {
-                                com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.showSensitivityThresholdsDialog(it)
-                            }
-                        }
-                    ),
-                    Preference.PreferenceItem.TextPreference(
-                        title = stringResource(R.string.nsfw_visual_thresholds_title),
-                        subtitle = thresholdsSummary,
-                        icon = painterResource(R.drawable.ic_baseline_edit_24),
                         enabled = !nsfwGloballyEnabled,
                         onClick = {
                             val act = (context as? Activity)
