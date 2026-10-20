@@ -1,5 +1,7 @@
 package com.lagradost.cloudstream3.ui.settings
 
+import android.app.Activity
+import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -86,6 +88,31 @@ object SettingsGeneralScreen : SearchableSettings {
         val bananas by settings.general.bananas.collectAsState()
         val downloadPathVisual by settings.general.downloadPathVisual.collectAsState()
         val nsfwGloballyEnabled by settings.general.enableNsfw.collectAsState()
+        val nsfwLevel by settings.general.nsfwFilterLevel.collectAsState()
+        val thresholdExtreme by settings.general.visualThresholdExtreme.collectAsState()
+        val thresholdModerate by settings.general.visualThresholdModerate.collectAsState()
+        val thresholdLow by settings.general.visualThresholdLow.collectAsState()
+
+        val activeThreshold = when (nsfwLevel) {
+            "extreme" -> thresholdExtreme
+            "low" -> thresholdLow
+            else -> thresholdModerate
+        }
+        val levelLabel = when (nsfwLevel) {
+            "extreme" -> "Extreme"
+            "low" -> "Low"
+            else -> "Moderate"
+        }
+        val sensitivitySummary = String.format(
+            java.util.Locale.ROOT,
+            "%s (Visual Threshold: %.2f | E: %.2f, M: %.2f, L: %.2f)",
+            levelLabel, activeThreshold, thresholdExtreme, thresholdModerate, thresholdLow
+        )
+        val thresholdsSummary = String.format(
+            java.util.Locale.ROOT,
+            "Extreme: %.2f | Moderate: %.2f | Low: %.2f (Tap to configure)",
+            thresholdExtreme, thresholdModerate, thresholdLow
+        )
         //val downloadPath by settings.general.downloadPath.collectAsState()
 
         var isBatteryShown by remember { mutableStateOf(false) }
@@ -250,21 +277,46 @@ object SettingsGeneralScreen : SearchableSettings {
                             true
                         }
                     ),
-                    Preference.PreferenceItem.ListPreference(
+                    Preference.PreferenceItem.TextPreference(
                         title = stringResource(R.string.nsfw_filter_level_title),
-                        subtitle = "%s",
+                        subtitle = sensitivitySummary,
                         icon = painterResource(R.drawable.ic_baseline_tune_24),
-                        preference = settings.general.nsfwFilterLevel,
                         enabled = !nsfwGloballyEnabled,
-                        entries = mapOf(
-                            "extreme" to "Extreme",
-                            "moderate" to "Moderate",
-                            "low" to "Low"
-                        ),
-                        onValueChanged = {
-                            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
-                            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
-                            true
+                        onClick = {
+                            val act = (context as? Activity)
+                                ?: com.lagradost.cloudstream3.CommonActivity.activity
+                                ?: run {
+                                    var c = context
+                                    while (c is ContextWrapper) {
+                                        if (c is Activity) return@run c
+                                        c = c.baseContext
+                                    }
+                                    null
+                                }
+                            act?.let {
+                                com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.showSensitivityThresholdsDialog(it)
+                            }
+                        }
+                    ),
+                    Preference.PreferenceItem.TextPreference(
+                        title = stringResource(R.string.nsfw_visual_thresholds_title),
+                        subtitle = thresholdsSummary,
+                        icon = painterResource(R.drawable.ic_baseline_edit_24),
+                        enabled = !nsfwGloballyEnabled,
+                        onClick = {
+                            val act = (context as? Activity)
+                                ?: com.lagradost.cloudstream3.CommonActivity.activity
+                                ?: run {
+                                    var c = context
+                                    while (c is ContextWrapper) {
+                                        if (c is Activity) return@run c
+                                        c = c.baseContext
+                                    }
+                                    null
+                                }
+                            act?.let {
+                                com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.showSensitivityThresholdsDialog(it)
+                            }
                         }
                     ),
                     Preference.PreferenceItem.SwitchPreference(

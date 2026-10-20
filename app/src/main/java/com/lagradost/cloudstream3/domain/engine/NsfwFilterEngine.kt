@@ -273,7 +273,7 @@ object NsfwFilterEngine {
                     NsfwFilterLevel.MODERATE -> binding.inputModerate
                     NsfwFilterLevel.LOW -> binding.inputLow
                 }
-                val rawVal = inputView.text.toString().trim().toFloatOrNull()
+                val rawVal = inputView.text.toString().trim().replace(',', '.').toFloatOrNull()
                 if (rawVal != null) {
                     val (adjE, adjM, adjL) = when (tier) {
                         NsfwFilterLevel.EXTREME -> enforceThresholdConstraints(rawVal, curM, curL, tier)
@@ -322,7 +322,7 @@ object NsfwFilterEngine {
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
                 override fun afterTextChanged(s: Editable?) {
                     if (isUpdating) return
-                    val str = s?.toString()?.trim() ?: return
+                    val str = s?.toString()?.trim()?.replace(',', '.') ?: return
                     if (str.length >= 4 || str == "1" || str == "1.0" || str == "1.00") {
                         val parsed = str.toFloatOrNull()
                         if (parsed != null && parsed in 0.01f..1.00f) {
@@ -376,9 +376,9 @@ object NsfwFilterEngine {
         })
 
         fun commitAllInputs() {
-            val eVal = binding.inputExtreme.text.toString().trim().toFloatOrNull() ?: curE
-            val mVal = binding.inputModerate.text.toString().trim().toFloatOrNull() ?: curM
-            val lVal = binding.inputLow.text.toString().trim().toFloatOrNull() ?: curL
+            val eVal = binding.inputExtreme.text.toString().trim().replace(',', '.').toFloatOrNull() ?: curE
+            val mVal = binding.inputModerate.text.toString().trim().replace(',', '.').toFloatOrNull() ?: curM
+            val lVal = binding.inputLow.text.toString().trim().replace(',', '.').toFloatOrNull() ?: curL
             val (adjE, adjM, adjL) = enforceThresholdConstraints(eVal, mVal, lVal, selectedLevel)
             curE = adjE
             curM = adjM
