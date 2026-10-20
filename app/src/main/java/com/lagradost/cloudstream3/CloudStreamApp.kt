@@ -112,6 +112,9 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                 }
             }
             prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
+        } catch (_: Throwable) {
+        }
+
         try {
             if (com.lagradost.cloudstream3.utils.DeviceProfile.isLowEnd(this)) {
                 com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this)
