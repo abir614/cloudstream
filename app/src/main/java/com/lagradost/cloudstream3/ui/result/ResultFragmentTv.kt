@@ -79,6 +79,10 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
     private lateinit var viewModel: ResultViewModel2
 
     override fun onDestroyView() {
+        loadingDialog?.dismissSafe(activity)
+        loadingDialog = null
+        popupDialog?.dismissSafe(activity)
+        popupDialog = null
         updateUIEvent -= ::updateUI
         activity?.detachBackPressedCallback(this@ResultFragmentTv.toString())
         super.onDestroyView()

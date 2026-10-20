@@ -131,6 +131,8 @@ actual class WebViewResolver actual constructor(
                     // Bare minimum to bypass captcha
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    settings.allowFileAccess = false
+                    settings.allowContentAccess = false
 
                     webViewUserAgent = settings.userAgentString
                     // Don't set user agent, setting user agent will make cloudflare break.

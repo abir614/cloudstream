@@ -99,6 +99,7 @@ import com.lagradost.cloudstream3.ui.subtitles.SaveCaptionStyle
 import com.lagradost.cloudstream3.ui.subtitles.SubtitlesFragment.Companion.applyStyle
 import com.lagradost.cloudstream3.utils.AppContextUtils.isUsingMobileData
 import com.lagradost.cloudstream3.utils.DeviceProfile
+import com.lagradost.cloudstream3.utils.DeviceTier
 import com.lagradost.cloudstream3.utils.AppContextUtils.setDefaultFocus
 import com.lagradost.cloudstream3.utils.CLEARKEY_DRM_UUID
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
@@ -1112,16 +1113,28 @@ class CS3IPlayer : IPlayer {
         // Hardware Adaptive LoadControl driven by centralized DeviceProfile (§5.2, §5.6)
         val playerConfig = DeviceProfile.getPlayerBufferConfig(context)
 
+        // Protect low-RAM devices against OOM by capping maximum RAM buffer bytes
+        val maxAllowedBufferBytes = when (DeviceProfile.tier(context)) {
+            DeviceTier.LOW -> 24 * 1024 * 1024 // 24 MB hard ceiling on low-spec hardware
+            DeviceTier.MID -> 64 * 1024 * 1024 // 64 MB ceiling on mid-spec
+            DeviceTier.HIGH -> 256 * 1024 * 1024
+        }
         val targetBufferBytes = when {
-            cacheSize > 0 -> if (cacheSize > Int.MAX_VALUE) Int.MAX_VALUE else cacheSize.toInt()
+            cacheSize > 0 -> cacheSize.coerceAtMost(maxAllowedBufferBytes.toLong()).toInt()
             else -> playerConfig.targetBufferBytes
         }
         val backBufferMs = playerConfig.backBufferMs
-        val minBufferMs = playerConfig.minBufferMs
-        val maxBufferMs = when {
+        val rawMinBufferMs = playerConfig.minBufferMs
+        val rawMaxBufferMs = when {
             videoBufferMs > 0 -> videoBufferMs.toInt()
             else -> playerConfig.maxBufferMs
         }
+        // Ensure ExoPlayer's DefaultLoadControl invariants:
+        // bufferForPlaybackMs <= bufferForPlaybackAfterRebufferMs <= minBufferMs <= maxBufferMs
+        val playbackMs = playerConfig.bufferForPlaybackMs
+        val rebufferMs = maxOf(playbackMs, playerConfig.bufferForPlaybackAfterRebufferMs)
+        val minBufferMs = maxOf(rebufferMs, rawMinBufferMs)
+        val maxBufferMs = maxOf(minBufferMs, rawMaxBufferMs)
 
         val exoPlayerBuilder =
             ExoPlayer.Builder(context)
@@ -1305,8 +1318,8 @@ class CS3IPlayer : IPlayer {
                         .setBufferDurationsMs(
                             minBufferMs,
                             maxBufferMs,
-                            playerConfig.bufferForPlaybackMs,
-                            playerConfig.bufferForPlaybackAfterRebufferMs
+                            playbackMs,
+                            rebufferMs
                         ).build()
                 )
 

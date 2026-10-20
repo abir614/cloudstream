@@ -2017,6 +2017,16 @@ class GeneratorPlayer : FullScreenPlayer() {
         flushCurrentPositionToDisk()
         ResultFragment.updateUI()
         currentVerifyLink?.cancel()
+        selectSourceDialog?.dismissSafe(activity)
+        selectSourceDialog = null
+        selectTrackDialog?.dismissSafe(activity)
+        selectTrackDialog = null
+        selectSpeedDialog?.dismissSafe(activity)
+        selectSpeedDialog = null
+        selectSubtitlesDialog?.dismissSafe(activity)
+        selectSubtitlesDialog = null
+        selectCompressorDialog?.dismissSafe(activity)
+        selectCompressorDialog = null
         if (activity?.isChangingConfigurations != true) {
             cleanupGenerator(playerUuid)
         }

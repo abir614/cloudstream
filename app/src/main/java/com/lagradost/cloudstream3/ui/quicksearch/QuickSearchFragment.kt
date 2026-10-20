@@ -40,6 +40,7 @@ import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterProviderByPreferredMedia
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterSearchResultByFilmQuality
 import com.lagradost.cloudstream3.utils.AppContextUtils.isRecyclerScrollable
+import com.lagradost.cloudstream3.utils.AppContextUtils.ownHide
 import com.lagradost.cloudstream3.utils.AppContextUtils.ownShow
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.UIHelper.fixSystemBarsPadding
@@ -113,6 +114,12 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
         searchViewModel = ViewModelProvider(this)[SearchViewModel::class.java]
         bottomSheetDialog?.ownShow()
         return super.onCreateView(inflater, container, savedInstanceState)
+    }
+
+    override fun onDestroyView() {
+        bottomSheetDialog?.ownHide()
+        bottomSheetDialog = null
+        super.onDestroyView()
     }
 
     override fun onDestroy() {

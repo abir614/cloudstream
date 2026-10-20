@@ -337,6 +337,11 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
     }
 
     override fun onDestroyView() {
+        loadingDialog?.dismissSafe(activity)
+        loadingDialog = null
+        popupDialog?.dismissSafe(activity)
+        popupDialog = null
+
         PanelsChildGestureRegionObserver.Provider.get().let { obs ->
             resultBinding?.resultCastItems?.let {
                 obs.unregister(it)

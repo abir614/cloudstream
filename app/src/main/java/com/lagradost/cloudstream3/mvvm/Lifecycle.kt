@@ -36,12 +36,21 @@ fun <T, V : ViewBinding> BaseFragment<V>.observeNullable(
 ) {
     val root = this.binding?.root
     if (root == null) {
-        liveData.removeObservers(this)
-        liveData.observe(this, action)
+        val owner: LifecycleOwner = try {
+            this.viewLifecycleOwner
+        } catch (_: IllegalStateException) {
+            this
+        }
+        liveData.removeObservers(owner)
+        liveData.observe(owner, action)
     } else {
         root.doOnAttach { view ->
-            // On attach should make findViewTreeLifecycleOwner non-null, but use "this" just in case
-            val owner: LifecycleOwner = view.findViewTreeLifecycleOwner() ?: this@observeNullable
+            // Prefer viewLifecycleOwner to prevent observer leaks across view recreations
+            val owner: LifecycleOwner = try {
+                this@observeNullable.viewLifecycleOwner
+            } catch (_: IllegalStateException) {
+                view.findViewTreeLifecycleOwner() ?: this@observeNullable
+            }
             liveData.removeObservers(owner)
             liveData.observe(owner, action)
         }

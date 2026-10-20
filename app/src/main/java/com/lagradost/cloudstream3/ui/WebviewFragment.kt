@@ -48,9 +48,22 @@ class WebviewFragment : BaseFragment<FragmentWebviewBinding>(
             settings.javaScriptEnabled = true
             settings.userAgentString = USER_AGENT
             settings.domStorageEnabled = true
+            settings.allowFileAccess = false
+            settings.allowContentAccess = false
 
             loadUrl(url)
         }
+    }
+
+    override fun onDestroyView() {
+        binding?.webView?.apply {
+            stopLoading()
+            loadUrl("about:blank")
+            clearHistory()
+            removeAllViews()
+            destroy()
+        }
+        super.onDestroyView()
     }
 
     companion object {
