@@ -117,7 +117,9 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
 
         try {
             if (com.lagradost.cloudstream3.utils.DeviceProfile.isLowEnd(this)) {
-                com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this)
+                thread(start = true, isDaemon = true, name = "StartupMemoryReclaimer") {
+                    com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this)
+                }
             }
         } catch (_: Throwable) {
         }

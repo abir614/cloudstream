@@ -14,15 +14,36 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginStart="@dimen/navbar_width"
-        android:visibility="gone"
+        android:visibility="visible"
         tools:visibility="visible">
 
-        <ProgressBar
-            android:layout_width="50dp"
-            android:layout_height="50dp"
+        <LinearLayout
+            android:id="@+id/home_loading_indicator"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:visibility="gone"
-            tools:visibility="gone" />
+            android:gravity="center"
+            android:orientation="vertical"
+            android:elevation="10dp"
+            android:visibility="visible">
+
+            <ProgressBar
+                android:id="@+id/home_loading_progress"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
+                android:indeterminate="true"
+                android:indeterminateTint="?attr/colorPrimary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:text="@string/loading"
+                android:textColor="?attr/textColor"
+                android:textSize="18sp"
+                android:fontFamily="sans-serif-medium"
+                android:alpha="0.85" />
+        </LinearLayout>
 
         <com.facebook.shimmer.ShimmerFrameLayout
             android:id="@+id/home_loading_shimmer"
@@ -33,9 +54,9 @@
             android:orientation="vertical"
             android:paddingTop="40dp"
             app:shimmer_auto_start="true"
-            app:shimmer_base_alpha="0.2"
+            app:shimmer_base_alpha="0.25"
             app:shimmer_duration="@integer/loading_time"
-            app:shimmer_highlight_alpha="0.3">
+            app:shimmer_highlight_alpha="0.6">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -53,6 +74,7 @@
                         android:layout_gravity="center"
                         android:layout_margin="@dimen/loading_margin"
                         android:background="@color/grayShimmer"
+                        app:cardBackgroundColor="@color/grayShimmer"
                         android:translationX="-164dp"
                         app:cardCornerRadius="@dimen/loading_radius" />
 
@@ -62,6 +84,7 @@
                         android:layout_gravity="center"
                         android:layout_margin="@dimen/loading_margin"
                         android:background="@color/grayShimmer"
+                        app:cardBackgroundColor="@color/grayShimmer"
                         app:cardCornerRadius="@dimen/loading_radius" />
 
                     <androidx.cardview.widget.CardView
@@ -70,6 +93,7 @@
                         android:layout_gravity="center"
                         android:layout_margin="@dimen/loading_margin"
                         android:background="@color/grayShimmer"
+                        app:cardBackgroundColor="@color/grayShimmer"
                         android:translationX="164dp"
                         app:cardCornerRadius="@dimen/loading_radius" />
                 </FrameLayout>

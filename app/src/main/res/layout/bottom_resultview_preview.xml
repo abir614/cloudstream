@@ -242,6 +242,7 @@
                     android:layout_margin="@dimen/result_padding"
                     android:layout_marginBottom="@dimen/loading_margin"
                     android:background="@color/grayShimmer"
+                    app:cardBackgroundColor="@color/grayShimmer"
                     app:cardCornerRadius="@dimen/loading_radius"
                     tools:ignore="ContentDescription" />
             </LinearLayout>

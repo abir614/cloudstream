@@ -16,6 +16,7 @@
         <!--app:cardCornerRadius="@dimen/roundedImageRadius"-->
         <androidx.cardview.widget.CardView
                 android:background="@color/grayShimmer"
+                app:cardBackgroundColor="@color/grayShimmer"
                 app:cardCornerRadius="@dimen/loading_radius"
                 android:layout_width="126dp"
                 android:layout_height="72dp"

@@ -218,6 +218,7 @@
                     android:layout_marginTop="@dimen/result_padding"
                     android:layout_marginEnd="@dimen/result_padding"
                     android:background="@color/grayShimmer"
+                    app:cardBackgroundColor="@color/grayShimmer"
                     app:cardCornerRadius="@dimen/loading_radius"
                     tools:ignore="ContentDescription" />
 
@@ -258,6 +259,7 @@
                     android:layout_margin="@dimen/result_padding"
                     android:layout_marginBottom="@dimen/loading_margin"
                     android:background="@color/grayShimmer"
+                    app:cardBackgroundColor="@color/grayShimmer"
                     app:cardCornerRadius="@dimen/loading_radius"
                     tools:ignore="ContentDescription" />
 
@@ -267,6 +269,7 @@
                     android:layout_margin="@dimen/result_padding"
                     android:layout_marginBottom="@dimen/loading_margin"
                     android:background="@color/grayShimmer"
+                    app:cardBackgroundColor="@color/grayShimmer"
                     app:cardCornerRadius="@dimen/loading_radius"
                     tools:ignore="ContentDescription" />
             </LinearLayout>

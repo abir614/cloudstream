@@ -19,6 +19,7 @@
             android:layout_height="0dp"
             android:layout_marginBottom="10dp"
             android:background="@color/grayShimmer"
+            app:cardBackgroundColor="@color/grayShimmer"
             app:cardCornerRadius="@dimen/loading_radius"
             app:layout_constraintDimensionRatio="1:1.414"
             app:layout_constraintEnd_toEndOf="parent"

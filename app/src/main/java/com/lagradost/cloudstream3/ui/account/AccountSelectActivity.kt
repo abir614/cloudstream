@@ -217,6 +217,8 @@ class AccountSelectActivity : FragmentActivity(), BiometricCallback {
         // We want to propagate any intent we get here to MainActivity since this is just an intermediary
         openActivity(MainActivity::class.java, baseIntent = intent)
         finish() // Finish the account selection activity
+        @Suppress("DEPRECATION")
+        overridePendingTransition(0, 0)
     }
 
     override fun onAuthenticationSuccess() {
