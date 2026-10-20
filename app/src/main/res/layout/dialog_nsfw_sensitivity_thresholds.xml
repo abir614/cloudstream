@@ -82,42 +82,67 @@
                 android:textColor="?attr/grayTextColor"
                 android:textSize="12sp" />
 
-            <LinearLayout
+            <SeekBar
+                android:id="@+id/seekbar_extreme"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="24dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:focusable="true"
+                android:max="100"
+                android:progress="15" />
+
+            <!-- Dedicated Visible Numeric Input Box Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="36dp"
                 android:layout_marginTop="6dp"
-                android:layout_marginEnd="4dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <SeekBar
-                    android:id="@+id/seekbar_extreme"
-                    android:layout_width="0dp"
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_baseline_edit_24"
+                    tools:ignore="ContentDescription" />
+
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:max="100"
-                    android:progress="15" />
+                    android:layout_marginStart="6dp"
+                    android:text="@string/nsfw_threshold_input_label"
+                    android:textColor="?attr/textColor"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <EditText
                     android:id="@+id/input_extreme"
-                    android:layout_width="68dp"
+                    android:layout_width="80dp"
                     android:layout_height="38dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="10dp"
                     android:autofillHints="no"
                     android:background="@drawable/bg_threshold_input_box"
                     android:gravity="center"
                     android:imeOptions="actionDone"
                     android:inputType="numberDecimal"
                     android:maxLength="5"
-                    android:paddingHorizontal="6dp"
+                    android:paddingHorizontal="8dp"
                     android:text="0.15"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     tools:ignore="LabelFor"
                     tools:text="0.15" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="(0.01 - 1.00)"
+                    android:textColor="?attr/grayTextColor"
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -170,42 +195,67 @@
                 android:textColor="?attr/grayTextColor"
                 android:textSize="12sp" />
 
-            <LinearLayout
+            <SeekBar
+                android:id="@+id/seekbar_moderate"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="24dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:focusable="true"
+                android:max="100"
+                android:progress="30" />
+
+            <!-- Dedicated Visible Numeric Input Box Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="36dp"
                 android:layout_marginTop="6dp"
-                android:layout_marginEnd="4dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <SeekBar
-                    android:id="@+id/seekbar_moderate"
-                    android:layout_width="0dp"
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_baseline_edit_24"
+                    tools:ignore="ContentDescription" />
+
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:max="100"
-                    android:progress="30" />
+                    android:layout_marginStart="6dp"
+                    android:text="@string/nsfw_threshold_input_label"
+                    android:textColor="?attr/textColor"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <EditText
                     android:id="@+id/input_moderate"
-                    android:layout_width="68dp"
+                    android:layout_width="80dp"
                     android:layout_height="38dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="10dp"
                     android:autofillHints="no"
                     android:background="@drawable/bg_threshold_input_box"
                     android:gravity="center"
                     android:imeOptions="actionDone"
                     android:inputType="numberDecimal"
                     android:maxLength="5"
-                    android:paddingHorizontal="6dp"
+                    android:paddingHorizontal="8dp"
                     android:text="0.30"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     tools:ignore="LabelFor"
                     tools:text="0.30" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="(0.01 - 1.00)"
+                    android:textColor="?attr/grayTextColor"
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 
@@ -258,42 +308,67 @@
                 android:textColor="?attr/grayTextColor"
                 android:textSize="12sp" />
 
-            <LinearLayout
+            <SeekBar
+                android:id="@+id/seekbar_low"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="24dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginEnd="8dp"
+                android:focusable="true"
+                android:max="100"
+                android:progress="55" />
+
+            <!-- Dedicated Visible Numeric Input Box Row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="36dp"
                 android:layout_marginTop="6dp"
-                android:layout_marginEnd="4dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <SeekBar
-                    android:id="@+id/seekbar_low"
-                    android:layout_width="0dp"
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_baseline_edit_24"
+                    tools:ignore="ContentDescription" />
+
+                <TextView
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:focusable="true"
-                    android:max="100"
-                    android:progress="55" />
+                    android:layout_marginStart="6dp"
+                    android:text="@string/nsfw_threshold_input_label"
+                    android:textColor="?attr/textColor"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
 
                 <EditText
                     android:id="@+id/input_low"
-                    android:layout_width="68dp"
+                    android:layout_width="80dp"
                     android:layout_height="38dp"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="10dp"
                     android:autofillHints="no"
                     android:background="@drawable/bg_threshold_input_box"
                     android:gravity="center"
                     android:imeOptions="actionDone"
                     android:inputType="numberDecimal"
                     android:maxLength="5"
-                    android:paddingHorizontal="6dp"
+                    android:paddingHorizontal="8dp"
                     android:text="0.55"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     tools:ignore="LabelFor"
                     tools:text="0.55" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="(0.01 - 1.00)"
+                    android:textColor="?attr/grayTextColor"
+                    android:textSize="12sp" />
             </LinearLayout>
         </LinearLayout>
 

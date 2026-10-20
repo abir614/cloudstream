@@ -303,7 +303,12 @@ object NsfwFilterEngine {
                 }
             }
             et.setOnFocusChangeListener { _, hasFocus ->
-                if (!hasFocus) {
+                if (hasFocus) {
+                    selectedLevel = tier
+                    binding.radioExtreme.isChecked = (selectedLevel == NsfwFilterLevel.EXTREME)
+                    binding.radioModerate.isChecked = (selectedLevel == NsfwFilterLevel.MODERATE)
+                    binding.radioLow.isChecked = (selectedLevel == NsfwFilterLevel.LOW)
+                } else {
                     handleInputChange(tier)
                     et.setText(String.format(Locale.ROOT, "%.2f", when (tier) {
                         NsfwFilterLevel.EXTREME -> curE

@@ -79,6 +79,7 @@
     <string name="nsfw_visual_threshold_extreme_key">nsfw_visual_threshold_extreme_key</string>
     <string name="nsfw_visual_threshold_moderate_key">nsfw_visual_threshold_moderate_key</string>
     <string name="nsfw_visual_threshold_low_key">nsfw_visual_threshold_low_key</string>
+    <string name="nsfw_visual_thresholds_menu_key">nsfw_visual_thresholds_menu_key</string>
     <string name="censor_nsfw_posters_key">censor_nsfw_posters_key</string>
     <string name="skip_startup_account_select_key">skip_startup_account_select_key</string>
     <string name="enable_skip_op_from_database">enable_skip_op_from_database</string>
