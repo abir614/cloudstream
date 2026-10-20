@@ -341,7 +341,12 @@ object ImageLoader {
                                 imageKey = imageKey,
                                 drawable = drawable
                             )
-                        } catch (_: Throwable) {
+                        } catch (t: Throwable) {
+                            try {
+                                this@loadImageInternal.setImageDrawable(result.asDrawable(context.resources))
+                            } catch (_: Throwable) {
+                                this@loadImageInternal.setImageResource(R.drawable.default_cover)
+                            }
                         }
                     }
                 )

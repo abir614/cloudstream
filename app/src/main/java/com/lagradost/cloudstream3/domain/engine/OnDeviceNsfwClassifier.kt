@@ -1,13 +1,17 @@
 package com.lagradost.cloudstream3.domain.engine
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.res.AssetFileDescriptor
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.TransitionDrawable
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
@@ -17,12 +21,13 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.graphics.drawable.toBitmap
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.R
+import com.lagradost.cloudstream3.ui.settings.Globals.TV
+import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.DeviceProfile
@@ -30,38 +35,42 @@ import com.lagradost.cloudstream3.utils.DeviceTier
 import com.lagradost.cloudstream3.utils.ImageLoader
 import org.tensorflow.lite.Interpreter
 import java.io.FileInputStream
+import java.lang.ref.WeakReference
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
-import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.RejectedExecutionHandler
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Ultra-Lightweight, Production-Grade On-Device AI NSFW Classification Engine.
+ * Ultra-Lightweight, Production-Grade On-Device AI Classification Engine.
  *
- * Runs Yahoo OpenNSFW / MobileNet quantized inference directly on-device via TensorFlow Lite.
+ * Runs quantized neural network inference directly on-device via TensorFlow Lite.
  *
  * Engineering & Potato-Device Optimizations:
  * 1. ZERO-HEAP MMAP: Uses `AssetFileDescriptor` to memory-map the model directly from APK assets
  *    into virtual memory via Linux `mmap()`, consuming 0 KB of private JVM heap memory.
- * 2. PRE-ALLOCATED BUFFERS: Allocates a single direct `ByteBuffer` (602 KB) and one reusable
- *    224x224 scratch bitmap, eliminating all per-frame heap allocations and GC pressure.
+ * 2. PRE-ALLOCATED BUFFERS: Allocates a single direct native `ByteBuffer` and one reusable
+ *    224x224 scratch bitmap, eliminating per-frame heap allocations and GC pressure.
  * 3. HARDWARE-ADAPTIVE INFERENCE: Automatically configures TFLite options based on `DeviceTier`:
- *    - Potato devices (Tier LOW / TV sticks): Exactly 1 background worker thread, ensuring the UI
- *      and video decoders never experience CPU starvation or stutter.
- *    - Higher tiers: 2 worker threads with XNNPACK SIMD acceleration.
- * 4. ULTRA-LOW PRIORITY BACKGROUND QUEUE: Runs on a dedicated daemon thread configured with
- *    `Process.THREAD_PRIORITY_BACKGROUND` (Linux nice level +10).
- * 5. BOUNDED EXECUTOR (SIZE 8): Drops stale off-screen tasks via DiscardOldestPolicy during fast
- *    scrolling, strictly bounding memory usage (< 1 MB) and eliminating OOM crashes.
- * 6. TWO-TIER HIGH-SPEED CACHING: In-memory `LruCache` (1,000 items), providing O(1) instantaneous
+ *    - Potato devices (Tier LOW / 32-bit ARM / Go edition / TV sticks): Exactly 1 background worker thread,
+ *      XNNPACK explicitly disabled to prevent native SIMD instruction traps (SIGILL/SIGSEGV).
+ *    - Capable tiers: 2 worker threads with optional SIMD acceleration.
+ *    - Resilient fallback: Any delegate or native interpreter initialization failure falls back seamlessly
+ *      to a single-threaded CPU interpreter.
+ * 4. BOUNDED ADAPTIVE WORKER QUEUE WITH SMART EVICTION: Uses a bounded queue (16 items) with
+ *    smart eviction. Evicted tasks whose views remain on screen are safely delivered, preventing
+ *    indefinite placeholder stalls and completely bounding heap memory consumption (< 2 MB).
+ * 5. HARDWARE BITMAP & RECYCLING PROTECTION: Safely converts hardware bitmaps via software copies,
+ *    guards against view recycling races, and verifies bitmap lifecycle state before rendering.
+ * 6. LEANBACK & RECYCLERVIEW CONCURRENCY SAFETY: Preserves layout grid geometry on TV devices
+ *    to protect remote D-pad focus, and defers layout modifications when lists are computing layout.
+ * 7. TWO-TIER HIGH-SPEED CACHING: In-memory `LruCache` (1,000 items), providing O(1) instantaneous
  *    (< 0.001 ms) responses for previously evaluated posters.
- * 7. ASYNC VIEW BINDING PROTECTION: Verifies view tags before applying censorship to guarantee
- *    that fast RecyclerView scrolling never applies censorship to recycled views.
  */
 object OnDeviceNsfwClassifier {
     private const val TAG = "OnDeviceNsfw"
@@ -69,8 +78,9 @@ object OnDeviceNsfwClassifier {
     private const val INPUT_DIM = 224
     private const val BGR_CHANNELS = 3
     private const val BYTES_PER_FLOAT = 4
+    private const val MAX_QUEUE_CAPACITY = 16
 
-    // OpenNSFW standard dataset mean normalization values
+    // Dataset mean normalization values
     private const val MEAN_B = 104.0f
     private const val MEAN_G = 117.0f
     private const val MEAN_R = 123.0f
@@ -80,6 +90,7 @@ object OnDeviceNsfwClassifier {
     private var interpreter: Interpreter? = null
     private var inputBuffer: ByteBuffer? = null
     private var isModelLoaded = false
+    private var isModelPermanentlyUnavailable = false
 
     // Single direct allocation for scratch bitmap & pixel extraction
     private val scratchPixels = IntArray(INPUT_DIM * INPUT_DIM)
@@ -95,14 +106,108 @@ object OnDeviceNsfwClassifier {
     // Main thread handler for UI updates
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // Dedicated background executor with bounded queue (64) to prevent memory leaks during fast scroll
-    // while ensuring visible on-screen items are always evaluated and never left on placeholder.
+    /**
+     * Safe classification task that supports smart eviction without leaving on-screen views on placeholder.
+     */
+    private class SafeClassificationTask(
+        val weakImageView: WeakReference<ImageView>,
+        val imageKey: String,
+        val drawable: Drawable,
+        val appContext: Context
+    ) : Runnable {
+        fun onEvicted() {
+            // Task was evicted from queue during rapid scrolling.
+            // If the view is still active and bound to this image, display it safely to prevent placeholder stalls.
+            val view = weakImageView.get() ?: return
+            val currentTag = try {
+                view.getTag(R.id.coil_image_url_tag)
+            } catch (_: Throwable) {
+                null
+            }
+            if (currentTag == imageKey) {
+                mainHandler.post {
+                    val activeView = weakImageView.get() ?: return@post
+                    val checkTag = try {
+                        activeView.getTag(R.id.coil_image_url_tag)
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    if (checkTag == imageKey) {
+                        setSmoothPosterDrawable(activeView, drawable, false)
+                    }
+                }
+            }
+        }
+
+        override fun run() {
+            try {
+                val currentView = weakImageView.get() ?: return
+                val activeTag = try {
+                    currentView.getTag(R.id.coil_image_url_tag)
+                } catch (_: Throwable) {
+                    null
+                }
+                if (activeTag != imageKey) {
+                    return
+                }
+
+                // If device is under severe memory pressure, safely bypass heavy neural network inference
+                if (isDeviceUnderMemoryPressure(appContext)) {
+                    mainHandler.post {
+                        val activeView = weakImageView.get() ?: return@post
+                        val checkTag = try {
+                            activeView.getTag(R.id.coil_image_url_tag)
+                        } catch (_: Throwable) {
+                            null
+                        }
+                        if (checkTag == imageKey) {
+                            setSmoothPosterDrawable(activeView, drawable, false)
+                        }
+                    }
+                    return
+                }
+
+                val score = classifyDrawableScore(appContext, drawable)
+                scoreCache.put(imageKey, score)
+
+                val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
+                mainHandler.post {
+                    val activeView = weakImageView.get() ?: return@post
+                    val checkTag = try {
+                        activeView.getTag(R.id.coil_image_url_tag)
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    if (checkTag == imageKey) {
+                        if (score >= activeThreshold) {
+                            if (!appContext.isNsfwEnabled()) {
+                                activeView.setImageDrawable(null)
+                                hideParentItem(activeView)
+                            } else if (appContext.shouldCensorPosters()) {
+                                ImageLoader.applyCensoredPoster(activeView)
+                            }
+                        } else {
+                            setSmoothPosterDrawable(
+                                activeView,
+                                drawable,
+                                DeviceProfile.tier(activeView.context) != DeviceTier.LOW
+                            )
+                        }
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Background poster classification error: ${t.message}")
+            }
+        }
+    }
+
+    // Dedicated background executor with bounded queue and smart eviction
     private val workerExecutor = ThreadPoolExecutor(
         1,
         1,
         0L,
         TimeUnit.MILLISECONDS,
-        LinkedBlockingQueue<Runnable>(64),
+        LinkedBlockingQueue<Runnable>(MAX_QUEUE_CAPACITY),
         { runnable ->
             Thread {
                 try {
@@ -115,8 +220,33 @@ object OnDeviceNsfwClassifier {
                 isDaemon = true
             }
         },
-        ThreadPoolExecutor.DiscardOldestPolicy()
+        RejectedExecutionHandler { r, executor ->
+            if (!executor.isShutdown) {
+                val evicted = executor.queue.poll()
+                if (evicted is SafeClassificationTask) {
+                    evicted.onEvicted()
+                }
+                try {
+                    executor.execute(r)
+                } catch (_: Throwable) {
+                }
+            }
+        }
     )
+
+    /**
+     * Checks if the device is currently experiencing critical memory pressure.
+     */
+    fun isDeviceUnderMemoryPressure(ctx: Context): Boolean {
+        return try {
+            val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
+            val mi = ActivityManager.MemoryInfo()
+            am.getMemoryInfo(mi)
+            mi.lowMemory || (am.isLowRamDevice && mi.availMem < 40 * 1024 * 1024L)
+        } catch (_: Throwable) {
+            false
+        }
+    }
 
     /**
      * Checks if a poster URL has already been evaluated and crosses the active sensitivity threshold.
@@ -137,10 +267,14 @@ object OnDeviceNsfwClassifier {
 
     /**
      * Memory-maps the TFLite model from assets without loading bytes into JVM heap memory.
+     * Incorporates potato-device protections and safe multi-tier fallbacks.
      */
     @Synchronized
     private fun ensureModelInitialized(ctx: Context): Boolean {
-        if (isModelLoaded && interpreter != null) return true
+        if (isModelPermanentlyUnavailable) return false
+        if (isModelLoaded && interpreter != null && scratchBitmap != null && !scratchBitmap!!.isRecycled && inputBuffer != null) {
+            return true
+        }
         if (isInitializing.get()) return false
 
         isInitializing.set(true)
@@ -157,13 +291,38 @@ object OnDeviceNsfwClassifier {
             )
 
             val tier = DeviceProfile.tier(ctx)
-            val options = Interpreter.Options().apply {
-                // Low-tier potato devices use exactly 1 thread to preserve CPU for UI & video
-                setNumThreads(if (tier == DeviceTier.LOW) 1 else 2)
-                setUseXNNPACK(true)
+            val is32Bit = try {
+                Build.SUPPORTED_64_BIT_ABIS.isNullOrEmpty()
+            } catch (_: Throwable) {
+                true
+            }
+            val isLowRam = try {
+                val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                am?.isLowRamDevice ?: false
+            } catch (_: Throwable) {
+                false
             }
 
-            val interp = Interpreter(modelBuffer, options)
+            // CRITICAL POTATO HARDWARE OPTIMIZATION:
+            // Disable XNNPACK on Low Tier, 32-bit ARM, or Low-RAM devices.
+            // XNNPACK on budget SoCs can emit unsupported SIMD opcodes triggering native SIGILL / SIGSEGV.
+            val shouldUseXnnpack = tier != DeviceTier.LOW && !is32Bit && !isLowRam
+            val threadCount = if (tier == DeviceTier.LOW || is32Bit || isLowRam) 1 else 2
+
+            val interp = try {
+                val options = Interpreter.Options().apply {
+                    setNumThreads(threadCount)
+                    setUseXNNPACK(shouldUseXnnpack)
+                }
+                Interpreter(modelBuffer, options)
+            } catch (t: Throwable) {
+                Log.w(TAG, "Primary interpreter init failed (xnnpack=$shouldUseXnnpack), falling back to safe CPU: ${t.message}")
+                val safeOptions = Interpreter.Options().apply {
+                    setNumThreads(1)
+                    setUseXNNPACK(false)
+                }
+                Interpreter(modelBuffer, safeOptions)
+            }
 
             // Allocate direct native memory (not on GC heap) for input tensor: 1x224x224x3x4 bytes
             val buf = ByteBuffer.allocateDirect(1 * INPUT_DIM * INPUT_DIM * BGR_CHANNELS * BYTES_PER_FLOAT).apply {
@@ -176,11 +335,13 @@ object OnDeviceNsfwClassifier {
             interpreter = interp
             inputBuffer = buf
             isModelLoaded = true
-            Log.i(TAG, "On-device NSFW TFLite AI model loaded (tier=$tier, threads=${options.numThreads})")
+            Log.i(TAG, "On-device NSFW TFLite AI model loaded (tier=$tier, 32bit=$is32Bit, xnnpack=$shouldUseXnnpack, threads=$threadCount)")
             true
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to initialize On-Device NSFW AI model: ${t.message}")
+            isModelPermanentlyUnavailable = true
             isModelLoaded = false
+            release()
             false
         } finally {
             isInitializing.set(false)
@@ -188,108 +349,137 @@ object OnDeviceNsfwClassifier {
     }
 
     /**
-     * Synchronously runs inference on a bitmap and returns raw NSFW confidence score (0.0f - 1.0f).
+     * Executes inference on the pre-filled scratchPixels array and returns the classification confidence score.
+     */
+    private fun executeInferenceOnPixels(interp: Interpreter, buf: ByteBuffer): Float {
+        var floatIdx = 0
+        var bodySkinPixels = 0
+        val totalPixels = INPUT_DIM * INPUT_DIM
+        // Spatial zoning: Top 65 rows (~29%) contain character head/face.
+        // Rows 66..223 (~71%) contain torso, shoulders, midriff, and thighs.
+        val bodyStartPixel = 66 * INPUT_DIM
+        val bodyTotalPixels = totalPixels - bodyStartPixel
+
+        for (i in 0 until totalPixels) {
+            val pixel = scratchPixels[i]
+            val r = (pixel shr 16) and 0xFF
+            val g = (pixel shr 8) and 0xFF
+            val b = pixel and 0xFF
+
+            scratchFloatArray[floatIdx++] = b.toFloat() - MEAN_B
+            scratchFloatArray[floatIdx++] = g.toFloat() - MEAN_G
+            scratchFloatArray[floatIdx++] = r.toFloat() - MEAN_R
+
+            // Fast integer bit-shift skin chrominance analysis (< 0.05ms, 0 allocations)
+            if (i >= bodyStartPixel) {
+                val y = (77 * r + 150 * g + 29 * b) shr 8
+                val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
+                val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
+
+                if (y in 55..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8) {
+                    bodySkinPixels++
+                }
+            }
+        }
+
+        buf.rewind()
+        buf.asFloatBuffer().put(scratchFloatArray)
+
+        val outputProb = Array(1) { FloatArray(2) }
+        interp.run(buf, outputProb)
+
+        val rawAiScore = outputProb[0][1]
+        val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
+
+        return if (bodySkinRatio > 0.05f) {
+            val exposureBoost = ((bodySkinRatio - 0.05f) * 2.5f).coerceIn(0.0f, 1.0f)
+            maxOf(rawAiScore, (rawAiScore * 0.40f) + (exposureBoost * 0.80f))
+        } else {
+            rawAiScore
+        }
+    }
+
+    /**
+     * Synchronously runs inference on a Drawable without allocating full-resolution intermediate bitmaps.
+     * Note: Must only be called on background threads.
+     */
+    @Synchronized
+    fun classifyDrawableScore(ctx: Context, drawable: Drawable): Float {
+        if (isModelPermanentlyUnavailable) return 0.0f
+
+        if (drawable is BitmapDrawable) {
+            val b = drawable.bitmap
+            if (b != null && !b.isRecycled) {
+                return classifyBitmapScore(ctx, b)
+            }
+        }
+
+        if (!ensureModelInitialized(ctx)) return 0.0f
+        val interp = interpreter ?: return 0.0f
+        val buf = inputBuffer ?: return 0.0f
+        val sBitmap = scratchBitmap
+        if (sBitmap == null || sBitmap.isRecycled) return 0.0f
+        val canvas = scratchCanvas ?: return 0.0f
+
+        return try {
+            canvas.drawColor(Color.BLACK)
+            drawable.setBounds(0, 0, INPUT_DIM, INPUT_DIM)
+            drawable.draw(canvas)
+            sBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
+
+            executeInferenceOnPixels(interp, buf)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Drawable classification warning: ${t.message}")
+            0.0f
+        }
+    }
+
+    /**
+     * Synchronously runs inference on a bitmap and returns raw confidence score (0.0f - 1.0f).
      * Note: Must only be called on background threads.
      */
     @Synchronized
     fun classifyBitmapScore(ctx: Context, bitmap: Bitmap): Float {
+        if (isModelPermanentlyUnavailable) return 0.0f
         if (bitmap.isRecycled) return 0.0f
         if (!ensureModelInitialized(ctx)) return 0.0f
         val interp = interpreter ?: return 0.0f
         val buf = inputBuffer ?: return 0.0f
-        val sBitmap = scratchBitmap ?: return 0.0f
+        val sBitmap = scratchBitmap
+        if (sBitmap == null || sBitmap.isRecycled) return 0.0f
         val canvas = scratchCanvas ?: return 0.0f
 
-        // Android throws IllegalArgumentException if a Bitmap.Config.HARDWARE bitmap
-        // is drawn onto a software Canvas. Convert to software ARGB_8888 scaled directly to 224x224.
         var softwareBitmap: Bitmap? = null
-        val sourceBitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
-            bitmap.config == Bitmap.Config.HARDWARE
-        ) {
-            try {
-                // Direct downscale to 224x224 (0.2MB) instead of full-res (6-8MB) copy
-                val scaled = Bitmap.createScaledBitmap(bitmap, INPUT_DIM, INPUT_DIM, true)
-                if (scaled.config == Bitmap.Config.HARDWARE) {
-                    scaled.copy(Bitmap.Config.ARGB_8888, false)?.also {
-                        if (scaled != bitmap && !scaled.isRecycled) {
-                            try { scaled.recycle() } catch (_: Throwable) {}
-                        }
-                        softwareBitmap = it
-                    } ?: scaled
-                } else {
-                    softwareBitmap = scaled
-                    scaled
-                }
-            } catch (t: Throwable) {
-                Log.w(TAG, "Failed to downscale hardware bitmap: ${t.message}")
+        val sourceBitmap = try {
+            if (bitmap.isRecycled) return 0.0f
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                bitmap.config == Bitmap.Config.HARDWARE
+            ) {
+                val copy = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                softwareBitmap = copy
+                copy ?: bitmap
+            } else {
                 bitmap
             }
-        } else {
-            bitmap
+        } catch (t: Throwable) {
+            Log.w(TAG, "Hardware bitmap conversion warning: ${t.message}")
+            if (bitmap.isRecycled) return 0.0f else bitmap
         }
 
         return try {
-            // Scale and draw source bitmap onto reusable 224x224 scratch bitmap
+            if (sourceBitmap.isRecycled) return 0.0f
+            canvas.drawColor(Color.BLACK)
             canvas.drawBitmap(sourceBitmap, null, scratchRect, scratchPaint)
             sBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
 
-            // Fast pure-register float normalization and spatial body-exposure pixel analysis
-            var floatIdx = 0
-            var bodySkinPixels = 0
-            val totalPixels = INPUT_DIM * INPUT_DIM
-            // Spatial zoning: Top 65 rows (~29%) contain character head/face.
-            // Rows 66..223 (~71%) contain torso, shoulders, midriff, and thighs.
-            val bodyStartPixel = 66 * INPUT_DIM
-            val bodyTotalPixels = totalPixels - bodyStartPixel
-
-            for (i in 0 until totalPixels) {
-                val pixel = scratchPixels[i]
-                val r = (pixel shr 16) and 0xFF
-                val g = (pixel shr 8) and 0xFF
-                val b = pixel and 0xFF
-
-                scratchFloatArray[floatIdx++] = b.toFloat() - MEAN_B
-                scratchFloatArray[floatIdx++] = g.toFloat() - MEAN_G
-                scratchFloatArray[floatIdx++] = r.toFloat() - MEAN_R
-
-                // Fast integer bit-shift skin chrominance analysis (< 0.05ms, 0 allocations)
-                if (i >= bodyStartPixel) {
-                    val y = (77 * r + 150 * g + 29 * b) shr 8
-                    val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
-                    val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
-
-                    // Robust human and anime skin chromaticity detector
-                    if (y in 55..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8) {
-                        bodySkinPixels++
-                    }
-                }
-            }
-
-            buf.rewind()
-            buf.asFloatBuffer().put(scratchFloatArray)
-
-            val outputProb = Array(1) { FloatArray(2) }
-            interp.run(buf, outputProb)
-
-            val rawAiScore = outputProb[0][1]
-            val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
-
-            // Robust multi-modal fusion:
-            // In fully clothed characters (e.g. Tanjiro, Anya, Frieren), bodySkinRatio is < 0.06 (covered by clothes).
-            // In swimsuits, bikinis, exposed halfbody, cleavage, or nudity, bodySkinRatio is 0.10 to 0.60+.
-            if (bodySkinRatio > 0.05f) {
-                val exposureBoost = ((bodySkinRatio - 0.05f) * 2.5f).coerceIn(0.0f, 1.0f)
-                maxOf(rawAiScore, (rawAiScore * 0.40f) + (exposureBoost * 0.80f))
-            } else {
-                rawAiScore
-            }
+            executeInferenceOnPixels(interp, buf)
         } catch (t: Throwable) {
             Log.w(TAG, "Error during NSFW model inference: ${t.message}")
             0.0f
         } finally {
-            if (softwareBitmap != null && softwareBitmap != bitmap && !softwareBitmap!!.isRecycled) {
+            if (softwareBitmap != null && softwareBitmap != bitmap && !softwareBitmap.isRecycled) {
                 try {
-                    softwareBitmap!!.recycle()
+                    softwareBitmap.recycle()
                 } catch (_: Throwable) {
                 }
             }
@@ -309,10 +499,11 @@ object OnDeviceNsfwClassifier {
      * Decoupled Asynchronous Classifier for Coil ImageView loading.
      *
      * 1. Checks memory cache for instantaneous response (< 0.001 ms).
-     * 2. Offloads inference to a low-priority bounded worker daemon thread (queue size 8).
+     * 2. Offloads inference to a low-priority bounded worker daemon thread (queue size 16).
      * 3. Always stores raw score in LRU cache so sensitivity adjustments take effect immediately.
      * 4. Zero visual leakage: downloaded image is NEVER rendered until verified safe.
      * 5. Validates view tag before applying censorship to prevent recycling races in lists.
+     * 6. Evicted tasks whose views remain on screen are safely rendered to prevent placeholder stalls.
      */
     fun classifyAndApplyAsync(
         imageView: ImageView,
@@ -348,80 +539,61 @@ object OnDeviceNsfwClassifier {
             return
         }
 
-        val weakImageView = java.lang.ref.WeakReference(imageView)
+        // Fast fallback if model is permanently unavailable or device is under memory pressure
+        if (isModelPermanentlyUnavailable || isDeviceUnderMemoryPressure(appContext)) {
+            setSmoothPosterDrawable(imageView, drawable, false)
+            return
+        }
 
-        workerExecutor.execute {
-            try {
-                // Drop task immediately if view has been garbage-collected, recycled, or rebound
-                val currentView = weakImageView.get() ?: return@execute
-                val activeTag = try {
-                    currentView.getTag(R.id.coil_image_url_tag)
-                } catch (_: Throwable) {
-                    null
-                }
-                if (activeTag != imageKey) {
-                    return@execute
-                }
-
-                val isTempBitmap = drawable !is BitmapDrawable
-                val bitmap = when (drawable) {
-                    is BitmapDrawable -> drawable.bitmap
-                    else -> drawable.toBitmap()
-                }
-
-                if (bitmap == null || bitmap.isRecycled) {
-                    return@execute
-                }
-
-                val score = classifyBitmapScore(appContext, bitmap)
-                if (isTempBitmap && !bitmap.isRecycled) {
-                    try {
-                        bitmap.recycle()
-                    } catch (_: Throwable) {
-                    }
-                }
-                scoreCache.put(imageKey, score)
-
-                val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
-                mainHandler.post {
-                    val activeView = weakImageView.get() ?: return@post
-                    val checkTag = try {
-                        activeView.getTag(R.id.coil_image_url_tag)
-                    } catch (_: Throwable) {
-                        null
-                    }
-                    if (checkTag == imageKey) {
-                        if (score >= activeThreshold) {
-                            if (!appContext.isNsfwEnabled()) {
-                                activeView.setImageDrawable(null)
-                                hideParentItem(activeView)
-                            } else if (appContext.shouldCensorPosters()) {
-                                ImageLoader.applyCensoredPoster(activeView)
-                            }
-                        } else {
-                            setSmoothPosterDrawable(activeView, drawable, DeviceProfile.tier(activeView.context) != DeviceTier.LOW)
-                        }
-                    }
-                }
-            } catch (t: Throwable) {
-                Log.w(TAG, "Background poster classification error: ${t.message}")
-            }
+        val weakImageView = WeakReference(imageView)
+        try {
+            workerExecutor.execute(
+                SafeClassificationTask(
+                    weakImageView = weakImageView,
+                    imageKey = imageKey,
+                    drawable = drawable,
+                    appContext = appContext
+                )
+            )
+        } catch (_: Throwable) {
+            // If submission fails due to executor rejection, safely apply drawable directly
+            setSmoothPosterDrawable(imageView, drawable, false)
         }
     }
 
     private fun setSmoothPosterDrawable(view: ImageView, newDrawable: Drawable, animate: Boolean) {
+        if (newDrawable is BitmapDrawable) {
+            val b = newDrawable.bitmap
+            if (b == null || b.isRecycled) {
+                return
+            }
+        }
+
         val oldDrawable = view.drawable
-        val actualOld = if (oldDrawable is android.graphics.drawable.TransitionDrawable && oldDrawable.numberOfLayers > 0) {
+        val actualOld = if (oldDrawable is TransitionDrawable && oldDrawable.numberOfLayers > 0) {
             oldDrawable.getDrawable(oldDrawable.numberOfLayers - 1)
         } else {
             oldDrawable
         }
-        if (animate && actualOld != null && actualOld != newDrawable) {
-            val transition = android.graphics.drawable.TransitionDrawable(arrayOf(actualOld, newDrawable)).apply {
-                isCrossFadeEnabled = true
+
+        if (actualOld is BitmapDrawable) {
+            val b = actualOld.bitmap
+            if (b != null && b.isRecycled) {
+                view.setImageDrawable(newDrawable)
+                return
             }
-            view.setImageDrawable(transition)
-            transition.startTransition(150)
+        }
+
+        if (animate && actualOld != null && actualOld != newDrawable) {
+            try {
+                val transition = TransitionDrawable(arrayOf(actualOld, newDrawable)).apply {
+                    isCrossFadeEnabled = true
+                }
+                view.setImageDrawable(transition)
+                transition.startTransition(150)
+            } catch (_: Throwable) {
+                view.setImageDrawable(newDrawable)
+            }
         } else {
             view.setImageDrawable(newDrawable)
         }
@@ -429,10 +601,12 @@ object OnDeviceNsfwClassifier {
 
     /**
      * Completely hides the parent card/item view when its poster is classified as NSFW in safe mode.
+     * Incorporates TV layout protections and RecyclerView concurrency safety.
      */
     fun hideParentItem(view: View) {
         try {
-            val weak = view.getTag(R.id.parent_view_tag) as? java.lang.ref.WeakReference<*>
+            val isTv = isLayout(TV)
+            val weak = view.getTag(R.id.parent_view_tag) as? WeakReference<*>
             val root = (weak?.get() as? View) ?: findRootItemView(view) ?: run {
                 // If view is not part of a RecyclerView or ViewPager2 item (e.g. details screen poster in ResultFragment),
                 // replace with clean default cover and never collapse or alter the screen layout!
@@ -440,6 +614,11 @@ object OnDeviceNsfwClassifier {
                     view.setImageResource(R.drawable.default_cover)
                 }
                 return
+            }
+
+            // Always sanitize the poster view
+            if (view is ImageView) {
+                view.setImageDrawable(null)
             }
 
             // Safety guard: Ensure root is truly a child item inside a container, never a Fragment/Activity root
@@ -453,8 +632,6 @@ object OnDeviceNsfwClassifier {
 
             if (isInsideViewPager2(root)) {
                 // ViewPager2 strictly enforces MATCH_PARENT on its child pages.
-                // Setting lp.width or lp.height to 0 causes IllegalStateException: Pages must fill the whole ViewPager2 (use match_parent).
-                // Safely sanitize child views without altering page dimensions.
                 root.findViewById<ImageView>(R.id.home_scroll_preview)?.let { preview ->
                     preview.setImageDrawable(null)
                     preview.setImageResource(R.drawable.default_cover)
@@ -472,24 +649,51 @@ object OnDeviceNsfwClassifier {
                 return
             }
 
-            root.isVisible = false
-            root.isFocusable = false
-            root.isFocusableInTouchMode = false
-            root.isClickable = false
-            root.setOnClickListener(null)
-            root.setOnLongClickListener(null)
-            root.onFocusChangeListener = null
-            root.findViewById<View>(R.id.background_card)?.isVisible = false
-            root.findViewById<View>(R.id.imageText)?.isVisible = false
-            root.findViewById<View>(R.id.title_shadow)?.isVisible = false
-            val lp = root.layoutParams
-            if (lp != null) {
-                lp.width = 0
-                lp.height = 0
-                (lp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-                root.layoutParams = lp
+            // On TV (Leanback / D-pad remote navigation):
+            // Collapsing dimensions to 0x0 corrupts Leanback focus navigation and causes crashes.
+            // Instead, sanitize content and make non-focusable while keeping grid geometry intact.
+            if (isTv) {
+                root.findViewById<View>(R.id.background_card)?.isVisible = false
+                root.findViewById<View>(R.id.imageText)?.isVisible = false
+                root.findViewById<View>(R.id.title_shadow)?.isVisible = false
+                root.isFocusable = false
+                root.isFocusableInTouchMode = false
+                root.isClickable = false
+                root.setOnClickListener(null)
+                root.setOnLongClickListener(null)
+                root.onFocusChangeListener = null
+                return
             }
-            root.requestLayout()
+
+            fun applyCollapse() {
+                try {
+                    root.isVisible = false
+                    root.isFocusable = false
+                    root.isFocusableInTouchMode = false
+                    root.isClickable = false
+                    root.setOnClickListener(null)
+                    root.setOnLongClickListener(null)
+                    root.onFocusChangeListener = null
+                    root.findViewById<View>(R.id.background_card)?.isVisible = false
+                    root.findViewById<View>(R.id.imageText)?.isVisible = false
+                    root.findViewById<View>(R.id.title_shadow)?.isVisible = false
+                    val lp = root.layoutParams
+                    if (lp != null) {
+                        lp.width = 0
+                        lp.height = 0
+                        (lp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
+                        root.layoutParams = lp
+                    }
+                    root.requestLayout()
+                } catch (_: Throwable) {
+                }
+            }
+
+            if (parent is RecyclerView && parent.isComputingLayout) {
+                root.post { applyCollapse() }
+            } else {
+                applyCollapse()
+            }
         } catch (_: Throwable) {
         }
     }

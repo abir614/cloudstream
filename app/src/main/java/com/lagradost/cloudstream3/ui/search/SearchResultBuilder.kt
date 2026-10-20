@@ -154,7 +154,7 @@ object SearchResultBuilder {
             itemView.findViewById<View>(R.id.background_card)?.isVisible = false
             itemView.findViewById<View>(R.id.imageText)?.isVisible = false
             itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
-            if (!isInsideViewPager2(itemView)) {
+            if (!isInsideViewPager2(itemView) && !isLayout(TV)) {
                 val lp = itemView.layoutParams
                 if (lp != null) {
                     lp.width = 0
@@ -194,7 +194,7 @@ object SearchResultBuilder {
                 itemView.findViewById<View>(R.id.background_card)?.isVisible = false
                 itemView.findViewById<View>(R.id.imageText)?.isVisible = false
                 itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
-                if (!isInsideViewPager2(itemView)) {
+                if (!isInsideViewPager2(itemView) && !isLayout(TV)) {
                     val emptyLp = itemView.layoutParams
                     if (emptyLp != null) {
                         emptyLp.width = 0
