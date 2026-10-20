@@ -126,6 +126,8 @@ import com.lagradost.cloudstream3.ui.settings.SettingsGeneral
 import com.lagradost.cloudstream3.ui.setup.HAS_DONE_SETUP_KEY
 import com.lagradost.cloudstream3.ui.setup.SetupFragmentExtensions
 import com.lagradost.cloudstream3.utils.ApkInstaller
+import com.lagradost.cloudstream3.utils.DeviceProfile
+import com.lagradost.cloudstream3.utils.SystemMemoryOptimizer
 import com.lagradost.cloudstream3.utils.AppContextUtils.getApiDubstatusSettings
 import com.lagradost.cloudstream3.utils.AppContextUtils.html
 import com.lagradost.cloudstream3.utils.AppContextUtils.isCastApiAvailable
@@ -655,6 +657,11 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             logError(e)
         }
         InAppUpdater.checkAndResumePendingInstall(this)
+        ioSafe {
+            if (DeviceProfile.isLowEnd(this@MainActivity)) {
+                SystemMemoryOptimizer.reclaimBackgroundMemory(this@MainActivity)
+            }
+        }
     }
 
     override fun onPause() {

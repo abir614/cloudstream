@@ -732,6 +732,8 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             searchSuggestionsRecycler.layoutManager = LinearLayoutManager(context)
 
             searchMasterRecycler.setRecycledViewPool(ParentItemAdapter.sharedPool)
+            searchMasterRecycler.setHasFixedSize(true)
+            searchMasterRecycler.setItemViewCacheSize(4)
             searchMasterRecycler.adapter = masterAdapter
             //searchMasterRecycler.setLinearListLayout(isHorizontal = false, nextRight = FOCUS_SELF)
 

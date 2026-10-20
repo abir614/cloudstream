@@ -242,7 +242,13 @@ object OnDeviceNsfwClassifier {
             val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
             val mi = ActivityManager.MemoryInfo()
             am.getMemoryInfo(mi)
-            mi.lowMemory || (am.isLowRamDevice && mi.availMem < 40 * 1024 * 1024L)
+            val isLowTier = DeviceProfile.tier(ctx) == DeviceTier.LOW
+            val memoryThreshold = if (isLowTier) 80 * 1024 * 1024L else 40 * 1024 * 1024L
+            val isCritical = mi.lowMemory || (am.isLowRamDevice && mi.availMem < memoryThreshold) || mi.availMem < 40 * 1024 * 1024L
+            if (isCritical) {
+                com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(ctx)
+            }
+            isCritical
         } catch (_: Throwable) {
             false
         }
@@ -406,14 +412,6 @@ object OnDeviceNsfwClassifier {
     @Synchronized
     fun classifyDrawableScore(ctx: Context, drawable: Drawable): Float {
         if (isModelPermanentlyUnavailable) return 0.0f
-
-        if (drawable is BitmapDrawable) {
-            val b = drawable.bitmap
-            if (b != null && !b.isRecycled) {
-                return classifyBitmapScore(ctx, b)
-            }
-        }
-
         if (!ensureModelInitialized(ctx)) return 0.0f
         val interp = interpreter ?: return 0.0f
         val buf = inputBuffer ?: return 0.0f
@@ -423,8 +421,27 @@ object OnDeviceNsfwClassifier {
 
         return try {
             canvas.drawColor(Color.BLACK)
-            drawable.setBounds(0, 0, INPUT_DIM, INPUT_DIM)
-            drawable.draw(canvas)
+            if (drawable is BitmapDrawable) {
+                val b = drawable.bitmap
+                if (b == null || b.isRecycled) return 0.0f
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
+                    val copy = try { b.copy(Bitmap.Config.ARGB_8888, false) } catch (_: Throwable) { null }
+                    if (copy != null) {
+                        try {
+                            canvas.drawBitmap(copy, null, scratchRect, scratchPaint)
+                        } finally {
+                            try { copy.recycle() } catch (_: Throwable) {}
+                        }
+                    } else {
+                        return 0.0f
+                    }
+                } else {
+                    canvas.drawBitmap(b, null, scratchRect, scratchPaint)
+                }
+            } else {
+                drawable.setBounds(0, 0, INPUT_DIM, INPUT_DIM)
+                drawable.draw(canvas)
+            }
             sBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
 
             executeInferenceOnPixels(interp, buf)
@@ -440,50 +457,8 @@ object OnDeviceNsfwClassifier {
      */
     @Synchronized
     fun classifyBitmapScore(ctx: Context, bitmap: Bitmap): Float {
-        if (isModelPermanentlyUnavailable) return 0.0f
-        if (bitmap.isRecycled) return 0.0f
-        if (!ensureModelInitialized(ctx)) return 0.0f
-        val interp = interpreter ?: return 0.0f
-        val buf = inputBuffer ?: return 0.0f
-        val sBitmap = scratchBitmap
-        if (sBitmap == null || sBitmap.isRecycled) return 0.0f
-        val canvas = scratchCanvas ?: return 0.0f
-
-        var softwareBitmap: Bitmap? = null
-        val sourceBitmap = try {
-            if (bitmap.isRecycled) return 0.0f
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-                bitmap.config == Bitmap.Config.HARDWARE
-            ) {
-                val copy = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                softwareBitmap = copy
-                copy ?: bitmap
-            } else {
-                bitmap
-            }
-        } catch (t: Throwable) {
-            Log.w(TAG, "Hardware bitmap conversion warning: ${t.message}")
-            if (bitmap.isRecycled) return 0.0f else bitmap
-        }
-
-        return try {
-            if (sourceBitmap.isRecycled) return 0.0f
-            canvas.drawColor(Color.BLACK)
-            canvas.drawBitmap(sourceBitmap, null, scratchRect, scratchPaint)
-            sBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
-
-            executeInferenceOnPixels(interp, buf)
-        } catch (t: Throwable) {
-            Log.w(TAG, "Error during NSFW model inference: ${t.message}")
-            0.0f
-        } finally {
-            if (softwareBitmap != null && softwareBitmap != bitmap && !softwareBitmap.isRecycled) {
-                try {
-                    softwareBitmap.recycle()
-                } catch (_: Throwable) {
-                }
-            }
-        }
+        if (isModelPermanentlyUnavailable || bitmap.isRecycled) return 0.0f
+        return classifyDrawableScore(ctx, BitmapDrawable(ctx.resources, bitmap))
     }
 
     /**
@@ -541,6 +516,12 @@ object OnDeviceNsfwClassifier {
 
         // Fast fallback if model is permanently unavailable or device is under memory pressure
         if (isModelPermanentlyUnavailable || isDeviceUnderMemoryPressure(appContext)) {
+            setSmoothPosterDrawable(imageView, drawable, false)
+            return
+        }
+
+        // Low-tier device scroll protection: throttle background worker queue to maintain smooth 60fps scrolling
+        if (DeviceProfile.isLowEnd(appContext) && workerExecutor.queue.size >= 4) {
             setSmoothPosterDrawable(imageView, drawable, false)
             return
         }
@@ -677,14 +658,6 @@ object OnDeviceNsfwClassifier {
                     root.findViewById<View>(R.id.background_card)?.isVisible = false
                     root.findViewById<View>(R.id.imageText)?.isVisible = false
                     root.findViewById<View>(R.id.title_shadow)?.isVisible = false
-                    val lp = root.layoutParams
-                    if (lp != null) {
-                        lp.width = 0
-                        lp.height = 0
-                        (lp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-                        root.layoutParams = lp
-                    }
-                    root.requestLayout()
                 } catch (_: Throwable) {
                 }
             }

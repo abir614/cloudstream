@@ -112,6 +112,10 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                 }
             }
             prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
+        try {
+            if (com.lagradost.cloudstream3.utils.DeviceProfile.isLowEnd(this)) {
+                com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this)
+            }
         } catch (_: Throwable) {
         }
     }
@@ -149,6 +153,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                 try {
                     com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
                     com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
+                    com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
                 } catch (_: Throwable) {
                 }
             }
@@ -171,6 +176,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             try {
                 com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
                 com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
+                com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
             } catch (_: Throwable) {
             }
             System.gc()

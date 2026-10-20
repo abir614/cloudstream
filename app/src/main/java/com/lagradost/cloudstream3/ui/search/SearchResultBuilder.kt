@@ -153,28 +153,12 @@ object SearchResultBuilder {
             cardView.setImageDrawable(null)
             itemView.findViewById<View>(R.id.background_card)?.isVisible = false
             itemView.findViewById<View>(R.id.imageText)?.isVisible = false
-            itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
-            if (!isInsideViewPager2(itemView) && !isLayout(TV)) {
-                val lp = itemView.layoutParams
-                if (lp != null) {
-                    lp.width = 0
-                    lp.height = 0
-                    (lp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-                    itemView.layoutParams = lp
-                }
-            }
             return
         }
 
         itemView.isVisible = true
         itemView.isClickable = true
         itemView.findViewById<View>(R.id.background_card)?.isVisible = true
-        val lp = itemView.layoutParams
-        if (lp != null && (lp.width == 0 || lp.height == 0)) {
-            lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
-            lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
-            itemView.layoutParams = lp
-        }
         cardView.setTag(R.id.parent_view_tag, java.lang.ref.WeakReference(itemView))
         cardText?.text = card.name
         cardText?.isVisible = showTitle

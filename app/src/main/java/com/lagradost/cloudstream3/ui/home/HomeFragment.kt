@@ -709,6 +709,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                 homeViewModel, accountViewModel
             )
             homeMasterRecycler.setRecycledViewPool(ParentItemAdapter.sharedPool)
+            homeMasterRecycler.setHasFixedSize(true)
+            homeMasterRecycler.setItemViewCacheSize(4)
             homeMasterRecycler.adapter = homeMasterAdapter
 
             homeApiFab.isVisible = isLayout(PHONE)
