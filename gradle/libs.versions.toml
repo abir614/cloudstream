@@ -40,7 +40,7 @@ material = "1.14.0"
 media3 = "1.9.3"
 navigationKtx = { strictly = "2.9.8" } # 2.10.x requires minSdk 24 (breaks minSdk 23 compatibility for Android TV/potato devices)
 newpipeextractor = "v0.26.3"
-nextlibMedia3 = "1.9.3-0.12.0"
+nextlibMedia3 = "1.11.1-0.16.0"
 nicehttp = "0.4.18"
 overlappingpanels = "0.1.5"
 paletteKtx = "1.0.0"
