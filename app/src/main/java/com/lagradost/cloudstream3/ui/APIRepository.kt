@@ -9,8 +9,10 @@ import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.MainActivity.Companion.afterPluginsLoadedEvent
 import com.lagradost.cloudstream3.MainPageRequest
+import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.SearchResponseList
 import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.newSearchResponseList
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.fixUrl
 import com.lagradost.cloudstream3.mvvm.Resource
@@ -212,7 +214,7 @@ class APIRepository(val api: MainAPI) {
 
     suspend fun search(query: String, page: Int): Resource<SearchResponseList> {
         if (query.isEmpty())
-            return Resource.Success(newSearchResponseList(emptyList()))
+            return Resource.Success(newSearchResponseList(emptyList<SearchResponse>()))
 
         return safeApiCall {
             withTimeout(getTimeout(api.searchTimeoutMs)) {
@@ -225,7 +227,7 @@ class APIRepository(val api: MainAPI) {
 
     suspend fun quickSearch(query: String): Resource<SearchResponseList> {
         if (query.isEmpty())
-            return Resource.Success(newSearchResponseList(emptyList()))
+            return Resource.Success(newSearchResponseList(emptyList<SearchResponse>()))
 
         return safeApiCall {
             withTimeout(getTimeout(api.quickSearchTimeoutMs)) {
