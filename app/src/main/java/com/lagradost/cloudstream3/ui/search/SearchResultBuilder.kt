@@ -141,18 +141,36 @@ object SearchResultBuilder {
         val isAdultAllowed = context.isNsfwEnabled()
         val filterLevel = NsfwFilterEngine.getFilterLevel(context)
         val isCardNsfw = NsfwFilterEngine.isNsfw(card, filterLevel)
+        val isTv = isLayout(TV)
 
         if (!isAdultAllowed && isCardNsfw) {
-            itemView.isVisible = false
-            itemView.isFocusable = false
-            itemView.isFocusableInTouchMode = false
-            itemView.isClickable = false
-            itemView.setOnClickListener(null)
-            itemView.setOnLongClickListener(null)
-            itemView.onFocusChangeListener = null
-            cardView.setImageDrawable(null)
-            itemView.findViewById<View>(R.id.background_card)?.isVisible = false
-            itemView.findViewById<View>(R.id.imageText)?.isVisible = false
+            if (isTv) {
+                // On TV: Keep grid cell geometry intact so Leanback D-pad focus navigation never crashes
+                cardView.setImageDrawable(null)
+                cardView.setImageResource(R.drawable.default_cover)
+                itemView.findViewById<View>(R.id.background_card)?.isVisible = false
+                itemView.findViewById<View>(R.id.imageText)?.isVisible = false
+                itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
+                if (!itemView.hasFocus()) {
+                    itemView.isFocusable = false
+                    itemView.isFocusableInTouchMode = false
+                    itemView.isClickable = false
+                }
+                itemView.setOnClickListener(null)
+                itemView.setOnLongClickListener(null)
+                itemView.onFocusChangeListener = null
+            } else {
+                itemView.isVisible = false
+                itemView.isFocusable = false
+                itemView.isFocusableInTouchMode = false
+                itemView.isClickable = false
+                itemView.setOnClickListener(null)
+                itemView.setOnLongClickListener(null)
+                itemView.onFocusChangeListener = null
+                cardView.setImageDrawable(null)
+                itemView.findViewById<View>(R.id.background_card)?.isVisible = false
+                itemView.findViewById<View>(R.id.imageText)?.isVisible = false
+            }
             return
         }
 
@@ -174,17 +192,32 @@ object SearchResultBuilder {
             }
         } else {
             if (!isAdultAllowed && filterLevel == NsfwFilterLevel.EXTREME) {
-                itemView.isVisible = false
-                itemView.findViewById<View>(R.id.background_card)?.isVisible = false
-                itemView.findViewById<View>(R.id.imageText)?.isVisible = false
-                itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
-                if (!isInsideViewPager2(itemView) && !isLayout(TV)) {
-                    val emptyLp = itemView.layoutParams
-                    if (emptyLp != null) {
-                        emptyLp.width = 0
-                        emptyLp.height = 0
-                        (emptyLp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-                        itemView.layoutParams = emptyLp
+                if (isTv) {
+                    cardView.setImageResource(R.drawable.default_cover)
+                    itemView.findViewById<View>(R.id.background_card)?.isVisible = false
+                    itemView.findViewById<View>(R.id.imageText)?.isVisible = false
+                    itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
+                    if (!itemView.hasFocus()) {
+                        itemView.isFocusable = false
+                        itemView.isFocusableInTouchMode = false
+                        itemView.isClickable = false
+                    }
+                    itemView.setOnClickListener(null)
+                    itemView.setOnLongClickListener(null)
+                    itemView.onFocusChangeListener = null
+                } else {
+                    itemView.isVisible = false
+                    itemView.findViewById<View>(R.id.background_card)?.isVisible = false
+                    itemView.findViewById<View>(R.id.imageText)?.isVisible = false
+                    itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
+                    if (!isInsideViewPager2(itemView)) {
+                        val emptyLp = itemView.layoutParams
+                        if (emptyLp != null) {
+                            emptyLp.width = 0
+                            emptyLp.height = 0
+                            (emptyLp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
+                            itemView.layoutParams = emptyLp
+                        }
                     }
                 }
             } else {

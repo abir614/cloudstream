@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.core.view.isVisible
 import androidx.preference.PreferenceManager
 import androidx.viewbinding.ViewBinding
 import com.lagradost.cloudstream3.R
@@ -35,9 +36,12 @@ class HomeScrollViewHolderState(view: ViewBinding) : ViewHolderState<Boolean>(vi
     override fun restore(state: Boolean) {
         if (state) {
             wasFocused = false
-            // only refocus if tv
-            if (isLayout(TV)) {
-                itemView.requestFocus()
+            // only refocus if tv and the view is still active, visible, and focusable
+            if (isLayout(TV) && itemView.isVisible && itemView.isFocusable) {
+                try {
+                    itemView.requestFocus()
+                } catch (_: Throwable) {
+                }
             }
         }
     }
