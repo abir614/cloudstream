@@ -47,6 +47,10 @@ allprojects {
                     useVersion("2.13.5")
                     because("Enforces latest 2.13.x patch release maintaining minSdk 23 TV Stick compatibility")
                 }
+                requested.group == "com.google.guava" && requested.name == "guava" -> {
+                    useVersion("33.7.2-android")
+                    because("Patches CVE-2026-102554 / GHSA-xxph-c9ww-hj94 deserialization uncontrolled memory allocation")
+                }
             }
         }
     }

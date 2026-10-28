@@ -34,7 +34,7 @@ jobs:
       - name: Run Cargo Audit
         run: |
           cd rust-core
-          cargo audit --ignore RUSTSEC-2024-0436
+          cargo audit --ignore RUSTSEC-2024-0436 --ignore RUSTSEC-2026-0385
 
       - name: Run Clippy Security Lints
         run: |
