@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.DialogInterface
-import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -17,7 +16,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.appcompat.app.AlertDialog
-import androidx.core.net.toUri
 import androidx.core.view.doOnLayout
 import androidx.core.view.isGone
 import androidx.core.view.isInvisible
@@ -32,7 +30,6 @@ import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.chip.Chip
 import com.lagradost.api.Log
 import com.lagradost.cloudstream3.APIHolder
-import com.lagradost.cloudstream3.APIHolder.apis
 import com.lagradost.cloudstream3.APIHolder.getApiFromNameNull
 import com.lagradost.cloudstream3.AllLanguagesName
 import com.lagradost.cloudstream3.CommonActivity.showToast

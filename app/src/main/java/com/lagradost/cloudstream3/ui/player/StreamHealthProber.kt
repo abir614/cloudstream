@@ -5,7 +5,6 @@ import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.APIHolder.getApiFromNameNull
 import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async

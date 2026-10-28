@@ -142,12 +142,6 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
         }
     }
 
-//    private fun hasNoFocus(): Boolean {
-//        val focus = activity?.currentFocus
-//        if (focus == null || !focus.isVisible) return true
-//        return focus == binding?.resultRoot
-//    }
-
     /**
      * Force focus any play button.
      * Note that this will steal any focus if the episode loading is too slow (unlikely).

@@ -4,7 +4,6 @@ import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
 import androidx.preference.PreferenceManager
-import com.lagradost.cloudstream3.R
 import java.io.File
 
 enum class DeviceTier {

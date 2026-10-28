@@ -42,7 +42,6 @@ import androidx.navigation.fragment.findNavController
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.tvprovider.media.tv.PreviewChannelHelper
 import androidx.tvprovider.media.tv.TvContractCompat
 import androidx.tvprovider.media.tv.WatchNextProgram
 import androidx.tvprovider.media.tv.WatchNextProgram.fromCursor
@@ -81,15 +80,11 @@ import com.lagradost.cloudstream3.ui.settings.extensions.PluginsFragment
 import com.lagradost.cloudstream3.ui.settings.extensions.RepositoryData
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.Coroutines.main
-import com.lagradost.cloudstream3.utils.DataStoreHelper.getAllResumeStateIds
-import com.lagradost.cloudstream3.utils.DataStoreHelper.getLastWatched
 import com.lagradost.cloudstream3.utils.FillerEpisodeCheck.toClassDir
 import com.lagradost.cloudstream3.utils.JsUnpacker.Companion.load
 import com.lagradost.cloudstream3.utils.UIHelper.navigate
 import com.lagradost.cloudstream3.utils.downloader.DownloadObjects
 import com.lagradost.cloudstream4.AppSettings
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import okhttp3.Cache
 import java.io.File
 import java.util.concurrent.Executor
@@ -306,9 +301,6 @@ object AppContextUtils {
             (cursor.getString(cursor.getColumnIndex(COLUMN_INTERNAL_PROVIDER_ID)) == id)
         }
     }
-
-    /** Prevents losing data when removing and adding simultaneously */
-    private val continueWatchingLock = Mutex()
 
     // https://github.com/googlearchive/leanback-homescreen-channels/blob/master/app/src/main/java/com/google/android/tvhomescreenchannels/SampleTvProvider.java
     @SuppressLint("RestrictedApi")
@@ -687,8 +679,6 @@ object AppContextUtils {
         } catch (_: Exception) {
         }
     }
-
-    //private val viewModel: ResultViewModel by activityViewModels()
 
     private fun getResultsId(): Int {
         return if (Globals.isLayout(Globals.TV or Globals.EMULATOR)) {

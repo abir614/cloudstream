@@ -74,15 +74,7 @@ open class LinearListLayout(context: Context?) :
             }
         }
         return null
-        //return recyclerView.children.firstOrNull { child -> (child.layoutParams as? RecyclerView.LayoutParams?)?.absoluteAdapterPosition == pos) }
     }
-
-    /*
-    private fun scrollTo(position: Int) {
-        val linearSmoothScroller = LinearSmoothScroller(recyclerView.context)
-        linearSmoothScroller.targetPosition = position
-        startSmoothScroll(linearSmoothScroller)
-    }*/
 
     /** from the current focus go to a direction */
     private fun getNextDirection(focused: View?, direction: FocusDirection): View? {

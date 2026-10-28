@@ -1,6 +1,5 @@
 package com.lagradost.cloudstream3.domain.usecase
 
-import android.app.Activity
 import android.content.Context
 import com.lagradost.cloudstream3.utils.UpdateSecurityGate
 import java.io.File
