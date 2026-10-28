@@ -619,11 +619,6 @@ class MALApi : SyncAPI() {
     )
 
 
-    @Serializable
-    data class MalNode(
-        @JsonProperty("id") @SerialName("id") val id: Int,
-        @JsonProperty("title") @SerialName("title") val title: String,
-    )
 
     @Serializable
     data class MalStatus(
