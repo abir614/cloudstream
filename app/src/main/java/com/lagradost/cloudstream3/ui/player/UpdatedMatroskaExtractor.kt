@@ -1708,9 +1708,7 @@ class UpdatedMatroskaExtractor private constructor(
     }
 
     private fun assertInitialized() {
-        checkNotNull<ExtractorOutput?>(
-            extractorOutput
-        )
+        checkNotNull(extractorOutput)
     }
 
     private fun maybeEndTracks() {
@@ -2378,9 +2376,7 @@ class UpdatedMatroskaExtractor private constructor(
          * fact at runtime.
          */
         fun assertOutputInitialized() {
-            checkNotNull<TrackOutput?>(
-                output
-            )
+            checkNotNull(output)
         }
 
         @Throws(ParserException::class)
