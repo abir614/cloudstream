@@ -58,6 +58,7 @@ import com.lagradost.cloudstream3.ui.home.HomeViewModel
 import com.lagradost.cloudstream3.ui.home.ParentItemAdapter
 import com.lagradost.cloudstream3.ui.result.FOCUS_SELF
 import com.lagradost.cloudstream3.ui.result.setLinearListLayout
+import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.ui.setRecycledViewPool
 import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
 import com.lagradost.cloudstream3.ui.settings.Globals.PHONE
@@ -733,7 +734,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
 
             searchMasterRecycler.setRecycledViewPool(ParentItemAdapter.sharedPool)
             searchMasterRecycler.setHasFixedSize(true)
-            searchMasterRecycler.setItemViewCacheSize(4)
+            searchMasterRecycler.setItemViewCacheSize(context?.let { DeviceProfile.getItemViewCacheSize(it) } ?: 4)
             searchMasterRecycler.adapter = masterAdapter
             //searchMasterRecycler.setLinearListLayout(isHorizontal = false, nextRight = FOCUS_SELF)
 

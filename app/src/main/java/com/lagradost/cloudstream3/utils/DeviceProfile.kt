@@ -84,9 +84,9 @@ object DeviceProfile {
     fun isLowEnd(ctx: Context): Boolean = tier(ctx) == DeviceTier.LOW
 
     fun getNetworkConfig(ctx: Context): NetworkTierConfig {
-        val isUltraPotato = getTotalRamMb(ctx) <= 1024
+        val isPotato = isUltraPotato(ctx)
         return when (tier(ctx)) {
-            DeviceTier.LOW -> if (isUltraPotato) {
+            DeviceTier.LOW -> if (isPotato) {
                 NetworkTierConfig(
                     maxRequests = 16,
                     maxRequestsPerHost = 4,
@@ -125,9 +125,9 @@ object DeviceProfile {
     }
 
     fun getPlayerBufferConfig(ctx: Context): PlayerBufferConfig {
-        val isUltraPotato = getTotalRamMb(ctx) <= 1024
+        val isPotato = isUltraPotato(ctx)
         return when (tier(ctx)) {
-            DeviceTier.LOW -> if (isUltraPotato) {
+            DeviceTier.LOW -> if (isPotato) {
                 PlayerBufferConfig(
                     minBufferMs = 6_000,
                     maxBufferMs = 15_000,
@@ -166,10 +166,10 @@ object DeviceProfile {
     }
 
     fun getCoilConfig(ctx: Context): CoilTierConfig {
-        val isUltraPotato = getTotalRamMb(ctx) <= 1024
+        val isPotato = isUltraPotato(ctx)
         return when (tier(ctx)) {
             DeviceTier.LOW -> CoilTierConfig(
-                memoryCachePercent = if (isUltraPotato) 0.05 else 0.10, // 5% RAM for 500MB devices
+                memoryCachePercent = if (isPotato) 0.05 else 0.10, // 5% RAM for 500MB devices
                 diskCacheMaxBytes = 128L * 1024 * 1024,
                 crossfadeMs = 0, // crossfade off on LOW
                 allowHardwareBitmaps = false,
@@ -354,22 +354,72 @@ object DeviceProfile {
         }
     }
 
+    fun getTotalRamMb(ctx: Context): Long {
+        return try {
+            val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            val mi = ActivityManager.MemoryInfo()
+            if (am != null) {
+                am.getMemoryInfo(mi)
+                mi.totalMem / (1024 * 1024)
+            } else {
+                Runtime.getRuntime().maxMemory() / (1024 * 1024)
+            }
+        } catch (_: Throwable) {
+            1024L
+        }
+    }
+
+    fun getDownloadBufferLimit(ctx: Context): Long {
+        val isPotato = isUltraPotato(ctx)
+        return when (tier(ctx)) {
+            DeviceTier.HIGH -> 80_000_000L  // 80 MB
+            DeviceTier.MID -> 35_000_000L   // 35 MB
+            DeviceTier.LOW -> if (isPotato) 5_000_000L else 10_000_000L   // 5 MB on potato, 10 MB on low
+        }
+    }
+
+    fun isLegacyLinuxKernel(): Boolean {
+        return try {
+            val file = File("/proc/version")
+            if (file.exists() && file.canRead()) {
+                val line = file.readText().trim()
+                val match = Regex("""Linux version (\d+)\.(\d+)""").find(line)
+                if (match != null) {
+                    val major = match.groupValues[1].toIntOrNull() ?: 4
+                    val minor = match.groupValues[2].toIntOrNull() ?: 14
+                    major < 4 || (major == 4 && minor < 9)
+                } else false
+            } else false
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
+    fun isUltraPotato(ctx: Context?): Boolean {
+        if (ctx == null) return false
+        val totalMb = getTotalRamMb(ctx)
+        val swapMb = getZramSwapMb()
+        val isLegacyKernel = isLegacyLinuxKernel()
+        // Ultra-low RAM condition: <= 1024MB RAM, or <= 1536MB RAM with zero zRAM swap, or <= 2048MB with legacy Linux kernel (< 4.9)
+        return totalMb <= 1024 || (totalMb <= 1536 && swapMb == 0L) || (totalMb <= 2048 && isLegacyKernel)
+    }
+
     fun getSearchConcurrency(ctx: Context?): Int {
         if (ctx == null) return 8
-        val totalMb = getTotalRamMb(ctx)
+        val isPotato = isUltraPotato(ctx)
         return when (tier(ctx)) {
             DeviceTier.HIGH -> 16
             DeviceTier.MID -> 8
-            DeviceTier.LOW -> if (totalMb <= 1024) 2 else 3
+            DeviceTier.LOW -> if (isPotato) 2 else 3
         }
     }
 
     fun getItemViewCacheSize(ctx: Context): Int {
-        val totalMb = getTotalRamMb(ctx)
+        val isPotato = isUltraPotato(ctx)
         return when (tier(ctx)) {
             DeviceTier.HIGH -> 8
             DeviceTier.MID -> 4
-            DeviceTier.LOW -> if (totalMb <= 1024) 2 else 3
+            DeviceTier.LOW -> if (isPotato) 2 else 3
         }
     }
 
@@ -423,10 +473,11 @@ object DeviceProfile {
             val kernel = getKernelVersion()
             val swapMb = getZramSwapMb()
             val swapInfo = if (swapMb > 0) " • ${swapMb}MB zRAM" else ""
+            val isPotato = isUltraPotato(ctx)
             val hwMode = when (currentTier) {
                 DeviceTier.HIGH -> "Performance • 128MB Buffers • Max Concurrency"
                 DeviceTier.MID -> "Balanced • 48MB Buffers • Standard Acceleration"
-                DeviceTier.LOW -> if (totalMb <= 1024) "Potato Safe • RGB_565 • 6MB Buffers" else "Power Safe • RGB_565 (50% RAM Save) • 12MB Buffers"
+                DeviceTier.LOW -> if (isPotato) "Potato Safe • RGB_565 • 6MB Buffers" else "Power Safe • RGB_565 (50% RAM Save) • 12MB Buffers"
             }
 
             "[$badge] ${totalMb} MB RAM$swapInfo • $cores Cores ($arch)\nKernel: $kernel • Battery: $batteryLabel • $hwMode"
@@ -467,8 +518,10 @@ object DeviceProfile {
             val cores = Runtime.getRuntime().availableProcessors()
             val isBrokenGpu = hasBrokenHardwareGpu()
 
+            val isPotato = isUltraPotato(ctx)
+
             // 1. Weak / Low-memory / Potato hardware check:
-            if (isLowChip || isBrokenGpu || isLowRam || totalMb <= 2048 || (!has64Bit && totalMb <= 3072) || cores < 4) {
+            if (isLowChip || isBrokenGpu || isLowRam || totalMb <= 2048 || (!has64Bit && totalMb <= 3072) || cores < 4 || isPotato) {
                 return DeviceTier.LOW
             }
 

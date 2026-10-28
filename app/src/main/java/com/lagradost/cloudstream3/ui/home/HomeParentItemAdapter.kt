@@ -25,6 +25,7 @@ import com.lagradost.cloudstream3.ui.settings.Globals.PHONE
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.AppContextUtils.isRecyclerScrollable
+import com.lagradost.cloudstream3.utils.DeviceProfile
 
 class LoadClickCallback(
     val action: Int = 0,
@@ -100,7 +101,7 @@ open class ParentItemAdapter(
             if (currentAdapter == null) {
                 homeChildRecyclerview.setRecycledViewPool(HomeChildItemAdapter.sharedPool)
                 homeChildRecyclerview.setHasFixedSize(true)
-                homeChildRecyclerview.setItemViewCacheSize(6)
+                homeChildRecyclerview.setItemViewCacheSize(DeviceProfile.getItemViewCacheSize(holder.itemView.context))
                 homeChildRecyclerview.adapter = HomeChildItemAdapter(
                     id = id + position + 100,
                     clickCallback = clickCallback,

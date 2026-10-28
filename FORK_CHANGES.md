@@ -177,11 +177,15 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 - **Overall Source Resolution Timeout**: Wrapped content generation in `withTimeoutOrNull(60_000L)` across `ResultViewModel2` and `PlayerGeneratorViewModel`, bounding total source resolution to 1 minute.
 - **Per-Source Extractor Timeout**: Wrapped individual extractor resolution in `withTimeout(5_000L)` (`ExtractorApi.kt`). Any hanging or unresponsive host extractor terminates after 5 seconds without stalling remaining extractors. Parent coroutine cancellation is preserved.
 
-### 10.4 Kernel & zRAM Hardware Profiling
-- **Linux Kernel Inspection**: Detects active kernel version via `/proc/version` to accurately report system environment metrics.
-- **zRAM Swap Detection**: Reads total swap allocation from `/proc/meminfo` to tune memory allocations dynamically.
-- **Ultra-Low Memory (Potato ≤1024MB RAM) Tuning**:
+### 10.4 Hardware Acceleration & Kernel/zRAM Tuning
+- **Explicit Window Hardware Acceleration**: Enforces `android:hardwareAccelerated="true"` under `<application>` in `AndroidManifest.xml` to prevent budget TV box firmwares from disabling the 2D OpenGL ES/Vulkan RenderThread pipeline.
+- **Linux Kernel Inspection**: Detects active kernel version via `/proc/version` (`getKernelVersion()`) and checks for legacy Linux kernels `< 4.9` (`isLegacyLinuxKernel()`).
+- **zRAM Swap Detection**: Reads total swap allocation from `/proc/meminfo` (`getZramSwapMb()`).
+- **Composite Ultra-Low Memory / Potato Engine (`isUltraPotato`)**:
+  - Dynamically triggers if $\le 1024\text{ MB}$ RAM, $\le 1536\text{ MB}$ RAM with zero zRAM swap, or $\le 2048\text{ MB}$ RAM on legacy Linux kernels.
   - Search concurrency restricted to 2 concurrent tasks.
-  - Video playback buffer bounded to 6MB target and 5s back-buffer.
+  - Video playback buffer bounded to 6MB target and 2s back-buffer.
+  - Download buffer limit bounded to 5MB (down from 10MB/80MB).
   - Coil image memory cache constrained to 5% of available heap.
-  - RecyclerView `itemViewCacheSize` dynamically scaled (2 on low RAM, 4 on mid, 8 on high).
+  - RecyclerView `itemViewCacheSize` dynamically scaled across both master feeds and individual horizontal rows (`HomeParentItemAdapter`, `SearchFragment`, `HomeFragment`).
+

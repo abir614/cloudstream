@@ -124,4 +124,14 @@ class DeviceProfileTest {
         assertTrue(midColor.startsWith("#") && midColor.length == 7)
         assertTrue(lowColor.startsWith("#") && lowColor.length == 7)
     }
+
+    @Test
+    fun `test kernel version and zram methods execute safely`() {
+        // Runs cleanly on host Linux runner without throwing
+        val kernel = DeviceProfile.getKernelVersion()
+        assertTrue(kernel.isNotBlank())
+        val swap = DeviceProfile.getZramSwapMb()
+        assertTrue(swap >= 0L)
+        assertFalse(DeviceProfile.isUltraPotato(null))
+    }
 }
