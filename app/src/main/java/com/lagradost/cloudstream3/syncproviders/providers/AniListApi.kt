@@ -1088,40 +1088,6 @@ class AniListApi : SyncAPI() {
         @JsonProperty("id") @SerialName("id") val id: Int?,
     )
 
-    @Serializable
-    data class LikePageInfo(
-        @JsonProperty("total") @SerialName("total") val total: Int?,
-        @JsonProperty("currentPage") @SerialName("currentPage") val currentPage: Int?,
-        @JsonProperty("lastPage") @SerialName("lastPage") val lastPage: Int?,
-        @JsonProperty("perPage") @SerialName("perPage") val perPage: Int?,
-        @JsonProperty("hasNextPage") @SerialName("hasNextPage") val hasNextPage: Boolean?,
-    )
-
-    @Serializable
-    data class LikeAnime(
-        @JsonProperty("nodes") @SerialName("nodes") val nodes: List<LikeNode>?,
-        @JsonProperty("pageInfo") @SerialName("pageInfo") val pageInfo: LikePageInfo?,
-    )
-
-    @Serializable
-    data class LikeFavourites(
-        @JsonProperty("anime") @SerialName("anime") val anime: LikeAnime?,
-    )
-
-    @Serializable
-    data class LikeViewer(
-        @JsonProperty("favourites") @SerialName("favourites") val favourites: LikeFavourites?,
-    )
-
-    @Serializable
-    data class LikeData(
-        @JsonProperty("Viewer") @SerialName("Viewer") val viewer: LikeViewer?,
-    )
-
-    @Serializable
-    data class LikeRoot(
-        @JsonProperty("data") @SerialName("data") val data: LikeData?,
-    )
 
     @Serializable
     data class AniListTitleHolder(

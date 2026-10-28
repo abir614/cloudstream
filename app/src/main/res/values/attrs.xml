@@ -17,9 +17,6 @@
         <attr name="focusBackground" format="reference" />
     </declare-styleable>
 
-    <declare-styleable name="TestView">
-        <attr name="header_text" format="string" />
-    </declare-styleable>
 
     <declare-styleable name="PieFetchButton">
         <attr name="download_layout" format="reference" />

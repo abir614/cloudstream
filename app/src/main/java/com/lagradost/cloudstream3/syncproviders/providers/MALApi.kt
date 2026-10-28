@@ -618,16 +618,6 @@ class MALApi : SyncAPI() {
         @JsonProperty("refresh_token") @SerialName("refresh_token") val refreshToken: String,
     )
 
-    @Serializable
-    data class MalRoot(
-        @JsonProperty("data") @SerialName("data") val data: List<MalDatum>,
-    )
-
-    @Serializable
-    data class MalDatum(
-        @JsonProperty("node") @SerialName("node") val node: MalNode,
-        @JsonProperty("list_status") @SerialName("list_status") val listStatus: MalStatus,
-    )
 
     @Serializable
     data class MalNode(
