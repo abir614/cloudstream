@@ -207,9 +207,6 @@ class DownloadViewModel : ViewModel() {
     }
 
     fun updateHeaderList(context: Context) = viewModelScope.launchSafe {
-        // Do not push loading as it interrupts the UI
-        //_headerCards.postValue(Resource.Loading())
-
         val visual = ioWork {
             val children = context.getKeys(DOWNLOAD_EPISODE_CACHE)
                 .mapNotNull { context.getKey<DownloadObjects.DownloadEpisodeCached>(it) }

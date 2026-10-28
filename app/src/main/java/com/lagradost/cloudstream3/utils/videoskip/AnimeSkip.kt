@@ -166,7 +166,6 @@ class AnimeSkip : SkipAPI() {
     override val supportedTypes: Set<TvType> = setOf(TvType.Anime, TvType.OVA)
 
     val auth = PlainAuthRepo(animeSkipApi)
-    //val clientId = "ZGfO0sMF3eCwLYf8yMSCJjlynwNGRXWE"
 
     companion object {
         const val MIN_LENGTH: Int = 4

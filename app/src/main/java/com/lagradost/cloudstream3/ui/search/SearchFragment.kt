@@ -427,7 +427,6 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                             listView?.setItemChecked(index, currentSelectedApis.contains(api))
                         }
 
-                        //arrayAdapter.notifyDataSetChanged()
                         arrayAdapter.addAll(names)
                         arrayAdapter.notifyDataSetChanged()
                     }
@@ -527,7 +526,6 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             }
 
             override fun onQueryTextChange(newText: String): Boolean {
-                //searchViewModel.quickSearch(newText)
                 val showHistory = newText.isBlank()
                 if (showHistory) {
                     searchViewModel.clearSearch()
@@ -571,7 +569,6 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                 }
 
                 is Resource.Failure -> {
-                    // Toast.makeText(activity, "Server error", Toast.LENGTH_LONG).show()
                     searchExitIcon?.alpha = 1f
                     binding.searchLoadingBar.alpha = 0f
                 }
@@ -616,7 +613,6 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                     }
 
                     submitList(newItems)
-                    //notifyDataSetChanged()
                 }
             } catch (e: Exception) {
                 logError(e)
@@ -624,15 +620,6 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                 listLock.unlock()
             }
         }
-
-
-        /*main_search.setOnQueryTextFocusChangeListener { _, b ->
-            if (b) {
-                // https://stackoverflow.com/questions/12022715/unable-to-show-keyboard-automatically-in-the-searchview
-                showInputMethod(view.findFocus())
-            }
-        }*/
-        //main_search.onActionViewExpanded()*/
 
         val masterAdapter =
             ParentItemAdapter(id = "masterAdapter".hashCode(), { callback ->
@@ -736,7 +723,6 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             searchMasterRecycler.setHasFixedSize(true)
             searchMasterRecycler.setItemViewCacheSize(context?.let { DeviceProfile.getItemViewCacheSize(it) } ?: 4)
             searchMasterRecycler.adapter = masterAdapter
-            //searchMasterRecycler.setLinearListLayout(isHorizontal = false, nextRight = FOCUS_SELF)
 
             searchMasterRecycler.layoutManager = GridLayoutManager(context, 1)
 

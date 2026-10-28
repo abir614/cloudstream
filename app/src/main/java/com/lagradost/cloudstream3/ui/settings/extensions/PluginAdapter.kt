@@ -107,14 +107,6 @@ class PluginAdapter(
             val activity = itemView.context.getActivity() as AppCompatActivity
             sheet.show(activity.supportFragmentManager, "PluginDetails")
         }
-        //if (itemView.context?.isTrueTvSettings() == false) {
-        //    val siteUrl = metadata.repositoryUrl
-        //    if (siteUrl != null && siteUrl.isNotBlank() && siteUrl != "NONE") {
-        //        itemView.setOnClickListener {
-        //            openBrowser(siteUrl)
-        //        }
-        //    }
-        //}
 
         if (item.isDownloaded) {
             // On local plugins page the filepath is provided instead of url.
@@ -168,8 +160,6 @@ class PluginAdapter(
             binding.langIcon.isVisible = true
             binding.langIcon.text = getNameNextToFlagEmoji(metadata.language) ?: metadata.language
         }
-
-        //val oldRecycleCount = (holder as? RepositoryViewHolderState)?.recycleCount
 
         binding.extVotes.isVisible = false
 

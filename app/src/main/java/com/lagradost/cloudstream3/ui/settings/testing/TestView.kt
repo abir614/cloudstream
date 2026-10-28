@@ -23,8 +23,6 @@ class TestView @JvmOverloads constructor(
 ) : CardView(context, attrs) {
     enum class TestState(@StringRes val stringRes: Int, @DrawableRes val icon: Int) {
         None(R.string.start, R.drawable.ic_baseline_play_arrow_24),
-
-        //        Paused(R.string.resume, R.drawable.ic_baseline_play_arrow_24),
         Stopped(R.string.restart, R.drawable.ic_baseline_play_arrow_24),
         Running(R.string.stop, R.drawable.pause_to_play),
     }

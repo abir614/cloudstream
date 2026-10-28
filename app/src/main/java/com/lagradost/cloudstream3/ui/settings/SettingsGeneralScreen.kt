@@ -108,7 +108,6 @@ object SettingsGeneralScreen : SearchableSettings {
             "%s (Visual Threshold: %.2f | E: %.2f, M: %.2f, L: %.2f)",
             levelLabel, activeThreshold, thresholdExtreme, thresholdModerate, thresholdLow
         )
-        //val downloadPath by settings.general.downloadPath.collectAsState()
 
         var isBatteryShown by remember { mutableStateOf(false) }
         val context = LocalContext.current
@@ -126,8 +125,6 @@ object SettingsGeneralScreen : SearchableSettings {
                 },
                 confirm = {
                     isBatteryShown = false
-                    // The og impl never modified it to true?
-                    // settings.general.batterOptimization.set(true)
                     context.showRequestIgnoreBatteryOptDialog()
                 }
             )

@@ -159,7 +159,6 @@ class SettingsFragment : BaseFragment<MainSettingsBinding>(
             dir.listFiles()?.let {
                 for (file in it) {
                     size += if (file.isFile) {
-                        // System.out.println(file.getName() + " " + file.length());
                         file.length()
                     } else getFolderSize(file)
                 }

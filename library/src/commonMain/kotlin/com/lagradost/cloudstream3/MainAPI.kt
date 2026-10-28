@@ -95,8 +95,6 @@ const val USER_AGENT =
 
 class ErrorLoadingException(message: String? = null) : Exception(message)
 
-//val baseHeader = mapOf("User-Agent" to USER_AGENT)
-
 val json = Json {
     encodeDefaults = true
     explicitNulls = false
@@ -1792,8 +1790,6 @@ data class TrailerData(
     val referer: String?,
     val raw: Boolean,
     val headers: Map<String, String> = mapOf(),
-    // var mirrors: List<ExtractorLink>,
-    // var subtitles: List<SubtitleFile> = emptyList(),
 )
 
 /** Abstract interface of LoadResponse responses
@@ -1975,37 +1971,7 @@ interface LoadResponse {
         ) {
             if (!isTrailersEnabled || trailerUrl.isNullOrBlank()) return
             this.trailers.add(TrailerData(trailerUrl, referer, addRaw))
-            /*val links = arrayListOf<ExtractorLink>()
-            val subs = arrayListOf<SubtitleFile>()
-            if (!loadExtractor(
-                    trailerUrl,
-                    referer,
-                    { subs.add(it) },
-                    { links.add(it) }) && addRaw
-            ) {
-                this.trailers.add(
-                    TrailerData(
-                        listOf(
-                            ExtractorLink(
-                                "",
-                                "Trailer",
-                                trailerUrl,
-                                referer ?: "",
-                                Qualities.Unknown.value,
-                                trailerUrl.contains(".m3u8")
-                            )
-                        ), listOf()
-                    )
-                )
-            } else {
-                this.trailers.add(TrailerData(links, subs))
-            }*/
         }
-
-        /*
-        fun LoadResponse.addTrailer(newTrailers: List<ExtractorLink>) {
-            trailers.addAll(newTrailers.map { TrailerData(listOf(it)) })
-        }*/
 
         @Suppress("RedundantSuspendModifier")
         suspend fun LoadResponse.addTrailer(
@@ -2026,30 +1992,6 @@ interface LoadResponse {
         ) {
             if (!isTrailersEnabled || trailerUrls == null) return
             trailers.addAll(trailerUrls.map { TrailerData(it, referer, addRaw) })
-            /*val trailers = trailerUrls.filter { it.isNotBlank() }.amap { trailerUrl ->
-                val links = arrayListOf<ExtractorLink>()
-                val subs = arrayListOf<SubtitleFile>()
-                if (!loadExtractor(
-                        trailerUrl,
-                        referer,
-                        { subs.add(it) },
-                        { links.add(it) }) && addRaw
-                ) {
-                    arrayListOf(
-                        ExtractorLink(
-                            "",
-                            "Trailer",
-                            trailerUrl,
-                            referer ?: "",
-                            Qualities.Unknown.value,
-                            trailerUrl.contains(".m3u8")
-                        )
-                    ) to arrayListOf()
-                } else {
-                    links to subs
-                }
-            }.map { (links, subs) -> TrailerData(links, subs) }
-            this.trailers.addAll(trailers)*/
         }
 
         fun LoadResponse.addImdbId(id: String?) {
@@ -2115,7 +2057,6 @@ fun getDurationFromString(input: String?): Int? {
             if (timeText.isNotBlank()) {
                 val time = timeText.filter { s -> s.isDigit() }.trim().toInt()
                 val scale = timeText.filter { s -> !s.isDigit() }.trim()
-                //println("Scale: $scale")
                 val timeval = when (scale) {
                     "hr", "hour" -> time * 60 * 60
                     "min" -> time * 60

@@ -238,8 +238,6 @@ object PluginManager {
         }
     }
 
-    // var allCurrentOutDatedPlugins: Set<OnlinePluginData> = emptySet()
-
     suspend fun loadSinglePlugin(context: Context, apiName: String): Boolean {
         return (getPluginsOnline().firstOrNull {
             // Most of the time the provider ends with Provider which isn't part of the api name
@@ -248,7 +246,6 @@ object PluginManager {
             ?: getPluginsLocal().firstOrNull {
                 it.internalName.replace("provider", "", ignoreCase = true) == apiName
             })?.let { savedData ->
-            // OnlinePluginData(savedData, onlineData)
             loadPlugin(
                 context,
                 File(savedData.filePath),
@@ -305,7 +302,6 @@ object PluginManager {
         outdatedPlugins.amap { pluginData ->
             updateSemaphore.withPermit {
                 if (pluginData.isDisabled) {
-                    //updatedPlugins.add(activity.getString(R.string.single_plugin_disabled, pluginData.onlineData.second.name))
                     unloadPlugin(pluginData.savedData.filePath)
                 } else if (pluginData.isOutdated) {
                     downloadPlugin(
@@ -368,7 +364,6 @@ object PluginManager {
         }.flatten().distinctBy { it.plugin.url }
 
         val providerLang = activity.getApiProviderLangSettings()
-        //Log.i(TAG, "providerLang => ${providerLang.toJson()}")
 
         // Iterate online repos and returns not downloaded plugins
         val notDownloadedPlugins = onlinePlugins.mapNotNull { onlineData ->
@@ -411,7 +406,6 @@ object PluginManager {
                 if (!providerLang.contains(AllLanguagesName) && !providerLang.contains(lang)) {
                     return@mapNotNull null
                 }
-                //Log.i(TAG, "sitePlugin lang => $lang")
             }
 
             val savedData = PluginData(
@@ -423,7 +417,6 @@ object PluginManager {
             )
             OnlinePluginData(savedData, onlineData)
         }
-        //Log.i(TAG, "notDownloadedPlugins => ${notDownloadedPlugins.toJson()}")
 
         val downloadSemaphore = Semaphore(3)
         notDownloadedPlugins.amap { pluginData ->
@@ -690,7 +683,6 @@ object PluginManager {
         } catch (e: Throwable) {
             Log.e(TAG, "Failed to load $file: ${Log.getStackTraceString(e)}")
             showToast(
-                // context.getActivity(), // we are not always on the main thread
                 context.getString(R.string.plugin_load_fail).format(fileName),
                 Toast.LENGTH_LONG
             )

@@ -204,7 +204,6 @@ object ResultFragment {
      ): View? {
 
          return super.onCreateView(inflater, container, savedInstanceState)
-         //return inflater.inflate(resultLayout, container, false)
      }
 
      override fun onDestroyView() {
@@ -367,7 +366,6 @@ object ResultFragment {
         result_dub_select?.isFocusableInTouchMode = isTv
             if (storedData?.url != null) {
                 if (restart || !viewModel.hasLoaded()) {
-                    //viewModel.clear()
                     viewModel.load(
                         activity,
                         storedData.url,

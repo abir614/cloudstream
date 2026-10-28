@@ -149,14 +149,11 @@ object SingleSelectionHelper {
             listView.setSelection(it)
         }
 
-        //  var lastSelectedIndex = if(selectedIndex.isNotEmpty()) selectedIndex.first() else -1
-
         dialog.setOnDismissListener {
             dismissCallback.invoke()
         }
 
         listView.setOnItemClickListener { _, _, which, _ ->
-            //  lastSelectedIndex = which
             if (realShowApply) {
                 if (!isMultiSelect) {
                     listView.setItemChecked(which, true)
@@ -334,7 +331,6 @@ object SingleSelectionHelper {
             LayoutInflater.from(this)
         )
 
-        //builder.setContentView(R.layout.bottom_selection_dialog_direct)
         builder.setContentView(binding.root)
         builder.show()
         showDialog(

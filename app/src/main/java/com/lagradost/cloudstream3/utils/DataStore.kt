@@ -25,33 +25,6 @@ const val USER_SELECTED_HOMEPAGE_API = "home_api_used"
 const val USER_PROVIDER_API = "user_custom_sites"
 const val PREFERENCES_NAME = "rebuild_preference"
 
-// TODO degelgate by value for get & set
-
-class PreferenceDelegate<T : Any>(
-    val key: String, val default: T //, private val klass: KClass<T>
-) {
-    private val klass: KClass<out T> = default::class
-
-    // simple cache to make it not get the key every time it is accessed, however this requires
-    // that ONLY this changes the key
-    private var cache: T? = null
-
-    operator fun getValue(self: Any?, property: KProperty<*>) =
-        cache ?: getKeyClass(key, klass.java).also { newCache -> cache = newCache } ?: default
-
-    operator fun setValue(
-        self: Any?,
-        property: KProperty<*>,
-        t: T?
-    ) {
-        cache = t
-        if (t == null) {
-            removeKey(key)
-        } else {
-            setKeyClass(key, t)
-        }
-    }
-}
 
 /** When inserting many keys use this function, this is because apply for every key is very expensive on memory */
 data class Editor(

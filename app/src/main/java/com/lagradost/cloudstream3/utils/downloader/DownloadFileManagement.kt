@@ -35,8 +35,6 @@ object DownloadFileManagement {
         val folder =
             base?.gotoDirectory(relativePath, createMissingDirectories = false) ?: return null
 
-        //if (folder.isDirectory() != false) return null
-
         return folder.listFiles()
             ?.mapNotNull { (it.name() ?: "") to (it.uri() ?: return@mapNotNull null) }
     }

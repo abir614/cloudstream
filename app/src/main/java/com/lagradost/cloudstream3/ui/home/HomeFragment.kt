@@ -120,17 +120,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             }
         }
 
-        //fun Activity.loadHomepageList(
-        //    item: HomePageList,
-        //    deleteCallback: (() -> Unit)? = null,
-        //) {
-        //    loadHomepageList(
-        //        expand = HomeViewModel.ExpandableHomepageList(item, 1, false),
-        //        deleteCallback = deleteCallback,
-        //        expandCallback = null
-        //    )
-        //}
-
         // returns a BottomSheetDialog that will be hidden with OwnHidden upon hide, and must be saved to be able call ownShow in onCreateView
 
         fun Activity.loadHomepageList(
@@ -147,35 +136,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                 false
             )
             bottomSheetDialogBuilder.setContentView(binding.root)
-            //val title = bottomSheetDialogBuilder.findViewById<TextView>(R.id.home_expanded_text)!!
-
-            //title.findViewTreeLifecycleOwner().lifecycle.addObserver()
 
             val item = expand.list
             binding.homeExpandedText.text = item.name
-            // val recycle =
-            //    bottomSheetDialogBuilder.findViewById<AutofitRecyclerView>(R.id.home_expanded_recycler)!!
-            //val titleHolder =
-            //    bottomSheetDialogBuilder.findViewById<FrameLayout>(R.id.home_expanded_drag_down)!!
-
-            // main {
-            //(bottomSheetDialogBuilder.ownerActivity as androidx.fragment.app.FragmentActivity?)?.supportFragmentManager?.fragments?.lastOrNull()?.viewLifecycleOwner?.apply {
-            //    println("GOT LIFE: lifecycle $this")
-            //    this.lifecycle.addObserver(object : DefaultLifecycleObserver {
-            //        override fun onResume(owner: LifecycleOwner) {
-            //            super.onResume(owner)
-            //            println("onResume!!!!")
-            //            bottomSheetDialogBuilder?.ownShow()
-            //        }
-
-            //        override fun onStop(owner: LifecycleOwner) {
-            //            super.onStop(owner)
-            //            bottomSheetDialogBuilder?.ownHide()
-            //        }
-            //    })
-            //}
-            // }
-            //val delete = bottomSheetDialogBuilder.home_expanded_delete
             binding.homeExpandedDelete.isGone = deleteCallback == null
             if (deleteCallback != null) {
                 binding.homeExpandedDelete.setOnClickListener {
@@ -221,7 +184,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                     handleSearchClickCallback(callback)
                     if (callback.action == SEARCH_ACTION_LOAD || callback.action == SEARCH_ACTION_PLAY_FILE) {
                         bottomSheetDialogBuilder.ownHide() // we hide here because we want to resume it later
-                        //bottomSheetDialogBuilder.dismissSafe(this)
                     }
                 }.apply {
                     submitList(item.list)
@@ -385,8 +347,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
 
             validAPIs.add(0, randomApi)
             validAPIs.add(0, noneApi)
-            //val builder: AlertDialog.Builder = AlertDialog.Builder(this)
-            //builder.setView(R.layout.home_select_mainpage)
             val builder =
                 BottomSheetDialog(this)
 
@@ -689,8 +649,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             handleTvBackPress(this)
         }
         binding.apply {
-            //homeChangeApiLoading.setOnClickListener(apiChangeClickListener)
-            //homeChangeApiLoading.setOnClickListener(apiChangeClickListener)
             homeApiFab.setOnClickListener(apiChangeClickListener)
             homeApiFab.setOnLongClickListener {
                 if (currentApiName == noneApi.name) return@setOnLongClickListener false
@@ -980,25 +938,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
 
         homeViewModel.reloadStored()
         homeViewModel.loadAndCancel(DataStoreHelper.currentHomePage, false)
-        //loadHomePage(false)
-
-        // nice profile pic on homepage
-        //home_profile_picture_holder?.isVisible = false
-        // just in case
-
-        //TODO READD THIS
-        /*for (syncApi in OAuth2Apis) {
-            val login = SyncAPI2.loginInfo()
-            val pic = login?.profilePicture
-            if (home_profile_picture?.setImage(
-                    pic,
-                    errorImageDrawable = errorProfilePic
-                ) == true
-            ) {
-                home_profile_picture_holder?.isVisible = true
-                break
-            }
-        }*/
     }
 
     private fun updateTvRailFocus() {

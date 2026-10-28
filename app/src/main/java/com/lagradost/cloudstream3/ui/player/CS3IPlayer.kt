@@ -644,7 +644,6 @@ class CS3IPlayer : IPlayer {
         if (!isAudioOnlyBackground) {
             handleEvent(CSPlayerEvent.Pause, PlayerEventSource.Player)
         }
-        //releasePlayer()
     }
 
     override fun onPause() {
@@ -653,7 +652,6 @@ class CS3IPlayer : IPlayer {
         if (!isAudioOnlyBackground) {
             handleEvent(CSPlayerEvent.Pause, PlayerEventSource.Player)
         }
-        //releasePlayer()
     }
 
     override fun onResume(context: Context) {
@@ -1060,7 +1058,6 @@ class CS3IPlayer : IPlayer {
                     )
 
                     CSPlayerEvent.SkipCurrentChapter -> {
-                        //val dur = this@CS3IPlayer.getDuration() ?: return@apply
                         getCurrentTimestamp()?.let { lastTimeStamp ->
                             if (lastTimeStamp.skipToNextEpisode) {
                                 handleEvent(CSPlayerEvent.NextEpisode, source)
@@ -1653,10 +1650,6 @@ class CS3IPlayer : IPlayer {
                     super.onPlayerError(error)
                 }
 
-                //override fun onCues(cues: MutableList<Cue>) {
-                //    super.onCues(cues.map { cue -> cue.buildUpon().setText("Hello world").setSize(Cue.DIMEN_UNSET).build() })
-                //}
-
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
                     super.onIsPlayingChanged(isPlaying)
                     if (isPlaying) {
@@ -1724,12 +1717,9 @@ class CS3IPlayer : IPlayer {
         timeStamps.forEach { timestamp ->
             exoPlayer?.createMessage { _, _ ->
                 updatedTime(source = PlayerEventSource.Player)
-                //if (payload is EpisodeSkip.SkipStamp) // this should always be true
-                //    onTimestampInvoked?.invoke(payload)
             }
                 ?.setLooper(Looper.getMainLooper())
                 ?.setPosition(timestamp.timestamp.startMs)
-                //?.setPayload(timestamp)
                 ?.setDeleteAfterDelivery(false)
                 ?.send()
         }

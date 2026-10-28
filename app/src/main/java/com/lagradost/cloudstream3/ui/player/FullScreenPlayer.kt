@@ -700,13 +700,6 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
             selectSpeedDialog = null
         }
 
-        // if (isLayout(PHONE)) {
-        //    val builder =
-        //        BottomSheetDialog(act, R.style.AlertDialogCustom)
-        //    builder.setContentView(binding.root)
-        //    builder.setOnDismissListener(dismiss)
-        //    builder.show()
-        //} else {
         val builder =
             AlertDialog.Builder(act, R.style.AlertDialogCustom)
                 .setView(binding.root)
@@ -1022,8 +1015,6 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
 
             if (hasEpisodes)
                 playerEpisodesButton.startAnimation(fadeAnimation)
-            // player_media_route_button?.startAnimation(fadeAnimation)
-            // video_bar.startAnimation(fadeAnimation)
 
             // TITLE
             playerVideoTitleRez.startAnimation(fadeAnimation)

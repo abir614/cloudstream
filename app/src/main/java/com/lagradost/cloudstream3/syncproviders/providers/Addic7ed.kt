@@ -128,11 +128,6 @@ class Addic7ed : SubtitleAPI() {
         return subtitle.data
     }
 
-    // Missing (?_?)
-    // Pair("2", ""),
-    // Pair("3", ""),
-    // Pair("33", ""),
-    // Pair("34", ""),
     // Do not modify unless Addic7ed changes them!
     // as they are the exact values from their website
     private val langTagIETF2Addic7ed = mapOf(

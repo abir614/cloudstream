@@ -8,14 +8,13 @@ import com.lagradost.cloudstream3.utils.StringUtils.encodeUrl
 object NineAnimeHelper {
     private const val nineAnimeKey =
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    private const val cipherKey = "kMXzgyNzT3k5dYab"
 
     fun encodeVrf(text: String, mainKey: String): String {
         return encode(
             encrypt(
                 cipher(mainKey, encode(text)),
                 nineAnimeKey
-        )//.replace("""=+$""".toRegex(), "")
+            )
         )
     }
 

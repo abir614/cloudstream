@@ -20,7 +20,6 @@ class AsianEmbedHelper {
             if (!links.isNullOrEmpty()) {
                 links.amap {
                     val datavid = it.attr("data-video")
-                    //Log.i("AsianEmbed", "Result => (datavid) ${datavid}")
                     if (datavid.isNotBlank()) {
                         val res = loadExtractor(datavid, url, subtitleCallback, callback)
                         Log.i("AsianEmbed", "Result => ($res) (datavid) $datavid")

@@ -494,8 +494,6 @@ class ResultViewModel2 : ViewModel() {
     private var preferDubStatus: DubStatus? = null
     private var preferStartEpisode: Int? = null
     private var preferStartSeason: Int? = null
-    //private val currentIsMovie get() = currentResponse?.isEpisodeBased() == false
-    //private val currentHeaderName get() = currentResponse?.name
 
 
     private val _page: MutableLiveData<Resource<ResultData>?> =
@@ -1237,8 +1235,6 @@ class ResultViewModel2 : ViewModel() {
     ) {
         // TODO Add skip loading here
         loadLinks(result, isVisible = true, sourceTypes, isCasting = isCasting) { links ->
-            // Could not find a better way to do this
-            //val context = CloudStreamApp.context
             postPopup(
                 text,
                 links.links.map { txt("${it.name} ${Qualities.getStringByInt(it.quality)}") }
@@ -1680,7 +1676,6 @@ class ResultViewModel2 : ViewModel() {
         meta: SyncAPI.SyncResult?,
         syncs: Map<String, String>? = null
     ): Pair<LoadResponse, Boolean> {
-        //if (meta == null) return resp to false
         var updateEpisodes = false
         val out = resp.apply {
             Log.i(TAG, "applyMeta")

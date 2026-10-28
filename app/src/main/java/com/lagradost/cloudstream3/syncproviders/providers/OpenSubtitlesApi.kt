@@ -157,10 +157,8 @@ class OpenSubtitlesApi : SubtitleAPI() {
                 val year = featureDetails?.year ?: query.year
                 val type = if ((resSeasonNum ?: 0) > 0) TvType.TvSeries else TvType.Movie
                 val isHearingImpaired = attr.hearingImpaired ?: false
-                //Log.i(TAG, "Result id/name => ${item.id} / $name")
                 item.attributes?.files?.forEach { file ->
                     val resultData = file.fileId?.toString() ?: ""
-                    //Log.i(TAG, "Result file => ${file.fileId} / ${file.fileName}")
                     results.add(
                         AbstractSubtitleEntities.SubtitleEntity(
                             idPrefix = this.idPrefix,
@@ -207,7 +205,6 @@ class OpenSubtitlesApi : SubtitleAPI() {
             )
         )
         Log.i(TAG, "Request result  => (${req.code}) ${req.text}")
-        //Log.i(TAG, "Request headers => ${req.headers}")
         if (req.isSuccessful) {
             AppUtils.tryParseJson<ResultDownloadLink>(req.text)?.let {
                 val link = it.link ?: ""

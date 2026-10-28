@@ -47,18 +47,7 @@ open class Vidsonic : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
-        // Extracted JavaScript code that decodes the encrypted m3u8 stream URL:
-        //
-        // const _0x1 = '3363616238|3638666534|6264323565|3666616366|6636333662|6230626339|30613d3564|6d26743130|6b74693170|336563793d|64695f656c|6966263634|3332363033|3737313d73|6572697078|6526333d64|695f726576|7265733f38|75336d2e72|657473616d|2f7431306b|7469317033|6563792f38|392f657275|6365732f74|656e2e6369|6e6f736469|762e31302d|73752d7473|2f2f3a7370|747468';
-        // const _0x2 = function(_0x3) {
-        //    const _0x4 = _0x3.split('|').join('');
-        //    let _0x5 = '';
-        //     for (let _0x6 = 0; _0x6 < _0x4.length; _0x6 += 2) {
-        //       _0x5 += String.fromCharCode(parseInt(_0x4.substr(_0x6, 2), 16));
-        //     }
-        //     return _0x5.split('').reverse().join('');
-        // };
-        // const _0x7 = _0x2(_0x1); <-- now contains the stream URL
+        // Decodes hex pairs and reverses the result to extract the stream URL
         val response = app.get(url)
         val encodedStreamUrl = extractEncodedVideoUrl(response)
 

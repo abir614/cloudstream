@@ -191,7 +191,6 @@ class TestViewModel2 : ViewModel(), StateContainer<TestState> by DefaultStateCon
 
                     /** By default, they are idle, but we also keep the old data */
                     val newData = (newInternalApis.mapValues { entry ->
-                        // val pluginInstance = (entry.value.sourcePlugin?.let { PluginManager.plugins[it] } as? Plugin)?.filename
                         // There is no way to get the icon without a get request...
                         ImmutableTestResult(
                             language = entry.value.lang,

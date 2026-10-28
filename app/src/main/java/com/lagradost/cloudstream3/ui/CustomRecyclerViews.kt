@@ -26,26 +26,6 @@ class GrdLayoutManager(val context: Context, spanCount: Int) :
         }
     }
 
-    /*override fun onRequestChildFocus(
-        parent: RecyclerView,
-        state: RecyclerView.State,
-        child: View,
-        focused: View?
-    ): Boolean {
-        // android.widget.FrameLayout$LayoutParams cannot be cast to androidx.recyclerview.widget.RecyclerView$LayoutParams
-        return try {
-            if(focused != null) {
-              //  val pos = maxOf(0, getPosition(focused) - 2) // IDK WHY
-                val pos = getPosition(focused)
-                if(pos >= 0) parent.scrollToPosition(pos)
-            }
-
-            super.onRequestChildFocus(parent, state, child, focused)
-        } catch (e: Exception) {
-            false
-        }
-    }*/
-
     // Allows moving right and left with focus https://gist.github.com/vganin/8930b41f55820ec49e4d
     override fun onInterceptFocusSearch(focused: View, direction: Int): View? {
         return try {

@@ -197,12 +197,6 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
                     id = "quickSearchMasterRecycler".hashCode(),
                     { callback ->
                         SearchHelper.handleSearchClickCallback(callback)
-                        //when (callback.action) {
-                        //SEARCH_ACTION_LOAD -> {
-                        //    clickCallback?.invoke(callback)
-                        //}
-                        //    else -> SearchHelper.handleSearchClickCallback(activity, callback)
-                        //}
                     },
                     { item ->
                         bottomSheetDialog = activity?.loadHomepageList(item, dismissCallback = {
@@ -245,7 +239,6 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
                     }
 
                     submitList(newItems)
-                    //notifyDataSetChanged()
                 }
             } catch (e: Exception) {
                 logError(e)
@@ -287,7 +280,6 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
                 }
 
                 is Resource.Failure -> {
-                    // Toast.makeText(activity, "Server error", Toast.LENGTH_LONG).show()
                     searchExitIcon?.alpha = 1f
                     binding.quickSearchLoadingBar.alpha = 0f
                 }

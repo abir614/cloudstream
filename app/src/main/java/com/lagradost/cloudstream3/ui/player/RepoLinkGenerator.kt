@@ -42,10 +42,6 @@ class RepoLinkGenerator(
     override val canSkipLoading = true
     override fun getId(index: Int): Int? = videos.getOrNull(index)?.id
 
-    // this is a simple array that is used to instantly load links if they are already loaded
-    //var linkCache = Array<Set<ExtractorLink>>(size = episodes.size, init = { setOf() })
-    //var subsCache = Array<Set<SubtitleData>>(size = episodes.size, init = { setOf() })
-
     @Throws
     override suspend fun generateLinks(
         clearCache: Boolean,

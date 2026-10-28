@@ -276,8 +276,6 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
         var comingSoon = false
 
         binding.apply {
-            //episodesShadow.rotationX = 180.0f//if(episodesShadow.isRtl()) 180.0f else 0.0f
-
             // parallax on background
             resultFinishLoading.setOnScrollChangeListener(NestedScrollView.OnScrollChangeListener { view, _, scrollY, _, oldScrollY ->
                 backgroundPosterHolder.translationY = -scrollY.toFloat() * 0.8f

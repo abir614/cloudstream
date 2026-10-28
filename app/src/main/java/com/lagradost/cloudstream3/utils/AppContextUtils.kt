@@ -42,9 +42,6 @@ import androidx.navigation.fragment.findNavController
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.tvprovider.media.tv.TvContractCompat
-import androidx.tvprovider.media.tv.WatchNextProgram
-import androidx.tvprovider.media.tv.WatchNextProgram.fromCursor
 import androidx.viewpager2.widget.ViewPager2
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastState
@@ -114,18 +111,6 @@ object AppContextUtils {
         }, 200)
     }
 
-    //fun Context.deleteFavorite(data: SearchResponse) {
-    //    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-    //    safe {
-    //        val existingId =
-    //            getWatchNextProgramByVideoId(data.url, this).second ?: return@safe
-    //        contentResolver.delete(
-//
-    //            TvContractCompat.buildWatchNextProgramUri(existingId),
-    //            null, null
-    //        )
-    //    }
-    //}
     fun String?.html(): Spanned {
         return getHtmlText(this ?: return "".toSpanned())
     }
@@ -140,51 +125,6 @@ object AppContextUtils {
             logError(e)
             text.toSpanned()
         }
-    }
-
-    /** Get channel ID by name */
-    @SuppressLint("RestrictedApi")
-    private fun buildWatchNextProgramUri(
-        context: Context,
-        card: DataStoreHelper.ResumeWatchingResult,
-        resumeWatching: DownloadObjects.ResumeWatching?
-    ): WatchNextProgram {
-        val isSeries = card.type?.isMovieType() == false
-        val title = if (isSeries) {
-            context.getNameFull(card.name, card.episode, card.season)
-        } else {
-            card.name
-        }
-
-        val builder = WatchNextProgram.Builder()
-            .setEpisodeTitle(title)
-            .setType(
-                if (isSeries) {
-                    TvContractCompat.WatchNextPrograms.TYPE_TV_EPISODE
-                } else TvContractCompat.WatchNextPrograms.TYPE_MOVIE
-            )
-            .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
-            .setTitle(title)
-            .setPosterArtUri(card.posterUrl?.toUri())
-            .setIntentUri((card.id?.let {
-                "$APP_STRING_RESUME_WATCHING://$it"
-            } ?: card.url).toUri())
-            .setInternalProviderId(card.url)
-            .setLastEngagementTimeUtcMillis(
-                resumeWatching?.updateTime ?: System.currentTimeMillis()
-            )
-
-        card.watchPos?.let {
-            builder.setDurationMillis(it.duration.toInt())
-            builder.setLastPlaybackPositionMillis(it.position.toInt())
-        }
-
-        if (isSeries)
-            card.episode?.let {
-                builder.setEpisodeNumber(it)
-            }
-
-        return builder.build()
     }
 
     // https://stackoverflow.com/a/67441735/13746422
@@ -233,75 +173,6 @@ object AppContextUtils {
         }
     }
 
-    @SuppressLint("RestrictedApi")
-    fun getAllWatchNextPrograms(context: Context): Set<Long> {
-        val COLUMN_WATCH_NEXT_ID_INDEX = 0
-        val cursor = context.contentResolver.query(
-            TvContractCompat.WatchNextPrograms.CONTENT_URI,
-            WatchNextProgram.PROJECTION,
-            /* selection = */ null,
-            /* selectionArgs = */ null,
-            /* sortOrder = */ null
-        )
-        val set = mutableSetOf<Long>()
-        cursor?.use {
-            if (it.moveToFirst()) {
-                do {
-                    set.add(cursor.getLong(COLUMN_WATCH_NEXT_ID_INDEX))
-                } while (it.moveToNext())
-            }
-        }
-        return set
-    }
-
-    /**
-     * Find the Watch Next program for given id.
-     * Returns the first instance available.
-     */
-    @SuppressLint("RestrictedApi")
-    // Suppress RestrictedApi due to https://issuetracker.google.com/138150076
-    fun findFirstWatchNextProgram(context: Context, predicate: (Cursor) -> Boolean):
-            Pair<WatchNextProgram?, Long?> {
-        val COLUMN_WATCH_NEXT_ID_INDEX = 0
-//        val COLUMN_WATCH_NEXT_INTERNAL_PROVIDER_ID_INDEX = 1
-//        val COLUMN_WATCH_NEXT_COLUMN_BROWSABLE_INDEX = 2
-
-        val cursor = context.contentResolver.query(
-            TvContractCompat.WatchNextPrograms.CONTENT_URI,
-            WatchNextProgram.PROJECTION,
-            /* selection = */ null,
-            /* selectionArgs = */ null,
-            /* sortOrder = */ null
-        )
-        cursor?.use {
-            if (it.moveToFirst()) {
-                do {
-                    if (predicate(cursor)) {
-                        return fromCursor(cursor) to cursor.getLong(COLUMN_WATCH_NEXT_ID_INDEX)
-                    }
-                } while (it.moveToNext())
-            }
-        }
-        return null to null
-    }
-
-    /**
-     * Query the Watch Next list and find the program with given videoId.
-     * Return null if not found.
-     */
-
-    @RequiresApi(Build.VERSION_CODES.O)
-    @SuppressLint("Range")
-    @Synchronized
-    private fun getWatchNextProgramByVideoId(
-        id: String,
-        context: Context
-    ): Pair<WatchNextProgram?, Long?> {
-        return findFirstWatchNextProgram(context) { cursor ->
-            (cursor.getString(cursor.getColumnIndex(COLUMN_INTERNAL_PROVIDER_ID)) == id)
-        }
-    }
-
     // https://github.com/googlearchive/leanback-homescreen-channels/blob/master/app/src/main/java/com/google/android/tvhomescreenchannels/SampleTvProvider.java
     @SuppressLint("RestrictedApi")
     @Throws
@@ -340,7 +211,6 @@ object AppContextUtils {
         ) ?: return hashSet
 
         val names = DubStatus.values().map { it.name }.toHashSet()
-        //if(realSet.isEmpty()) return hashSet
 
         return list.filter { names.contains(it) }.map { DubStatus.valueOf(it) }.toHashSet()
     }
@@ -348,7 +218,6 @@ object AppContextUtils {
     fun Context.getApiProviderLangSettings(): HashSet<String> {
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(this)
         val hashSet = hashSetOf(AllLanguagesName) // def is all languages
-//        hashSet.add("en") // def is only en
         val list = settingsManager.getStringSet(
             this.getString(R.string.provider_lang_key),
             hashSet
@@ -471,8 +340,7 @@ object AppContextUtils {
                 } ?: listOf()*/
             if (filteredSearchQuality.isNotEmpty()) {
                 return data.filter { item ->
-                    val searchQualVal = item.quality //?.ordinal ?: -1
-                    //Log.i("filterSearch", "QuickSearch item => ${item.toJson()}")
+                    val searchQualVal = item.quality
                     !filteredSearchQuality.contains(searchQualVal)
                 }
             }
@@ -493,8 +361,7 @@ object AppContextUtils {
                     name = data.name,
                     isHorizontalImages = data.isHorizontalImages,
                     list = data.list.filter { item ->
-                        val searchQualVal = item.quality //?.ordinal ?: -1
-                        //Log.i("filterSearch", "QuickSearch item => ${item.toJson()}")
+                        val searchQualVal = item.quality
                         !filteredSearchQuality.contains(searchQualVal)
                     }
                 )
@@ -714,7 +581,6 @@ object AppContextUtils {
         }
 
         this.runOnUiThread {
-            // viewModelStore.clear()
             this.navigate(
                 getResultsId(),
                 ResultFragment.newInstance(url, apiName, name, startAction, startValue)
@@ -736,13 +602,11 @@ object AppContextUtils {
         startValue: Int? = null,
     ) {
         this?.runOnUiThread {
-            // viewModelStore.clear()
             this.navigate(
                 getResultsId(),
                 ResultFragment.newInstance(card, startAction, startValue)
             )
         }
-        //(this as? AppCompatActivity?)?.loadResult(card.url, card.apiName, startAction, startValue)
     }
 
     fun Activity.requestLocalAudioFocus(focusRequest: AudioFocusRequest?) {

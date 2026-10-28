@@ -160,7 +160,6 @@ abstract class AccountManager {
             if (minutes < 0) {
                 return completedValue
             }
-            //println("$days $hours $minutes")
             return "${if (days != 0L) "$days" + "d " else ""}${if (hours != 0L) "$hours" + "h " else ""}${minutes}m"
         }
     }

@@ -59,12 +59,6 @@ class SetupFragmentExtensions : BaseFragment<FragmentSetupExtensionsBinding>(
                     PluginsViewModel.downloadAll(activity, it, null)
                 }).apply { submitList(repositories.toList()) }
             }
-//            else {
-//                list_repositories?.setOnClickListener {
-//                    // Open webview on tv if browser fails
-//                    openBrowser(PUBLIC_REPOSITORIES_LIST, isTvSettings(), this)
-//                }
-//            }
         }
     }
 

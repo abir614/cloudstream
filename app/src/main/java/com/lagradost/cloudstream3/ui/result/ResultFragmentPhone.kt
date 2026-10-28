@@ -312,20 +312,6 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
             }
             binding?.resultFullscreenHolder?.isVisible = !isSuccess && isFullScreenPlayer
         }
-        //player_view?.apply {
-        //alpha = 0.0f
-        //ObjectAnimator.ofFloat(player_view, "alpha", 1f).apply {
-        //    duration = 200
-        //    start()
-        //}
-
-        //val fadeIn: Animation = AlphaAnimation(0.0f, 1f).apply {
-        //    interpolator = DecelerateInterpolator()
-        //    duration = 2000
-        //    fillAfter = true
-        //}
-        //startAnimation(fadeIn)
-        //}
     }
 
     private fun setTrailers(trailers: List<Pair<ExtractorLink, String>>?) {
@@ -1391,8 +1377,6 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
             }
         }
 
-//        val preferDub = context?.getApiDubstatusSettings()?.all { it == DubStatus.Dubbed } == true
-
         observe(viewModel.dubSubSelections) { range ->
             resultBinding?.resultDubSelect?.setOnClickListener { view ->
                 view?.context?.let { ctx ->
@@ -1447,13 +1431,6 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                         {}) { itemId ->
                         viewModel.changeSeason(names[itemId].first)
                     }
-
-
-                    //view.popupMenuNoIconsAndNoStringRes(names.mapIndexed { index, (_, name) ->
-                    //    index to name
-                    //}) {
-                    //    viewModel.changeSeason(names[itemId].first)
-                    //}
                 }
             }
         }

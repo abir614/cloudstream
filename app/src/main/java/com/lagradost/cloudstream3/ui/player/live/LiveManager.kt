@@ -31,15 +31,12 @@ class LivestreamChunk(
     fun isPositionLive(position: Long): Boolean {
         val currentTime = System.currentTimeMillis()
         val livePosition = targetPosition + (currentTime - receiveTimeMs)
-        val withinLive = position + LIVE_MARGIN > livePosition - PREFERRED_LIVE_OFFSET
-        // println("Position: $position, livePosition: ${livePosition}, Behind live: ${livePosition-position}, within live: $withinLive")
-        return withinLive
+        return position + LIVE_MARGIN > livePosition - PREFERRED_LIVE_OFFSET
     }
 
     fun getTimeAheadOfLive(position: Long): Long {
         val currentTime = System.currentTimeMillis()
         val livePosition = targetPosition + (currentTime - receiveTimeMs)
-        // println("Ahead of live: ${position-livePosition}")
         return position - livePosition
     }
 }

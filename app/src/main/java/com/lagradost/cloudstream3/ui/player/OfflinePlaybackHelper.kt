@@ -45,7 +45,6 @@ object OfflinePlaybackHelper {
             ?.mapNotNull { tryParseJson<CloudStreamPackage.MinimalSubtitleLink>(it) } ?: emptyList()
 
         val id = intent.getIntExtra(CloudStreamPackage.ID_EXTRA, -1)
-        //val title = intent.getStringExtra(CloudStreamPackage.TITLE_EXTRA) // unused
         val pos = intent.getLongExtra(CloudStreamPackage.POSITION_EXTRA, -1L)
         val dur = intent.getLongExtra(CloudStreamPackage.DURATION_EXTRA, -1L)
 

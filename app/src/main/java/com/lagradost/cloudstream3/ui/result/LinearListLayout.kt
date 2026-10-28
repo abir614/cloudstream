@@ -160,7 +160,6 @@ open class LinearListLayout(context: Context?) :
                 return null
             }
 
-            //if (direction == View.FOCUS_RIGHT || direction == View.FOCUS_LEFT) return null
             if (direction == View.FOCUS_DOWN) 1 else -1
         }
 
@@ -222,52 +221,4 @@ open class LinearListLayout(context: Context?) :
             )
         }
     }
-
-    /*override fun onRequestChildFocus(
-        parent: RecyclerView,
-        state: RecyclerView.State,
-        child: View,
-        focused: View?
-    ): Boolean {
-        return super.onRequestChildFocus(parent, state, child, focused)
-        getPosition(getCorrectParent(focused ?: return true))?.let {
-            val startView = findFirstVisibleChildClosestToStart(true,true)
-            val endView = findFirstVisibleChildClosestToEnd(true,true)
-            val start = getPosition(startView)
-            val end = getPosition(endView)
-            fill(parent,LayoutState())
-
-            val helper = mOrientationHelper ?: return false
-            val laidOutArea: Int = abs(
-                helper.getDecoratedEnd(startView)
-                        - helper.getDecoratedStart(endView)
-            )
-            val itemRange: Int = abs(
-                (start
-                        - end)
-            ) + 1
-
-            val avgSizePerRow = laidOutArea.toFloat() / itemRange
-
-            return Math.round(
-                itemsBefore * avgSizePerRow + ((orientation.getStartAfterPadding()
-                        - orientation.getDecoratedStart(startChild)))
-            )
-            recyclerView.scrollToPosition(it)
-        }
-        return true*/
-
-    //return super.onRequestChildFocus(parent, state, child, focused)
-    /* if (focused == null || focused == child) {
-         return super.onRequestChildFocus(parent, state, child, focused)
-     }
-
-     try {
-         val pos = getPosition(getCorrectParent(focused) ?: return true)
-         scrollToPosition(pos)
-     } catch (e: Exception) {
-         logError(e)
-     }
-     return true
-}*/
 }

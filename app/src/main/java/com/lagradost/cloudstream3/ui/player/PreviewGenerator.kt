@@ -298,9 +298,6 @@ private class M3u8PreviewGenerator(override var params: ImageParams) : IPreviewG
     private fun clear() {
         synchronized(images) {
             currentJob?.cancel()
-            // for (i in images.indices) {
-            //     images[i]?.recycle()
-            // }
             images = arrayOf()
             prefixSum = arrayOf()
             loadedImages = 0
@@ -322,10 +319,6 @@ private class M3u8PreviewGenerator(override var params: ImageParams) : IPreviewG
         currentJob = ioSafe {
             withContext(Dispatchers.IO) {
                 Log.i(TAG, "Loading with url = $url headers = $headers")
-                //tmpFile =
-                //    File.createTempFile("video", ".ts", context.cacheDir).apply {
-                //        deleteOnExit()
-                //    }
                 val retriever = MediaMetadataRetriever()
                 val hsl = M3u8Helper2.hslLazy(
                     M3u8Helper.M3u8Stream(
@@ -470,10 +463,6 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
         synchronized(images) {
             loadedLod = 0
             loadedImages = 0
-            // for (i in images.indices) {
-            //    images[i]?.recycle()
-            //     images[i] = null
-            //}
             images.fill(null)
         }
     }
@@ -516,8 +505,6 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
                 ?: throw IllegalArgumentException("Bad video duration")
         this.durationMs = durationMs
         val durationUs = (durationMs * 1000L).toFloat()
-        //val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toInt() ?: throw IllegalArgumentException("Bad video width")
-        //val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toInt() ?: throw IllegalArgumentException("Bad video height")
 
         // log2 # 10s durations in the video ~= how many segments we have
         val maxLod = ceil(log2((durationMs / 10_000).toFloat())).toInt().coerceIn(MIN_LOD, MAX_LOD)

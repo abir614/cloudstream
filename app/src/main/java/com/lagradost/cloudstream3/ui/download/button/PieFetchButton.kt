@@ -136,8 +136,6 @@ open class PieFetchButton(context: Context, attributeSet: AttributeSet) :
         statusView = findViewById(R.id.image_download_status)
         
         progressBar.progressDrawable = ContextCompat.getDrawable(context, progressDrawable)
-
-        // resetView()
         onInflate()
     }
 
@@ -220,15 +218,12 @@ open class PieFetchButton(context: Context, attributeSet: AttributeSet) :
                     list
                 ) {
                     callback(DownloadClickEvent(itemId, card))
-                    // callback.invoke(DownloadClickEvent(itemId, data))
                 }
             }
         }
 
         view.setOnLongClickListener {
             callback(DownloadClickEvent(DOWNLOAD_ACTION_LONG_CLICK, card))
-
-            // clickCallback.invoke(DownloadClickEvent(DOWNLOAD_ACTION_LONG_CLICK, data))
             return@setOnLongClickListener true
         }
     }

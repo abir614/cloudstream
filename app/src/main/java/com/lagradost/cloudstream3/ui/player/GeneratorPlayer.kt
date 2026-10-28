@@ -314,7 +314,6 @@ class GeneratorPlayer : FullScreenPlayer() {
         }
 
         currentSelectedSubtitles = subtitle
-        //Log.i(TAG, "setSubtitles = $subtitle")
         return player.setPreferredSubtitles(subtitle)
     }
 
@@ -671,10 +670,7 @@ class GeneratorPlayer : FullScreenPlayer() {
 
         showDownloadProgress(DownloadEvent(0, 0, 0, null))
 
-        // uiReset() // Removed due to UX
-
         currentSelectedLink = link
-        //  setEpisodes(viewModel.getAllMeta() ?: emptyList())
         setPlayerDimen(null)
         setTitle()
         if (!sameEpisode) {
@@ -1181,7 +1177,6 @@ class GeneratorPlayer : FullScreenPlayer() {
     override fun showMirrorsDialogue() {
         try {
             currentSelectedSubtitles = player.getCurrentPreferredSubtitle()
-            //println("CURRENT SELECTED :$currentSelectedSubtitles of $currentSubs")
             context?.let { ctx ->
                 val isPlaying = player.getIsPlaying()
                 player.handleEvent(CSPlayerEvent.Pause, PlayerEventSource.UI)
@@ -1581,7 +1576,6 @@ class GeneratorPlayer : FullScreenPlayer() {
 
     override fun showTracksDialogue() {
         try {
-            //println("CURRENT SELECTED :$currentSelectedSubtitles of $currentSubs")
             context?.let { ctx ->
                 val tracks = player.getVideoTracks()
 
@@ -2451,9 +2445,6 @@ class GeneratorPlayer : FullScreenPlayer() {
         playerBinding?.skipChapterButton?.apply {
             val showWidth = 170.toPx
             val noShowWidth = 10.toPx
-            //if((show && width == showWidth) || (!show && width == noShowWidth)) {
-            //    return
-            //}
             val to = if (show) showWidth else noShowWidth
             val from = if (!show) showWidth else noShowWidth
 

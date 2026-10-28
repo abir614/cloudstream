@@ -232,7 +232,6 @@ object VideoDownloadManager {
     val downloadDeleteEvent = Event<Int>()
     val downloadEvent = Event<Pair<Int, DownloadActionType>>()
     val downloadProgressEvent = Event<Triple<Int, Long, Long>>()
-//    val downloadQueue = LinkedList<DownloadResumePackage>()
 
     private var hasCreatedNotChannel = false
 
@@ -1045,7 +1044,6 @@ object VideoDownloadManager {
         }
 
         var fileStream: OutputStream? = null
-        //var requestStream: InputStream? = null
         val metadata = DownloadMetaData(
             totalBytes = 0,
             bytesDownloaded = 0,

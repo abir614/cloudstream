@@ -123,10 +123,6 @@ class HomeViewModel : ViewModel() {
 
     private var currentShuffledList: List<SearchResponse> = listOf()
 
-    private fun autoloadRepo(): APIRepository {
-        return APIRepository(apis.withLock { apis.first { it.hasMainPage } })
-    }
-
     private val _availableWatchStatusTypes =
         MutableLiveData<Pair<Set<WatchType>, Set<WatchType>>>()
     val availableWatchStatusTypes: LiveData<Pair<Set<WatchType>, Set<WatchType>>> =
@@ -182,7 +178,6 @@ class HomeViewModel : ViewModel() {
         }
 
         val watchPrefNotNull = preferredWatchStatus ?: EnumSet.of(currentWatchTypes.first())
-        //if (currentWatchTypes.any { watchPrefNotNull.contains(it) }) watchPrefNotNull else listOf(currentWatchTypes.first())
 
         DataStoreHelper.homeBookmarkedList = watchPrefNotNull.map { it.internalId }.toIntArray()
         _availableWatchStatusTypes.postValue(
@@ -203,7 +198,6 @@ class HomeViewModel : ViewModel() {
     private var onGoingLoad: Job? = null
     private var isCurrentlyLoadingName: String? = null
     private fun loadAndCancel(api: MainAPI, forceReload: Boolean = false) {
-        //println("loaded ${api.name}")
         onGoingLoad?.cancel()
         isCurrentlyLoadingName = api.name
         onGoingLoad = load(api, forceReload)
@@ -406,11 +400,7 @@ class HomeViewModel : ViewModel() {
     }
 
     private fun load(api: MainAPI, forceReload: Boolean = false): Job = ioSafe {
-        repo = //if (api != null) {
-            APIRepository(api)
-        //} else {
-        //    autoloadRepo()
-        //}
+        repo = APIRepository(api)
 
         _apiName.postValue(repo?.name)
         _randomItems.postValue(listOf())
@@ -556,10 +546,8 @@ class HomeViewModel : ViewModel() {
         fromUI: Boolean = false
     ) =
         ioSafe {
-            //println("trying to load $preferredApiName")
             // Since plugins are loaded in stages this function can get called multiple times.
             // The issue with this is that the homepage may be fetched multiple times while the first request is loading
-            // api?.let { expandable[it.name]?.list?.list?.isNotEmpty() } == true
             val currentPage = page.value
 
             // if we don't need to reload and we have a valid homepage or currently loading the same thing then return

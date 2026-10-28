@@ -48,9 +48,6 @@ class SyncViewModel : ViewModel() {
 
     // prefix, id
     private val syncs = mutableMapOf<String, String>()
-    //private val _syncIds: MutableLiveData<MutableMap<String, String>> =
-    //    MutableLiveData(mutableMapOf())
-    //val syncIds: LiveData<MutableMap<String, String>> get() = _syncIds
 
     fun getSyncs(): Map<String, String> {
         return syncs
@@ -84,7 +81,6 @@ class SyncViewModel : ViewModel() {
         Log.i(TAG, "addSync $idPrefix = $id")
 
         syncs[idPrefix] = id
-        //_syncIds.postValue(syncs)
         return true
     }
 

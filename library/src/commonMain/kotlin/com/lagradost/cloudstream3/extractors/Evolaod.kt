@@ -10,7 +10,6 @@ class Evoload1 : Evoload() {
 open class Evoload : ExtractorApi() {
     override val name: String = "Evoload"
     override val mainUrl: String = "https://www.evoload.io"
-    //private val srcRegex = Regex("""video .*src="(.*)""""")  // would be possible to use the parse and find src attribute
     override val requiresReferer = true
 
 

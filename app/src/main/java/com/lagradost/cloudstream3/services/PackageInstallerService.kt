@@ -160,7 +160,6 @@ class PackageInstallerService : Service() {
         state: ApkInstaller.InstallProgressStatus,
         contentText: String? = null
     ) {
-//        Log.d(LOG_TAG, "Downloading app update progress $percentage | $state")
         val text = when (state) {
             ApkInstaller.InstallProgressStatus.Installing -> R.string.update_notification_installing
             ApkInstaller.InstallProgressStatus.Preparing, ApkInstaller.InstallProgressStatus.Downloading -> R.string.update_notification_downloading

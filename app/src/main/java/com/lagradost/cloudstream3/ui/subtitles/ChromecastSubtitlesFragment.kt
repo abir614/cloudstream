@@ -64,20 +64,6 @@ class ChromecastSubtitlesFragment : BaseFragment<ChromecastSubtitleSettingsBindi
     companion object {
         val applyStyleEvent = Event<SaveChromeCaptionStyle>()
 
-        //fun Context.fromSaveToStyle(data: SaveChromeCaptionStyle): CaptionStyleCompat {
-        //    return CaptionStyleCompat(
-        //        data.foregroundColor,
-        //        data.backgroundColor,
-        //        data.windowColor,
-        //        data.edgeType,
-        //        data.edgeColor,
-        //        if (typeface == null) Typeface.SANS_SERIF else ResourcesCompat.getFont(
-        //            this,
-        //            typeface
-        //        )
-        //    )
-        //}
-
         fun push(activity: Activity?, hide: Boolean = true) {
             activity.navigate(R.id.global_to_navigation_chrome_subtitles, Bundle().apply {
                 putBoolean("hide", hide)
@@ -291,13 +277,11 @@ class ChromecastSubtitlesFragment : BaseFragment<ChromecastSubtitleSettingsBindi
                 dismissCallback
             ) { index ->
                 state = state.copy(fontScale = fontSizes.map { it.first }[index])
-                //textView.context.updateState() // font size not changed
             }
         }
 
         binding.subsFontSize.setOnLongClickListener { _ ->
             state = state.copy(fontScale = defaultChromeCastSubtitleState.fontScale)
-            //textView.context.updateState() // font size not changed
             showToast(R.string.subs_default_reset_toast, Toast.LENGTH_SHORT)
             return@setOnLongClickListener true
         }
@@ -341,7 +325,6 @@ class ChromecastSubtitlesFragment : BaseFragment<ChromecastSubtitleSettingsBindi
         binding.applyBtt.setOnClickListener {
             it.context.saveStyle(state)
             applyStyleEvent.invoke(state)
-            //it.context.fromSaveToStyle(state)
             activity?.popCurrentPage()
         }
 

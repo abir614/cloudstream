@@ -43,7 +43,6 @@ object BiometricAuthenticator {
                     showToast("$errString")
                     Log.e(TAG, "$errorCode")
                     authCallback?.onAuthenticationError()
-                        //activity.finish()
                 }
 
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {

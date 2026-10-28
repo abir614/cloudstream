@@ -141,7 +141,6 @@ class HomeParentItemAdapterPreview(
                     "bookmarkRecyclerView",
                     bookmarkRecyclerView.layoutManager?.onSaveInstanceState()
                 )
-                //putInt("previewViewpager", previewViewpager.currentItem)
             }
 
         override fun restore(state: Bundle) {
@@ -405,8 +404,6 @@ class HomeParentItemAdapterPreview(
                 }
             }
             (binding as? FragmentHomeHeadBinding)?.apply {
-                //homePreviewImage.setImage(item.posterUrl, item.posterHeaders)
-
                 homePreviewPlay.setOnClickListener { view ->
                     viewModel.click(
                         LoadClickCallback(
@@ -628,7 +625,6 @@ class HomeParentItemAdapterPreview(
                     } else {
                         previewViewpager.setCurrentItem(previewViewpager.currentItem - 1, true)
                         binding.homePreviewInfoBtt.requestFocus()
-                        //binding.homePreviewPlayBtt.requestFocus()
                     }
                 }
             }

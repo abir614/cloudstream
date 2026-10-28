@@ -1439,10 +1439,6 @@ abstract class ExtractorApi {
     /** Determines which plugin a given provider is from. This is the full path to the plugin. */
     var sourcePlugin: String? = null
 
-    //suspend fun getSafeUrl(url: String, referer: String? = null): List<ExtractorLink>? {
-    //    return safeAsync { getUrl(url, referer) }
-    //}
-
     // this is the new extractorapi, override to add subtitles and stuff
     @Throws
     open suspend fun getUrl(

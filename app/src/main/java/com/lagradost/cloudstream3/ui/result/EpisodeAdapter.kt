@@ -211,15 +211,12 @@ class EpisodeAdapter(
                     val name =
                         if (item.name == null) "${episodeText.context.getString(R.string.episode)} ${item.episode}" else "${item.episode}. ${item.name}"
                     episodeFiller.isVisible = item.isFiller == true
-                    episodeText.text =
-                        name//if(card.isFiller == true) episodeText.context.getString(R.string.filler).format(name) else name
+                    episodeText.text = name
                     episodeText.isSelected = true // is needed for text repeating
 
                     if (item.videoWatchState == VideoWatchState.Watched) {
                         // This cannot be done in getDisplayPosition() as when you have not watched something
                         // the duration and position is 0
-                        //episodeProgress.max = 1
-                        //episodeProgress.progress = 1
                         episodePlayIcon.setImageResource(R.drawable.ic_baseline_check_24)
                         episodeProgress.isVisible = false
                     } else {
@@ -432,8 +429,7 @@ class EpisodeAdapter(
                     val name =
                         if (item.name == null) "${episodeText.context.getString(R.string.episode)} ${item.episode}" else "${item.episode}. ${item.name}"
                     episodeFiller.isVisible = item.isFiller == true
-                    episodeText.text =
-                        name//if(card.isFiller == true) episodeText.context.getString(R.string.filler).format(name) else name
+                    episodeText.text = name
                     episodeText.isSelected = true // is needed for text repeating
 
                     if (item.videoWatchState == VideoWatchState.Watched) {
@@ -470,16 +466,12 @@ class EpisodeAdapter(
                     if (isLayout(TV)) {
                         itemView.isFocusable = true
                         itemView.isFocusableInTouchMode = true
-                        //itemView.touchscreenBlocksFocus = false
                     }
 
                     itemView.setOnLongClickListener {
                         clickCallback.invoke(EpisodeClickEvent(position, ACTION_SHOW_OPTIONS, item))
                         return@setOnLongClickListener true
                     }
-
-                    //binding.resultEpisodeDownload.isVisible = hasDownloadSupport
-                    //binding.resultEpisodeProgressDownloaded.isVisible = hasDownloadSupport
                 }
             }
         }

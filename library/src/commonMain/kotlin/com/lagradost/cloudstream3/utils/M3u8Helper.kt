@@ -73,21 +73,10 @@ object M3u8Helper2 {
             }
     }
 
-    private val ENCRYPTION_DETECTION_REGEX = Regex("#EXT-X-KEY:METHOD=([^,]+),")
     private val ENCRYPTION_URL_IV_REGEX =
         Regex("#EXT-X-KEY:METHOD=([^,]+),URI=\"([^\"]+)\"(?:,IV=(.*))?")
-    private val QUALITY_REGEX =
-        Regex("""#EXT-X-STREAM-INF:(?:(?:.*?(?:RESOLUTION=\d+x(\d+)).*?\s+(.*))|(?:.*?\s+(.*)))""")
     private val TS_EXTENSION_REGEX =
-        Regex("""#EXTINF:(([0-9]*[.])?[0-9]+|).*\n(.+?\n)""") // fuck it we ball, who cares about the type anyways
-
-    private fun absoluteExtensionDetermination(url: String): String? {
-        val split = url.split("/")
-        val gg: String = split[split.size - 1].split("?")[0]
-        return if (gg.contains(".")) {
-            gg.split(".").ifEmpty { null }?.last()
-        } else null
-    }
+        Regex("""#EXTINF:(([0-9]*[.])?[0-9]+|).*\n(.+?\n)""")
 
     private fun toBytes16Big(n: Int): ByteArray {
         return ByteArray(16) {
@@ -155,7 +144,6 @@ object M3u8Helper2 {
                 // The m3u8 should not be split it that causes a loss of audio, however this can not be done reliably
                 // Therefore that should be figured out on the extension level, so only "trick play" is checked for
                 if (video.isTrickPlay()) {
-                    //println("Denied m3u8Generation, isTrickPlay = ${video.isTrickPlay()} containsAudio = ${video.containsAudio()}, codec = ${video.format.codecs}, url = ${video.url}")
                     continue
                 }
 

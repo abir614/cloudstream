@@ -146,11 +146,6 @@ class PluginsFragment : BaseFragment<FragmentPluginsBinding>(
                 }
             })
         }
-//        searchView?.onActionViewCollapsed = {
-//            pluginViewModel.search(null)
-//        }
-
-        // Because onActionViewCollapsed doesn't wanna work we need this workaround :(
 
         binding.pluginRecyclerView.apply {
             setLinearListLayout(

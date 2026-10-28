@@ -563,7 +563,6 @@ object CommonActivity {
                 else -> null
             }
 
-            // println("NEXT FOCUS : $nextView")
             if (nextView != null) {
                 nextView.requestFocus()
                 keyEventListener?.invoke(Pair(event, true))
@@ -580,13 +579,6 @@ object CommonActivity {
             ) {
                 showInputMethod(act.currentFocus?.findFocus())
             }
-
-            //println("Keycode: $keyCode")
-            //showToast(
-            //    this,
-            //    "Got Keycode $keyCode | ${KeyEvent.keyCodeToString(keyCode)} \n ${event?.action}",
-            //    Toast.LENGTH_LONG
-            //)
         }
 
         // if someone else want to override the focus then don't handle the event as it is already

@@ -298,7 +298,6 @@ class AniListApi : SyncAPI() {
                             .replace(")", "\\)")
                     })"""
                 )
-            // println("NAME $name NEW NAME ${name.replace(blackListRegex, "")}")
             val shows = searchShows(name.replace(blackListRegex, ""))
 
             shows?.data?.page?.media?.find {

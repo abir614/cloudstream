@@ -29,42 +29,23 @@ import kotlin.uuid.Uuid
 @Suppress("unused")
 object HlsPlaylistParser {
     private const val LOG_TAG: String = "HlsPlaylistParser"
-    private const val PLAYLIST_HEADER: String = "#EXTM3U"
     private const val TAG_PREFIX: String = "#EXT"
     private const val TAG_VERSION: String = "#EXT-X-VERSION"
     private const val TAG_PLAYLIST_TYPE: String = "#EXT-X-PLAYLIST-TYPE"
     private const val TAG_DEFINE: String = "#EXT-X-DEFINE"
-    private const val TAG_SERVER_CONTROL: String = "#EXT-X-SERVER-CONTROL"
     private const val TAG_STREAM_INF: String = "#EXT-X-STREAM-INF"
-    private const val TAG_PART_INF: String = "#EXT-X-PART-INF"
-    private const val TAG_PART: String = "#EXT-X-PART"
     private const val TAG_I_FRAME_STREAM_INF: String = "#EXT-X-I-FRAME-STREAM-INF"
-    private const val TAG_IFRAME: String = "#EXT-X-I-FRAMES-ONLY"
     private const val TAG_MEDIA: String = "#EXT-X-MEDIA"
     private const val TAG_TARGET_DURATION: String = "#EXT-X-TARGETDURATION"
-    private const val TAG_DISCONTINUITY: String = "#EXT-X-DISCONTINUITY"
-    private const val TAG_DISCONTINUITY_SEQUENCE: String = "#EXT-X-DISCONTINUITY-SEQUENCE"
-    private const val TAG_PROGRAM_DATE_TIME: String = "#EXT-X-PROGRAM-DATE-TIME"
-    private const val TAG_INIT_SEGMENT: String = "#EXT-X-MAP"
     private const val TAG_INDEPENDENT_SEGMENTS: String = "#EXT-X-INDEPENDENT-SEGMENTS"
     private const val TAG_MEDIA_DURATION: String = "#EXTINF"
     private const val TAG_MEDIA_SEQUENCE: String = "#EXT-X-MEDIA-SEQUENCE"
-    private const val TAG_START: String = "#EXT-X-START"
-    private const val TAG_ENDLIST: String = "#EXT-X-ENDLIST"
-    private const val TAG_KEY: String = "#EXT-X-KEY"
     private const val TAG_SESSION_KEY: String = "#EXT-X-SESSION-KEY"
     private const val TAG_BYTERANGE: String = "#EXT-X-BYTERANGE"
-    private const val TAG_GAP: String = "#EXT-X-GAP"
-    private const val TAG_SKIP: String = "#EXT-X-SKIP"
-    private const val TAG_PRELOAD_HINT: String = "#EXT-X-PRELOAD-HINT"
-    private const val TAG_RENDITION_REPORT: String = "#EXT-X-RENDITION-REPORT"
-    private const val TAG_DATERANGE: String = "#EXT-X-DATERANGE"
     private const val TYPE_AUDIO: String = "AUDIO"
     private const val TYPE_VIDEO: String = "VIDEO"
     private const val TYPE_SUBTITLES: String = "SUBTITLES"
     private const val TYPE_CLOSED_CAPTIONS: String = "CLOSED-CAPTIONS"
-    private const val TYPE_PART: String = "PART"
-    private const val TYPE_MAP: String = "MAP"
     private const val METHOD_NONE: String = "NONE"
     private const val METHOD_AES_128: String = "AES-128"
     private const val METHOD_SAMPLE_AES: String = "SAMPLE-AES"
@@ -92,28 +73,6 @@ object HlsPlaylistParser {
     private val REGEX_SUPPLEMENTAL_CODECS: Regex = Regex("SUPPLEMENTAL-CODECS=\"(.+?)\"")
     private val REGEX_RESOLUTION: Regex = Regex("RESOLUTION=(\\d+x\\d+)")
     private val REGEX_FRAME_RATE: Regex = Regex("FRAME-RATE=([\\d\\.]+)\\b")
-    private val REGEX_TARGET_DURATION: Regex = Regex("$TAG_TARGET_DURATION:(\\d+)\\b")
-    private val REGEX_ATTR_DURATION: Regex = Regex("DURATION=([\\d\\.]+)\\b")
-    private val REGEX_ATTR_DURATION_PREFIXED: Regex = Regex("[:,]DURATION=([\\d\\.]+)\\b")
-    private val REGEX_PART_TARGET_DURATION: Regex = Regex("PART-TARGET=([\\d\\.]+)\\b")
-    private val REGEX_VERSION: Regex = Regex("$TAG_VERSION:(\\d+)\\b")
-    private val REGEX_PLAYLIST_TYPE: Regex = Regex("$TAG_PLAYLIST_TYPE:(.+)\\b")
-    private val REGEX_CAN_SKIP_UNTIL: Regex = Regex("CAN-SKIP-UNTIL=([\\d\\.]+)\\b")
-    private val REGEX_CAN_SKIP_DATE_RANGES: Regex = compileBooleanAttrPattern("CAN-SKIP-DATERANGES")
-    private val REGEX_SKIPPED_SEGMENTS: Regex = Regex("SKIPPED-SEGMENTS=(\\d+)\\b")
-    private val REGEX_HOLD_BACK: Regex = Regex("[:|,]HOLD-BACK=([\\d\\.]+)\\b")
-    private val REGEX_PART_HOLD_BACK: Regex = Regex("PART-HOLD-BACK=([\\d\\.]+)\\b")
-    private val REGEX_CAN_BLOCK_RELOAD: Regex = compileBooleanAttrPattern("CAN-BLOCK-RELOAD")
-    private val REGEX_MEDIA_SEQUENCE: Regex = Regex("$TAG_MEDIA_SEQUENCE:(\\d+)\\b")
-    private val REGEX_MEDIA_DURATION: Regex = Regex("$TAG_MEDIA_DURATION:([\\d\\.]+)\\b")
-    private val REGEX_MEDIA_TITLE: Regex = Regex("$TAG_MEDIA_DURATION:[\\d\\.]+\\b,(.+)")
-    private val REGEX_LAST_MSN: Regex = Regex("LAST-MSN" + "=(\\d+)\\b")
-    private val REGEX_LAST_PART: Regex = Regex("LAST-PART" + "=(\\d+)\\b")
-    private val REGEX_TIME_OFFSET: Regex = Regex("TIME-OFFSET=(-?[\\d\\.]+)\\b")
-    private val REGEX_BYTERANGE: Regex = Regex("$TAG_BYTERANGE:(\\d+(?:@\\d+)?)\\b")
-    private val REGEX_ATTR_BYTERANGE: Regex = Regex("BYTERANGE=\"(\\d+(?:@\\d+)?)\\b\"")
-    private val REGEX_BYTERANGE_START: Regex = Regex("BYTERANGE-START=(\\d+)\\b")
-    private val REGEX_BYTERANGE_LENGTH: Regex = Regex("BYTERANGE-LENGTH=(\\d+)\\b")
     private val REGEX_METHOD: Regex = Regex(
         ("METHOD=("
                 + METHOD_NONE
@@ -131,7 +90,6 @@ object HlsPlaylistParser {
     private val REGEX_KEYFORMAT: Regex = Regex("KEYFORMAT=\"(.+?)\"")
     private val REGEX_KEYFORMATVERSIONS: Regex = Regex("KEYFORMATVERSIONS=\"(.+?)\"")
     private val REGEX_URI: Regex = Regex("URI=\"(.+?)\"")
-    private val REGEX_IV: Regex = Regex("IV=([^,.*]+)")
     private val REGEX_TYPE: Regex = Regex(
         ("TYPE=("
                 + TYPE_AUDIO
@@ -143,7 +101,6 @@ object HlsPlaylistParser {
                 + TYPE_CLOSED_CAPTIONS
                 + ")")
     )
-    private val REGEX_PRELOAD_HINT_TYPE: Regex = Regex("TYPE=($TYPE_PART|$TYPE_MAP)")
     private val REGEX_LANGUAGE: Regex = Regex("LANGUAGE=\"(.+?)\"")
     private val REGEX_NAME: Regex = Regex("NAME=\"(.+?)\"")
     private val REGEX_GROUP_ID: Regex = Regex("GROUP-ID=\"(.+?)\"")
@@ -152,26 +109,8 @@ object HlsPlaylistParser {
     private val REGEX_AUTOSELECT: Regex = compileBooleanAttrPattern("AUTOSELECT")
     private val REGEX_DEFAULT: Regex = compileBooleanAttrPattern("DEFAULT")
     private val REGEX_FORCED: Regex = compileBooleanAttrPattern("FORCED")
-    private val REGEX_INDEPENDENT: Regex = compileBooleanAttrPattern("INDEPENDENT")
-    private val REGEX_GAP: Regex = compileBooleanAttrPattern("GAP")
-    private val REGEX_PRECISE: Regex = compileBooleanAttrPattern("PRECISE")
     private val REGEX_VALUE: Regex = Regex("VALUE=\"(.+?)\"")
-    private val REGEX_IMPORT: Regex = Regex("IMPORT=\"(.+?)\"")
-    private val REGEX_ID: Regex = Regex("[:,]ID=\"(.+?)\"")
-    private val REGEX_CLASS: Regex = Regex("CLASS=\"(.+?)\"")
-    private val REGEX_START_DATE: Regex = Regex("START-DATE=\"(.+?)\"")
-    private val REGEX_CUE: Regex = Regex("CUE=\"(.+?)\"")
-    private val REGEX_END_DATE: Regex = Regex("END-DATE=\"(.+?)\"")
-    private val REGEX_PLANNED_DURATION: Regex = Regex("PLANNED-DURATION=([\\d.]+)\\b")
-    private val REGEX_END_ON_NEXT: Regex = compileBooleanAttrPattern("END-ON-NEXT")
-    private val REGEX_ASSET_URI: Regex = Regex("X-ASSET-URI=\"(.+?)\"")
-    private val REGEX_ASSET_LIST_URI: Regex = Regex("X-ASSET-LIST=\"(.+?)\"")
-    private val REGEX_RESUME_OFFSET: Regex = Regex("X-RESUME-OFFSET=(-?[\\d.]+)\\b")
-    private val REGEX_PLAYOUT_LIMIT: Regex = Regex("X-PLAYOUT-LIMIT=([\\d.]+)\\b")
-    private val REGEX_SNAP: Regex = Regex("X-SNAP=\"(.+?)\"")
-    private val REGEX_RESTRICT: Regex = Regex("X-RESTRICT=\"(.+?)\"")
     private val REGEX_VARIABLE_REFERENCE: Regex = Regex("\\{\\$([a-zA-Z0-9\\-_]+)\\}")
-    private val REGEX_CLIENT_DEFINED_ATTRIBUTE_PREFIX: Regex = Regex("\\b(X-[A-Z0-9-]+)=")
 
     private fun compileBooleanAttrPattern(attribute: String): Regex {
         return Regex("$attribute=($BOOLEAN_FALSE|$BOOLEAN_TRUE)")
@@ -1345,9 +1284,6 @@ object HlsPlaylistParser {
         /** The list of tags in the playlist. */
         val tags: List<String>,
 
-        /** All of the media playlist URLs referenced by the playlist. */
-        //val mediaPlaylistUrls: List<Url>,
-
         /** The variants declared by the playlist. */
         val variants: List<Variant>,
 
@@ -1439,14 +1375,6 @@ object HlsPlaylistParser {
         val label: String? = null,
 
         /**
-         * The human readable list of labels, or an empty list if unknown or not applicable.
-         *
-         * <p>If non-empty, the default {@link #label} will be part of this list. If empty, the default
-         * {@link #label} will be null.
-         */
-        //val labels: List<Label> = emptyList(),
-
-        /**
          * The language as an IETF BCP 47 conformant tag, or null if unknown or not applicable.
          * Check [com.lagradost.cloudstream3.utils.SubtitleHelper].
          *
@@ -1465,10 +1393,6 @@ object HlsPlaylistParser {
         /** Track role flags. */
         // @C.RoleFlags
         val roleFlags: Int = 0,
-
-        /** The auxiliary track type. */
-        // @C.AuxiliaryTrackType
-        //val auxiliaryTrackType: Int,
 
         /**
          * The average bitrate in bits per second, or {@link #NO_VALUE} if unknown or not applicable. The
@@ -1522,18 +1446,6 @@ object HlsPlaylistParser {
 
         /** Codecs of the format as described in RFC 6381, or null if unknown or not applicable. */
         val codecs: String? = null,
-
-        /** Metadata, or null if unknown or not applicable. */
-        //val metadata: Metadata? = null,
-
-        /**
-         * An extra opaque object that can be added to the {@link Format} to provide additional
-         * information that can be passed through the player.
-         *
-         * <p>This value is not included in serialized {@link Bundle} instances of this class that are
-         * used to transfer data to other processes.
-         */
-        //@UnstableApi @Nullable public final Object customData;
 
         // Container specific.
 
@@ -1952,8 +1864,6 @@ object HlsPlaylistParser {
                 parseOptionalStringAttr(line, REGEX_URI, variableDefinitions)
             val url: Url? =
                 if (referenceUrl == null) null else UrlUtil.resolveToUrl(baseUri, referenceUrl)
-            //val metadata =
-            //    Metadata(HlsTrackMetadataEntry(groupId, name, emptyList<T>()))
             when (parseStringAttr(line, REGEX_TYPE, variableDefinitions)) {
                 TYPE_VIDEO -> {
                     val variant: Variant? = getVariantWithVideoGroup(variants, groupId)
@@ -1969,7 +1879,6 @@ object HlsPlaylistParser {
                     if (url == null) {
                         // TODO: Remove this case and add a Rendition with a null url to videos.
                     } else {
-                        //formatBuilder.setMetadata(metadata)
                         videos.add(Rendition(url = url, format = formatBuilder, groupId, name))
                     }
                 }
@@ -1999,7 +1908,6 @@ object HlsPlaylistParser {
                     }
                     val format = formatBuilder.copy(sampleMimeType = sampleMimeType)
                     if (url != null) {
-                        //formatBuilder.setMetadata(metadata)
                         audios.add(Rendition(url, format, groupId, name))
                     } else if (variant != null) {
                         // TODO: Remove muxedAudioFormat and add a Rendition with a null url to audios.

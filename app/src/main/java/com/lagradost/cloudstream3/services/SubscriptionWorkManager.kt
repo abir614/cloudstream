@@ -53,16 +53,6 @@ class SubscriptionWorkManager(val context: Context, workerParams: WorkerParamete
                 ExistingPeriodicWorkPolicy.KEEP,
                 periodicSyncDataWork
             )
-
-            // Uncomment below for testing
-
-//            val oneTimeSyncDataWork =
-//                OneTimeWorkRequest.Builder(SubscriptionWorkManager::class.java)
-//                    .addTag(SUBSCRIPTION_WORK_NAME)
-//                    .setConstraints(constraints)
-//                    .build()
-//
-//            WorkManager.getInstance(context).enqueue(oneTimeSyncDataWork)
         }
     }
 
@@ -100,7 +90,6 @@ class SubscriptionWorkManager(val context: Context, workerParams: WorkerParamete
 
     override suspend fun doWork(): Result {
         try {
-//        println("Update subscriptions!")
             context.createNotificationChannel(
                 SUBSCRIPTION_CHANNEL_ID,
                 SUBSCRIPTION_CHANNEL_NAME,

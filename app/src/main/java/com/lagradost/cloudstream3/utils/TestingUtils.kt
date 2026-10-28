@@ -211,18 +211,6 @@ object TestingUtils {
             } ?: return TestResult.Fail
 
             return TestResultLoad(url, loadResponse.type != TvType.CustomMedia)
-
-//            val loadTest = testLoadResponse(api, load, logger)
-//            if (loadTest is TestResultLoad) {
-//                testLinkLoading(api, loadTest.extractorData, logger).success
-//            } else {
-//                false
-//            }
-//            if (!validResults) {
-//                logger("Api ${api.name} did not load on the first search results: ${smallSearchResults.map { it.name }}")
-//            }
-
-//            return TestResult(validResults)
         } catch (e: Throwable) {
             if (e is NotImplementedError) {
                 fail("Provider has not implemented load()")

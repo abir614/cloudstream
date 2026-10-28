@@ -970,13 +970,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                     focusOutline.get()?.isVisible = false
                 }
             }
-        /*private val scrollListener = object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                super.onScrolled(recyclerView, dx, dy)
-                current = current.copy(x = current.x + dx, y = current.y + dy)
-                setTargetPosition(current)
-            }
-        }*/
 
         private fun setTargetPosition(target: FocusTarget) {
             focusOutline.get()?.apply {
@@ -1021,7 +1014,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                 lastView?.removeOnAttachStateChangeListener(attachListener)
                 (lastView?.parent as? RecyclerView)?.apply {
                     removeOnLayoutChangeListener(layoutListener)
-                    //removeOnScrollListener(scrollListener)
                 }
             }
 
@@ -1102,7 +1094,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                 if (!exactlyTheSame) {
                     (newFocus.parent as? RecyclerView)?.apply {
                         addOnLayoutChangeListener(layoutListener)
-                        //addOnScrollListener(scrollListener)
                     }
                     newFocus.addOnLayoutChangeListener(layoutListener)
                     newFocus.addOnAttachStateChangeListener(attachListener)
@@ -1452,8 +1443,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                     else -> {
                         resultviewPreviewBookmark.isEnabled = false
                         resultviewPreviewBookmark.showProgress()
-                        //resultviewPreviewBookmark.setIconResource(R.drawable.ic_baseline_bookmark_border_24)
-                        //resultviewPreviewBookmark.setText(R.string.loading)
                     }
                 }
             }
@@ -1571,7 +1560,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                         setSubscribeStatus(viewModel.subscribeStatus.value)
 
                         resultviewPreviewBookmark.setOnClickListener {
-                            //viewModel.updateWatchStatus(WatchType.PLANTOWATCH)
                             if (isLocalList) {
                                 val value = viewModel.watchStatus.value ?: WatchType.NONE
 
@@ -1655,19 +1643,9 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             }
         }
 
-//        ioSafe {
-//            val plugins =
-//                RepositoryParser.getRepoPlugins("https://raw.githubusercontent.com/recloudstream/TestPlugin/master/repo.json")
-//                    ?: emptyList()
-//            plugins.map {
-//                println("Load plugin: ${it.name} ${it.url}")
-//                RepositoryParser.loadSiteTemp(applicationContext, it.url, it.name)
-//            }
-//        }
-
         // init accounts
         ioSafe {
-            // we need to run this after we init all apis, otherwise currentSyncApi will fuck itself
+            // we need to run this after we init all apis, otherwise currentSyncApi will fail
             this@MainActivity.runOnUiThread {
                 // Change library icon with logo of current api in sync
                 libraryViewModel =
@@ -1729,7 +1707,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             apis = allProviders.distinctBy { it }
         }
 
-        //  val navView: BottomNavigationView = findViewById(R.id.nav_view)
         setUpBackup()
 
         CommonActivity.init(this)
@@ -1752,8 +1729,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                 }
             } else detachBackPressedCallback("MainActivity")
         }
-
-        //val navController = findNavController(R.id.nav_host_fragment)
 
         /*navOptions = NavOptions.Builder()
             .setLaunchSingleTop(true)
@@ -1806,16 +1781,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             }
 
 
-            fun noFocus(view: View) {
-                view.tag = view.context.getString(R.string.tv_no_focus_tag)
-                (view as? ViewGroup)?.let {
-                    for (child in it.children) {
-                        noFocus(child)
-                    }
-                }
-            }
-            //noFocus(this)
-
             val navProfileRoot = findViewById<LinearLayout>(R.id.nav_footer_root)
 
             if (isLayout(TV or EMULATOR)) {
@@ -1848,7 +1813,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         if (rail != null) {
             binding?.navRailView?.labelVisibilityMode =
                 NavigationRailView.LABEL_VISIBILITY_UNLABELED
-            //val focus = mutableSetOf<Int>()
 
             var prevId: Int? = null
             var prevView: View? = null
@@ -1967,70 +1931,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             requestRW()
             if (checkWrite()) return
         }
-        //CastButtonFactory.setUpMediaRouteButton(this, media_route_button)
-
-        // THIS IS CURRENTLY REMOVED BECAUSE HIGHER VERS OF ANDROID NEEDS A NOTIFICATION
-        //if (!VideoDownloadManager.isMyServiceRunning(this, VideoDownloadKeepAliveService::class.java)) {
-        //    val mYourService = VideoDownloadKeepAliveService()
-        //    val mServiceIntent = Intent(this, mYourService::class.java).putExtra(START_VALUE_KEY, RESTART_ALL_DOWNLOADS_AND_QUEUE)
-        //    this.startService(mServiceIntent)
-        //}
-//settingsManager.getBoolean("disable_automatic_data_downloads", true) &&
-
-        // TODO RETURN TO TRUE
-        /*
-        if (isUsingMobileData()) {
-            Toast.makeText(this, "Downloads not resumed on mobile data", Toast.LENGTH_LONG).show()
-        } else {
-            val keys = getKeys(VideoDownloadManager.KEY_RESUME_PACKAGES)
-            val resumePkg = keys.mapNotNull { k -> getKey<VideoDownloadManager.DownloadResumePackage>(k) }
-
-            // To remove a bug where this is permanent
-            removeKeys(VideoDownloadManager.KEY_RESUME_PACKAGES)
-
-            for (pkg in resumePkg) { // ADD ALL CURRENT DOWNLOADS
-                VideoDownloadManager.downloadFromResume(this, pkg, false)
-            }
-
-            // ADD QUEUE
-            // array needed because List gets cast exception to linkedList for some unknown reason
-            val resumeQueue =
-                getKey<Array<VideoDownloadManager.DownloadQueueResumePackage>>(VideoDownloadManager.KEY_RESUME_QUEUE_PACKAGES)
-
-            resumeQueue?.sortedBy { it.index }?.forEach {
-                VideoDownloadManager.downloadFromResume(this, it.pkg)
-            }
-        }*/
-
-
-        /*
-        val castContext = CastContext.getSharedInstance(applicationContext)
-         fun buildMediaQueueItem(video: String): MediaQueueItem {
-           // val movieMetadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_PHOTO)
-            //movieMetadata.putString(MediaMetadata.KEY_TITLE, "CloudStream")
-            val mediaInfo = MediaInfo.Builder(video.toUri().toString())
-                .setStreamType(MediaInfo.STREAM_TYPE_NONE)
-                .setContentType(MimeTypes.IMAGE_JPEG)
-               // .setMetadata(movieMetadata).build()
-                .build()
-            return MediaQueueItem.Builder(mediaInfo).build()
-        }*/
-        /*
-        castContext.addCastStateListener { state ->
-            if (state == CastState.CONNECTED) {
-                println("TESTING")
-                val isCasting = castContext?.sessionManager?.currentCastSession?.remoteMediaClient?.currentItem != null
-                if(!isCasting) {
-                    val castPlayer = CastPlayer(castContext)
-                    println("LOAD ITEM")
-
-                    castPlayer.loadItem(buildMediaQueueItem("https://cdn.discordapp.com/attachments/551382684560261121/730169809408622702/ChromecastLogo6.png"),0)
-                }
-            }
-        }*/
-        /*thread {
-            createISO()
-        }*/
 
         if (BuildConfig.DEBUG) {
             var providersAndroidManifestString = "Current androidmanifest should be:\n"
@@ -2102,15 +2002,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         } catch (e: Exception) {
             logError(e)
         }
-
-//        Used to check current focus for TV
-//        main {
-//            while (true) {
-//                delay(5000)
-//                println("Current focus: $currentFocus")
-//                showToast(this, currentFocus.toString(), Toast.LENGTH_LONG)
-//            }
-//        }
 
         attachBackPressedCallback("MainActivityDefault") {
             setNavigationBarColorCompat(R.attr.primaryGrayBackground)

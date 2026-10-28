@@ -202,7 +202,6 @@ object DownloadObjects {
     data class StreamData(
         private val fileLength: Long,
         val file: SafeFile,
-        // val fileStream: OutputStream,
     ) {
         @Throws(IOException::class)
         fun open(): OutputStream {

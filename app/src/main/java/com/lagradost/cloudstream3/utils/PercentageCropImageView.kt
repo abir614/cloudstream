@@ -133,8 +133,6 @@ class PercentageCropImageView : androidx.appcompat.widget.AppCompatImageView {
     }
 
     // In case you can change the ScaleType in code you have to call redraw()
-    //fullsizeImageView.setScaleType(ScaleType.FIT_CENTER);
-    //fullsizeImageView.redraw();
     fun redraw() {
         val d = this.drawable
         if (d != null) {

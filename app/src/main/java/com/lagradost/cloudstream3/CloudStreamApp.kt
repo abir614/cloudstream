@@ -70,9 +70,6 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
-        // If we want to initialize Coil as early as possible, maybe when
-        // loading an image or GIF in a splash screen activity.
-        // buildImageLoader(applicationContext)
 
         ExceptionHandler(filesDir.resolve("last_error")) {
             val intent = context!!.packageManager.getLaunchIntentForPackage(context!!.packageName)
