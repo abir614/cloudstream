@@ -82,7 +82,6 @@ import com.lagradost.cloudstream3.ui.player.CS3IPlayer.Companion.preferredAudioT
 import com.lagradost.cloudstream3.ui.player.CustomDecoder.Companion.updateForcedEncoding
 import com.lagradost.cloudstream3.ui.player.PlayerSubtitleHelper.Companion.toSubtitleMimeType
 import com.lagradost.cloudstream3.ui.player.source_priority.LinkSource
-import com.lagradost.cloudstream3.ui.player.source_priority.ProfileSettings
 import com.lagradost.cloudstream3.ui.player.source_priority.QualityDataHelper
 import com.lagradost.cloudstream3.ui.player.source_priority.QualityDataHelper.getLinkPriority
 import com.lagradost.cloudstream3.ui.player.source_priority.QualityProfileDialog
@@ -140,7 +139,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.Serializable
-import java.lang.ref.WeakReference
 import java.util.Calendar
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap

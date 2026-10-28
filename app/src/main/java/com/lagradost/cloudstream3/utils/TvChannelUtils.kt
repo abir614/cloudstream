@@ -17,7 +17,6 @@ import com.lagradost.cloudstream3.base64Encode
 import com.lagradost.cloudstream3.syncproviders.AccountManager.Companion.APP_STRING_SHARE
 import com.lagradost.cloudstream3.utils.DataStore.getKey
 import com.lagradost.cloudstream3.utils.DataStore.setKey
-import java.net.URLEncoder
 
 const val PROGRAM_ID_LIST_KEY = "persistent_program_ids"
 

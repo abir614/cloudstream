@@ -6,7 +6,6 @@ import android.os.Parcelable
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.core.view.doOnAttach
-import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.RecyclerView.OnFlingListener
 import com.google.android.material.appbar.AppBarLayout
 import com.lagradost.cloudstream3.R

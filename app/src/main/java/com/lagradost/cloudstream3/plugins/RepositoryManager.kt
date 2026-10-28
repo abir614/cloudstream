@@ -3,7 +3,6 @@ package com.lagradost.cloudstream3.plugins
 import android.content.Context
 import android.util.Log
 import androidx.annotation.WorkerThread
-import java.util.zip.ZipFile
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.context
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.getKey

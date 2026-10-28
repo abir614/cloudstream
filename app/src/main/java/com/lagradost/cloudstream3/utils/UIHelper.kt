@@ -3,7 +3,6 @@ package com.lagradost.cloudstream3.utils
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.app.AppOpsManager
 import android.app.Dialog
 import android.content.ClipData
 import android.content.ClipboardManager

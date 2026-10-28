@@ -9,7 +9,6 @@ import android.util.Log
 import android.widget.ImageView
 import androidx.annotation.DrawableRes
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
 import coil3.asDrawable
 import coil3.EventListener
 import coil3.ImageLoader
@@ -17,7 +16,6 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.decode.BitmapFactoryDecoder
 import coil3.disk.DiskCache
-import coil3.dispose
 import coil3.load
 import coil3.memory.MemoryCache
 import coil3.network.NetworkHeaders
@@ -39,7 +37,6 @@ import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel
 import com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
-import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.network.SafeDns
 import com.lagradost.cloudstream3.network.addAdGuardDns
