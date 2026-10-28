@@ -571,5 +571,3 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
             })
     }
 }
-
-class MenuSearchView(context: Context) : SearchView(context)
