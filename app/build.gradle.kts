@@ -333,6 +333,9 @@ dependencies {
     implementation(libs.material)
     implementation(libs.constraintlayout)
 
+    // Core Utilities
+    implementation(libs.guava)
+
     // Coil Image Loading
     implementation(libs.bundles.coil)
 
