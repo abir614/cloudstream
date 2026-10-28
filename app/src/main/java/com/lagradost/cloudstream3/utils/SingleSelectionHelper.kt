@@ -20,7 +20,6 @@ import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.databinding.BottomInputDialogBinding
 import com.lagradost.cloudstream3.databinding.BottomSelectionDialogBinding
 import com.lagradost.cloudstream3.databinding.BottomTextDialogBinding
-import com.lagradost.cloudstream3.databinding.OptionsPopupTvBinding
 import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
 import com.lagradost.cloudstream3.ui.settings.Globals.PHONE
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
@@ -57,33 +56,6 @@ object SingleSelectionHelper {
     ) {
         if (this == null) return
 
-        // This was temporarily removed until better UI is made
-        /*if (isLayout(TV or EMULATOR)) {
-            val binding = OptionsPopupTvBinding.inflate(layoutInflater)
-            val dialog = AlertDialog.Builder(this, R.style.AlertDialogCustom)
-                .setView(binding.root)
-                .create()
-
-            dialog.show()
-
-            binding.listview1.let { listView ->
-                listView.choiceMode = AbsListView.CHOICE_MODE_SINGLE
-                listView.adapter =
-                    ArrayAdapter<String>(this, R.layout.sort_bottom_single_choice_color).apply {
-                        addAll(tvOptions)
-                    }
-
-                listView.setOnItemClickListener { _, _, i, _ ->
-                    callback.invoke(Pair(true, i))
-                    dialog.dismissSafe(this)
-                }
-            }
-
-            binding.imageView.apply {
-                isGone = poster.isNullOrEmpty()
-                loadImage(poster)
-            }
-        } else {*/
         view?.popupMenuNoIconsAndNoStringRes(options.mapIndexed { index, s ->
             Pair(
                 index,
@@ -92,7 +64,6 @@ object SingleSelectionHelper {
         }) {
             callback(Pair(false, this.itemId))
         }
-        //}
     }
 
     fun Activity?.showDialog(
