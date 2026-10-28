@@ -180,18 +180,14 @@ object OnDeviceNsfwClassifier {
 
                 sBitmap.getPixels(potatoPixels, 0, POTATO_DIM, 0, 0, POTATO_DIM, POTATO_DIM)
 
-                var bodySkinPixels = 0
-                val totalPixels = POTATO_DIM * POTATO_DIM // 2304
-                val bodyStartPixel = 14 * POTATO_DIM // row 14 (~29% down)
-                val bodyTotalPixels = totalPixels - bodyStartPixel // 1632 pixels
-
-                for (i in bodyStartPixel until totalPixels) {
+                var upperSkinPixels = 0
+                val upperTotalPixels = 14 * POTATO_DIM // 672 pixels
+                for (i in 0 until upperTotalPixels) {
                     val pixel = potatoPixels[i]
                     val r = (pixel shr 16) and 0xFF
                     val g = (pixel shr 8) and 0xFF
                     val b = pixel and 0xFF
 
-                    // Standard YCbCr skin detection formula with bit-shifts (< 0.05ms)
                     val y = (77 * r + 150 * g + 29 * b) shr 8
                     val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
                     val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
@@ -201,13 +197,55 @@ object OnDeviceNsfwClassifier {
                     val isDarkerSkin = r in 70..190 && g in 45..150 && b in 25..110 && r > g && g > b && (r - b) >= 12 && (r - g) >= 8
 
                     if (isStandardSkin || isAnimeSkin || isDarkerSkin) {
-                        bodySkinPixels++
+                        upperSkinPixels++
                     }
                 }
 
+                var bodySkinPixels = 0
+                val totalPixels = POTATO_DIM * POTATO_DIM // 2304
+                val bodyStartPixel = 14 * POTATO_DIM // row 14 (~29% down)
+                val bodyTotalPixels = totalPixels - bodyStartPixel // 1632 pixels
+                var maxRowSkinCount = 0
+
+                for (row in 14 until POTATO_DIM) {
+                    var rowSkin = 0
+                    val rowStart = row * POTATO_DIM
+                    for (col in 0 until POTATO_DIM) {
+                        val pixel = potatoPixels[rowStart + col]
+                        val r = (pixel shr 16) and 0xFF
+                        val g = (pixel shr 8) and 0xFF
+                        val b = pixel and 0xFF
+
+                        val y = (77 * r + 150 * g + 29 * b) shr 8
+                        val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
+                        val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
+
+                        val isStandardSkin = y in 55..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8
+                        val isAnimeSkin = r in 205..255 && g in 175..245 && b in 150..235 && r > g && g > b && (r - b) in 8..70 && (r - g) in 4..40
+                        val isDarkerSkin = r in 70..190 && g in 45..150 && b in 25..110 && r > g && g > b && (r - b) >= 12 && (r - g) >= 8
+
+                        if (isStandardSkin || isAnimeSkin || isDarkerSkin) {
+                            rowSkin++
+                        }
+                    }
+                    if (rowSkin > maxRowSkinCount) {
+                        maxRowSkinCount = rowSkin
+                    }
+                    bodySkinPixels += rowSkin
+                }
+
+                val upperSkinRatio = upperSkinPixels.toFloat() / upperTotalPixels.toFloat()
                 val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
-                if (bodySkinRatio > 0.06f) {
-                    ((bodySkinRatio - 0.06f) * 2.5f).coerceIn(0.0f, 1.0f)
+                val maxRowSkinRatio = maxRowSkinCount.toFloat() / POTATO_DIM.toFloat()
+
+                // False-positive rejection: uniform colored backdrop (e.g. solid yellow, beige, or gold poster)
+                if (upperSkinRatio > 0.60f && bodySkinRatio > 0.60f) {
+                    0.0f
+                } else if (maxRowSkinRatio < 0.22f) {
+                    // Require at least one row with concentrated skin (>= 22%) to distinguish from dispersed noise
+                    0.0f
+                } else if (bodySkinRatio > 0.10f) {
+                    ((bodySkinRatio - 0.10f) * 2.2f).coerceIn(0.0f, 1.0f)
                 } else {
                     0.0f
                 }

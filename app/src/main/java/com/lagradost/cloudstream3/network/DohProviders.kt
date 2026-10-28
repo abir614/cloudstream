@@ -193,21 +193,21 @@ class ResilientFallbackDns(
 
         val deadline = System.currentTimeMillis() + 2000L
 
-        // 1. Primary High-Speed Edge DoH: Cloudflare -> Google (sub-15ms Anycast resolution)
+        // 1. Primary Privacy DoH: Mullvad -> Quad9 (Zero-logging, strictly confidential)
         try {
-            return cloudflareDoh.lookup(hostname)
+            return mullvadDoh.lookup(hostname)
         } catch (_: Throwable) {}
         try {
-            return googleDoh.lookup(hostname)
+            return quad9Doh.lookup(hostname)
         } catch (_: Throwable) {}
 
         if (System.currentTimeMillis() < deadline) {
-            // 2. Secondary Privacy DoH: Mullvad -> Quad9
+            // 2. Secondary High-Speed Edge DoH: Cloudflare -> Google
             try {
-                return mullvadDoh.lookup(hostname)
+                return cloudflareDoh.lookup(hostname)
             } catch (_: Throwable) {}
             try {
-                return quad9Doh.lookup(hostname)
+                return googleDoh.lookup(hostname)
             } catch (_: Throwable) {}
         }
 
