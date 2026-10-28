@@ -84,15 +84,27 @@ object DeviceProfile {
     fun isLowEnd(ctx: Context): Boolean = tier(ctx) == DeviceTier.LOW
 
     fun getNetworkConfig(ctx: Context): NetworkTierConfig {
+        val isUltraPotato = getTotalRamMb(ctx) <= 1024
         return when (tier(ctx)) {
-            DeviceTier.LOW -> NetworkTierConfig(
-                maxRequests = 32,
-                maxRequestsPerHost = 10,
-                maxIdleConnections = 6,
-                keepAliveDurationMinutes = 2L,
-                connectTimeoutSeconds = 15L,
-                readTimeoutSeconds = 25L
-            )
+            DeviceTier.LOW -> if (isUltraPotato) {
+                NetworkTierConfig(
+                    maxRequests = 16,
+                    maxRequestsPerHost = 4,
+                    maxIdleConnections = 2,
+                    keepAliveDurationMinutes = 1L,
+                    connectTimeoutSeconds = 15L,
+                    readTimeoutSeconds = 25L
+                )
+            } else {
+                NetworkTierConfig(
+                    maxRequests = 32,
+                    maxRequestsPerHost = 10,
+                    maxIdleConnections = 6,
+                    keepAliveDurationMinutes = 2L,
+                    connectTimeoutSeconds = 15L,
+                    readTimeoutSeconds = 25L
+                )
+            }
             DeviceTier.MID -> NetworkTierConfig(
                 maxRequests = 64,
                 maxRequestsPerHost = 16,
@@ -113,15 +125,27 @@ object DeviceProfile {
     }
 
     fun getPlayerBufferConfig(ctx: Context): PlayerBufferConfig {
+        val isUltraPotato = getTotalRamMb(ctx) <= 1024
         return when (tier(ctx)) {
-            DeviceTier.LOW -> PlayerBufferConfig(
-                minBufferMs = 10_000,
-                maxBufferMs = 25_000,
-                bufferForPlaybackMs = 1_500,
-                bufferForPlaybackAfterRebufferMs = 3_000,
-                targetBufferBytes = 12 * 1024 * 1024, // 12 MB
-                backBufferMs = 5_000
-            )
+            DeviceTier.LOW -> if (isUltraPotato) {
+                PlayerBufferConfig(
+                    minBufferMs = 6_000,
+                    maxBufferMs = 15_000,
+                    bufferForPlaybackMs = 1_000,
+                    bufferForPlaybackAfterRebufferMs = 2_000,
+                    targetBufferBytes = 6 * 1024 * 1024, // 6 MB for ultra-low 500MB devices
+                    backBufferMs = 2_000
+                )
+            } else {
+                PlayerBufferConfig(
+                    minBufferMs = 10_000,
+                    maxBufferMs = 25_000,
+                    bufferForPlaybackMs = 1_500,
+                    bufferForPlaybackAfterRebufferMs = 3_000,
+                    targetBufferBytes = 12 * 1024 * 1024, // 12 MB
+                    backBufferMs = 5_000
+                )
+            }
             DeviceTier.MID -> PlayerBufferConfig(
                 minBufferMs = 20_000,
                 maxBufferMs = 45_000,
@@ -142,9 +166,10 @@ object DeviceProfile {
     }
 
     fun getCoilConfig(ctx: Context): CoilTierConfig {
+        val isUltraPotato = getTotalRamMb(ctx) <= 1024
         return when (tier(ctx)) {
             DeviceTier.LOW -> CoilTierConfig(
-                memoryCachePercent = 0.10, // ~10% of app memory
+                memoryCachePercent = if (isUltraPotato) 0.05 else 0.10, // 5% RAM for 500MB devices
                 diskCacheMaxBytes = 128L * 1024 * 1024,
                 crossfadeMs = 0, // crossfade off on LOW
                 allowHardwareBitmaps = false,
@@ -331,33 +356,57 @@ object DeviceProfile {
 
     fun getSearchConcurrency(ctx: Context?): Int {
         if (ctx == null) return 8
+        val totalMb = getTotalRamMb(ctx)
         return when (tier(ctx)) {
             DeviceTier.HIGH -> 16
             DeviceTier.MID -> 8
-            DeviceTier.LOW -> 3
+            DeviceTier.LOW -> if (totalMb <= 1024) 2 else 3
         }
     }
 
-    fun getDownloadBufferLimit(ctx: Context): Long {
+    fun getItemViewCacheSize(ctx: Context): Int {
+        val totalMb = getTotalRamMb(ctx)
         return when (tier(ctx)) {
-            DeviceTier.HIGH -> 80_000_000L  // 80 MB
-            DeviceTier.MID -> 35_000_000L   // 35 MB
-            DeviceTier.LOW -> 10_000_000L   // 10 MB
+            DeviceTier.HIGH -> 8
+            DeviceTier.MID -> 4
+            DeviceTier.LOW -> if (totalMb <= 1024) 2 else 3
         }
     }
 
-    fun getTotalRamMb(ctx: Context): Long {
+    fun getKernelVersion(): String {
         return try {
-            val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-            val mi = ActivityManager.MemoryInfo()
-            if (am != null) {
-                am.getMemoryInfo(mi)
-                mi.totalMem / (1024 * 1024)
+            val file = File("/proc/version")
+            if (file.exists() && file.canRead()) {
+                val line = file.readText().trim()
+                val match = Regex("""Linux version (\d+\.\d+\.\d+)""").find(line)
+                match?.groupValues?.getOrNull(1) ?: line.take(30)
             } else {
-                Runtime.getRuntime().maxMemory() / (1024 * 1024)
+                System.getProperty("os.version") ?: "Linux"
             }
         } catch (_: Throwable) {
-            1024L
+            "Linux"
+        }
+    }
+
+    fun getZramSwapMb(): Long {
+        return try {
+            val file = File("/proc/meminfo")
+            if (file.exists() && file.canRead()) {
+                file.useLines { lines ->
+                    for (line in lines) {
+                        if (line.startsWith("SwapTotal:", ignoreCase = true)) {
+                            val parts = line.split("\\s+".toRegex())
+                            if (parts.size >= 2) {
+                                val kb = parts[1].toLongOrNull() ?: 0L
+                                return kb / 1024L
+                            }
+                        }
+                    }
+                }
+            }
+            0L
+        } catch (_: Throwable) {
+            0L
         }
     }
 
@@ -371,13 +420,16 @@ object DeviceProfile {
             val badge = getProfileBadge(ctx)
             val isBatteryUnrestricted = !BatteryOptimizationChecker.isAppRestricted(ctx)
             val batteryLabel = if (isBatteryUnrestricted) "Unrestricted" else "Optimized"
+            val kernel = getKernelVersion()
+            val swapMb = getZramSwapMb()
+            val swapInfo = if (swapMb > 0) " • ${swapMb}MB zRAM" else ""
             val hwMode = when (currentTier) {
                 DeviceTier.HIGH -> "Performance • 128MB Buffers • Max Concurrency"
                 DeviceTier.MID -> "Balanced • 48MB Buffers • Standard Acceleration"
-                DeviceTier.LOW -> "Power Safe • RGB_565 (50% RAM Save) • 12MB Buffers"
+                DeviceTier.LOW -> if (totalMb <= 1024) "Potato Safe • RGB_565 • 6MB Buffers" else "Power Safe • RGB_565 (50% RAM Save) • 12MB Buffers"
             }
 
-            "[$badge] ${totalMb} MB RAM • $cores Cores ($arch)\nBattery: $batteryLabel • $hwMode"
+            "[$badge] ${totalMb} MB RAM$swapInfo • $cores Cores ($arch)\nKernel: $kernel • Battery: $batteryLabel • $hwMode"
         } catch (_: Throwable) {
             "[⚙️ BALANCED] Standard Profile"
         }

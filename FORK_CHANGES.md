@@ -159,3 +159,29 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 
 ## 9. On-Demand Deployment via GitHub Actions
 - **Manual Stable Release**: Supported via `workflow_dispatch` on `release.yml`. Users can deploy signed production releases anytime directly through GitHub Actions with custom or auto-incrementing tags.
+
+---
+
+## 10. Cold/Warm Start Acceleration, Granular Timeouts & Kernel Tuning
+
+### 10.1 Instant Warm Starts & Persistent Main Page Cache
+- **Persistent Disk Serialization (`MainPageDiskCache`)**: Serializes homepage feed responses to a dedicated app cache directory (`cs3_mainpage_cache`) with a 24-hour TTL.
+- **Stale-While-Revalidate Rendering**: `HomeViewModel` loads from memory or disk cache immediately on cold/warm startup. The homepage populates instantly without showing a blank screen or wiping existing UI, revalidating against upstream providers in the background.
+- **Coil Poster Cache Retention**: Configured disk cache size (up to 1GB on high tiers, 128MB on low tiers) persists across process exits without premature truncation.
+
+### 10.2 Startup Blank Screen Elimination
+- **Diff-Commit Bound Lifecycle**: In `HomeFragment`, loading shimmer indicators are dismissed and content recycler views made visible strictly within `AsyncListDiffer`'s commit callback. Shimmer only clears when child view holders have completed binding and layout, eliminating the 2-3 second blank pause during initial load.
+- **Protected Revalidation State**: `Resource.Loading` preserves rendered items when revalidating an already-populated list (`itemCount > 1`), preventing full-screen clearing during background refreshes.
+
+### 10.3 Source Resolution Timeouts
+- **Overall Source Resolution Timeout**: Wrapped content generation in `withTimeoutOrNull(60_000L)` across `ResultViewModel2` and `PlayerGeneratorViewModel`, bounding total source resolution to 1 minute.
+- **Per-Source Extractor Timeout**: Wrapped individual extractor resolution in `withTimeout(5_000L)` (`ExtractorApi.kt`). Any hanging or unresponsive host extractor terminates after 5 seconds without stalling remaining extractors. Parent coroutine cancellation is preserved.
+
+### 10.4 Kernel & zRAM Hardware Profiling
+- **Linux Kernel Inspection**: Detects active kernel version via `/proc/version` to accurately report system environment metrics.
+- **zRAM Swap Detection**: Reads total swap allocation from `/proc/meminfo` to tune memory allocations dynamically.
+- **Ultra-Low Memory (Potato ≤1024MB RAM) Tuning**:
+  - Search concurrency restricted to 2 concurrent tasks.
+  - Video playback buffer bounded to 6MB target and 5s back-buffer.
+  - Coil image memory cache constrained to 5% of available heap.
+  - RecyclerView `itemViewCacheSize` dynamically scaled (2 on low RAM, 4 on mid, 8 on high).

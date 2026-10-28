@@ -176,7 +176,6 @@ object ImageLoader {
                 DiskCache.Builder()
                     .directory(context.cacheDir.resolve("cs3_image_cache").toOkioPath())
                     .maxSizeBytes(config.diskCacheMaxBytes)
-                    .maxSizePercent(if (tier == DeviceTier.LOW) 0.02 else 0.05)
                     .build()
             }
             .components {

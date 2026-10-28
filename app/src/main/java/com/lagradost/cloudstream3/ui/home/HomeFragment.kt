@@ -79,6 +79,7 @@ import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper.attachBackPres
 import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper.detachBackPressedCallback
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.DataStoreHelper
+import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.EmptyEvent
 import com.lagradost.cloudstream3.utils.SubtitleHelper.getFlagFromIso
 import com.lagradost.cloudstream3.utils.TvChannelUtils
@@ -710,7 +711,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             )
             homeMasterRecycler.setRecycledViewPool(ParentItemAdapter.sharedPool)
             homeMasterRecycler.setHasFixedSize(true)
-            homeMasterRecycler.setItemViewCacheSize(4)
+            homeMasterRecycler.setItemViewCacheSize(context?.let { DeviceProfile.getItemViewCacheSize(it) } ?: 4)
             homeMasterRecycler.adapter = homeMasterAdapter
 
             homeApiFab.isVisible = isLayout(PHONE)
@@ -860,14 +861,22 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                             it.copy(
                                 list = it.list.copy(list = it.list.list.toMutableList())
                             )
-                        })
+                        }) {
+                            // Only dismiss loading shimmer when views are committed and ready to render
+                            homeLoading.isVisible = false
+                            homeLoadingError.isVisible = false
+                            homeMasterRecycler.isVisible = true
+                            homeLoadingShimmer.stopShimmer()
+                        }
+
+                        if (d.isEmpty()) {
+                            homeLoading.isVisible = false
+                            homeLoadingError.isVisible = false
+                            homeMasterRecycler.isVisible = true
+                            homeLoadingShimmer.stopShimmer()
+                        }
 
                         saveHomepageToTV(d)
-
-                        homeLoading.isVisible = false
-                        homeLoadingError.isVisible = false
-                        homeMasterRecycler.isVisible = true
-                        homeLoadingShimmer.stopShimmer()
 
                         //home_loaded?.isVisible = true
                         if (toggleRandomButton) {
@@ -934,15 +943,17 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                     }
 
                     is Resource.Loading -> {
-                        homeLoadingShimmer.startShimmer()
-                        homeLoading.isVisible = true
-                        homeLoadingError.isVisible = false
-                        homeMasterRecycler.isInvisible = true
-                        (homeMasterRecycler.adapter as? ParentItemAdapter)?.apply {
-                            submitList(null)
-                            clearState()
+                        val currentItemCount = (homeMasterRecycler.adapter as? ParentItemAdapter)?.itemCount ?: 0
+                        if (currentItemCount <= 1) {
+                            homeLoadingShimmer.startShimmer()
+                            homeLoading.isVisible = true
+                            homeLoadingError.isVisible = false
+                            homeMasterRecycler.isInvisible = true
+                            (homeMasterRecycler.adapter as? ParentItemAdapter)?.apply {
+                                submitList(null)
+                                clearState()
+                            }
                         }
-                        //home_loaded?.isVisible = false
                     }
                 }
             }

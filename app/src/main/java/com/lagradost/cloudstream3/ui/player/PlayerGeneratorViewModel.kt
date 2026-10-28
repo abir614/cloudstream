@@ -30,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jetbrains.annotations.Contract
 import java.util.concurrent.ConcurrentHashMap
 
@@ -331,28 +332,30 @@ class PlayerGeneratorViewModel : ViewModel() {
             )
 
             val loadingState = safeApiCall {
-                generator?.generateLinks(
-                    sourceTypes = LOADTYPE_INAPP,
-                    clearCache = false,
-                    isCasting = false,
-                    callback = { link ->
-                        if (isActive) {
-                            preloadedLinks.add(link)
-                            if (episodeIndex == nextIndex) {
-                                modifyState { add(link) }
+                withTimeoutOrNull(60_000L) { // 1 min overall timeout for source loading
+                    generator?.generateLinks(
+                        sourceTypes = LOADTYPE_INAPP,
+                        clearCache = false,
+                        isCasting = false,
+                        callback = { link ->
+                            if (isActive) {
+                                preloadedLinks.add(link)
+                                if (episodeIndex == nextIndex) {
+                                    modifyState { add(link) }
+                                }
+                            }
+                        },
+                        offset = nextIndex,
+                        subtitleCallback = { sub ->
+                            if (isActive && isValidSubtitle(sub)) {
+                                preloadedSubs.add(sub)
+                                if (episodeIndex == nextIndex) {
+                                    modifyState { add(sub) }
+                                }
                             }
                         }
-                    },
-                    offset = nextIndex,
-                    subtitleCallback = { sub ->
-                        if (isActive && isValidSubtitle(sub)) {
-                            preloadedSubs.add(sub)
-                            if (episodeIndex == nextIndex) {
-                                modifyState { add(sub) }
-                            }
-                        }
-                    }
-                )
+                    )
+                }
                 Unit
             }
 
@@ -500,23 +503,25 @@ class PlayerGeneratorViewModel : ViewModel() {
         currentJob = viewModelScope.launchSafe {
             // Load more data
             val loadingState = safeApiCall {
-                generator?.generateLinks(
-                    sourceTypes = sourceTypes,
-                    clearCache = forceClearCache,
-                    callback = { link ->
-                        if (isActive)
-                            modifyState {
-                                add(link)
-                            }
-                    },
-                    isCasting = false,
-                    offset = index,
-                    subtitleCallback = { link ->
-                        if (isActive && isValidSubtitle(link))
-                            modifyState {
-                                add(link)
-                            }
-                    })
+                withTimeoutOrNull(60_000L) { // 1 min overall timeout for source loading
+                    generator?.generateLinks(
+                        sourceTypes = sourceTypes,
+                        clearCache = forceClearCache,
+                        callback = { link ->
+                            if (isActive)
+                                modifyState {
+                                    add(link)
+                                }
+                        },
+                        isCasting = false,
+                        offset = index,
+                        subtitleCallback = { link ->
+                            if (isActive && isValidSubtitle(link))
+                                modifyState {
+                                    add(link)
+                                }
+                        })
+                }
                 Unit
             }
 

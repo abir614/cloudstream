@@ -339,6 +339,9 @@ import io.ktor.http.decodeURLPart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withTimeout
+import kotlin.coroutines.coroutineContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -928,6 +931,8 @@ suspend fun loadExtractor(
 }
 
 
+internal const val PER_SOURCE_TIMEOUT_MS = 5_000L
+
 /**
  * Tries to load the appropriate extractor based on link, returns true if any extractor is loaded.
  * */
@@ -949,11 +954,13 @@ suspend fun loadExtractor(
         val extractor = extractorApis[index]
         if (compareUrl.startsWith(extractor.mainUrl.replace(schemaStripRegex, ""))) {
             try {
-                extractor.getUrl(currentUrl, referer, subtitleCallback, callback)
+                withTimeout(PER_SOURCE_TIMEOUT_MS) {
+                    extractor.getUrl(currentUrl, referer, subtitleCallback, callback)
+                }
             } catch (e: Exception) {
                 logError(e)
-                // Rethrow if we have timed out
-                if (e is CancellationException) {
+                // Rethrow only if the parent coroutine scope itself was cancelled, not if individual extractor timed out
+                if (e is CancellationException && !coroutineContext.isActive) {
                     throw e
                 }
             }
@@ -970,11 +977,13 @@ suspend fun loadExtractor(
             ) > 80
         ) {
             try {
-                extractor.getUrl(currentUrl, referer, subtitleCallback, callback)
+                withTimeout(PER_SOURCE_TIMEOUT_MS) {
+                    extractor.getUrl(currentUrl, referer, subtitleCallback, callback)
+                }
             } catch (e: Exception) {
                 logError(e)
-                // Rethrow if we have timed out
-                if (e is CancellationException) {
+                // Rethrow only if the parent coroutine scope itself was cancelled, not if individual extractor timed out
+                if (e is CancellationException && !coroutineContext.isActive) {
                     throw e
                 }
             }

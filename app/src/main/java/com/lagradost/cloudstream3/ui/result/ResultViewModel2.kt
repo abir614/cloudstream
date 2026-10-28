@@ -1290,22 +1290,24 @@ class ResultViewModel2 : ViewModel() {
         }
         try {
             updatePage()
-            tempGenerator.generateLinks(
-                clearCache,
-                sourceTypes = sourceTypes,
-                callback = { (link, _) ->
-                    if (link != null) {
-                        links += link
+            withTimeoutOrNull(60_000L) { // 1 minute overall timeout for all source loading
+                tempGenerator.generateLinks(
+                    clearCache,
+                    sourceTypes = sourceTypes,
+                    callback = { (link, _) ->
+                        if (link != null) {
+                            links += link
+                            updatePage()
+                        }
+                    },
+                    subtitleCallback = { sub ->
+                        subs += sub
                         updatePage()
-                    }
-                },
-                subtitleCallback = { sub ->
-                    subs += sub
-                    updatePage()
-                },
-                isCasting = isCasting,
-                offset = 0
-            )
+                    },
+                    isCasting = isCasting,
+                    offset = 0
+                )
+            }
         } catch (_: CancellationException) {
             // Do nothing
         } catch (e: Exception) {

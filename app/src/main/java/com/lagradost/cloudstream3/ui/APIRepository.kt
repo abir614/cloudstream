@@ -16,21 +16,91 @@ import com.lagradost.cloudstream3.fixUrl
 import com.lagradost.cloudstream3.mvvm.Resource
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.mvvm.safeApiCall
-import com.lagradost.cloudstream3.newSearchResponseList
+import com.lagradost.cloudstream3.CloudStreamApp
+import com.lagradost.cloudstream3.utils.AppUtils.toJsonLiteral
+import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
 import com.lagradost.cloudstream3.utils.Coroutines.atomicListOf
+import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
+import java.io.File
+
+data class MainPageDiskCacheEntry(
+    val unixTime: Long,
+    val apiName: String,
+    val page: Int,
+    val data: List<HomePageResponse?>
+)
+
+object MainPageDiskCache {
+    private const val FOLDER = "cs3_mainpage_cache"
+    private const val DISK_TTL_SECONDS = 3600L * 24L // 24 hours persistent cache for instant offline/warm load
+
+    private fun getCacheFile(apiName: String, page: Int): File? {
+        val ctx = CloudStreamApp.context ?: return null
+        val safeName = apiName.replace(Regex("[^a-zA-Z0-9_-]"), "_")
+        val dir = ctx.cacheDir.resolve(FOLDER)
+        if (!dir.exists()) dir.mkdirs()
+        return dir.resolve("${safeName}_${page}.json")
+    }
+
+    fun get(apiName: String, page: Int): List<HomePageResponse?>? {
+        return try {
+            val file = getCacheFile(apiName, page) ?: return null
+            if (!file.exists() || !file.isFile) return null
+            val text = file.readText()
+            val entry = tryParseJson<MainPageDiskCacheEntry>(text) ?: return null
+            if (unixTime - entry.unixTime < DISK_TTL_SECONDS) {
+                entry.data
+            } else {
+                null
+            }
+        } catch (t: Throwable) {
+            logError(t)
+            null
+        }
+    }
+
+    fun put(apiName: String, page: Int, response: List<HomePageResponse?>) {
+        ioSafe {
+            try {
+                val file = getCacheFile(apiName, page) ?: return@ioSafe
+                val entry = MainPageDiskCacheEntry(
+                    unixTime = unixTime,
+                    apiName = apiName,
+                    page = page,
+                    data = response
+                )
+                file.writeText(entry.toJsonLiteral())
+            } catch (t: Throwable) {
+                logError(t)
+            }
+        }
+    }
+
+    fun clear() {
+        ioSafe {
+            try {
+                val ctx = CloudStreamApp.context ?: return@ioSafe
+                val dir = ctx.cacheDir.resolve(FOLDER)
+                if (dir.exists()) {
+                    dir.deleteRecursively()
+                }
+            } catch (_: Throwable) {
+            }
+        }
+    }
+}
 
 class APIRepository(val api: MainAPI) {
     companion object {
-        // 2 minute timeout to prevent bad extensions/extractors from hogging the resources
-        // No real provider should take longer, so we hard kill them.
-        private const val DEFAULT_TIMEOUT = 120_000L
-        private const val MAX_TIMEOUT = 4 * DEFAULT_TIMEOUT
+        // Overall timeout: 1 minute (60s) for all source loading to prevent hung extractors
+        private const val DEFAULT_TIMEOUT = 60_000L
+        private const val MAX_TIMEOUT = 2 * DEFAULT_TIMEOUT
         private const val MIN_TIMEOUT = 5_000L
 
         var dubStatusActive = HashSet<DubStatus>()
@@ -72,12 +142,22 @@ class APIRepository(val api: MainAPI) {
         fun getTimeout(desired: Long?): Long {
             return (desired ?: DEFAULT_TIMEOUT).coerceIn(MIN_TIMEOUT, MAX_TIMEOUT)
         }
+
+        fun getCachedMainPage(apiName: String, page: Int): List<HomePageResponse?>? {
+            val cacheKey = Pair(apiName, page)
+            val mem = mainPageCache.withLock {
+                mainPageCache.firstOrNull { it.key == cacheKey }?.response
+            }
+            if (mem != null) return mem
+            return MainPageDiskCache.get(apiName, page)
+        }
     }
 
     private fun afterPluginsLoaded(forceReload: Boolean) {
         if (forceReload) {
             cache.clear()
             mainPageCache.clear()
+            MainPageDiskCache.clear()
         }
     }
 
@@ -194,6 +274,16 @@ class APIRepository(val api: MainAPI) {
                             }?.response
                         }
                         if (cached != null) return@withTimeout cached
+
+                        val diskCached = MainPageDiskCache.get(api.name, page)
+                        if (diskCached != null) {
+                            val entry = SavedMainPageResponse(unixTime, diskCached, cacheKey)
+                            mainPageCache.withLock {
+                                mainPageCache.removeAll { it.key == cacheKey }
+                                mainPageCache.add(entry)
+                            }
+                            return@withTimeout diskCached
+                        }
                     }
 
                     val results = if (api.sequentialMainPage) {
@@ -247,6 +337,7 @@ class APIRepository(val api: MainAPI) {
                             }
                             mainPageCache.add(entry)
                         }
+                        MainPageDiskCache.put(api.name, page, results)
                     }
 
                     results

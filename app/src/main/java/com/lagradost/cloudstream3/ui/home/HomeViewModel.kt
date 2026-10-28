@@ -422,8 +422,18 @@ class HomeViewModel : ViewModel() {
             return@ioSafe
         }
 
-        _page.postValue(Resource.Loading())
-        _preview.postValue(Resource.Loading())
+        // Check for cached homepage data (stale-while-revalidate for instant cold/warm start)
+        val cachedData = if (!forceReload) {
+            APIRepository.getCachedMainPage(api.name, 1)
+        } else null
+
+        if (cachedData != null && cachedData.any { it != null }) {
+            rawHomeData = cachedData
+            populateHomeFromData(cachedData)
+        } else {
+            _page.postValue(Resource.Loading())
+            _preview.postValue(Resource.Loading())
+        }
         // cancel the current preview expand as that is no longer relevant
         addJob?.cancel()
 
@@ -434,10 +444,12 @@ class HomeViewModel : ViewModel() {
             }
 
             is Resource.Failure -> {
-                @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
-                _page.postValue(data!!)
-                @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
-                _preview.postValue(data!!)
+                if (cachedData == null) {
+                    @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
+                    _page.postValue(data!!)
+                    @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
+                    _preview.postValue(data!!)
+                }
             }
 
             else -> Unit
