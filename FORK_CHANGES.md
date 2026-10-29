@@ -32,6 +32,8 @@ This document catalogues all intentional architectural deviations, security hard
   - Carrier-Grade NAT (`100.64.0.0/10`)
   - Reserved / Experimental (`0.0.0.0/8`, `240.0.0.0/4`)
   - IPv6 Unique Local Address (`fc00::/7`)
+  - IPv4-Mapped IPv6 (`::ffff:0:0/96`) & IPv4-Compatible IPv6 (`::/96`)
+  - NAT64 Well-Known Prefix (`64:ff9b::/96`)
 - **LAN Access**: Opt-in toggle (`allowLan`) available for streaming from private LAN media servers (e.g., Jellyfin, Kodi, local NAS).
 
 ### 2.4 Privacy-First Resilient Multi-Tier DNS with Hard Budget

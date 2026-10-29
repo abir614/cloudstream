@@ -74,8 +74,20 @@ pub fn validate_ip_safety(ip: &IpAddr) -> Result<(), NetworkSecurityError> {
             if ipv6.is_loopback() || ipv6.is_unspecified() {
                 return Err(NetworkSecurityError::PrivateNetworkBlocked(ip.to_string()));
             }
-            // IPv6 Unique Local (fc00::/7) or Link-local (fe80::/10)
             let segments = ipv6.segments();
+            // Check IPv4-mapped IPv6 (::ffff:w.x.y.z)
+            if segments[0] == 0 && segments[1] == 0 && segments[2] == 0 && segments[3] == 0 && segments[4] == 0 && segments[5] == 0xffff {
+                let octets = ipv6.octets();
+                let v4 = std::net::Ipv4Addr::new(octets[12], octets[13], octets[14], octets[15]);
+                return validate_ip_safety(&IpAddr::V4(v4));
+            }
+            // Check NAT64 well-known prefix (64:ff9b::/96)
+            if segments[0] == 0x0064 && segments[1] == 0xff9b && segments[2] == 0 && segments[3] == 0 && segments[4] == 0 && segments[5] == 0 {
+                let octets = ipv6.octets();
+                let v4 = std::net::Ipv4Addr::new(octets[12], octets[13], octets[14], octets[15]);
+                return validate_ip_safety(&IpAddr::V4(v4));
+            }
+            // IPv6 Unique Local (fc00::/7) or Link-local (fe80::/10)
             if (segments[0] & 0xfe00) == 0xfc00 || (segments[0] & 0xffc0) == 0xfe80 {
                 return Err(NetworkSecurityError::PrivateNetworkBlocked(ip.to_string()));
             }
@@ -131,6 +143,16 @@ mod tests {
     fn test_blocked_ipv6_loopback_and_link_local() {
         assert!(validate_url_safety("http://[::1]:8080/api").is_err());
         assert!(validate_url_safety("http://[fe80::1]/service").is_err());
+    }
+
+    #[test]
+    fn test_blocked_ipv4_mapped_and_nat64() {
+        assert!(validate_url_safety("http://[::ffff:127.0.0.1]/status").is_err());
+        assert!(validate_url_safety("http://[::ffff:192.168.1.1]/admin").is_err());
+        assert!(validate_url_safety("http://[::ffff:169.254.169.254]/meta").is_err());
+        assert!(validate_url_safety("http://[64:ff9b::127.0.0.1]/test").is_err());
+        assert!(validate_url_safety("http://[64:ff9b::192.168.1.1]/test").is_err());
+        assert!(validate_url_safety("http://[::ffff:8.8.8.8]/dns").is_ok());
     }
 
     #[test]

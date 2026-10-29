@@ -40,6 +40,17 @@ class SafeDnsTest {
         // IPv6 Unique Local Address (fc00::/7)
         assertTrue(InetAddress.getByName("fc00::1").isBlocked())
         assertTrue(InetAddress.getByName("fd12:3456:789a::1").isBlocked())
+
+        // IPv4-mapped IPv6 blocked addresses (::ffff:w.x.y.z)
+        assertTrue(InetAddress.getByName("::ffff:127.0.0.1").isBlocked())
+        assertTrue(InetAddress.getByName("::ffff:192.168.1.1").isBlocked())
+        assertTrue(InetAddress.getByName("::ffff:169.254.169.254").isBlocked())
+        assertTrue(InetAddress.getByName("::ffff:10.0.0.1").isBlocked())
+
+        // NAT64 Well-Known Prefix (64:ff9b::w.x.y.z)
+        assertTrue(InetAddress.getByName("64:ff9b::127.0.0.1").isBlocked())
+        assertTrue(InetAddress.getByName("64:ff9b::192.168.0.1").isBlocked())
+        assertTrue(InetAddress.getByName("64:ff9b::169.254.169.254").isBlocked())
     }
 
     @Test
@@ -49,6 +60,8 @@ class SafeDnsTest {
         assertFalse(InetAddress.getByName("9.9.9.9").isBlocked())
         assertFalse(InetAddress.getByName("142.250.190.46").isBlocked())
         assertFalse(InetAddress.getByName("2606:4700:4700::1111").isBlocked())
+        assertFalse(InetAddress.getByName("::ffff:8.8.8.8").isBlocked())
+        assertFalse(InetAddress.getByName("64:ff9b::8.8.8.8").isBlocked())
     }
 
     @Test
