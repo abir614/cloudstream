@@ -93,14 +93,13 @@ object StreamHealthProber {
                     }
 
                     val call = probeClient.newCall(requestBuilder.build())
-                    val response = call.execute()
-                    val latency = System.currentTimeMillis() - startTime
-                    val code = response.code
+                    val (code, latency, isAlive) = call.execute().use { response ->
+                        val lat = System.currentTimeMillis() - startTime
+                        val c = response.code
+                        val alive = c in 200..399
+                        Triple(c, lat, alive)
+                    }
 
-                    // Close immediately without reading body
-                    response.close()
-
-                    val isAlive = code in 200..399
                     if (BuildConfig.DEBUG) Log.d(TAG, "Probed ${extractorLink.name} (${extractorLink.url}): code=$code, latency=${latency}ms, alive=$isAlive")
                     ProbeResult(videoLink, isAlive, latency, code)
                 } ?: run {

@@ -2918,8 +2918,8 @@ class GeneratorPlayer : FullScreenPlayer() {
                     if (preferredMatch != null) {
                         Log.i(TAG, "Fast-Start: Preferred user video source loaded -> ${preferredMatch.link.first?.source}")
                         startPlayer()
-                    } else if (viewModel.state.links.any { link ->
-                            getLinkPriority(currentQualityProfile, link.first) >=
+                    } else if (usableSorted.any { link ->
+                            getLinkPriority(currentQualityProfile, link.link.first) >=
                                     QualityDataHelper.AUTO_SKIP_PRIORITY
                         }
                     ) {
