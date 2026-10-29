@@ -188,4 +188,6 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
   - Download buffer limit bounded to 5MB (down from 10MB/80MB).
   - Coil image memory cache constrained to 5% of available heap.
   - RecyclerView `itemViewCacheSize` dynamically scaled across both master feeds and individual horizontal rows (`HomeParentItemAdapter`, `SearchFragment`, `HomeFragment`).
+- **Nested RecyclerView GapWorker Prefetching**: Configured `isItemPrefetchEnabled = true` and `initialPrefetchItemCount` (`DeviceProfile.getInitialPrefetchItemCount`) across all linear layouts in `LinearListLayout.kt` (4 items on standard tiers, 2 on ultra-potato). Enables the Android RenderThread GapWorker to pre-bind horizontal cards during idle frame intervals, eliminating frame drop spikes when horizontal rows enter the viewport.
+- **Dynamic Display Refresh Rate Optimization**: In `MainActivity.kt` (`optimizeDisplayRefreshRate`), automatically inspects `supportedModes` and requests highest available refresh rate (90Hz, 120Hz, 144Hz) on Android M+ (API 23+) strictly matching the current screen resolution, delivering butter-smooth 90/120fps UI scrolling on capable hardware while conserving battery on ultra-potato devices.
 

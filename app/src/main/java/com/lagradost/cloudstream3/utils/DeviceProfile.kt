@@ -422,6 +422,11 @@ object DeviceProfile {
         }
     }
 
+    fun getInitialPrefetchItemCount(ctx: Context?): Int {
+        if (ctx == null) return 4
+        return if (isUltraPotato(ctx)) 2 else 4
+    }
+
     fun getKernelVersion(): String {
         return try {
             val file = File("/proc/version")

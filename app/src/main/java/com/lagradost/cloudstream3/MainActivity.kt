@@ -9,6 +9,7 @@ import android.content.SharedPreferences
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
 import android.util.AttributeSet
 import android.util.Log
@@ -1214,6 +1215,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         }
 
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
+        optimizeDisplayRefreshRate()
         updateTv()
 
         // backup when we update the app, I don't trust myself to not boot lock users, might want to make this a setting?
@@ -2028,6 +2030,39 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             ).text.trim() == "ok"
         } catch (t: Throwable) {
             false
+        }
+    }
+
+    /**
+     * Unlocks high refresh rate (90Hz, 120Hz, 144Hz) display modes for butter-smooth UI scrolling on capable hardware.
+     */
+    private fun optimizeDisplayRefreshRate() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                if (DeviceProfile.isUltraPotato(this)) return
+
+                val currentDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    display
+                } else {
+                    @Suppress("DEPRECATION")
+                    windowManager.defaultDisplay
+                } ?: return
+
+                val supportedModes = currentDisplay.supportedModes
+                if (!supportedModes.isNullOrEmpty()) {
+                    val currentMode = currentDisplay.mode
+                    val highestRefreshMode = supportedModes
+                        .filter { it.physicalWidth == currentMode.physicalWidth && it.physicalHeight == currentMode.physicalHeight }
+                        .maxByOrNull { it.refreshRate }
+
+                    if (highestRefreshMode != null && highestRefreshMode.refreshRate > currentMode.refreshRate) {
+                        val lp = window.attributes
+                        lp.preferredDisplayModeId = highestRefreshMode.modeId
+                        window.attributes = lp
+                    }
+                }
+            } catch (_: Throwable) {
+            }
         }
     }
 }

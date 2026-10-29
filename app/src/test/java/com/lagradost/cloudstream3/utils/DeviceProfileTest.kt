@@ -133,5 +133,6 @@ class DeviceProfileTest {
         val swap = DeviceProfile.getZramSwapMb()
         assertTrue(swap >= 0L)
         assertFalse(DeviceProfile.isUltraPotato(null))
+        assertEquals(4, DeviceProfile.getInitialPrefetchItemCount(null))
     }
 }
