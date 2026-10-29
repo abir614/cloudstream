@@ -52,6 +52,14 @@ object DeviceProfile {
     private var cachedOverride: String? = null
     @Volatile
     private var cachedBatteryRestricted: Boolean? = null
+    @Volatile
+    private var cachedCpuInfo: String? = null
+    @Volatile
+    private var cachedIsLegacyKernel: Boolean? = null
+    @Volatile
+    private var cachedKernelVersion: String? = null
+    @Volatile
+    private var cachedZramSwapMb: Long? = null
 
     fun tier(ctx: Context): DeviceTier {
         val override = try {
@@ -283,25 +291,34 @@ object DeviceProfile {
     )
 
     private fun getCpuInfoString(): String {
-        return try {
+        cachedCpuInfo?.let { return it }
+        val info = try {
             val file = File("/proc/cpuinfo")
             if (file.exists() && file.canRead()) {
+                var res = ""
                 file.useLines { lines ->
                     for (line in lines) {
                         if (line.startsWith("Hardware", ignoreCase = true) || line.startsWith("model name", ignoreCase = true)) {
                             val parts = line.split(":")
                             if (parts.size >= 2) {
                                 val candidate = parts[1].trim()
-                                if (candidate.isNotEmpty()) return candidate
+                                if (candidate.isNotEmpty()) {
+                                    res = candidate
+                                    break
+                                }
                             }
                         }
                     }
                 }
+                res
+            } else {
+                ""
             }
-            ""
         } catch (_: Throwable) {
             ""
         }
+        cachedCpuInfo = info
+        return info
     }
 
     fun hasBrokenHardwareGpu(): Boolean {
@@ -383,20 +400,16 @@ object DeviceProfile {
     }
 
     fun isLegacyLinuxKernel(): Boolean {
-        return try {
-            val file = File("/proc/version")
-            if (file.exists() && file.canRead()) {
-                val line = file.readText().trim()
-                val match = Regex("""Linux version (\d+)\.(\d+)""").find(line)
-                if (match != null) {
-                    val major = match.groupValues[1].toIntOrNull() ?: 4
-                    val minor = match.groupValues[2].toIntOrNull() ?: 14
-                    major < 4 || (major == 4 && minor < 9)
-                } else false
-            } else false
-        } catch (_: Throwable) {
-            false
-        }
+        cachedIsLegacyKernel?.let { return it }
+        val kernel = getKernelVersion()
+        val match = Regex("""(\d+)\.(\d+)""").find(kernel)
+        val legacy = if (match != null) {
+            val major = match.groupValues[1].toIntOrNull() ?: 4
+            val minor = match.groupValues[2].toIntOrNull() ?: 14
+            major < 4 || (major == 4 && minor < 9)
+        } else false
+        cachedIsLegacyKernel = legacy
+        return legacy
     }
 
     fun isUltraPotato(ctx: Context?): Boolean {
@@ -433,6 +446,7 @@ object DeviceProfile {
     }
 
     fun getKernelVersion(): String {
+        cachedKernelVersion?.let { return it }
         // Query os.version property first - compliant with Android SELinux and avoids proc_version AVC denials
         val osVersion = try {
             System.getProperty("os.version")?.trim()
@@ -441,10 +455,12 @@ object DeviceProfile {
         }
         if (!osVersion.isNullOrBlank()) {
             val match = Regex("""(\d+\.\d+\.\d+)""").find(osVersion)
-            return match?.groupValues?.getOrNull(1) ?: osVersion.take(30)
+            val parsed = match?.groupValues?.getOrNull(1) ?: osVersion.take(30)
+            cachedKernelVersion = parsed
+            return parsed
         }
 
-        return try {
+        val version = try {
             val file = File("/proc/version")
             if (file.exists() && file.canRead()) {
                 val line = file.readText().trim()
@@ -456,28 +472,36 @@ object DeviceProfile {
         } catch (_: Throwable) {
             "Linux"
         }
+        cachedKernelVersion = version
+        return version
     }
 
     fun getZramSwapMb(): Long {
-        return try {
+        cachedZramSwapMb?.let { return it }
+        val swap = try {
             val file = File("/proc/meminfo")
             if (file.exists() && file.canRead()) {
+                var kb = 0L
                 file.useLines { lines ->
                     for (line in lines) {
                         if (line.startsWith("SwapTotal:", ignoreCase = true)) {
                             val parts = line.split("\\s+".toRegex())
                             if (parts.size >= 2) {
-                                val kb = parts[1].toLongOrNull() ?: 0L
-                                return kb / 1024L
+                                kb = parts[1].toLongOrNull() ?: 0L
+                                break
                             }
                         }
                     }
                 }
+                kb / 1024L
+            } else {
+                0L
             }
-            0L
         } catch (_: Throwable) {
             0L
         }
+        cachedZramSwapMb = swap
+        return swap
     }
 
     fun getHardwareSummary(ctx: Context): String {

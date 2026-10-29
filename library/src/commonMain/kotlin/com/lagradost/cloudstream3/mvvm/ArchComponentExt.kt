@@ -68,6 +68,10 @@ sealed class Resource<out T> {
 
 fun logError(throwable: Throwable) {
     if (throwable is CancellationException) return
+    val msg = throwable.message
+    if (msg != null && (msg.equals("Canceled", ignoreCase = true) || msg.contains("Socket closed", ignoreCase = true))) {
+        return
+    }
     Log.d("ApiError", "-------------------------------------------------------------------")
     Log.d("ApiError", "safeApiCall: " + throwable.message)
     throwable.printStackTrace()

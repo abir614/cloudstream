@@ -27,6 +27,7 @@ class DdosGuardKiller(private val alwaysBypass: Boolean) : Interceptor {
 
         val response = chain.proceed(request)
         return@runBlocking if (response.code == 403) {
+            response.close()
             bypassDdosGuard(request)
         } else response
     }

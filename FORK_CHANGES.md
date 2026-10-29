@@ -217,10 +217,10 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 - **Zero-Build Actions & Rust Analysis**: Configured `build-mode: none` for Actions and Rust static scanning.
 
 ### 11.3 Device & Exception Diagnostics Hardening
-- **Cloudflare & DDoS-Guard Interceptor Restorations**: Restored `CloudflareKiller` and `DdosGuardKiller` with thread-safe `ConcurrentHashMap` cookie persistence, guaranteeing seamless backward compatibility with modular scraper plugins.
+- **Cloudflare & DDoS-Guard Interceptor Restorations**: Restored `CloudflareKiller` and `DdosGuardKiller` with thread-safe `ConcurrentHashMap` cookie persistence, guaranteeing seamless backward compatibility with modular scraper plugins. Added explicit `response.close()` on 403 fallback to guarantee leak-free socket teardown.
 - **Fail-Safe Crash Recovery (`CloudStreamApp`)**: Replaced unsafe context assertions in `ExceptionHandler` with safe package manager resolution to prevent cascading crashes during recovery.
-- **SELinux `/proc/version` Audit Compliance**: Prioritized `System.getProperty("os.version")` in `DeviceProfile.kt` before falling back to `/proc/version`, eliminating `avc: denied { read } for name="version"` audit warnings on Android 14+ devices.
+- **SELinux `/proc/version` Audit Compliance & Zero-I/O Caching**: Cached `isLegacyLinuxKernel()`, `getKernelVersion()`, `getZramSwapMb()`, and `getCpuInfoString()` into static volatile fields in `DeviceProfile.kt`. Prioritizes `System.getProperty("os.version")` before ever touching `/proc/version`, eliminating `avc: denied { read } for name="version"` audit warnings on Android 14+ devices and eliminating redundant procfs disk I/O during UI scrolling.
 - **TV Channels Provider Check**: Guarded `TvChannelUtils` initialization in `MainActivity.kt` with `isTvChannelsSupported` (`resolveContentProvider(TvContractCompat.AUTHORITY, 0) != null`), eliminating `Failed to find provider info for android.media.tv` logs on non-TV devices.
-- **Coroutine Cancellation Filtering**: Suppressed normal `CancellationException` logging in `ArchComponentExt.kt` to prevent routine user navigation and stream cancellation from dumping false-positive stack traces to standard error.
+- **Cancellation Log Filtering**: Suppressed normal `CancellationException` and OkHttp `IOException("Canceled")` logging in `ArchComponentExt.kt` to prevent routine user navigation, screen rotation, and stream switching from dumping false-positive stack traces to standard error.
 
 
