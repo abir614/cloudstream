@@ -72,8 +72,10 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         super.onCreate()
 
         ExceptionHandler(filesDir.resolve("last_error")) {
-            val intent = context!!.packageManager.getLaunchIntentForPackage(context!!.packageName)
-            startActivity(Intent.makeRestartActivityTask(intent!!.component))
+            val intent = this.packageManager.getLaunchIntentForPackage(this.packageName)
+            intent?.component?.let { comp ->
+                startActivity(Intent.makeRestartActivityTask(comp))
+            }
         }.also {
             exceptionHandler = it
             Thread.setDefaultUncaughtExceptionHandler(it)
