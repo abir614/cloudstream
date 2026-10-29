@@ -79,12 +79,7 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: java-kotlin
-          build-mode: manual
-
-      - name: Build Android Kotlin Sources
-        run: |
-          chmod +x gradlew
-          ./gradlew compilePrereleaseDebugSources -x lint -x test --no-daemon --no-configuration-cache
+          build-mode: none
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
