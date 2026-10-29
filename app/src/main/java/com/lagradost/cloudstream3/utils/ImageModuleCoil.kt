@@ -95,9 +95,13 @@ object ImageLoader {
 
     private fun buildImageHttpClient(context: PlatformContext): OkHttpClient {
         val tier = DeviceProfile.tier(context)
+        val isPotato = DeviceProfile.isUltraPotato(context)
         val dispatcher = Dispatcher().apply {
             when (tier) {
-                DeviceTier.LOW -> {
+                DeviceTier.LOW -> if (isPotato) {
+                    maxRequests = 16
+                    maxRequestsPerHost = 6
+                } else {
                     maxRequests = 32
                     maxRequestsPerHost = 12
                 }
@@ -114,11 +118,11 @@ object ImageLoader {
 
         val connectionPool = ConnectionPool(
             maxIdleConnections = when (tier) {
-                DeviceTier.LOW -> 8
+                DeviceTier.LOW -> if (isPotato) 3 else 8
                 DeviceTier.MID -> 16
                 DeviceTier.HIGH -> 32
             },
-            keepAliveDuration = 5L,
+            keepAliveDuration = if (isPotato) 2L else 5L,
             timeUnit = TimeUnit.MINUTES
         )
 

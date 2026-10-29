@@ -45,6 +45,9 @@ This document catalogues all intentional architectural deviations, security hard
   5. **Tier 5 (System Fallback)**: Transparent Android `Dns.SYSTEM` fallback.
 - **Bounded Total Budget**: Enforces a 2000ms hard deadline per lookup to prevent sequential fallbacks from stacking latency on slow connections.
 - **ExoPlayer / Media3 DNS Alignment**: When DoH is enabled (`dns != 0`), Cronet is automatically bypassed in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt) so video chunks are retrieved via OkHttp `app.baseClient`, guaranteeing video segment downloads never leak to unencrypted ISP DNS.
+- **Cronet Thread Pool Lifecycle Management**: Replaced ad-hoc `Executors.newSingleThreadExecutor()` with a shared daemon-backed executor in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt), preventing unmanaged thread accumulation across stream/quality changes.
+- **Hardware-Adaptive HTTP Disk Cache Scaling**: Scaled OkHttp disk cache dynamically in [`DeviceProfile.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/DeviceProfile.kt) and [`RequestsHelper.kt`](app/src/main/java/com/lagradost/cloudstream3/network/RequestsHelper.kt) (15MB on ultra-potato, 30MB on low, 50MB on mid, 100MB on high), safeguarding eMMC storage on low-end TV sticks.
+- **Ultra-Potato Coil Concurrency Bounds**: Scaled image network dispatcher (`maxRequests = 16`, `maxRequestsPerHost = 6`) and connection pool (`maxIdle = 3`, `keepAlive = 2m`) on low-RAM devices (<= 768MB) in [`ImageModuleCoil.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/ImageModuleCoil.kt) to prevent file descriptor exhaustion during fast poster scrolling.
 
 ### 2.5 Scoped Permissive SSL Client
 - **Isolated Scope**: [`SSLTrustManager`](app/src/main/java/com/lagradost/cloudstream3/ui/player/SSLTrustManager.kt) is strictly confined to individual video playback instances and `insecureApp`.

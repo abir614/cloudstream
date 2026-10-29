@@ -15,7 +15,8 @@ class DeviceProfileTest {
             maxIdleConnections = 6,
             keepAliveDurationMinutes = 2L,
             connectTimeoutSeconds = 15L,
-            readTimeoutSeconds = 25L
+            readTimeoutSeconds = 25L,
+            diskCacheMaxBytes = 30L * 1024 * 1024
         )
         val midNet = NetworkTierConfig(
             maxRequests = 64,
@@ -23,7 +24,8 @@ class DeviceProfileTest {
             maxIdleConnections = 12,
             keepAliveDurationMinutes = 4L,
             connectTimeoutSeconds = 12L,
-            readTimeoutSeconds = 20L
+            readTimeoutSeconds = 20L,
+            diskCacheMaxBytes = 50L * 1024 * 1024
         )
         val highNet = NetworkTierConfig(
             maxRequests = 96,
@@ -31,7 +33,8 @@ class DeviceProfileTest {
             maxIdleConnections = 20,
             keepAliveDurationMinutes = 5L,
             connectTimeoutSeconds = 10L,
-            readTimeoutSeconds = 20L
+            readTimeoutSeconds = 20L,
+            diskCacheMaxBytes = 100L * 1024 * 1024
         )
 
         assertTrue(lowNet.maxRequests < midNet.maxRequests)
@@ -39,6 +42,8 @@ class DeviceProfileTest {
         assertTrue(lowNet.maxIdleConnections < midNet.maxIdleConnections)
         assertTrue(midNet.maxIdleConnections < highNet.maxIdleConnections)
         assertTrue(lowNet.connectTimeoutSeconds > highNet.connectTimeoutSeconds)
+        assertTrue(lowNet.diskCacheMaxBytes < midNet.diskCacheMaxBytes)
+        assertTrue(midNet.diskCacheMaxBytes < highNet.diskCacheMaxBytes)
     }
 
     @Test

@@ -682,6 +682,16 @@ class CS3IPlayer : IPlayer {
         private var cronetEngine: CronetEngine? = null
 
         /**
+         * Shared daemon-backed single-thread executor for Cronet network callbacks.
+         * Reusing this executor prevents leaking unmanaged thread pools across stream changes.
+         */
+        private val cronetExecutor: java.util.concurrent.Executor by lazy {
+            Executors.newSingleThreadExecutor { r ->
+                Thread(r, "cronet-io").apply { isDaemon = true }
+            }
+        }
+
+        /**
          * How many active sessions we have.
          *
          * However in reality it should never go negative or be more than 1,
@@ -851,7 +861,7 @@ class CS3IPlayer : IPlayer {
                     OkHttpDataSource.Factory(app.baseClient).setUserAgent(userAgent)
                 } else {
                     Log.d(TAG, "Using CronetDataSource for $link")
-                    CronetDataSource.Factory(engine, Executors.newSingleThreadExecutor())
+                    CronetDataSource.Factory(engine, cronetExecutor)
                         .setUserAgent(userAgent)
                         .setConnectionTimeoutMs(CRONET_TIMEOUT_MS)
                         .setReadTimeoutMs(CRONET_TIMEOUT_MS)

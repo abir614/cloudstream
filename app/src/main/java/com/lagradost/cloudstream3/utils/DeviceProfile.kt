@@ -18,7 +18,8 @@ data class NetworkTierConfig(
     val maxIdleConnections: Int,
     val keepAliveDurationMinutes: Long,
     val connectTimeoutSeconds: Long,
-    val readTimeoutSeconds: Long
+    val readTimeoutSeconds: Long,
+    val diskCacheMaxBytes: Long = 50L * 1024 * 1024
 )
 
 data class PlayerBufferConfig(
@@ -92,7 +93,8 @@ object DeviceProfile {
                     maxIdleConnections = 2,
                     keepAliveDurationMinutes = 1L,
                     connectTimeoutSeconds = 15L,
-                    readTimeoutSeconds = 25L
+                    readTimeoutSeconds = 25L,
+                    diskCacheMaxBytes = 15L * 1024 * 1024 // 15 MiB for ultra-potato storage
                 )
             } else {
                 NetworkTierConfig(
@@ -101,7 +103,8 @@ object DeviceProfile {
                     maxIdleConnections = 6,
                     keepAliveDurationMinutes = 2L,
                     connectTimeoutSeconds = 15L,
-                    readTimeoutSeconds = 25L
+                    readTimeoutSeconds = 25L,
+                    diskCacheMaxBytes = 30L * 1024 * 1024 // 30 MiB
                 )
             }
             DeviceTier.MID -> NetworkTierConfig(
@@ -110,7 +113,8 @@ object DeviceProfile {
                 maxIdleConnections = 12,
                 keepAliveDurationMinutes = 4L,
                 connectTimeoutSeconds = 12L,
-                readTimeoutSeconds = 20L
+                readTimeoutSeconds = 20L,
+                diskCacheMaxBytes = 50L * 1024 * 1024 // 50 MiB
             )
             DeviceTier.HIGH -> NetworkTierConfig(
                 maxRequests = 96,
@@ -118,7 +122,8 @@ object DeviceProfile {
                 maxIdleConnections = 20,
                 keepAliveDurationMinutes = 5L,
                 connectTimeoutSeconds = 10L,
-                readTimeoutSeconds = 20L
+                readTimeoutSeconds = 20L,
+                diskCacheMaxBytes = 100L * 1024 * 1024 // 100 MiB
             )
         }
     }

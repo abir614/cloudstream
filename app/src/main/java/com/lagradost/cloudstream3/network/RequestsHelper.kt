@@ -86,7 +86,7 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
             // The server response dictates if and when stuff should be cached.
             Cache(
                 directory = File(context.cacheDir, "http_cache"),
-                maxSize = 50L * 1024L * 1024L // 50 MiB
+                maxSize = netConfig.diskCacheMaxBytes
             )
         ).apply {
             when (dns) {
