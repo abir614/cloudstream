@@ -499,7 +499,7 @@ class PlayerGeneratorViewModel : ViewModel() {
             )
         }
 
-        currentJob = viewModelScope.launchSafe {
+        currentJob = viewModelScope.launchSafe(Dispatchers.IO) {
             // Load more data
             val loadingState = safeApiCall {
                 withTimeoutOrNull(60_000L) { // 1 min overall timeout for source loading

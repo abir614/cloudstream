@@ -1113,10 +1113,11 @@ class CS3IPlayer : IPlayer {
     ): ExoPlayer {
         // Hardware Adaptive LoadControl driven by centralized DeviceProfile (§5.2, §5.6)
         val playerConfig = DeviceProfile.getPlayerBufferConfig(context)
+        val isPotato = DeviceProfile.isUltraPotato(context)
 
         // Protect low-RAM devices against OOM by capping maximum RAM buffer bytes
         val maxAllowedBufferBytes = when (DeviceProfile.tier(context)) {
-            DeviceTier.LOW -> 24 * 1024 * 1024 // 24 MB hard ceiling on low-spec hardware
+            DeviceTier.LOW -> if (isPotato) 8 * 1024 * 1024 else 24 * 1024 * 1024 // 8 MB on ultra-potato (500MB RAM)
             DeviceTier.MID -> 64 * 1024 * 1024 // 64 MB ceiling on mid-spec
             DeviceTier.HIGH -> 256 * 1024 * 1024
         }
@@ -1330,13 +1331,14 @@ class CS3IPlayer : IPlayer {
             .setFragmentedMp4ExtractorFlags(FragmentedMp4Extractor.FLAG_MERGE_FRAGMENTED_SIDX)
 
         // Create an online connection with disk cache only when disk cache size is explicitly configured (> 0)
-        // Bypassing CacheDataSource when simpleCacheSize <= 0 prevents SQLite locking and disk thrashing on potato devices
+        // Bypassing CacheDataSource on potato devices (RAM <= 768MB) prevents SQLite locking and disk thrashing on slow flash storage
+        val effectiveDiskCacheSize = if (DeviceProfile.isUltraPotato(context)) 0L else simpleCacheSize
         val dataSourceFactory = if (onlineSource == null) {
             null
         } else {
-            if (simpleCacheSize > 0) {
+            if (effectiveDiskCacheSize > 0) {
                 if (simpleCache == null)
-                    simpleCache = getCache(context, simpleCacheSize)
+                    simpleCache = getCache(context, effectiveDiskCacheSize)
 
                 val cacheFactory = CacheDataSource.Factory().apply {
                     simpleCache?.let { setCache(it) }
@@ -1946,10 +1948,11 @@ class CS3IPlayer : IPlayer {
             val provider = getApiFromNameNull(link.source)
             val interceptor: Interceptor? = provider?.getVideoInterceptor(link)
 
+            val effectiveDiskCacheSize = if (DeviceProfile.isUltraPotato(context)) 0L else simpleCacheSize
             val onlineSourceFactory =
                 createVideoSource(
                     link = link,
-                    engine = tryCreateEngine(context, simpleCacheSize),
+                    engine = tryCreateEngine(context, effectiveDiskCacheSize),
                     interceptor = interceptor,
                     ignoreSSL = ignoreSSL,
                 )

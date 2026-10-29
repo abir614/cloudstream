@@ -933,6 +933,16 @@ suspend fun loadExtractor(
 
 internal const val PER_SOURCE_TIMEOUT_MS = 5_000L
 
+private val cleanMainUrlCache: MutableMap<String, String> = mutableMapOf()
+
+internal fun ExtractorApi.getCleanMainUrl(): String {
+    return cleanMainUrlCache[mainUrl] ?: synchronized(cleanMainUrlCache) {
+        cleanMainUrlCache.getOrPut(mainUrl) {
+            mainUrl.replace(schemaStripRegex, "")
+        }
+    }
+}
+
 /**
  * Tries to load the appropriate extractor based on link, returns true if any extractor is loaded.
  * */
@@ -952,7 +962,7 @@ suspend fun loadExtractor(
     // Iterate in reverse order so the new registered ExtractorApi takes priority
     for (index in extractorApis.lastIndex downTo 0) {
         val extractor = extractorApis[index]
-        if (compareUrl.startsWith(extractor.mainUrl.replace(schemaStripRegex, ""))) {
+        if (compareUrl.startsWith(extractor.getCleanMainUrl())) {
             try {
                 withTimeout(PER_SOURCE_TIMEOUT_MS) {
                     extractor.getUrl(currentUrl, referer, subtitleCallback, callback)
@@ -971,6 +981,14 @@ suspend fun loadExtractor(
     // this is to match mirror domains - like example.com, example.net
     for (index in extractorApis.lastIndex downTo 0) {
         val extractor = extractorApis[index]
+        val cleanUrl = extractor.getCleanMainUrl()
+        // Fast pre-filter: skip completely dissimilar domains before running O(N*M) Levenshtein
+        if (cleanUrl.isNotEmpty() && !currentUrl.contains(cleanUrl, ignoreCase = true)) {
+            val minLen = minOf(4, cleanUrl.length)
+            if (minLen > 0 && !compareUrl.regionMatches(0, cleanUrl, 0, minLen, ignoreCase = true)) {
+                continue
+            }
+        }
         if (Levenshtein.partialRatio(
                 extractor.mainUrl,
                 currentUrl

@@ -146,8 +146,6 @@ class RepoLinkGenerator(
                         if (sourceTypes.contains(link.type)) {
                             callback(Pair(link, null))
                         }
-
-                        currentCache.linkCache.add(link)
                         currentCache.lastCachedTimestamp = unixTime
                     }
                 }

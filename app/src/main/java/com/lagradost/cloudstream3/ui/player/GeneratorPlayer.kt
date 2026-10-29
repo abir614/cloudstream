@@ -162,6 +162,7 @@ class GeneratorPlayer : FullScreenPlayer() {
 
         const val SHOW_LINK_SOURCE_PREFIX = "pref_link_show_source_"
         const val SHOW_LINK_NAME_PREFIX = "pref_link_show_name_"
+        const val SHOW_LINK_QUALITY_PREFIX = "pref_link_show_quality_"
 
         private val generators = ConcurrentHashMap<String, VideoGenerator<*>>()
         private const val MAX_CACHED_GENERATORS = 4
@@ -225,6 +226,44 @@ class GeneratorPlayer : FullScreenPlayer() {
     private var preferredAutoSelectSubtitles: String? = null // null means do nothing, "" means none
     private var hasAutoSelectedSubtitlesForCurrentPlayback: Boolean = false
     private var playerUuid: String? = null
+
+    // User-selected preferences remembered across episodes and playback sessions
+    private var preferredVideoSource: String? = null
+    private var preferredVideoSourceName: String? = null
+    private var preferredVideoSourceQuality: Int? = null
+    private var preferredAudioLanguage: String? = null
+    private var preferredAudioLabel: String? = null
+    private var preferredAudioId: String? = null
+    private var preferredSubtitleLanguage: String? = null
+    private var preferredSubtitleName: String? = null
+    private var preferredSubtitleId: String? = null
+    private var preferredSubtitleDisabled: Boolean = false
+
+    private fun findPreferredLink(candidateLinks: List<DisplayLink>): DisplayLink? {
+        val seriesKey = currentSeriesKey
+        val remSource = preferredVideoSource ?: (seriesKey?.let { getKey<String>(SHOW_LINK_SOURCE_PREFIX + it) }) ?: return null
+        val remName = preferredVideoSourceName ?: (seriesKey?.let { getKey<String>(SHOW_LINK_NAME_PREFIX + it) })
+        val remQuality = preferredVideoSourceQuality ?: (seriesKey?.let { getKey<Int>(SHOW_LINK_QUALITY_PREFIX + it) })
+
+        // 1. Exact source AND name match (highest fidelity)
+        if (!remName.isNullOrBlank()) {
+            val match = candidateLinks.find {
+                it.link.first?.source == remSource && it.link.first?.name.equals(remName, ignoreCase = true)
+            }
+            if (match != null) return match
+        }
+
+        // 2. Exact source AND quality match
+        if (remQuality != null && remQuality > 0) {
+            val match = candidateLinks.find {
+                it.link.first?.source == remSource && it.link.first?.quality == remQuality
+            }
+            if (match != null) return match
+        }
+
+        // 3. Same source/extractor match
+        return candidateLinks.find { it.link.first?.source == remSource }
+    }
     private val allMeta: List<ResultEpisode>?
         get() = viewModel.state.generatorState?.allMeta?.filterIsInstance<ResultEpisode>()
             ?.map { episode ->
@@ -283,6 +322,11 @@ class GeneratorPlayer : FullScreenPlayer() {
     private fun setSubtitles(subtitle: SubtitleData?, userInitiated: Boolean): Boolean {
         if (userInitiated) {
             hasAutoSelectedSubtitlesForCurrentPlayback = true
+            preferredSubtitleDisabled = (subtitle == null)
+            preferredSubtitleId = subtitle?.getId()
+            preferredSubtitleName = subtitle?.name
+            preferredSubtitleLanguage = subtitle?.getIETF_tag() ?: subtitle?.languageCode
+
             currentSeriesKey?.let { seriesKey ->
                 if (subtitle == null) {
                     setKey(SHOW_SUB_DISABLED_PREFIX + seriesKey, true)
@@ -334,31 +378,29 @@ class GeneratorPlayer : FullScreenPlayer() {
         val audioTracks = tracks.allAudioTracks
         if (audioTracks.isEmpty()) return
 
-        // 1. Series-remembered track selection:
+        // 1. Series / User-remembered track selection:
         val seriesKey = currentSeriesKey
-        if (seriesKey != null) {
-            val remId = getKey<String>(SHOW_AUDIO_ID_PREFIX + seriesKey)
-            val remLabel = getKey<String>(SHOW_AUDIO_LABEL_PREFIX + seriesKey)
-            val remLang = getKey<String>(SHOW_AUDIO_LANG_PREFIX + seriesKey)
+        val remId = preferredAudioId ?: seriesKey?.let { getKey<String>(SHOW_AUDIO_ID_PREFIX + it) }
+        val remLabel = preferredAudioLabel ?: seriesKey?.let { getKey<String>(SHOW_AUDIO_LABEL_PREFIX + it) }
+        val remLang = preferredAudioLanguage ?: seriesKey?.let { getKey<String>(SHOW_AUDIO_LANG_PREFIX + it) }
 
-            if (!remId.isNullOrEmpty() || !remLabel.isNullOrEmpty() || !remLang.isNullOrEmpty()) {
-                // Exact match (by id or label)
-                val exactMatch = audioTracks.find {
-                    (!remId.isNullOrEmpty() && it.id == remId) ||
-                    (!remLabel.isNullOrEmpty() && it.label.equals(remLabel, ignoreCase = true))
-                }
-                if (exactMatch != null) {
-                    player.setPreferredAudioTrack(exactMatch.language, exactMatch.id, exactMatch.formatIndex)
+        if (!remId.isNullOrEmpty() || !remLabel.isNullOrEmpty() || !remLang.isNullOrEmpty()) {
+            // Exact match (by id or label)
+            val exactMatch = audioTracks.find {
+                (!remId.isNullOrEmpty() && it.id == remId) ||
+                (!remLabel.isNullOrEmpty() && it.label.equals(remLabel, ignoreCase = true))
+            }
+            if (exactMatch != null) {
+                player.setPreferredAudioTrack(exactMatch.language, exactMatch.id, exactMatch.formatIndex)
+                return
+            }
+
+            // Same language match
+            if (!remLang.isNullOrEmpty()) {
+                val langMatch = audioTracks.find { matchesLanguage(it.language, it.label, remLang) }
+                if (langMatch != null) {
+                    player.setPreferredAudioTrack(langMatch.language, langMatch.id, langMatch.formatIndex)
                     return
-                }
-
-                // Same language match
-                if (!remLang.isNullOrEmpty()) {
-                    val langMatch = audioTracks.find { matchesLanguage(it.language, it.label, remLang) }
-                    if (langMatch != null) {
-                        player.setPreferredAudioTrack(langMatch.language, langMatch.id, langMatch.formatIndex)
-                        return
-                    }
                 }
             }
         }
@@ -1556,10 +1598,14 @@ class GeneratorPlayer : FullScreenPlayer() {
                     }
                     if (init) {
                         filteredLinks.getOrNull(sourceIndex)?.let {
-                            currentSeriesKey?.let { seriesKey ->
-                                it.link.first?.let { extractorLink ->
+                            it.link.first?.let { extractorLink ->
+                                preferredVideoSource = extractorLink.source
+                                preferredVideoSourceName = extractorLink.name
+                                preferredVideoSourceQuality = extractorLink.quality
+                                currentSeriesKey?.let { seriesKey ->
                                     setKey(SHOW_LINK_SOURCE_PREFIX + seriesKey, extractorLink.source)
                                     setKey(SHOW_LINK_NAME_PREFIX + seriesKey, extractorLink.name)
+                                    setKey(SHOW_LINK_QUALITY_PREFIX + seriesKey, extractorLink.quality)
                                 }
                             }
                             loadLink(it.link, true)
@@ -1712,6 +1758,11 @@ class GeneratorPlayer : FullScreenPlayer() {
                         currentTrack?.id,
                         currentTrack?.formatIndex,
                     )
+                    currentTrack?.let { track ->
+                        preferredAudioId = track.id
+                        preferredAudioLabel = track.label
+                        preferredAudioLanguage = track.language
+                    }
                     currentSeriesKey?.let { seriesKey ->
                         currentTrack?.let { track ->
                             setKey(SHOW_AUDIO_ID_PREFIX + seriesKey, track.id ?: "")
@@ -1824,6 +1875,8 @@ class GeneratorPlayer : FullScreenPlayer() {
             return
         }
 
+        val preferredLink = findPreferredLink(availableLinks)
+
         if (availableLinks.size == 1) {
             loadLink(availableLinks.first().link, false)
             showPlayerMetadata()
@@ -1832,7 +1885,12 @@ class GeneratorPlayer : FullScreenPlayer() {
 
         // Parallel mirror health & latency probe for fastest start
         ioSafe {
-            val candidateVideoLinks = availableLinks.map { it.link }
+            // Prioritize the user's preferred video source as the leading candidate
+            val candidateVideoLinks = if (preferredLink != null) {
+                listOf(preferredLink.link) + availableLinks.filter { it != preferredLink }.map { it.link }
+            } else {
+                availableLinks.map { it.link }
+            }
             val (bestLink, deadLinks) = StreamHealthProber.selectBestLinkWithDeadList(candidateVideoLinks)
 
             if (deadLinks.isNotEmpty()) {
@@ -1842,7 +1900,11 @@ class GeneratorPlayer : FullScreenPlayer() {
             }
 
             runOnMainThread {
-                val winningLink = bestLink ?: availableLinks.first().link
+                val winningLink = if (preferredLink != null && !deadLinks.contains(preferredLink.link)) {
+                    preferredLink.link
+                } else {
+                    bestLink ?: availableLinks.first().link
+                }
                 loadLink(winningLink, false)
                 showPlayerMetadata()
             }
@@ -2130,43 +2192,41 @@ class GeneratorPlayer : FullScreenPlayer() {
         val availableSubs = viewModel.state.subtitles
         if (availableSubs.isEmpty()) return false
 
-        // 1. Series-remembered subtitle selection
+        // 1. Series / User-remembered subtitle selection
         val seriesKey = currentSeriesKey
-        if (seriesKey != null) {
-            val isDisabled = getKey<Boolean>(SHOW_SUB_DISABLED_PREFIX + seriesKey) ?: false
-            if (isDisabled) {
-                // User explicitly turned off subtitles for this series
-                return setSubtitles(null, false)
+        val isDisabled = preferredSubtitleDisabled || (seriesKey?.let { getKey<Boolean>(SHOW_SUB_DISABLED_PREFIX + it) } ?: false)
+        if (isDisabled) {
+            // User explicitly turned off subtitles for this series / session
+            return setSubtitles(null, false)
+        }
+
+        val remId = preferredSubtitleId ?: seriesKey?.let { getKey<String>(SHOW_SUB_ID_PREFIX + it) }
+        val remName = preferredSubtitleName ?: seriesKey?.let { getKey<String>(SHOW_SUB_NAME_PREFIX + it) }
+        val remLang = preferredSubtitleLanguage ?: seriesKey?.let { getKey<String>(SHOW_SUB_LANG_PREFIX + it) }
+
+        if (!remId.isNullOrEmpty() || !remName.isNullOrEmpty() || !remLang.isNullOrEmpty()) {
+            // First: exact ID or name match
+            val exactMatch = availableSubs.find {
+                (!remId.isNullOrEmpty() && it.getId() == remId) ||
+                (!remName.isNullOrEmpty() && it.name.equals(remName, ignoreCase = true))
+            }
+            if (exactMatch != null && setSubtitles(exactMatch, false)) {
+                player.saveData()
+                player.reloadPlayer(ctx)
+                player.handleEvent(CSPlayerEvent.Play)
+                return true
             }
 
-            val remId = getKey<String>(SHOW_SUB_ID_PREFIX + seriesKey)
-            val remName = getKey<String>(SHOW_SUB_NAME_PREFIX + seriesKey)
-            val remLang = getKey<String>(SHOW_SUB_LANG_PREFIX + seriesKey)
-
-            if (!remId.isNullOrEmpty() || !remName.isNullOrEmpty() || !remLang.isNullOrEmpty()) {
-                // First: exact ID or name match
-                val exactMatch = availableSubs.find {
-                    (!remId.isNullOrEmpty() && it.getId() == remId) ||
-                    (!remName.isNullOrEmpty() && it.name.equals(remName, ignoreCase = true))
+            // Second: same language match
+            if (!remLang.isNullOrEmpty()) {
+                val langMatch = sortSubs(availableSubs).firstOrNull {
+                    it.matchesLanguageCode(remLang) || matchesLanguage(it.languageCode, it.originalName, remLang)
                 }
-                if (exactMatch != null && setSubtitles(exactMatch, false)) {
+                if (langMatch != null && setSubtitles(langMatch, false)) {
                     player.saveData()
                     player.reloadPlayer(ctx)
                     player.handleEvent(CSPlayerEvent.Play)
                     return true
-                }
-
-                // Second: same language match
-                if (!remLang.isNullOrEmpty()) {
-                    val langMatch = sortSubs(availableSubs).firstOrNull {
-                        it.matchesLanguageCode(remLang) || matchesLanguage(it.languageCode, it.originalName, remLang)
-                    }
-                    if (langMatch != null && setSubtitles(langMatch, false)) {
-                        player.saveData()
-                        player.reloadPlayer(ctx)
-                        player.handleEvent(CSPlayerEvent.Play)
-                        return true
-                    }
                 }
             }
         }
@@ -2852,12 +2912,19 @@ class GeneratorPlayer : FullScreenPlayer() {
             }
 
             safe {
-                if (!isPlayerActive.get() && viewModel.state.links.any { link ->
-                        getLinkPriority(currentQualityProfile, link.first) >=
-                                QualityDataHelper.AUTO_SKIP_PRIORITY
+                if (!isPlayerActive.get()) {
+                    val usableSorted = sortedLinks.filter { it.shouldUseLink && !viewModel.state.erroredLinks.contains(it.link) }
+                    val preferredMatch = findPreferredLink(usableSorted)
+                    if (preferredMatch != null) {
+                        Log.i(TAG, "Fast-Start: Preferred user video source loaded -> ${preferredMatch.link.first?.source}")
+                        startPlayer()
+                    } else if (viewModel.state.links.any { link ->
+                            getLinkPriority(currentQualityProfile, link.first) >=
+                                    QualityDataHelper.AUTO_SKIP_PRIORITY
+                        }
+                    ) {
+                        startPlayer()
                     }
-                ) {
-                    startPlayer()
                 }
             }
 
