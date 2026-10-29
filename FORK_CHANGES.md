@@ -205,3 +205,22 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 - **Nested RecyclerView GapWorker Prefetching**: Configured `isItemPrefetchEnabled = true` and `initialPrefetchItemCount` (`DeviceProfile.getInitialPrefetchItemCount`) across all linear layouts in `LinearListLayout.kt` (4 items on standard tiers, 2 on ultra-potato). Enables the Android RenderThread GapWorker to pre-bind horizontal cards during idle frame intervals, eliminating frame drop spikes when horizontal rows enter the viewport.
 - **Dynamic Display Refresh Rate Optimization**: In `MainActivity.kt` (`optimizeDisplayRefreshRate`), automatically inspects `supportedModes` and requests highest available refresh rate (90Hz, 120Hz, 144Hz) on Android M+ (API 23+) strictly matching the current screen resolution, delivering butter-smooth 90/120fps UI scrolling on capable hardware while conserving battery on ultra-potato devices.
 
+---
+
+## 11. Build System Modernization, Static Analysis & Runtime Hardening
+
+### 11.1 Gradle 9.8.2 Modernization
+- **Gradle Wrapper 9.8.2**: Upgraded from Gradle 9.4.1 to Gradle 9.8.2 with official SHA-256 checksum verification (`21bd5da2de49b642904077f38c0efdc7778e92b3ed0889392dca61b97e389607`), eliminating Gradle lifecycle deprecation warnings while ensuring peak daemon efficiency and memory management.
+
+### 11.2 CodeQL Multi-Language Security Analysis
+- **Canonical Full-Database Android Static Analysis**: Utilizes `build-mode: manual` with `./gradlew compilePrereleaseDebugSources` under CodeQL Action v4 for `java-kotlin`, providing full abstract syntax tree and call-graph database generation across Android and Multiplatform Kotlin sources.
+- **Zero-Build Actions & Rust Analysis**: Configured `build-mode: none` for Actions and Rust static scanning.
+
+### 11.3 Device & Exception Diagnostics Hardening
+- **Cloudflare & DDoS-Guard Interceptor Restorations**: Restored `CloudflareKiller` and `DdosGuardKiller` with thread-safe `ConcurrentHashMap` cookie persistence, guaranteeing seamless backward compatibility with modular scraper plugins.
+- **Fail-Safe Crash Recovery (`CloudStreamApp`)**: Replaced unsafe context assertions in `ExceptionHandler` with safe package manager resolution to prevent cascading crashes during recovery.
+- **SELinux `/proc/version` Audit Compliance**: Prioritized `System.getProperty("os.version")` in `DeviceProfile.kt` before falling back to `/proc/version`, eliminating `avc: denied { read } for name="version"` audit warnings on Android 14+ devices.
+- **TV Channels Provider Check**: Guarded `TvChannelUtils` initialization in `MainActivity.kt` with `isTvChannelsSupported` (`resolveContentProvider(TvContractCompat.AUTHORITY, 0) != null`), eliminating `Failed to find provider info for android.media.tv` logs on non-TV devices.
+- **Coroutine Cancellation Filtering**: Suppressed normal `CancellationException` logging in `ArchComponentExt.kt` to prevent routine user navigation and stream cancellation from dumping false-positive stack traces to standard error.
+
+
