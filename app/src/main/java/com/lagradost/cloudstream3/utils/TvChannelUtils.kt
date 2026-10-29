@@ -21,6 +21,14 @@ import com.lagradost.cloudstream3.utils.DataStore.setKey
 const val PROGRAM_ID_LIST_KEY = "persistent_program_ids"
 
 object TvChannelUtils {
+    fun isTvChannelsSupported(context: Context): Boolean {
+        return try {
+            context.packageManager.resolveContentProvider(TvContractCompat.AUTHORITY, 0) != null
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     fun Context.saveProgramId(programId: Long) {
         val existing: List<Long> = getKey<List<Long>>(PROGRAM_ID_LIST_KEY) ?: emptyList()
         val updated = (existing + programId).distinct()
@@ -37,6 +45,7 @@ object TvChannelUtils {
 
 
     fun getChannelId(context: Context, channelName: String): Long? {
+        if (!isTvChannelsSupported(context)) return null
         return try {
             context.contentResolver.query(
                 TvContractCompat.Channels.CONTENT_URI,
@@ -68,6 +77,7 @@ object TvChannelUtils {
     /** Insert programs into a channel */
     @SuppressLint("RestrictedApi")
     fun addPrograms(context: Context, channelId: Long, items: List<SearchResponse>) {
+        if (!isTvChannelsSupported(context)) return
         for (item in items) {
             try {
                 val nameBase64 = base64Encode(item.apiName.toByteArray(Charsets.UTF_8))
@@ -115,6 +125,7 @@ object TvChannelUtils {
     }
 
     fun deleteStoredPrograms(context: Context) {
+        if (!isTvChannelsSupported(context)) return
         val programIds = context.getStoredProgramIds()
 
         for (id in programIds) {
@@ -135,6 +146,7 @@ object TvChannelUtils {
     }
 
     fun createTvChannel(context: Context) {
+        if (!isTvChannelsSupported(context)) return
         val componentName = ComponentName(context, MainActivity::class.java)
         val iconUri = "android.resource://${context.packageName}/mipmap/ic_launcher".toUri()
         val inputId = TvContractCompat.buildInputId(componentName)

@@ -67,6 +67,7 @@ sealed class Resource<out T> {
 }
 
 fun logError(throwable: Throwable) {
+    if (throwable is CancellationException) return
     Log.d("ApiError", "-------------------------------------------------------------------")
     Log.d("ApiError", "safeApiCall: " + throwable.message)
     throwable.printStackTrace()
@@ -104,6 +105,7 @@ suspend fun <T> safeAsync(apiCall: suspend () -> T): T? {
     return try {
         apiCall.invoke()
     } catch (throwable: Throwable) {
+        if (throwable is CancellationException) throw throwable
         logError(throwable)
         return null
     }
@@ -155,6 +157,7 @@ fun CoroutineScope.launchSafe(
         try {
             block()
         } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
             logError(throwable)
         }
     }
@@ -211,6 +214,7 @@ suspend fun <T> safeApiCall(
         try {
             Resource.Success(work.invoke())
         } catch (throwable: Throwable) {
+            if (throwable is CancellationException) throw throwable
             logError(throwable)
             throwAbleToResource(throwable)
         }

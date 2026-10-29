@@ -1970,13 +1970,15 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         }
 
         main {
-            val channelId =
-                TvChannelUtils.getChannelId(this@MainActivity, getString(R.string.app_name))
-            if (channelId == null) {
-                Log.d("TvChannel", "Channel not found, creating")
-                TvChannelUtils.createTvChannel(this@MainActivity)
-            } else {
-                Log.d("TvChannel", "Channel ID: $channelId")
+            if (TvChannelUtils.isTvChannelsSupported(this@MainActivity)) {
+                val channelId =
+                    TvChannelUtils.getChannelId(this@MainActivity, getString(R.string.app_name))
+                if (channelId == null) {
+                    Log.d("TvChannel", "Channel not found, creating")
+                    TvChannelUtils.createTvChannel(this@MainActivity)
+                } else {
+                    Log.d("TvChannel", "Channel ID: $channelId")
+                }
             }
         }
 

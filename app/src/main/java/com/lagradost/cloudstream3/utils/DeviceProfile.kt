@@ -433,6 +433,17 @@ object DeviceProfile {
     }
 
     fun getKernelVersion(): String {
+        // Query os.version property first - compliant with Android SELinux and avoids proc_version AVC denials
+        val osVersion = try {
+            System.getProperty("os.version")?.trim()
+        } catch (_: Throwable) {
+            null
+        }
+        if (!osVersion.isNullOrBlank()) {
+            val match = Regex("""(\d+\.\d+\.\d+)""").find(osVersion)
+            return match?.groupValues?.getOrNull(1) ?: osVersion.take(30)
+        }
+
         return try {
             val file = File("/proc/version")
             if (file.exists() && file.canRead()) {
@@ -440,7 +451,7 @@ object DeviceProfile {
                 val match = Regex("""Linux version (\d+\.\d+\.\d+)""").find(line)
                 match?.groupValues?.getOrNull(1) ?: line.take(30)
             } else {
-                System.getProperty("os.version") ?: "Linux"
+                "Linux"
             }
         } catch (_: Throwable) {
             "Linux"
