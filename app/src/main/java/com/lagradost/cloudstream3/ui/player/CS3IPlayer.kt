@@ -15,6 +15,7 @@ import androidx.annotation.AnyThread
 import androidx.annotation.MainThread
 import androidx.annotation.OptIn
 import androidx.core.net.toUri
+import androidx.media3.common.C
 import androidx.media3.common.C.TIME_UNSET
 import androidx.media3.common.C.TRACK_TYPE_AUDIO
 import androidx.media3.common.C.TRACK_TYPE_TEXT
@@ -1178,6 +1179,7 @@ class CS3IPlayer : IPlayer {
                     val factory = if (isSoftwareDecodingEnabled) {
                         FixedNextRenderersFactory(context, compressor).apply {
                             setEnableDecoderFallback(true)
+                            forceEnableMediaCodecAsynchronousQueueing()
                             setExtensionRendererMode(
                                 if (isSoftwareDecodingPreferred)
                                     DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
@@ -1191,6 +1193,7 @@ class CS3IPlayer : IPlayer {
                             // no nextlib = EXTENSION_RENDERER_MODE_OFF, no compressor = fully default sink
                             DefaultRenderersFactory(context).apply {
                                 setEnableDecoderFallback(true)
+                                forceEnableMediaCodecAsynchronousQueueing()
                             }
                         } else {
                             object : DefaultRenderersFactory(context) {
@@ -1206,6 +1209,7 @@ class CS3IPlayer : IPlayer {
                                     .build()
                             }.apply {
                                 setEnableDecoderFallback(true)
+                                forceEnableMediaCodecAsynchronousQueueing()
                             }
                         }
                     }
@@ -1324,6 +1328,7 @@ class CS3IPlayer : IPlayer {
                             rebufferMs
                         ).build()
                 )
+                .setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS)
 
         // Because "Java rules" the media3 team hates to do open classes so we have to copy paste the entire thing to add a custom extractor
         // This includes the updated MKV extractor that enabled seeking in formats where the seek information is at the back of the file
