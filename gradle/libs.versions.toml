@@ -57,7 +57,7 @@ tensorflowLite = "2.16.1"
 workRuntimeKtx = "2.11.2" # 2.12.0 requires minSdk 24 (breaks minSdk 23 compatibility)
 zipline = "1.27.0"
 composeMaterial3 = "1.12.0-alpha03"
-composeMultiplatform = "1.12.1"
+composeMultiplatform = "1.12.2"
 lifecycleViewmodelCompose = "2.11.0"
 
 # jvmTarget = "11" is needed for compose, otherwise you will get
