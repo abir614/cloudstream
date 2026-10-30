@@ -11,7 +11,7 @@ buildkonfigGradlePlugin = "0.23.0"
 coil = { strictly = "3.3.0" } # Later versions require jvmTarget 11 or later
 colorpicker = "6b46b49"
 conscryptAndroid = { strictly = "2.5.2" } # 2.5.3 crashes everything
-constraintlayout = "2.2.1"
+constraintlayout = "2.2.2"
 coreKtx = "1.19.1"
 cryptography = "0.6.0"
 desugar_jdk_libs_nio = "2.1.5"
