@@ -78,8 +78,6 @@ import com.lagradost.cloudstream3.utils.UIHelper.navigate
 import com.lagradost.cloudstream4.AppSettings
 import okhttp3.Cache
 import java.io.File
-import java.util.concurrent.Executor
-import java.util.concurrent.Executors
 
 object AppContextUtils {
     fun RecyclerView.isRecyclerScrollable(): Boolean {
@@ -680,10 +678,13 @@ object AppContextUtils {
 
     fun Context.isConnectedToChromecast(): Boolean {
         if (isCastApiAvailable()) {
-            val executor: Executor = Executors.newSingleThreadExecutor()
-            val castContext = CastContext.getSharedInstance(this, executor)
-            if (castContext.result.castState == CastState.CONNECTED) {
-                return true
+            try {
+                val castContext = CastContext.getSharedInstance(this) { it.run() }
+                if (castContext.isSuccessful && castContext.result?.castState == CastState.CONNECTED) {
+                    return true
+                }
+            } catch (_: Throwable) {
+                return false
             }
         }
         return false

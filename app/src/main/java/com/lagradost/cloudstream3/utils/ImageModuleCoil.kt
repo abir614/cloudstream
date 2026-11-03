@@ -89,6 +89,10 @@ object ImageLoader {
         } catch (_: Throwable) {
         }
         try {
+            SingletonImageLoader.get(context).diskCache?.clear()
+        } catch (_: Throwable) {
+        }
+        try {
             SingletonImageLoader.reset()
         } catch (_: Throwable) {
         }
@@ -139,6 +143,19 @@ object ImageLoader {
             .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
             .followRedirects(true)
             .followSslRedirects(true)
+            .addNetworkInterceptor { chain ->
+                val response = chain.proceed(chain.request())
+                if (response.isSuccessful) {
+                    // Enforce 30-day disk cache for remote images, bypassing restrictive CDN no-cache/no-store headers
+                    response.newBuilder()
+                        .removeHeader("Pragma")
+                        .removeHeader("Vary")
+                        .header("Cache-Control", "public, max-age=2592000")
+                        .build()
+                } else {
+                    response
+                }
+            }
             .apply {
                 when (dns) {
                     0 -> dns(SafeDns(Dns.SYSTEM))
@@ -313,6 +330,8 @@ object ImageLoader {
 
         // headers can be overridden by extensions.
         this.load(imageData, SingletonImageLoader.get(context)) {
+            this.diskCacheKey(imageKey)
+            this.memoryCacheKey(imageKey)
             this.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
                 headerBuilder["User-Agent"] = USER_AGENT
                 headers?.forEach { (key, value) ->

@@ -722,10 +722,12 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                     if (isLayout(PHONE)) {
                         // Fab is only relevant to Phone
                         if (dy > 0) { //check for scroll down
-                            homeApiFab.shrink() // hide
-                            homeRandom.shrink()
+                            if (homeApiFab.isExtended) {
+                                homeApiFab.shrink() // hide
+                                homeRandom.shrink()
+                            }
                         } else if (dy < -5) {
-                            if (isLayout(PHONE)) {
+                            if (!homeApiFab.isExtended) {
                                 homeApiFab.extend() // show
                                 homeRandom.extend()
                             }

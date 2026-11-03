@@ -264,8 +264,7 @@ object SettingsGeneralScreen : SearchableSettings {
                         preference = settings.general.enableNsfw,
                         onValueChanged = { enabled ->
                             com.lagradost.cloudstream3.MainAPI.settingsForProvider.enableAdult = enabled
-                            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
-                            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+                            com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.onFilterConfigChanged()
                             true
                         }
                     ),
@@ -297,8 +296,7 @@ object SettingsGeneralScreen : SearchableSettings {
                         preference = settings.general.censorNsfwPosters,
                         enabled = nsfwGloballyEnabled,
                         onValueChanged = {
-                            com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
-                            com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
+                            com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.onFilterConfigChanged()
                             true
                         }
                     )

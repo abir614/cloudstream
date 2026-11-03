@@ -38,6 +38,12 @@ import com.lagradost.cloudstream3.utils.getImageFromDrawable
 
 object SearchResultBuilder {
     private val showCache: MutableMap<String, Boolean> = mutableMapOf()
+    @Volatile var cachedShowSub: Boolean = false; private set
+    @Volatile var cachedShowDub: Boolean = false; private set
+    @Volatile var cachedShowTitle: Boolean = false; private set
+    @Volatile var cachedShowEpisodeText: Boolean = false; private set
+    @Volatile var cachedShowHd: Boolean = false; private set
+    @Volatile var cachedShowRatingView: Boolean = false; private set
 
     fun updateCache(context: Context?) {
         if (context == null) return
@@ -46,6 +52,12 @@ object SearchResultBuilder {
         for (k in context.resources.getStringArray(R.array.poster_ui_options_values)) {
             showCache[k] = settingsManager.getBoolean(k, showCache[k] ?: true)
         }
+        cachedShowSub = settingsManager.getBoolean(context.getString(R.string.show_sub_key), false)
+        cachedShowDub = settingsManager.getBoolean(context.getString(R.string.show_dub_key), false)
+        cachedShowTitle = settingsManager.getBoolean(context.getString(R.string.show_title_key), false)
+        cachedShowEpisodeText = settingsManager.getBoolean(context.getString(R.string.show_episode_text_key), false)
+        cachedShowHd = settingsManager.getBoolean(context.getString(R.string.show_hd_key), false)
+        cachedShowRatingView = settingsManager.getBoolean(context.getString(R.string.show_rating_key), false)
     }
 
     @SuppressLint("StringFormatInvalid")
@@ -85,13 +97,12 @@ object SearchResultBuilder {
         rating?.isVisible = false
         episodeText?.isVisible = false
 
-        val showSub = showCache[textIsDub?.context?.getString(R.string.show_sub_key)] ?: false
-        val showDub = showCache[textIsDub?.context?.getString(R.string.show_dub_key)] ?: false
-        val showTitle = showCache[cardText?.context?.getString(R.string.show_title_key)] ?: false
-        val showEpisodeText = showCache[cardText?.context?.getString(R.string.show_episode_text_key)] ?: false
-        val showHd = showCache[textQuality?.context?.getString(R.string.show_hd_key)] ?: false
-        val showRatingView =
-            showCache[textQuality?.context?.getString(R.string.show_rating_key)] ?: false
+        val showSub = cachedShowSub
+        val showDub = cachedShowDub
+        val showTitle = cachedShowTitle
+        val showEpisodeText = cachedShowEpisodeText
+        val showHd = cachedShowHd
+        val showRatingView = cachedShowRatingView
         if (card is SyncAPI.LibraryItem) {
             val ratingText = card.personalRating?.toStringNull(0.1, 10, 1)
             val showRating = !ratingText.isNullOrBlank()

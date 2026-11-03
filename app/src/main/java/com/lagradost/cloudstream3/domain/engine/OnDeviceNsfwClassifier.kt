@@ -536,6 +536,7 @@ object OnDeviceNsfwClassifier {
     private fun createAdaptiveWorkerExecutor(): ThreadPoolExecutor {
         val ctx = CloudStreamApp.context
         val isPotato = ctx?.let { isPotatoDevice(it) } ?: false
+        val tier = ctx?.let { DeviceProfile.tier(it) } ?: DeviceTier.MID
         // HARDWARE-ADAPTIVE MULTI-THREADING:
         // Each worker thread operates on its own isolated InferenceSession from sessionPool.
         // Zero lock contention, zero shared buffers, and zero race conditions.
