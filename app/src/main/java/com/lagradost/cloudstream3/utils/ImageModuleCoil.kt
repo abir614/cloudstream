@@ -303,7 +303,8 @@ object ImageLoader {
 
         this.setTag(R.id.coil_image_url_tag, imageKey)
 
-        val needsInspection = !isAdultAllowed || shouldCensor
+        val isAlreadyCachedSafe = OnDeviceNsfwClassifier.isCachedSafe(imageKey, context)
+        val needsInspection = (!isAdultAllowed || shouldCensor) && !isAlreadyCachedSafe
         if (needsInspection) {
             try { this.dispose() } catch (_: Throwable) {}
             val defaultCover = ContextCompat.getDrawable(context, R.drawable.default_cover)

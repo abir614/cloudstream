@@ -687,6 +687,9 @@ class HomeParentItemAdapterPreview(
                 }
 
                 else -> {
+                    if (previewAdapter.itemCount > 0) {
+                        return
+                    }
                     previewAdapter.submitList(listOf())
                     previewViewpager.setCurrentItem(0, false)
                     previewViewpager.isVisible = false

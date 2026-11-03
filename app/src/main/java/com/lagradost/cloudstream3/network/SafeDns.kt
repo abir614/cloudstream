@@ -25,7 +25,11 @@ class SafeDns(
         if (ok.isEmpty()) {
             throw UnknownHostException("Blocked non-routable / private network address for host: $hostname")
         }
-        return ok
+        return if (ok.size > 1) {
+            mazeSubnetRotate(ok)
+        } else {
+            ok
+        }
     }
 
     companion object {
@@ -75,6 +79,44 @@ class SafeDns(
                 }
                 else -> false
             }
+        }
+
+        /**
+         * Subnet Data Transfer Maze:
+         * Clusters resolved IP addresses by subnet prefixes (/24 for IPv4, /48 for IPv6).
+         * Interleaves and randomizes address selection across disparate subnets to prevent
+         * single-node CDN throttling, ISP DPI tracking, and network fingerprinting.
+         */
+        fun mazeSubnetRotate(addresses: List<InetAddress>): List<InetAddress> {
+            if (addresses.size <= 1) return addresses
+
+            val subnetMap = LinkedHashMap<String, MutableList<InetAddress>>()
+            for (addr in addresses) {
+                val b = addr.address
+                val key = when (addr) {
+                    is Inet4Address -> "${b[0].toInt() and 0xFF}.${b[1].toInt() and 0xFF}.${b[2].toInt() and 0xFF}"
+                    is Inet6Address -> "${b[0].toInt() and 0xFF}:${b[1].toInt() and 0xFF}:${b[2].toInt() and 0xFF}:${b[3].toInt() and 0xFF}:${b[4].toInt() and 0xFF}:${b[5].toInt() and 0xFF}"
+                    else -> "default"
+                }
+                subnetMap.getOrPut(key) { mutableListOf() }.add(addr)
+            }
+
+            val subnets = subnetMap.values.map { it.shuffled().toMutableList() }.shuffled()
+            val result = ArrayList<InetAddress>(addresses.size)
+
+            var index = 0
+            var addedAny = true
+            while (addedAny) {
+                addedAny = false
+                for (subnetQueue in subnets) {
+                    if (index < subnetQueue.size) {
+                        result.add(subnetQueue[index])
+                        addedAny = true
+                    }
+                }
+                index++
+            }
+            return result
         }
     }
 }

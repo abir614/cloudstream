@@ -463,7 +463,7 @@ object NsfwFilterEngine {
     )
 
     private val HARDCORE_STEMS = arrayOf(
-        "hentai", "hanime", "porn", "porno", "xxx", "jav", "r18", "+18", "18+", "eroti", "bukkake",
+        "hentai", "hanime", "porn", "porno", "xxx", "+18", "18+", "eroti", "bukkake",
         "nakadashi", "paizuri", "chikan", "shibari", "creampie", "blowjob", "deepthroat", "swinger",
         "cuckold", "cunnilingus", "pegging", "gangbang", "incest", "stepmom", "stepmother",
         "stepsister", "stepdaughter", "stepson", "stepbrother", "nude", "nudity", "topless",
@@ -781,10 +781,10 @@ object NsfwFilterEngine {
             return true
         }
 
-        // 2. If row items predominantly contain adult content
+        // 2. If row items exclusively contain adult content (100% NSFW), eliminate the entire row
         if (items.isNotEmpty()) {
             val nsfwCount = items.count { isNsfw(it, level) }
-            if (nsfwCount > 0 && (nsfwCount * 2 >= items.size || (items.size >= 4 && nsfwCount * 3 >= items.size))) {
+            if (nsfwCount == items.size) {
                 return true
             }
         }

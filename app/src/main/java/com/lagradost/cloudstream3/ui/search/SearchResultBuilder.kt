@@ -174,7 +174,17 @@ object SearchResultBuilder {
 
         itemView.isVisible = true
         itemView.isClickable = true
+        itemView.isFocusable = true
+        itemView.isFocusableInTouchMode = true
         itemView.findViewById<View>(R.id.background_card)?.isVisible = true
+        itemView.findViewById<View>(R.id.imageText)?.isVisible = showTitle
+        itemView.findViewById<View>(R.id.title_shadow)?.isVisible = true
+        val lp = itemView.layoutParams
+        if (lp != null && (lp.width == 0 || lp.height == 0)) {
+            lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
+            lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+            itemView.layoutParams = lp
+        }
         cardView.setTag(R.id.parent_view_tag, java.lang.ref.WeakReference(itemView))
         cardText?.text = card.name
         cardText?.isVisible = showTitle
@@ -208,15 +218,6 @@ object SearchResultBuilder {
                     itemView.findViewById<View>(R.id.background_card)?.isVisible = false
                     itemView.findViewById<View>(R.id.imageText)?.isVisible = false
                     itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
-                    if (!isInsideViewPager2(itemView)) {
-                        val emptyLp = itemView.layoutParams
-                        if (emptyLp != null) {
-                            emptyLp.width = 0
-                            emptyLp.height = 0
-                            (emptyLp as? ViewGroup.MarginLayoutParams)?.setMargins(0, 0, 0, 0)
-                            itemView.layoutParams = emptyLp
-                        }
-                    }
                 }
             } else {
                 cardView.loadImage(R.drawable.default_cover)

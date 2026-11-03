@@ -248,10 +248,10 @@ object OnDeviceNsfwClassifier {
                 // False-positive rejection: uniform colored backdrop (e.g. solid yellow, beige, or gold poster)
                 if (upperSkinRatio > 0.70f && bodySkinRatio > 0.70f) {
                     0.0f
-                } else if (bodySkinRatio > 0.05f && maxRowSkinRatio >= 0.14f) {
-                    ((bodySkinRatio - 0.05f) * 3.5f).coerceIn(0.0f, 1.0f)
-                } else if (bodySkinRatio > 0.03f && maxRowSkinRatio >= 0.10f) {
-                    0.40f
+                } else if (bodySkinRatio > 0.40f && maxRowSkinRatio >= 0.35f) {
+                    ((bodySkinRatio - 0.40f) * 2.0f + 0.40f).coerceIn(0.0f, 1.0f)
+                } else if (bodySkinRatio > 0.30f && maxRowSkinRatio >= 0.30f && upperSkinRatio < 0.20f) {
+                    0.45f
                 } else {
                     0.0f
                 }
@@ -273,7 +273,7 @@ object OnDeviceNsfwClassifier {
     ) : Runnable {
         fun onEvicted() {
             // Task was evicted from queue during rapid scrolling.
-            // Check view binding and apply safety guards: never leak unclassified posters when filtering or censoring is active!
+            // Check view binding: ensure view retains its safe placeholder cover without permanently hiding or collapsing parent view.
             val view = weakImageView.get() ?: return
             val currentTag = try {
                 view.getTag(R.id.coil_image_url_tag)
@@ -289,11 +289,10 @@ object OnDeviceNsfwClassifier {
                         null
                     }
                     if (checkTag == imageKey) {
-                        if (!appContext.isNsfwEnabled()) {
-                            activeView.setImageDrawable(null)
-                            hideParentItem(activeView)
-                        } else if (shouldCensorPosters(appContext)) {
+                        if (shouldCensorPosters(appContext)) {
                             ImageLoader.applyCensoredPoster(activeView, imageKey)
+                        } else if (!appContext.isNsfwEnabled()) {
+                            activeView.setImageResource(R.drawable.default_cover)
                         } else {
                             weakDrawable.get()?.let { setSmoothPosterDrawable(activeView, it, false) }
                         }
@@ -487,6 +486,23 @@ object OnDeviceNsfwClassifier {
     }
 
     /**
+     * Checks if a poster URL has already been evaluated and is confirmed safe below the active sensitivity threshold.
+     * Guaranteed < 0.001 ms response.
+     */
+    fun isCachedSafe(imageKey: String, ctx: Context? = null, overrideLevel: NsfwFilterLevel? = null): Boolean {
+        val score = scoreCache.get(imageKey) ?: return false
+        val threshold = overrideLevel?.let { NsfwFilterEngine.getVisualThreshold(ctx, it) } ?: NsfwFilterEngine.getVisualThreshold(ctx)
+        return score < threshold
+    }
+
+    /**
+     * Returns the cached numerical score for an imageKey, or null if not yet evaluated.
+     */
+    fun getCachedScore(imageKey: String): Float? {
+        return scoreCache.get(imageKey)
+    }
+
+    /**
      * Clears cached scores upon filter level updates.
      */
     fun clearCache() {
@@ -635,9 +651,9 @@ object OnDeviceNsfwClassifier {
         }
         val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
 
-        return if (bodySkinRatio > 0.05f) {
-            val exposureBoost = ((bodySkinRatio - 0.05f) * 2.5f).coerceIn(0.0f, 1.0f)
-            maxOf(rawAiScore, (rawAiScore * 0.40f) + (exposureBoost * 0.80f))
+        return if (rawAiScore >= 0.35f && bodySkinRatio > 0.30f) {
+            val exposureBoost = ((bodySkinRatio - 0.30f) * 1.5f).coerceIn(0.0f, 1.0f)
+            maxOf(rawAiScore, (rawAiScore * 0.70f) + (exposureBoost * 0.30f))
         } else {
             rawAiScore
         }

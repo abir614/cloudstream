@@ -15,6 +15,7 @@ import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.SearchResponse
+import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.amap
 import com.lagradost.cloudstream3.mvvm.Resource
 import com.lagradost.cloudstream3.mvvm.debugAssert
@@ -412,15 +413,43 @@ class HomeViewModel : ViewModel() {
                         context?.filterSearchResultByFilmQuality(nsfwFilteredCurrentList.shuffled())
                             ?: nsfwFilteredCurrentList.shuffled()
 
-                    updatePreviewResponses(
-                        previewResponses,
-                        previewResponsesAdded,
-                        randomItems,
-                        3
-                    )
-
                     _randomItems.postValue(randomItems)
                     currentShuffledList = randomItems
+
+                    val targetApi = repo?.api ?: noneApi
+                    val initialPreviews = randomItems.take(3).map { item ->
+                        val providerApi = getApiFromNameNull(item.apiName) ?: targetApi
+                        providerApi.newMovieLoadResponse(
+                            name = item.name,
+                            url = item.url,
+                            type = item.type ?: com.lagradost.cloudstream3.TvType.Movie,
+                            dataUrl = item.url
+                        ) {
+                            this.posterUrl = item.posterUrl
+                            this.backgroundPosterUrl = item.posterUrl
+                            this.posterHeaders = item.posterHeaders
+                        }
+                    }
+
+                    if (initialPreviews.isNotEmpty()) {
+                        previewResponses.clear()
+                        previewResponses.addAll(initialPreviews)
+                        _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
+                    }
+
+                    // Asynchronously enrich with full metadata in background without stalling home screen
+                    addJob?.cancel()
+                    addJob = ioSafe {
+                        updatePreviewResponses(
+                            previewResponses,
+                            previewResponsesAdded,
+                            randomItems,
+                            3
+                        )
+                        if (previewResponses.isNotEmpty()) {
+                            _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
+                        }
+                    }
                 }
             }
 
@@ -431,8 +460,6 @@ class HomeViewModel : ViewModel() {
                         "No homepage responses"
                     )
                 )
-            } else {
-                _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
             }
         } catch (e: Exception) {
             _randomItems.postValue(emptyList())
