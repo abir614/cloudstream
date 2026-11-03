@@ -123,13 +123,16 @@ open class ParentItemAdapter(
                 }
             }
 
-            homeChildRecyclerview.setLinearListLayout(
-                isHorizontal = true,
-                nextLeft = startFocus,
-                nextRight = endFocus,
-            )
+            if (homeChildRecyclerview.layoutManager == null) {
+                homeChildRecyclerview.setLinearListLayout(
+                    isHorizontal = true,
+                    nextLeft = startFocus,
+                    nextRight = endFocus,
+                )
+            }
             homeChildMoreInfo.text = info.name
 
+            homeChildRecyclerview.clearOnScrollListeners()
             homeChildRecyclerview.addOnScrollListener(object :
                 RecyclerView.OnScrollListener() {
                 var expandCount = 0

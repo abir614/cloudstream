@@ -73,9 +73,21 @@ object NsfwFilterEngine {
     private val _configVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
     val configVersion: kotlinx.coroutines.flow.StateFlow<Int> = _configVersion
 
+    @Volatile
+    private var cachedFilterLevel: NsfwFilterLevel? = null
+    @Volatile
+    private var cachedThresholdExtreme: Float? = null
+    @Volatile
+    private var cachedThresholdModerate: Float? = null
+    @Volatile
+    private var cachedThresholdLow: Float? = null
+
     fun onFilterConfigChanged() {
-        // Retain raw AI scores in LRU cache so sensitivity adjustments take effect immediately
-        // during rescan without re-running heavy neural network inference.
+        cachedFilterLevel = null
+        cachedThresholdExtreme = null
+        cachedThresholdModerate = null
+        cachedThresholdLow = null
+        AppContextUtils.resetNsfwPreferenceCache()
         CloudStreamApp.context?.let { ImageLoader.reconfigure(it) } ?: ImageLoader.resetImageClient()
         _configVersion.value += 1
     }
@@ -85,8 +97,13 @@ object NsfwFilterEngine {
      * Guaranteed bounds: 0.01f <= threshold <= 1.00f.
      */
     fun getVisualThreshold(context: Context? = null, level: NsfwFilterLevel = getFilterLevel(context)): Float {
+        when (level) {
+            NsfwFilterLevel.EXTREME -> cachedThresholdExtreme?.let { return it }
+            NsfwFilterLevel.MODERATE -> cachedThresholdModerate?.let { return it }
+            NsfwFilterLevel.LOW -> cachedThresholdLow?.let { return it }
+        }
         val ctx = context ?: CloudStreamApp.context ?: return level.defaultVisualThreshold
-        return try {
+        val resolved = try {
             val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
             val key = when (level) {
                 NsfwFilterLevel.EXTREME -> ctx.getString(R.string.nsfw_visual_threshold_extreme_key)
@@ -98,6 +115,12 @@ object NsfwFilterEngine {
         } catch (_: Throwable) {
             level.defaultVisualThreshold
         }
+        when (level) {
+            NsfwFilterLevel.EXTREME -> cachedThresholdExtreme = resolved
+            NsfwFilterLevel.MODERATE -> cachedThresholdModerate = resolved
+            NsfwFilterLevel.LOW -> cachedThresholdLow = resolved
+        }
+        return resolved
     }
 
     /**
@@ -548,14 +571,17 @@ object NsfwFilterEngine {
      * Resolves the user's active filter sensitivity level.
      */
     fun getFilterLevel(ctx: Context? = null): NsfwFilterLevel {
+        cachedFilterLevel?.let { return it }
         val context = ctx ?: CloudStreamApp.context ?: return NsfwFilterLevel.MODERATE
-        return try {
+        val resolved = try {
             val prefs = PreferenceManager.getDefaultSharedPreferences(context)
             val levelStr = prefs.getString(context.getString(R.string.nsfw_filter_level_key), "moderate")
             NsfwFilterLevel.fromString(levelStr)
         } catch (_: Throwable) {
             NsfwFilterLevel.MODERATE
         }
+        cachedFilterLevel = resolved
+        return resolved
     }
 
     /**

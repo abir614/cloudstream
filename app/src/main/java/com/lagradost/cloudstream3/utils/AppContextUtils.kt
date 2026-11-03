@@ -256,10 +256,22 @@ object AppContextUtils {
         )
     }
 
+    @Volatile
+    private var cachedNsfwEnabled: Boolean? = null
+    @Volatile
+    private var cachedCensorPosters: Boolean? = null
+
+    fun resetNsfwPreferenceCache() {
+        cachedNsfwEnabled = null
+        cachedCensorPosters = null
+    }
+
     fun Context.isNsfwEnabled(): Boolean {
+        cachedNsfwEnabled?.let { return it }
         val enabled = PreferenceManager.getDefaultSharedPreferences(this)
             .getBoolean(this.getString(R.string.enable_nsfw_on_providers_key), true)
         MainAPI.settingsForProvider.enableAdult = enabled
+        cachedNsfwEnabled = enabled
         return enabled
     }
 
@@ -269,13 +281,17 @@ object AppContextUtils {
     }
 
     fun shouldCensorPosters(context: Context? = null): Boolean {
+        cachedCensorPosters?.let { return it }
         val ctx = context ?: CloudStreamApp.context ?: return false
         val prefs = PreferenceManager.getDefaultSharedPreferences(ctx)
         val nsfwGloballyEnabled = prefs.getBoolean(ctx.getString(R.string.enable_nsfw_on_providers_key), true)
         if (!nsfwGloballyEnabled) {
+            cachedCensorPosters = false
             return false
         }
-        return prefs.getBoolean(ctx.getString(R.string.censor_nsfw_posters_key), true)
+        val result = prefs.getBoolean(ctx.getString(R.string.censor_nsfw_posters_key), true)
+        cachedCensorPosters = result
+        return result
     }
 
     fun isNsfwGloballyEnabled(): Boolean {
