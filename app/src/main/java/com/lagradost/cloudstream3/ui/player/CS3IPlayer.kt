@@ -94,6 +94,7 @@ import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
 import com.lagradost.cloudstream3.ui.settings.Globals.PHONE
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.ui.subtitles.SaveCaptionStyle
+import com.lagradost.cloudstream3.ui.subtitles.SUBTITLE_AUTO_SELECT_KEY
 import com.lagradost.cloudstream3.ui.subtitles.SubtitlesFragment.Companion.applyStyle
 import com.lagradost.cloudstream3.utils.AppContextUtils.isUsingMobileData
 import com.lagradost.cloudstream3.utils.DeviceProfile
@@ -932,7 +933,11 @@ class CS3IPlayer : IPlayer {
             val trackSelector = DefaultTrackSelector(context)
             val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
             val primarySub = settingsManager.getString(context.getString(R.string.primary_sub_language_key), null)
-            val isNonePreferred = primarySub.equals("none", ignoreCase = true)
+            val autoSelect = getKey<String>(SUBTITLE_AUTO_SELECT_KEY)
+            val isNonePreferred = autoSelect?.equals("none", ignoreCase = true) == true ||
+                autoSelect?.equals(context.getString(R.string.none), ignoreCase = true) == true ||
+                autoSelect?.equals(context.getString(R.string.subtitles_none), ignoreCase = true) == true ||
+                primarySub?.equals("none", ignoreCase = true) == true
 
             trackSelector.parameters = trackSelector.buildUponParameters()
                 // This will not force higher quality videos to fail

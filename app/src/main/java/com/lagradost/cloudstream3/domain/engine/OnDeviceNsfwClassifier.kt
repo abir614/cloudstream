@@ -248,9 +248,9 @@ object OnDeviceNsfwClassifier {
                 // False-positive rejection: uniform colored backdrop (e.g. solid yellow, beige, or gold poster)
                 if (upperSkinRatio > 0.70f && bodySkinRatio > 0.70f) {
                     0.0f
-                } else if (bodySkinRatio > 0.40f && maxRowSkinRatio >= 0.35f) {
-                    ((bodySkinRatio - 0.40f) * 2.0f + 0.40f).coerceIn(0.0f, 1.0f)
-                } else if (bodySkinRatio > 0.30f && maxRowSkinRatio >= 0.30f && upperSkinRatio < 0.20f) {
+                } else if (bodySkinRatio > 0.50f && maxRowSkinRatio >= 0.45f) {
+                    ((bodySkinRatio - 0.50f) * 2.0f + 0.50f).coerceIn(0.0f, 1.0f)
+                } else if (bodySkinRatio > 0.40f && maxRowSkinRatio >= 0.40f && upperSkinRatio < 0.20f) {
                     0.45f
                 } else {
                     0.0f
@@ -332,13 +332,10 @@ object OnDeviceNsfwClassifier {
                             null
                         }
                         if (checkTag == imageKey) {
-                            if (!appContext.isNsfwEnabled()) {
-                                activeView.setImageDrawable(null)
-                                hideParentItem(activeView)
-                            } else if (shouldCensorPosters(appContext)) {
+                            if (shouldCensorPosters(appContext)) {
                                 ImageLoader.applyCensoredPoster(activeView, imageKey)
                             } else {
-                                setSmoothPosterDrawable(activeView, drawable, false)
+                                activeView.setImageResource(R.drawable.default_cover)
                             }
                         }
                     }
@@ -389,11 +386,10 @@ object OnDeviceNsfwClassifier {
                         null
                     }
                     if (checkTag == imageKey) {
-                        if (!appContext.isNsfwEnabled()) {
-                            activeView.setImageDrawable(null)
-                            hideParentItem(activeView)
-                        } else if (shouldCensorPosters(appContext)) {
+                        if (shouldCensorPosters(appContext)) {
                             ImageLoader.applyCensoredPoster(activeView, imageKey)
+                        } else {
+                            activeView.setImageResource(R.drawable.default_cover)
                         }
                     }
                 }
@@ -779,26 +775,20 @@ object OnDeviceNsfwClassifier {
 
         // Fast fallback if device is under memory pressure: strictly sanitize without leaking
         if (isDeviceUnderMemoryPressure(appContext)) {
-            if (!appContext.isNsfwEnabled()) {
-                imageView.setImageDrawable(null)
-                hideParentItem(imageView)
-            } else if (shouldCensorPosters(appContext)) {
+            if (shouldCensorPosters(appContext)) {
                 ImageLoader.applyCensoredPoster(imageView, imageKey)
             } else {
-                setSmoothPosterDrawable(imageView, drawable, false)
+                imageView.setImageResource(R.drawable.default_cover)
             }
             return
         }
 
         // Potato / low-tier device scroll protection: throttle background worker queue to maintain smooth 60fps scrolling
         if (isPotatoDevice(appContext) && workerExecutor.queue.size >= 8) {
-            if (!appContext.isNsfwEnabled()) {
-                imageView.setImageDrawable(null)
-                hideParentItem(imageView)
-            } else if (shouldCensorPosters(appContext)) {
+            if (shouldCensorPosters(appContext)) {
                 ImageLoader.applyCensoredPoster(imageView, imageKey)
             } else {
-                setSmoothPosterDrawable(imageView, drawable, false)
+                imageView.setImageResource(R.drawable.default_cover)
             }
             return
         }
@@ -816,13 +806,10 @@ object OnDeviceNsfwClassifier {
             )
         } catch (_: Throwable) {
             // If submission fails due to executor rejection, safely apply safe fallback
-            if (!appContext.isNsfwEnabled()) {
-                imageView.setImageDrawable(null)
-                hideParentItem(imageView)
-            } else if (shouldCensorPosters(appContext)) {
+            if (shouldCensorPosters(appContext)) {
                 ImageLoader.applyCensoredPoster(imageView, imageKey)
             } else {
-                setSmoothPosterDrawable(imageView, drawable, false)
+                imageView.setImageResource(R.drawable.default_cover)
             }
         }
     }

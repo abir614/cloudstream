@@ -363,6 +363,15 @@ class SubtitlesFragment : BaseDialogFragment<SubtitleSettingsBinding>(
         fun getAutoSelectLanguageTagIETF(): String {
             return getKey<String>(SUBTITLE_AUTO_SELECT_KEY) ?: "en"
         }
+
+        fun isAutoSelectLanguageNone(ctx: Context? = null): Boolean {
+            val key = getKey<String>(SUBTITLE_AUTO_SELECT_KEY) ?: return false
+            if (key.isBlank() || key.equals("none", ignoreCase = true)) return true
+            val localizedNone = ctx?.getString(R.string.none)
+            if (localizedNone != null && key.equals(localizedNone, ignoreCase = true)) return true
+            val subtitlesNone = ctx?.getString(R.string.subtitles_none)
+            return subtitlesNone != null && key.equals(subtitlesNone, ignoreCase = true)
+        }
     }
 
     private fun onColorSelected(stuff: Pair<Int, Int>) {
@@ -769,11 +778,12 @@ class SubtitlesFragment : BaseDialogFragment<SubtitleSettingsBinding>(
 
             subsAutoSelectLanguage.setFocusableInTv()
             subsAutoSelectLanguage.setOnClickListener { textView ->
+                val noneLabel = textView.context.getString(R.string.none)
                 val languagesTagName =
                     listOf(
                         Pair(
-                            textView.context.getString(R.string.none),
-                            textView.context.getString(R.string.none)
+                            "none",
+                            noneLabel
                         )
                     ) +
                             languages
@@ -783,10 +793,12 @@ class SubtitlesFragment : BaseDialogFragment<SubtitleSettingsBinding>(
                                 } // name ignoring flag emoji
 
                 val (langTagsIETF, langNames) = languagesTagName.unzip()
+                val currentTag = getAutoSelectLanguageTagIETF()
+                val selectedIndex = if (isAutoSelectLanguageNone(textView.context)) 0 else langTagsIETF.indexOf(currentTag)
 
                 activity?.showDialog(
                     langNames,
-                    langTagsIETF.indexOf(getAutoSelectLanguageTagIETF()),
+                    selectedIndex,
                     (textView as TextView).text.toString(),
                     true,
                     dismissCallback

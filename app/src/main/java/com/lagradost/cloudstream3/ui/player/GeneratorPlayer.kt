@@ -2292,11 +2292,33 @@ class GeneratorPlayer : FullScreenPlayer() {
         return sortSubs(subtitles).firstOrNull { it.matchesLanguageCode(langCode) }
     }
 
+    private fun isSubtitleAutoSelectNone(ctx: Context): Boolean {
+        val autoKey = getKey<String>(SUBTITLE_AUTO_SELECT_KEY) ?: preferredAutoSelectSubtitles
+        if (!autoKey.isNullOrBlank()) {
+            if (autoKey.equals("none", ignoreCase = true) ||
+                autoKey.equals(ctx.getString(R.string.none), ignoreCase = true) ||
+                autoKey.equals(ctx.getString(R.string.subtitles_none), ignoreCase = true)) {
+                return true
+            }
+        }
+        val settings = PreferenceManager.getDefaultSharedPreferences(ctx)
+        val primary = settings.getString(ctx.getString(R.string.primary_sub_language_key), null)
+        return !primary.isNullOrBlank() && primary.equals("none", ignoreCase = true)
+    }
+
     private fun autoSelectFromSettings(): Boolean {
         val ctx = context ?: return false
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
         val availableSubs = viewModel.state.subtitles
         if (availableSubs.isEmpty()) return false
+
+        // 0. If user explicitly configured subtitle language to "none" in settings:
+        // Strictly disable subtitles immediately and prevent fallback to remembered subtitles or stream defaults!
+        if (isSubtitleAutoSelectNone(ctx) || preferredAutoSelectSubtitles?.equals("none", ignoreCase = true) == true) {
+            setSubtitles(null, false)
+            player.saveData()
+            return true
+        }
 
         // 1. Series / User-remembered subtitle selection
         val seriesKey = currentSeriesKey
@@ -2389,10 +2411,7 @@ class GeneratorPlayer : FullScreenPlayer() {
 
     private fun autoSelectFromDownloads(): Boolean {
         val ctx = context ?: return false
-        val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
-        val primarySub = settingsManager.getString(ctx.getString(R.string.primary_sub_language_key), null)
-            ?: preferredAutoSelectSubtitles
-        if (primarySub?.equals("none", ignoreCase = true) == true ||
+        if (isSubtitleAutoSelectNone(ctx) ||
             preferredAutoSelectSubtitles?.equals("none", ignoreCase = true) == true) {
             return false
         }
@@ -2413,6 +2432,13 @@ class GeneratorPlayer : FullScreenPlayer() {
 
     private fun autoSelectSubtitles() {
         if (hasAutoSelectedSubtitlesForCurrentPlayback) return
+        val ctx = context
+        if (ctx != null && (isSubtitleAutoSelectNone(ctx) || preferredAutoSelectSubtitles?.equals("none", ignoreCase = true) == true)) {
+            setSubtitles(null, false)
+            player.saveData()
+            hasAutoSelectedSubtitlesForCurrentPlayback = true
+            return
+        }
         safe {
             if (autoSelectFromSettings()) {
                 hasAutoSelectedSubtitlesForCurrentPlayback = true

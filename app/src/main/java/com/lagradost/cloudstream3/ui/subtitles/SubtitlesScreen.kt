@@ -410,7 +410,7 @@ object SubtitlesScreen : SearchableSettings {
                         title = stringResource(R.string.subs_auto_select_language),
                         preference = autoSelectSubtitles,
                         entries = mapOf(
-                            "None" to stringResource(R.string.none)
+                            "none" to stringResource(R.string.none)
                         ) + sortedLanguages,
                     ),
                     Preference.PreferenceItem.MultiSelectListPreference(
