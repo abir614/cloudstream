@@ -1540,7 +1540,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                             resultviewPreviewPoster.isVisible = false
                         } else if (isAdultAllowed && shouldCensorPosters(ctx) && isNsfw) {
                             resultviewPreviewPoster.isVisible = true
-                            applyCensoredPoster(resultviewPreviewPoster)
+                            applyCensoredPoster(resultviewPreviewPoster, d.posterImage ?: d.posterBackgroundImage)
                         } else {
                             resultviewPreviewPoster.isVisible = true
                             if (isLayout(PHONE)) {

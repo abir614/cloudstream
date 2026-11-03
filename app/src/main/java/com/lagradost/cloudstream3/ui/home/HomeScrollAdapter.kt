@@ -114,7 +114,7 @@ class HomeScrollAdapter(
         when (binding) {
             is HomeScrollViewBinding -> {
                 if (shouldCensor) {
-                    applyCensoredPoster(binding.homeScrollPreview)
+                    applyCensoredPoster(binding.homeScrollPreview, posterUrl)
                 } else {
                     binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
                         placeholder { getImageFromDrawable(context, R.drawable.default_cover) }
@@ -142,7 +142,7 @@ class HomeScrollAdapter(
                     callback.invoke(view ?: return@setOnClickListener, position, item)
                 }
                 if (shouldCensor) {
-                    applyCensoredPoster(binding.homeScrollPreview)
+                    applyCensoredPoster(binding.homeScrollPreview, posterUrl)
                 } else {
                     binding.homeScrollPreview.loadImage(posterUrl, item.posterHeaders) {
                         placeholder { getImageFromDrawable(context, R.drawable.default_cover) }

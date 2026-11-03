@@ -959,8 +959,8 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                     } else if (isAdultAllowed && shouldCensorPosters(context) && isNsfw) {
                         resultPoster.isVisible = true
                         resultPosterBackground.isVisible = true
-                        applyCensoredPoster(resultPoster)
-                        applyCensoredPoster(resultPosterBackground)
+                        applyCensoredPoster(resultPoster, d.posterImage)
+                        applyCensoredPoster(resultPosterBackground, d.posterBackgroundImage)
                     } else {
                         resultPoster.isVisible = true
                         resultPosterBackground.isVisible = true

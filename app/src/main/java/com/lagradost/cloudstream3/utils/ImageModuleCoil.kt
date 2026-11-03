@@ -16,6 +16,7 @@ import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.decode.BitmapFactoryDecoder
 import coil3.disk.DiskCache
+import coil3.dispose
 import coil3.load
 import coil3.memory.MemoryCache
 import coil3.network.NetworkHeaders
@@ -221,7 +222,13 @@ object ImageLoader {
             ?: ContextCompat.getDrawable(context, R.drawable.default_cover)
     }
 
-    fun applyCensoredPoster(imageView: ImageView) {
+    fun applyCensoredPoster(imageView: ImageView, targetUrl: String? = null) {
+        try {
+            imageView.dispose()
+        } catch (_: Throwable) {
+        }
+        val key = targetUrl ?: "censored_poster"
+        imageView.setTag(R.id.coil_image_url_tag, key)
         val d = getCensoredDrawable(imageView.context)
         try {
             imageView.scaleType = ImageView.ScaleType.CENTER_CROP
@@ -241,64 +248,67 @@ object ImageLoader {
         builder: ImageRequest.Builder.() -> Unit = {} // for placeholder, error & transformations
     ) {
         if (imageData == null) {
+            try { this.dispose() } catch (_: Throwable) {}
             this.setImageDrawable(null)
             this.setTag(R.id.coil_image_url_tag, null)
             return
         }
         // setImageResource is better than coil3 on resources due to attr
         if (imageData is Int) {
+            try { this.dispose() } catch (_: Throwable) {}
             this.setImageResource(imageData)
             this.setTag(R.id.coil_image_url_tag, null)
             return
         }
 
         val imageKey = (imageData as? String) ?: imageData.toString()
-        val currentTag = this.getTag(R.id.coil_image_url_tag)
-        if (currentTag == imageKey && this.drawable != null) {
-            return
-        }
-
         val isAdultAllowed = context.isNsfwEnabled()
+        val shouldCensor = isAdultAllowed && shouldCensorPosters(context)
 
-        // 1. Strict family safe mode: if adult content is disabled, NEVER show adult images or censored badges
-        if (!isAdultAllowed) {
+        // 1. Strict pre-load inspection: if content is already known NSFW via text or AI cache, censor or hide immediately
+        if (shouldCensor) {
+            val level = NsfwFilterEngine.getFilterLevel(context)
+            if ((imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) ||
+                OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)
+            ) {
+                applyCensoredPoster(this, imageKey)
+                return
+            }
+        } else if (!isAdultAllowed) {
             val level = NsfwFilterEngine.getFilterLevel(context)
             if (level == NsfwFilterLevel.EXTREME && (imageData is String)) {
                 if (imageData.isBlank() || imageData == "null" || (!imageData.startsWith("http://") && !imageData.startsWith("https://"))) {
+                    try { this.dispose() } catch (_: Throwable) {}
                     this.setImageDrawable(null)
                     this.setTag(R.id.coil_image_url_tag, imageKey)
                     OnDeviceNsfwClassifier.hideParentItem(this)
                     return
                 }
             }
-            if (imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) {
+            if ((imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) ||
+                OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)
+            ) {
+                try { this.dispose() } catch (_: Throwable) {}
                 this.setImageDrawable(null)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
                 OnDeviceNsfwClassifier.hideParentItem(this)
-                return
-            }
-            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)) {
-                this.setImageDrawable(null)
-                this.setTag(R.id.coil_image_url_tag, imageKey)
-                OnDeviceNsfwClassifier.hideParentItem(this)
-                return
-            }
-        } else if (shouldCensorPosters(context)) {
-            // Adult content allowed AND user explicitly enabled poster censorship badge
-            val level = NsfwFilterEngine.getFilterLevel(context)
-            if (imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) {
-                applyCensoredPoster(this)
-                this.setTag(R.id.coil_image_url_tag, imageKey)
-                return
-            }
-            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)) {
-                applyCensoredPoster(this)
-                this.setTag(R.id.coil_image_url_tag, imageKey)
                 return
             }
         }
 
+        val currentTag = this.getTag(R.id.coil_image_url_tag)
+        if (currentTag == imageKey && this.drawable != null) {
+            return
+        }
+
         this.setTag(R.id.coil_image_url_tag, imageKey)
+
+        val needsInspection = !isAdultAllowed || shouldCensor
+        if (needsInspection) {
+            try { this.dispose() } catch (_: Throwable) {}
+            val defaultCover = ContextCompat.getDrawable(context, R.drawable.default_cover)
+            this.setImageDrawable(defaultCover)
+        }
 
         // headers can be overridden by extensions.
         this.load(imageData, SingletonImageLoader.get(context)) {
@@ -309,28 +319,30 @@ object ImageLoader {
                 }
             }.build())
             builder() // if passed
-            if (!isAdultAllowed || shouldCensorPosters(context)) {
+            if (needsInspection) {
+                // CRITICAL HARDWARE BITMAP FIX:
+                // Disable hardware bitmaps so Coil decodes directly into a software Bitmap (ARGB_8888 / RGB_565).
+                // Software bitmaps can be inspected, sampled, scaled, and classified by TFLite & Canvas without native SIGSEGV or software rendering exceptions!
+                this.allowHardware(false)
                 target(
                     onStart = { placeholder ->
-                        val hasMemory = try {
-                            SingletonImageLoader.get(context).memoryCache?.get(coil3.memory.MemoryCache.Key(imageKey)) != null
-                        } catch (_: Throwable) {
-                            false
-                        }
-                        if (!hasMemory && this@loadImageInternal.drawable == null) {
-                            val defaultPlaceholder = placeholder?.asDrawable(context.resources)
-                                ?: ContextCompat.getDrawable(context, R.drawable.default_cover)
-                            this@loadImageInternal.setImageDrawable(defaultPlaceholder)
-                        }
+                        val defaultPlaceholder = placeholder?.asDrawable(context.resources)
+                            ?: ContextCompat.getDrawable(context, R.drawable.default_cover)
+                        this@loadImageInternal.setImageDrawable(defaultPlaceholder)
                     },
                     onError = { error ->
-                        val defaultError = ContextCompat.getDrawable(context, R.drawable.default_cover)
-                        this@loadImageInternal.setImageDrawable(error?.asDrawable(context.resources) ?: defaultError)
                         if (!isAdultAllowed) {
+                            val defaultError = ContextCompat.getDrawable(context, R.drawable.default_cover)
+                            this@loadImageInternal.setImageDrawable(error?.asDrawable(context.resources) ?: defaultError)
                             val level = NsfwFilterEngine.getFilterLevel(context)
                             if (level == NsfwFilterLevel.EXTREME) {
                                 OnDeviceNsfwClassifier.hideParentItem(this@loadImageInternal)
                             }
+                        } else if (shouldCensor) {
+                            applyCensoredPoster(this@loadImageInternal, imageKey)
+                        } else {
+                            val defaultError = ContextCompat.getDrawable(context, R.drawable.default_cover)
+                            this@loadImageInternal.setImageDrawable(error?.asDrawable(context.resources) ?: defaultError)
                         }
                     },
                     onSuccess = { result ->
@@ -342,9 +354,18 @@ object ImageLoader {
                                 drawable = drawable
                             )
                         } catch (t: Throwable) {
-                            try {
-                                this@loadImageInternal.setImageDrawable(result.asDrawable(context.resources))
-                            } catch (_: Throwable) {
+                            // ZERO LEAK GUARANTEE: Never leak raw uncensored posters on classification error
+                            if (!isAdultAllowed) {
+                                this@loadImageInternal.setImageDrawable(null)
+                                val level = NsfwFilterEngine.getFilterLevel(context)
+                                if (level == NsfwFilterLevel.EXTREME) {
+                                    OnDeviceNsfwClassifier.hideParentItem(this@loadImageInternal)
+                                } else {
+                                    this@loadImageInternal.setImageResource(R.drawable.default_cover)
+                                }
+                            } else if (shouldCensor) {
+                                applyCensoredPoster(this@loadImageInternal, imageKey)
+                            } else {
                                 this@loadImageInternal.setImageResource(R.drawable.default_cover)
                             }
                         }

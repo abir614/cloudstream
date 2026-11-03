@@ -182,7 +182,7 @@ object SearchResultBuilder {
 
         val shouldCensor = isAdultAllowed && shouldCensorPosters(context) && isCardNsfw
         if (shouldCensor) {
-            applyCensoredPoster(cardView)
+            applyCensoredPoster(cardView, card.posterUrl)
         } else if (!card.posterUrl.isNullOrEmpty()) {
             cardView.loadImage(card.posterUrl, card.posterHeaders) {
                 placeholder { getImageFromDrawable(itemView.context, R.drawable.default_cover) }

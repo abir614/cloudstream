@@ -149,22 +149,23 @@ object OnDeviceNsfwClassifier {
      * Ultra-fast zero-native-allocation skin chrominance analyzer for potato & low-RAM devices (< 0.05ms, 0 MB native RAM).
      * Analyzes skin tone density and spatial distribution across the torso/body zone on a tiny 48x48 sample.
      */
-    fun classifyPotatoFastScore(drawable: Drawable): Float {
+    fun classifyPotatoFastScore(drawable: Drawable, ctx: Context? = null): Float {
         val canvas = getPotatoCanvas() ?: return 0.0f
         synchronized(potatoLock) {
             val sBitmap = potatoBitmap ?: return 0.0f
             if (sBitmap.isRecycled) return 0.0f
 
+            val appCtx = ctx ?: CloudStreamApp.context
             return try {
                 canvas.drawColor(Color.BLACK)
                 if (drawable is BitmapDrawable) {
                     val b = drawable.bitmap
-                    if (b == null || b.isRecycled) return 0.0f
+                    if (b == null || b.isRecycled) return if (appCtx?.let { shouldCensorPosters(it) } == true) 1.0f else 0.0f
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
                         val copy = try {
-                            Bitmap.createScaledBitmap(b, POTATO_DIM, POTATO_DIM, true)
+                            b.copy(Bitmap.Config.ARGB_8888, false)
                         } catch (_: Throwable) {
-                            try { b.copy(Bitmap.Config.RGB_565, false) } catch (_: Throwable) { null }
+                            null
                         }
                         if (copy != null) {
                             try {
@@ -173,7 +174,8 @@ object OnDeviceNsfwClassifier {
                                 try { copy.recycle() } catch (_: Throwable) {}
                             }
                         } else {
-                            return 0.0f
+                            // Hardware copy failed (e.g. low memory) -> fail safe to censor
+                            return if (appCtx?.let { shouldCensorPosters(it) } == true) 1.0f else 0.0f
                         }
                     } else {
                         canvas.drawBitmap(b, null, potatoRect, potatoPaint)
@@ -244,19 +246,18 @@ object OnDeviceNsfwClassifier {
                 val maxRowSkinRatio = maxRowSkinCount.toFloat() / POTATO_DIM.toFloat()
 
                 // False-positive rejection: uniform colored backdrop (e.g. solid yellow, beige, or gold poster)
-                if (upperSkinRatio > 0.60f && bodySkinRatio > 0.60f) {
+                if (upperSkinRatio > 0.70f && bodySkinRatio > 0.70f) {
                     0.0f
-                } else if (maxRowSkinRatio < 0.22f) {
-                    // Require at least one row with concentrated skin (>= 22%) to distinguish from dispersed noise
-                    0.0f
-                } else if (bodySkinRatio > 0.10f) {
-                    ((bodySkinRatio - 0.10f) * 2.2f).coerceIn(0.0f, 1.0f)
+                } else if (bodySkinRatio > 0.05f && maxRowSkinRatio >= 0.14f) {
+                    ((bodySkinRatio - 0.05f) * 3.5f).coerceIn(0.0f, 1.0f)
+                } else if (bodySkinRatio > 0.03f && maxRowSkinRatio >= 0.10f) {
+                    0.40f
                 } else {
                     0.0f
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Potato fast visual scoring error: ${t.message}")
-                0.0f
+                if (appCtx?.let { shouldCensorPosters(it) } == true) 1.0f else 0.0f
             }
         }
     }
@@ -274,7 +275,6 @@ object OnDeviceNsfwClassifier {
             // Task was evicted from queue during rapid scrolling.
             // Check view binding and apply safety guards: never leak unclassified posters when filtering or censoring is active!
             val view = weakImageView.get() ?: return
-            val drawable = weakDrawable.get() ?: return
             val currentTag = try {
                 view.getTag(R.id.coil_image_url_tag)
             } catch (_: Throwable) {
@@ -292,10 +292,10 @@ object OnDeviceNsfwClassifier {
                         if (!appContext.isNsfwEnabled()) {
                             activeView.setImageDrawable(null)
                             hideParentItem(activeView)
-                        } else if (appContext.shouldCensorPosters()) {
-                            ImageLoader.applyCensoredPoster(activeView)
+                        } else if (shouldCensorPosters(appContext)) {
+                            ImageLoader.applyCensoredPoster(activeView, imageKey)
                         } else {
-                            setSmoothPosterDrawable(activeView, drawable, false)
+                            weakDrawable.get()?.let { setSmoothPosterDrawable(activeView, it, false) }
                         }
                     }
                 }
@@ -336,8 +336,8 @@ object OnDeviceNsfwClassifier {
                             if (!appContext.isNsfwEnabled()) {
                                 activeView.setImageDrawable(null)
                                 hideParentItem(activeView)
-                            } else if (appContext.shouldCensorPosters()) {
-                                ImageLoader.applyCensoredPoster(activeView)
+                            } else if (shouldCensorPosters(appContext)) {
+                                ImageLoader.applyCensoredPoster(activeView, imageKey)
                             } else {
                                 setSmoothPosterDrawable(activeView, drawable, false)
                             }
@@ -362,8 +362,8 @@ object OnDeviceNsfwClassifier {
                             if (!appContext.isNsfwEnabled()) {
                                 activeView.setImageDrawable(null)
                                 hideParentItem(activeView)
-                            } else if (appContext.shouldCensorPosters()) {
-                                ImageLoader.applyCensoredPoster(activeView)
+                            } else if (shouldCensorPosters(appContext)) {
+                                ImageLoader.applyCensoredPoster(activeView, imageKey)
                             } else {
                                 setSmoothPosterDrawable(
                                     activeView,
@@ -382,6 +382,22 @@ object OnDeviceNsfwClassifier {
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Background poster classification error: ${t.message}")
+                mainHandler.post {
+                    val activeView = weakImageView.get() ?: return@post
+                    val checkTag = try {
+                        activeView.getTag(R.id.coil_image_url_tag)
+                    } catch (_: Throwable) {
+                        null
+                    }
+                    if (checkTag == imageKey) {
+                        if (!appContext.isNsfwEnabled()) {
+                            activeView.setImageDrawable(null)
+                            hideParentItem(activeView)
+                        } else if (shouldCensorPosters(appContext)) {
+                            ImageLoader.applyCensoredPoster(activeView, imageKey)
+                        }
+                    }
+                }
             }
         }
     }
@@ -604,7 +620,19 @@ object OnDeviceNsfwClassifier {
         val outputProb = Array(1) { FloatArray(2) }
         interp.run(buf, outputProb)
 
-        val rawAiScore = outputProb[0][1]
+        val z0 = outputProb[0][0]
+        val z1 = outputProb[0][1]
+
+        // Numerically stable softmax to convert raw logits to true probability [0.0, 1.0]
+        val rawAiScore = if (z0 + z1 in 0.98f..1.02f && z0 >= 0f && z1 >= 0f) {
+            z1
+        } else {
+            val maxLogit = maxOf(z0, z1)
+            val exp0 = kotlin.math.exp((z0 - maxLogit).toDouble()).toFloat()
+            val exp1 = kotlin.math.exp((z1 - maxLogit).toDouble()).toFloat()
+            val sum = exp0 + exp1
+            if (sum > 0f) (exp1 / sum).coerceIn(0.0f, 1.0f) else 0.5f
+        }
         val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
 
         return if (bodySkinRatio > 0.05f) {
@@ -622,26 +650,26 @@ object OnDeviceNsfwClassifier {
     @Synchronized
     fun classifyDrawableScore(ctx: Context, drawable: Drawable): Float {
         if (isPotatoDevice(ctx)) {
-            return classifyPotatoFastScore(drawable)
+            return classifyPotatoFastScore(drawable, ctx)
         }
-        if (isModelPermanentlyUnavailable) return classifyPotatoFastScore(drawable)
-        if (!ensureModelInitialized(ctx)) return classifyPotatoFastScore(drawable)
-        val interp = interpreter ?: return classifyPotatoFastScore(drawable)
-        val buf = inputBuffer ?: return classifyPotatoFastScore(drawable)
+        if (isModelPermanentlyUnavailable) return classifyPotatoFastScore(drawable, ctx)
+        if (!ensureModelInitialized(ctx)) return classifyPotatoFastScore(drawable, ctx)
+        val interp = interpreter ?: return classifyPotatoFastScore(drawable, ctx)
+        val buf = inputBuffer ?: return classifyPotatoFastScore(drawable, ctx)
         val sBitmap = scratchBitmap
-        if (sBitmap == null || sBitmap.isRecycled) return classifyPotatoFastScore(drawable)
-        val canvas = scratchCanvas ?: return classifyPotatoFastScore(drawable)
+        if (sBitmap == null || sBitmap.isRecycled) return classifyPotatoFastScore(drawable, ctx)
+        val canvas = scratchCanvas ?: return classifyPotatoFastScore(drawable, ctx)
 
         return try {
             canvas.drawColor(Color.BLACK)
             if (drawable is BitmapDrawable) {
                 val b = drawable.bitmap
-                if (b == null || b.isRecycled) return 0.0f
+                if (b == null || b.isRecycled) return if (shouldCensorPosters(ctx)) 1.0f else 0.0f
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
                     val copy = try {
-                        Bitmap.createScaledBitmap(b, INPUT_DIM, INPUT_DIM, true)
+                        b.copy(Bitmap.Config.ARGB_8888, false)
                     } catch (_: Throwable) {
-                        try { b.copy(Bitmap.Config.ARGB_8888, false) } catch (_: Throwable) { null }
+                        null
                     }
                     if (copy != null) {
                         try {
@@ -650,7 +678,7 @@ object OnDeviceNsfwClassifier {
                             try { copy.recycle() } catch (_: Throwable) {}
                         }
                     } else {
-                        return classifyPotatoFastScore(drawable)
+                        return classifyPotatoFastScore(drawable, ctx)
                     }
                 } else {
                     canvas.drawBitmap(b, null, scratchRect, scratchPaint)
@@ -664,7 +692,7 @@ object OnDeviceNsfwClassifier {
             executeInferenceOnPixels(interp, buf)
         } catch (t: Throwable) {
             Log.w(TAG, "Drawable classification warning: ${t.message}")
-            classifyPotatoFastScore(drawable)
+            classifyPotatoFastScore(drawable, ctx)
         }
     }
 
@@ -712,8 +740,8 @@ object OnDeviceNsfwClassifier {
                 if (!appContext.isNsfwEnabled()) {
                     imageView.setImageDrawable(null)
                     hideParentItem(imageView)
-                } else if (appContext.shouldCensorPosters()) {
-                    ImageLoader.applyCensoredPoster(imageView)
+                } else if (shouldCensorPosters(appContext)) {
+                    ImageLoader.applyCensoredPoster(imageView, imageKey)
                 } else {
                     setSmoothPosterDrawable(imageView, drawable, DeviceProfile.tier(imageView.context) != DeviceTier.LOW)
                 }
@@ -738,8 +766,8 @@ object OnDeviceNsfwClassifier {
             if (!appContext.isNsfwEnabled()) {
                 imageView.setImageDrawable(null)
                 hideParentItem(imageView)
-            } else if (appContext.shouldCensorPosters()) {
-                ImageLoader.applyCensoredPoster(imageView)
+            } else if (shouldCensorPosters(appContext)) {
+                ImageLoader.applyCensoredPoster(imageView, imageKey)
             } else {
                 setSmoothPosterDrawable(imageView, drawable, false)
             }
@@ -751,8 +779,8 @@ object OnDeviceNsfwClassifier {
             if (!appContext.isNsfwEnabled()) {
                 imageView.setImageDrawable(null)
                 hideParentItem(imageView)
-            } else if (appContext.shouldCensorPosters()) {
-                ImageLoader.applyCensoredPoster(imageView)
+            } else if (shouldCensorPosters(appContext)) {
+                ImageLoader.applyCensoredPoster(imageView, imageKey)
             } else {
                 setSmoothPosterDrawable(imageView, drawable, false)
             }
@@ -775,8 +803,8 @@ object OnDeviceNsfwClassifier {
             if (!appContext.isNsfwEnabled()) {
                 imageView.setImageDrawable(null)
                 hideParentItem(imageView)
-            } else if (appContext.shouldCensorPosters()) {
-                ImageLoader.applyCensoredPoster(imageView)
+            } else if (shouldCensorPosters(appContext)) {
+                ImageLoader.applyCensoredPoster(imageView, imageKey)
             } else {
                 setSmoothPosterDrawable(imageView, drawable, false)
             }

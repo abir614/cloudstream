@@ -891,8 +891,8 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                         } else if (isAdultAllowed && shouldCensorPosters(context) && isNsfw) {
                             resultPoster.isVisible = true
                             backgroundPoster.isVisible = true
-                            applyCensoredPoster(resultPoster)
-                            applyCensoredPoster(backgroundPoster)
+                            applyCensoredPoster(resultPoster, d.posterImage)
+                            applyCensoredPoster(backgroundPoster, d.posterBackgroundImage)
                         } else {
                             resultPoster.isVisible = true
                             backgroundPoster.isVisible = true
