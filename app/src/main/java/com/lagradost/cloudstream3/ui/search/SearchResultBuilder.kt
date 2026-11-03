@@ -37,7 +37,6 @@ import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
 import com.lagradost.cloudstream3.utils.getImageFromDrawable
 
 object SearchResultBuilder {
-    private val showCache: MutableMap<String, Boolean> = mutableMapOf()
     @Volatile var cachedShowSub: Boolean = false; private set
     @Volatile var cachedShowDub: Boolean = false; private set
     @Volatile var cachedShowTitle: Boolean = false; private set
@@ -47,11 +46,8 @@ object SearchResultBuilder {
 
     fun updateCache(context: Context?) {
         if (context == null) return
-        val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(context) ?: return
 
-        for (k in context.resources.getStringArray(R.array.poster_ui_options_values)) {
-            showCache[k] = settingsManager.getBoolean(k, showCache[k] ?: true)
-        }
         cachedShowSub = settingsManager.getBoolean(context.getString(R.string.show_sub_key), false)
         cachedShowDub = settingsManager.getBoolean(context.getString(R.string.show_dub_key), false)
         cachedShowTitle = settingsManager.getBoolean(context.getString(R.string.show_title_key), false)

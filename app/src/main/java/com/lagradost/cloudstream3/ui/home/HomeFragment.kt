@@ -55,6 +55,7 @@ import com.lagradost.cloudstream3.ui.account.AccountViewModel
 import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_LOAD
 import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_PLAY_FILE
 import com.lagradost.cloudstream3.ui.search.SearchAdapter
+import com.lagradost.cloudstream3.ui.search.SearchResultBuilder
 import com.lagradost.cloudstream3.ui.search.SearchHelper.handleSearchClickCallback
 import com.lagradost.cloudstream3.ui.setRecycledViewPool
 import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
@@ -576,6 +577,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
 
     override fun onResume() {
         super.onResume()
+        SearchResultBuilder.updateCache(context)
         val currentVersion = NsfwFilterEngine.configVersion.value
         if (lastObservedFilterVersion != currentVersion) {
             lastObservedFilterVersion = currentVersion

@@ -99,7 +99,17 @@ object OnDeviceNsfwClassifier {
     private val modelBufferLock = Any()
     private val sessionPool = ConcurrentLinkedQueue<InferenceSession>()
     private val activeSessionCount = AtomicInteger(0)
-    @Volatile private var maxSessions = 1
+
+    fun getMaxSessions(ctx: Context? = null): Int {
+        val context = ctx ?: CloudStreamApp.context
+        val isPotato = context?.let { isPotatoDevice(it) } ?: false
+        val tier = context?.let { DeviceProfile.tier(it) } ?: DeviceTier.MID
+        return when {
+            isPotato || tier == DeviceTier.LOW -> 1
+            tier == DeviceTier.HIGH -> Runtime.getRuntime().availableProcessors().coerceIn(3, 4)
+            else -> 2
+        }
+    }
 
     /**
      * Completely isolated TFLite inference session.
@@ -537,20 +547,12 @@ object OnDeviceNsfwClassifier {
         val ctx = CloudStreamApp.context
         val isPotato = ctx?.let { isPotatoDevice(it) } ?: false
         val tier = ctx?.let { DeviceProfile.tier(it) } ?: DeviceTier.MID
-        // HARDWARE-ADAPTIVE MULTI-THREADING:
-        // Each worker thread operates on its own isolated InferenceSession from sessionPool.
-        // Zero lock contention, zero shared buffers, and zero race conditions.
-        // Flagships run 3-4 parallel workers; Mid-tier runs 2 parallel workers; Potato runs 1 paced worker.
-        val (threads, queueCap) = when {
-            isPotato || tier == DeviceTier.LOW -> Pair(1, 16)
-            tier == DeviceTier.HIGH -> Pair(
-                Runtime.getRuntime().availableProcessors().coerceIn(3, 4),
-                128
-            )
-            else -> Pair(2, 48)
+        val threads = getMaxSessions(ctx)
+        val queueCap = when {
+            isPotato || tier == DeviceTier.LOW -> 16
+            tier == DeviceTier.HIGH -> 128
+            else -> 48
         }
-
-        maxSessions = threads
 
         return ThreadPoolExecutor(
             threads,
@@ -581,9 +583,10 @@ object OnDeviceNsfwClassifier {
                     if (evicted is SafeClassificationTask) {
                         evicted.onEvicted()
                     }
-                    try {
-                        executor.execute(r)
-                    } catch (_: Throwable) {
+                    if (!executor.queue.offer(r)) {
+                        if (r is SafeClassificationTask) {
+                            r.onEvicted()
+                        }
                     }
                 }
             }
@@ -826,7 +829,7 @@ object OnDeviceNsfwClassifier {
      */
     private fun borrowSession(ctx: Context): InferenceSession? {
         sessionPool.poll()?.let { return it }
-        val max = maxSessions
+        val max = getMaxSessions(ctx)
         while (true) {
             val current = activeSessionCount.get()
             if (current >= max) break
@@ -839,6 +842,9 @@ object OnDeviceNsfwClassifier {
                     break
                 }
             }
+        }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            return sessionPool.poll()
         }
         // If all sessions are currently checked out, briefly wait for one to be returned (up to 60ms)
         val deadline = System.currentTimeMillis() + 60L
