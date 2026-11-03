@@ -87,6 +87,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
 import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showBottomDialog
@@ -948,8 +949,8 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                     val isAdultAllowed = context?.isNsfwEnabled() == true
                     val filterLevel = NsfwFilterEngine.getFilterLevel(context)
                     val isNsfw = NsfwFilterEngine.isNsfwText(d.title, d.url, d.tags.joinToString(" "), filterLevel) ||
-                        d.posterImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true ||
-                        d.posterBackgroundImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true
+                        d.posterImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) || OnDeviceNsfwClassifier.isCachedNsfw(it, context, filterLevel) } == true ||
+                        d.posterBackgroundImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) || OnDeviceNsfwClassifier.isCachedNsfw(it, context, filterLevel) } == true
 
                     if (!isAdultAllowed && isNsfw) {
                         resultPoster.setImageResource(R.drawable.default_cover)

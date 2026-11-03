@@ -119,10 +119,11 @@ object OnDeviceNsfwClassifier {
     private const val SCORE_CACHE_CAPACITY = 5000
     private const val SCORES_FILE_NAME = "cs3_visual_scores.bin"
     private const val SCORES_MAGIC = 0x43533353 // "CS3S"
-    private const val SCORES_VERSION = 1
+    private const val SCORES_VERSION = 2
 
     private val scoreCache = LruCache<String, Float>(SCORE_CACHE_CAPACITY)
     private val persistentScoreLock = Any()
+    private val inferenceLock = Any()
     @Volatile private var isScoresLoaded = false
     @Volatile private var isScoresDirty = false
 
@@ -181,7 +182,7 @@ object OnDeviceNsfwClassifier {
                 canvas.drawColor(Color.BLACK)
                 if (drawable is BitmapDrawable) {
                     val b = drawable.bitmap
-                    if (b == null || b.isRecycled) return if (appCtx?.let { shouldCensorPosters(it) } == true) 1.0f else 0.0f
+                    if (b == null || b.isRecycled) return if (appCtx?.let { shouldCensorPosters(it) || !it.isNsfwEnabled() } == true) 1.0f else 0.0f
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
                         val copy = try {
                             b.copy(Bitmap.Config.ARGB_8888, false)
@@ -196,7 +197,7 @@ object OnDeviceNsfwClassifier {
                             }
                         } else {
                             // Hardware copy failed (e.g. low memory) -> fail safe to censor
-                            return if (appCtx?.let { shouldCensorPosters(it) } == true) 1.0f else 0.0f
+                            return if (appCtx?.let { shouldCensorPosters(it) || !it.isNsfwEnabled() } == true) 1.0f else 0.0f
                         }
                     } else {
                         canvas.drawBitmap(b, null, potatoRect, potatoPaint)
@@ -278,18 +279,18 @@ object OnDeviceNsfwClassifier {
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Potato fast visual scoring error: ${t.message}")
-                if (appCtx?.let { shouldCensorPosters(it) } == true) 1.0f else 0.0f
+                if (appCtx?.let { shouldCensorPosters(it) || !it.isNsfwEnabled() } == true) 1.0f else 0.0f
             }
         }
     }
 
     /**
-     * Safe classification task that holds weak references to avoid pinning multi-megabyte bitmaps in queue.
+     * Safe classification task that holds weak view reference and strong drawable reference during bounded execution.
      */
     private class SafeClassificationTask(
         val weakImageView: WeakReference<ImageView>,
         val imageKey: String,
-        val weakDrawable: WeakReference<Drawable>,
+        val targetDrawable: Drawable,
         val appContext: Context
     ) : Runnable {
         fun onEvicted() {
@@ -315,7 +316,7 @@ object OnDeviceNsfwClassifier {
                         } else if (!appContext.isNsfwEnabled()) {
                             activeView.setImageResource(R.drawable.default_cover)
                         } else {
-                            weakDrawable.get()?.let { setSmoothPosterDrawable(activeView, it, false) }
+                            setSmoothPosterDrawable(activeView, targetDrawable, false)
                         }
                     }
                 }
@@ -332,7 +333,7 @@ object OnDeviceNsfwClassifier {
                     }
                 }
 
-                val drawable = weakDrawable.get() ?: return
+                val drawable = targetDrawable
 
                 // If device is under severe memory pressure, safely guard without leaking unclassified images
                 if (isDeviceUnderMemoryPressure(appContext)) {
@@ -419,18 +420,20 @@ object OnDeviceNsfwClassifier {
         val isPotato = ctx?.let { isPotatoDevice(it) } ?: false
         val tier = ctx?.let { DeviceProfile.tier(it) } ?: DeviceTier.MID
 
-        val (threads, queueCap) = when {
-            isPotato || tier == DeviceTier.LOW -> Pair(1, 16)
-            tier == DeviceTier.HIGH -> Pair(
-                Runtime.getRuntime().availableProcessors().coerceIn(3, 4),
-                128
-            )
-            else -> Pair(2, 48)
+        // CRITICAL CONCURRENCY INVARIANT:
+        // TFLite's Interpreter is NOT thread-safe at the application level.
+        // Scratch bitmap, canvas, pixel arrays, and input ByteBuffers are shared singletons.
+        // Exactly 1 background worker thread processes inference sequentially, eliminating 100% of thread races,
+        // native SIGSEGV traps, and corrupted logit evaluations. Internal intra-op parallelism is handled by TFLite.
+        val queueCap = when {
+            isPotato || tier == DeviceTier.LOW -> 16
+            tier == DeviceTier.HIGH -> 64
+            else -> 32
         }
 
         return ThreadPoolExecutor(
-            threads,
-            threads,
+            1,
+            1,
             60L,
             TimeUnit.SECONDS,
             LinkedBlockingQueue<Runnable>(queueCap),
@@ -722,7 +725,11 @@ object OnDeviceNsfwClassifier {
                 val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
                 val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
 
-                if (y in 55..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8) {
+                val isStandardSkin = y in 55..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8
+                val isAnimeSkin = r in 205..255 && g in 175..245 && b in 150..235 && r > g && g > b && (r - b) in 8..70 && (r - g) in 4..40
+                val isDarkerSkin = r in 70..190 && g in 45..150 && b in 25..110 && r > g && g > b && (r - b) >= 12 && (r - g) >= 8
+
+                if (isStandardSkin || isAnimeSkin || isDarkerSkin) {
                     bodySkinPixels++
                 }
             }
@@ -761,52 +768,62 @@ object OnDeviceNsfwClassifier {
      * Synchronously runs inference on a Drawable without allocating full-resolution intermediate bitmaps.
      * Note: Must only be called on background threads.
      */
-    @Synchronized
     fun classifyDrawableScore(ctx: Context, drawable: Drawable): Float {
         if (isPotatoDevice(ctx)) {
             return classifyPotatoFastScore(drawable, ctx)
         }
         if (isModelPermanentlyUnavailable) return classifyPotatoFastScore(drawable, ctx)
-        if (!ensureModelInitialized(ctx)) return classifyPotatoFastScore(drawable, ctx)
-        val interp = interpreter ?: return classifyPotatoFastScore(drawable, ctx)
-        val buf = inputBuffer ?: return classifyPotatoFastScore(drawable, ctx)
-        val sBitmap = scratchBitmap
-        if (sBitmap == null || sBitmap.isRecycled) return classifyPotatoFastScore(drawable, ctx)
-        val canvas = scratchCanvas ?: return classifyPotatoFastScore(drawable, ctx)
 
-        return try {
-            canvas.drawColor(Color.BLACK)
-            if (drawable is BitmapDrawable) {
-                val b = drawable.bitmap
-                if (b == null || b.isRecycled) return if (shouldCensorPosters(ctx)) 1.0f else 0.0f
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
-                    val copy = try {
-                        b.copy(Bitmap.Config.ARGB_8888, false)
-                    } catch (_: Throwable) {
-                        null
-                    }
-                    if (copy != null) {
-                        try {
-                            canvas.drawBitmap(copy, null, scratchRect, scratchPaint)
-                        } finally {
-                            try { copy.recycle() } catch (_: Throwable) {}
+        synchronized(inferenceLock) {
+            if (!ensureModelInitialized(ctx)) return classifyPotatoFastScore(drawable, ctx)
+            val interp = interpreter ?: return classifyPotatoFastScore(drawable, ctx)
+            val buf = inputBuffer ?: return classifyPotatoFastScore(drawable, ctx)
+            val sBitmap = scratchBitmap
+            if (sBitmap == null || sBitmap.isRecycled) return classifyPotatoFastScore(drawable, ctx)
+            val canvas = scratchCanvas ?: return classifyPotatoFastScore(drawable, ctx)
+
+            return try {
+                canvas.drawColor(Color.BLACK)
+                if (drawable is BitmapDrawable) {
+                    val b = drawable.bitmap
+                    if (b == null || b.isRecycled) return if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) 1.0f else 0.0f
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
+                        val copy = try {
+                            b.copy(Bitmap.Config.ARGB_8888, false)
+                        } catch (_: Throwable) {
+                            null
+                        }
+                        if (copy != null) {
+                            try {
+                                canvas.drawBitmap(copy, null, scratchRect, scratchPaint)
+                            } finally {
+                                try { copy.recycle() } catch (_: Throwable) {}
+                            }
+                        } else {
+                            val pScore = classifyPotatoFastScore(drawable, ctx)
+                            return if (pScore >= 0.30f) pScore else if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) 1.0f else 0.0f
                         }
                     } else {
-                        return classifyPotatoFastScore(drawable, ctx)
+                        canvas.drawBitmap(b, null, scratchRect, scratchPaint)
                     }
                 } else {
-                    canvas.drawBitmap(b, null, scratchRect, scratchPaint)
+                    drawable.setBounds(0, 0, INPUT_DIM, INPUT_DIM)
+                    drawable.draw(canvas)
                 }
-            } else {
-                drawable.setBounds(0, 0, INPUT_DIM, INPUT_DIM)
-                drawable.draw(canvas)
-            }
-            sBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
+                sBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
 
-            executeInferenceOnPixels(interp, buf)
-        } catch (t: Throwable) {
-            Log.w(TAG, "Drawable classification warning: ${t.message}")
-            classifyPotatoFastScore(drawable, ctx)
+                executeInferenceOnPixels(interp, buf)
+            } catch (t: Throwable) {
+                Log.w(TAG, "Drawable classification warning: ${t.message}")
+                val pScore = classifyPotatoFastScore(drawable, ctx)
+                if (pScore >= 0.30f) {
+                    pScore
+                } else if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) {
+                    1.0f
+                } else {
+                    0.0f
+                }
+            }
         }
     }
 
@@ -896,13 +913,12 @@ object OnDeviceNsfwClassifier {
         }
 
         val weakImageView = WeakReference(imageView)
-        val weakDrawable = WeakReference(drawable)
         try {
             workerExecutor.execute(
                 SafeClassificationTask(
                     weakImageView = weakImageView,
                     imageKey = imageKey,
-                    weakDrawable = weakDrawable,
+                    targetDrawable = drawable,
                     appContext = appContext
                 )
             )
