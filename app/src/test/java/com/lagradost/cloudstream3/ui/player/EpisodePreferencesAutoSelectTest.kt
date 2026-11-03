@@ -28,12 +28,13 @@ class EpisodePreferencesAutoSelectTest {
     }
 
     private fun isDubLink(link: DisplayLink): Boolean {
-        val ext = link.link.first ?: return false
+        val ext = link.link.first
+        val uri = link.link.second
         val dubRegex = Regex("""\b(dub|dubbed|dual[\s_-]*audio)\b""", RegexOption.IGNORE_CASE)
-        return dubRegex.containsMatchIn(ext.name) ||
+        return (ext != null && (dubRegex.containsMatchIn(ext.name) ||
                 dubRegex.containsMatchIn(ext.source) ||
-                dubRegex.containsMatchIn(ext.url) ||
-                dubRegex.containsMatchIn(link.name)
+                dubRegex.containsMatchIn(ext.url))) ||
+                (uri != null && dubRegex.containsMatchIn(uri.name))
     }
 
     private fun findLinkMatchingLanguage(candidateLinks: List<DisplayLink>, targetLang: String): DisplayLink? {
@@ -51,12 +52,13 @@ class EpisodePreferencesAutoSelectTest {
         }
 
         return candidateLinks.find { candidate ->
-            val ext = candidate.link.first ?: return@find false
+            val ext = candidate.link.first
+            val uri = candidate.link.second
             namesToCheck.any { name ->
-                ext.name.contains(name, ignoreCase = true) ||
-                ext.source.contains(name, ignoreCase = true) ||
-                ext.url.contains(name, ignoreCase = true) ||
-                candidate.name.contains(name, ignoreCase = true)
+                (ext != null && (ext.name.contains(name, ignoreCase = true) ||
+                 ext.source.contains(name, ignoreCase = true) ||
+                 ext.url.contains(name, ignoreCase = true))) ||
+                (uri != null && uri.name.contains(name, ignoreCase = true))
             }
         }
     }
