@@ -45,12 +45,14 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.RejectedExecutionHandler
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Ultra-Lightweight, Production-Grade On-Device AI Classification Engine.
@@ -91,20 +93,137 @@ object OnDeviceNsfwClassifier {
     private const val MEAN_G = 117.0f
     private const val MEAN_R = 123.0f
 
-    // Thread-safe state
-    private val isInitializing = AtomicBoolean(false)
-    private var interpreter: Interpreter? = null
-    private var inputBuffer: ByteBuffer? = null
-    private var isModelLoaded = false
-    private var isModelPermanentlyUnavailable = false
+    // Thread-safe multi-session pool for hardware-adaptive parallel inference
+    @Volatile private var sharedModelBuffer: MappedByteBuffer? = null
+    @Volatile private var isModelPermanentlyUnavailable = false
+    private val modelBufferLock = Any()
+    private val sessionPool = ConcurrentLinkedQueue<InferenceSession>()
+    private val activeSessionCount = AtomicInteger(0)
+    @Volatile private var maxSessions = 1
 
-    // Single direct allocation for scratch bitmap & pixel extraction (used only on capable devices)
-    private val scratchPixels = IntArray(INPUT_DIM * INPUT_DIM)
-    private val scratchFloatArray = FloatArray(INPUT_DIM * INPUT_DIM * BGR_CHANNELS)
-    private var scratchBitmap: Bitmap? = null
-    private var scratchCanvas: Canvas? = null
-    private val scratchRect = Rect(0, 0, INPUT_DIM, INPUT_DIM)
-    private val scratchPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+    /**
+     * Completely isolated TFLite inference session.
+     * Encapsulates its own Interpreter instance, native ByteBuffer, and scratch canvas/bitmap.
+     * Guaranteed 100% thread-safe: multiple worker threads execute in parallel with ZERO lock contention.
+     */
+    private class InferenceSession(
+        val interpreter: Interpreter,
+        val inputBuffer: ByteBuffer,
+        val scratchBitmap: Bitmap,
+        val scratchCanvas: Canvas,
+        val scratchPixels: IntArray,
+        val scratchFloatArray: FloatArray
+    ) {
+        private val scratchRect = Rect(0, 0, INPUT_DIM, INPUT_DIM)
+        private val scratchPaint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+        fun release() {
+            try { interpreter.close() } catch (_: Throwable) {}
+            try { scratchBitmap.recycle() } catch (_: Throwable) {}
+        }
+
+        fun execute(drawable: Drawable, ctx: Context): Float {
+            return try {
+                scratchCanvas.drawColor(Color.BLACK)
+                if (drawable is BitmapDrawable) {
+                    val b = drawable.bitmap
+                    if (b == null || b.isRecycled) return if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) 1.0f else 0.0f
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
+                        val copy = try {
+                            b.copy(Bitmap.Config.ARGB_8888, false)
+                        } catch (_: Throwable) {
+                            null
+                        }
+                        if (copy != null) {
+                            try {
+                                scratchCanvas.drawBitmap(copy, null, scratchRect, scratchPaint)
+                            } finally {
+                                try { copy.recycle() } catch (_: Throwable) {}
+                            }
+                        } else {
+                            val pScore = classifyPotatoFastScore(drawable, ctx)
+                            return if (pScore >= 0.30f) pScore else if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) 1.0f else 0.0f
+                        }
+                    } else {
+                        scratchCanvas.drawBitmap(b, null, scratchRect, scratchPaint)
+                    }
+                } else {
+                    drawable.setBounds(0, 0, INPUT_DIM, INPUT_DIM)
+                    drawable.draw(scratchCanvas)
+                }
+
+                scratchBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
+
+                var floatIdx = 0
+                var bodySkinPixels = 0
+                val totalPixels = INPUT_DIM * INPUT_DIM
+                val bodyStartPixel = 66 * INPUT_DIM
+                val bodyTotalPixels = totalPixels - bodyStartPixel
+
+                for (i in 0 until totalPixels) {
+                    val pixel = scratchPixels[i]
+                    val r = (pixel shr 16) and 0xFF
+                    val g = (pixel shr 8) and 0xFF
+                    val b = pixel and 0xFF
+
+                    scratchFloatArray[floatIdx++] = b.toFloat() - MEAN_B
+                    scratchFloatArray[floatIdx++] = g.toFloat() - MEAN_G
+                    scratchFloatArray[floatIdx++] = r.toFloat() - MEAN_R
+
+                    if (i >= bodyStartPixel) {
+                        val y = (77 * r + 150 * g + 29 * b) shr 8
+                        val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
+                        val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
+
+                        val isStandardSkin = y in 55..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8
+                        val isAnimeSkin = r in 205..255 && g in 175..245 && b in 150..235 && r > g && g > b && (r - b) in 8..70 && (r - g) in 4..40
+                        val isDarkerSkin = r in 70..190 && g in 45..150 && b in 25..110 && r > g && g > b && (r - b) >= 12 && (r - g) >= 8
+
+                        if (isStandardSkin || isAnimeSkin || isDarkerSkin) {
+                            bodySkinPixels++
+                        }
+                    }
+                }
+
+                inputBuffer.rewind()
+                inputBuffer.asFloatBuffer().put(scratchFloatArray)
+
+                val outputProb = Array(1) { FloatArray(2) }
+                interpreter.run(inputBuffer, outputProb)
+
+                val z0 = outputProb[0][0]
+                val z1 = outputProb[0][1]
+
+                val rawAiScore = if (z0 + z1 in 0.98f..1.02f && z0 >= 0f && z1 >= 0f) {
+                    z1
+                } else {
+                    val maxLogit = maxOf(z0, z1)
+                    val exp0 = kotlin.math.exp((z0 - maxLogit).toDouble()).toFloat()
+                    val exp1 = kotlin.math.exp((z1 - maxLogit).toDouble()).toFloat()
+                    val sum = exp0 + exp1
+                    if (sum > 0f) (exp1 / sum).coerceIn(0.0f, 1.0f) else 0.5f
+                }
+                val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
+
+                if (rawAiScore >= 0.35f && bodySkinRatio > 0.30f) {
+                    val exposureBoost = ((bodySkinRatio - 0.30f) * 1.5f).coerceIn(0.0f, 1.0f)
+                    maxOf(rawAiScore, (rawAiScore * 0.70f) + (exposureBoost * 0.30f))
+                } else {
+                    rawAiScore
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Inference session execution warning: ${t.message}")
+                val pScore = classifyPotatoFastScore(drawable, ctx)
+                if (pScore >= 0.30f) {
+                    pScore
+                } else if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) {
+                    1.0f
+                } else {
+                    0.0f
+                }
+            }
+        }
+    }
 
     // Ultra-lightweight reusable scratch structures for potato devices (< 10 KB total memory, 0 MB native RAM)
     private const val POTATO_DIM = 48
@@ -123,7 +242,6 @@ object OnDeviceNsfwClassifier {
 
     private val scoreCache = LruCache<String, Float>(SCORE_CACHE_CAPACITY)
     private val persistentScoreLock = Any()
-    private val inferenceLock = Any()
     @Volatile private var isScoresLoaded = false
     @Volatile private var isScoresDirty = false
 
@@ -418,22 +536,24 @@ object OnDeviceNsfwClassifier {
     private fun createAdaptiveWorkerExecutor(): ThreadPoolExecutor {
         val ctx = CloudStreamApp.context
         val isPotato = ctx?.let { isPotatoDevice(it) } ?: false
-        val tier = ctx?.let { DeviceProfile.tier(it) } ?: DeviceTier.MID
-
-        // CRITICAL CONCURRENCY INVARIANT:
-        // TFLite's Interpreter is NOT thread-safe at the application level.
-        // Scratch bitmap, canvas, pixel arrays, and input ByteBuffers are shared singletons.
-        // Exactly 1 background worker thread processes inference sequentially, eliminating 100% of thread races,
-        // native SIGSEGV traps, and corrupted logit evaluations. Internal intra-op parallelism is handled by TFLite.
-        val queueCap = when {
-            isPotato || tier == DeviceTier.LOW -> 16
-            tier == DeviceTier.HIGH -> 64
-            else -> 32
+        // HARDWARE-ADAPTIVE MULTI-THREADING:
+        // Each worker thread operates on its own isolated InferenceSession from sessionPool.
+        // Zero lock contention, zero shared buffers, and zero race conditions.
+        // Flagships run 3-4 parallel workers; Mid-tier runs 2 parallel workers; Potato runs 1 paced worker.
+        val (threads, queueCap) = when {
+            isPotato || tier == DeviceTier.LOW -> Pair(1, 16)
+            tier == DeviceTier.HIGH -> Pair(
+                Runtime.getRuntime().availableProcessors().coerceIn(3, 4),
+                128
+            )
+            else -> Pair(2, 48)
         }
 
+        maxSessions = threads
+
         return ThreadPoolExecutor(
-            1,
-            1,
+            threads,
+            threads,
             60L,
             TimeUnit.SECONDS,
             LinkedBlockingQueue<Runnable>(queueCap),
@@ -616,157 +736,129 @@ object OnDeviceNsfwClassifier {
      */
     @Synchronized
     private fun ensureModelInitialized(ctx: Context): Boolean {
-        if (isPotatoDevice(ctx)) {
-            // Ultra-low RAM potato device protection: never allocate 35MB+ native TFLite tensor arena
-            return false
-        }
-        if (isModelPermanentlyUnavailable) return false
-        if (isModelLoaded && interpreter != null && scratchBitmap != null && !scratchBitmap!!.isRecycled && inputBuffer != null) {
-            return true
-        }
-        if (isInitializing.get()) return false
-
-        isInitializing.set(true)
-        return try {
-            val assetFd: AssetFileDescriptor = ctx.assets.openFd(MODEL_ASSET_PATH)
-            val inputStream = FileInputStream(assetFd.fileDescriptor)
-            val fileChannel = inputStream.channel
-            val startOffset = assetFd.startOffset
-            val declaredLength = assetFd.declaredLength
-            val modelBuffer: MappedByteBuffer = fileChannel.map(
-                FileChannel.MapMode.READ_ONLY,
-                startOffset,
-                declaredLength
-            )
-
-            val tier = DeviceProfile.tier(ctx)
-            val is32Bit = try {
-                Build.SUPPORTED_64_BIT_ABIS.isNullOrEmpty()
-            } catch (_: Throwable) {
-                true
-            }
-            val isLowRam = try {
-                val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                am?.isLowRamDevice ?: false
-            } catch (_: Throwable) {
-                false
-            }
-
-            // CRITICAL POTATO HARDWARE OPTIMIZATION:
-            // Disable XNNPACK on Low Tier, 32-bit ARM, or Low-RAM devices.
-            // XNNPACK on budget SoCs can emit unsupported SIMD opcodes triggering native SIGILL / SIGSEGV.
-            val shouldUseXnnpack = tier != DeviceTier.LOW && !is32Bit && !isLowRam
-            val threadCount = if (tier == DeviceTier.LOW || is32Bit || isLowRam) 1 else 2
-
-            val interp = try {
-                val options = Interpreter.Options().apply {
-                    setNumThreads(threadCount)
-                    setUseXNNPACK(shouldUseXnnpack)
-                }
-                Interpreter(modelBuffer, options)
-            } catch (t: Throwable) {
-                Log.w(TAG, "Primary interpreter init failed (xnnpack=$shouldUseXnnpack), falling back to safe CPU: ${t.message}")
-                val safeOptions = Interpreter.Options().apply {
-                    setNumThreads(1)
-                    setUseXNNPACK(false)
-                }
-                Interpreter(modelBuffer, safeOptions)
-            }
-
-            // Allocate direct native memory (not on GC heap) for input tensor: 1x224x224x3x4 bytes
-            val buf = ByteBuffer.allocateDirect(1 * INPUT_DIM * INPUT_DIM * BGR_CHANNELS * BYTES_PER_FLOAT).apply {
-                order(ByteOrder.nativeOrder())
-            }
-
-            scratchBitmap = Bitmap.createBitmap(INPUT_DIM, INPUT_DIM, Bitmap.Config.ARGB_8888)
-            scratchCanvas = Canvas(scratchBitmap!!)
-
-            interpreter = interp
-            inputBuffer = buf
-            isModelLoaded = true
-            Log.i(TAG, "On-device NSFW TFLite AI model loaded (tier=$tier, 32bit=$is32Bit, xnnpack=$shouldUseXnnpack, threads=$threadCount)")
-            true
-        } catch (t: Throwable) {
-            Log.e(TAG, "Failed to initialize On-Device NSFW AI model: ${t.message}")
-            isModelPermanentlyUnavailable = true
-            isModelLoaded = false
-            release()
-            false
-        } finally {
-            isInitializing.set(false)
-        }
-    }
-
     /**
-     * Executes inference on the pre-filled scratchPixels array and returns the classification confidence score.
+     * Memory-maps the TFLite model from assets without loading bytes into JVM heap memory.
+     * Reused across all parallel inference sessions via Linux shared virtual memory (mmap).
      */
-    private fun executeInferenceOnPixels(interp: Interpreter, buf: ByteBuffer): Float {
-        var floatIdx = 0
-        var bodySkinPixels = 0
-        val totalPixels = INPUT_DIM * INPUT_DIM
-        // Spatial zoning: Top 65 rows (~29%) contain character head/face.
-        // Rows 66..223 (~71%) contain torso, shoulders, midriff, and thighs.
-        val bodyStartPixel = 66 * INPUT_DIM
-        val bodyTotalPixels = totalPixels - bodyStartPixel
+    private fun ensureModelBufferLoaded(ctx: Context): MappedByteBuffer? {
+        if (isPotatoDevice(ctx)) return null
+        if (isModelPermanentlyUnavailable) return null
+        sharedModelBuffer?.let { return it }
 
-        for (i in 0 until totalPixels) {
-            val pixel = scratchPixels[i]
-            val r = (pixel shr 16) and 0xFF
-            val g = (pixel shr 8) and 0xFF
-            val b = pixel and 0xFF
-
-            scratchFloatArray[floatIdx++] = b.toFloat() - MEAN_B
-            scratchFloatArray[floatIdx++] = g.toFloat() - MEAN_G
-            scratchFloatArray[floatIdx++] = r.toFloat() - MEAN_R
-
-            // Fast integer bit-shift skin chrominance analysis (< 0.05ms, 0 allocations)
-            if (i >= bodyStartPixel) {
-                val y = (77 * r + 150 * g + 29 * b) shr 8
-                val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
-                val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
-
-                val isStandardSkin = y in 55..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8
-                val isAnimeSkin = r in 205..255 && g in 175..245 && b in 150..235 && r > g && g > b && (r - b) in 8..70 && (r - g) in 4..40
-                val isDarkerSkin = r in 70..190 && g in 45..150 && b in 25..110 && r > g && g > b && (r - b) >= 12 && (r - g) >= 8
-
-                if (isStandardSkin || isAnimeSkin || isDarkerSkin) {
-                    bodySkinPixels++
-                }
+        synchronized(modelBufferLock) {
+            sharedModelBuffer?.let { return it }
+            return try {
+                val assetFd: AssetFileDescriptor = ctx.assets.openFd(MODEL_ASSET_PATH)
+                val inputStream = FileInputStream(assetFd.fileDescriptor)
+                val fileChannel = inputStream.channel
+                val startOffset = assetFd.startOffset
+                val declaredLength = assetFd.declaredLength
+                val buffer = fileChannel.map(
+                    FileChannel.MapMode.READ_ONLY,
+                    startOffset,
+                    declaredLength
+                )
+                sharedModelBuffer = buffer
+                buffer
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to memory map TFLite model: ${t.message}")
+                isModelPermanentlyUnavailable = true
+                null
             }
-        }
-
-        buf.rewind()
-        buf.asFloatBuffer().put(scratchFloatArray)
-
-        val outputProb = Array(1) { FloatArray(2) }
-        interp.run(buf, outputProb)
-
-        val z0 = outputProb[0][0]
-        val z1 = outputProb[0][1]
-
-        // Numerically stable softmax to convert raw logits to true probability [0.0, 1.0]
-        val rawAiScore = if (z0 + z1 in 0.98f..1.02f && z0 >= 0f && z1 >= 0f) {
-            z1
-        } else {
-            val maxLogit = maxOf(z0, z1)
-            val exp0 = kotlin.math.exp((z0 - maxLogit).toDouble()).toFloat()
-            val exp1 = kotlin.math.exp((z1 - maxLogit).toDouble()).toFloat()
-            val sum = exp0 + exp1
-            if (sum > 0f) (exp1 / sum).coerceIn(0.0f, 1.0f) else 0.5f
-        }
-        val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
-
-        return if (rawAiScore >= 0.35f && bodySkinRatio > 0.30f) {
-            val exposureBoost = ((bodySkinRatio - 0.30f) * 1.5f).coerceIn(0.0f, 1.0f)
-            maxOf(rawAiScore, (rawAiScore * 0.70f) + (exposureBoost * 0.30f))
-        } else {
-            rawAiScore
         }
     }
 
     /**
-     * Synchronously runs inference on a Drawable without allocating full-resolution intermediate bitmaps.
-     * Note: Must only be called on background threads.
+     * Creates an isolated InferenceSession with its own Interpreter instance and scratch buffers.
+     */
+    private fun createInferenceSession(ctx: Context): InferenceSession? {
+        val modelBuffer = ensureModelBufferLoaded(ctx) ?: return null
+        val tier = DeviceProfile.tier(ctx)
+        val is32Bit = try {
+            Build.SUPPORTED_64_BIT_ABIS.isNullOrEmpty()
+        } catch (_: Throwable) {
+            true
+        }
+        val isLowRam = try {
+            val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            am?.isLowRamDevice ?: false
+        } catch (_: Throwable) {
+            false
+        }
+
+        val shouldUseXnnpack = tier != DeviceTier.LOW && !is32Bit && !isLowRam
+        val threadCount = if (tier == DeviceTier.LOW || is32Bit || isLowRam) 1 else 2
+
+        val interp = try {
+            val options = Interpreter.Options().apply {
+                setNumThreads(threadCount)
+                setUseXNNPACK(shouldUseXnnpack)
+            }
+            Interpreter(modelBuffer, options)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Primary interpreter init failed (xnnpack=$shouldUseXnnpack), falling back to safe CPU: ${t.message}")
+            val safeOptions = Interpreter.Options().apply {
+                setNumThreads(1)
+                setUseXNNPACK(false)
+            }
+            try {
+                Interpreter(modelBuffer, safeOptions)
+            } catch (_: Throwable) {
+                return null
+            }
+        }
+
+        val buf = ByteBuffer.allocateDirect(1 * INPUT_DIM * INPUT_DIM * BGR_CHANNELS * BYTES_PER_FLOAT).apply {
+            order(ByteOrder.nativeOrder())
+        }
+        val sBitmap = Bitmap.createBitmap(INPUT_DIM, INPUT_DIM, Bitmap.Config.ARGB_8888)
+        val sCanvas = Canvas(sBitmap)
+        val sPixels = IntArray(INPUT_DIM * INPUT_DIM)
+        val sFloats = FloatArray(INPUT_DIM * INPUT_DIM * BGR_CHANNELS)
+
+        return InferenceSession(
+            interpreter = interp,
+            inputBuffer = buf,
+            scratchBitmap = sBitmap,
+            scratchCanvas = sCanvas,
+            scratchPixels = sPixels,
+            scratchFloatArray = sFloats
+        )
+    }
+
+    /**
+     * Borrows an isolated InferenceSession from the pool, or instantiates a new one if below maxSessions.
+     */
+    private fun borrowSession(ctx: Context): InferenceSession? {
+        sessionPool.poll()?.let { return it }
+        val max = maxSessions
+        if (activeSessionCount.get() < max) {
+            val session = createInferenceSession(ctx)
+            if (session != null) {
+                activeSessionCount.incrementAndGet()
+                return session
+            }
+        }
+        // If all sessions are currently checked out, briefly wait for one to be returned (up to 60ms)
+        val deadline = System.currentTimeMillis() + 60L
+        while (System.currentTimeMillis() < deadline) {
+            sessionPool.poll()?.let { return it }
+            try {
+                Thread.sleep(2L)
+            } catch (_: InterruptedException) {
+                break
+            }
+        }
+        return sessionPool.poll()
+    }
+
+    private fun returnSession(session: InferenceSession) {
+        sessionPool.offer(session)
+    }
+
+    /**
+     * Runs inference on a Drawable without allocating full-resolution intermediate bitmaps.
+     * Uses hardware-adaptive multi-session parallelism with zero thread contention.
      */
     fun classifyDrawableScore(ctx: Context, drawable: Drawable): Float {
         if (isPotatoDevice(ctx)) {
@@ -774,56 +866,16 @@ object OnDeviceNsfwClassifier {
         }
         if (isModelPermanentlyUnavailable) return classifyPotatoFastScore(drawable, ctx)
 
-        synchronized(inferenceLock) {
-            if (!ensureModelInitialized(ctx)) return classifyPotatoFastScore(drawable, ctx)
-            val interp = interpreter ?: return classifyPotatoFastScore(drawable, ctx)
-            val buf = inputBuffer ?: return classifyPotatoFastScore(drawable, ctx)
-            val sBitmap = scratchBitmap
-            if (sBitmap == null || sBitmap.isRecycled) return classifyPotatoFastScore(drawable, ctx)
-            val canvas = scratchCanvas ?: return classifyPotatoFastScore(drawable, ctx)
+        val session = borrowSession(ctx)
+        if (session == null) {
+            val pScore = classifyPotatoFastScore(drawable, ctx)
+            return if (pScore >= 0.30f) pScore else if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) 1.0f else 0.0f
+        }
 
-            return try {
-                canvas.drawColor(Color.BLACK)
-                if (drawable is BitmapDrawable) {
-                    val b = drawable.bitmap
-                    if (b == null || b.isRecycled) return if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) 1.0f else 0.0f
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
-                        val copy = try {
-                            b.copy(Bitmap.Config.ARGB_8888, false)
-                        } catch (_: Throwable) {
-                            null
-                        }
-                        if (copy != null) {
-                            try {
-                                canvas.drawBitmap(copy, null, scratchRect, scratchPaint)
-                            } finally {
-                                try { copy.recycle() } catch (_: Throwable) {}
-                            }
-                        } else {
-                            val pScore = classifyPotatoFastScore(drawable, ctx)
-                            return if (pScore >= 0.30f) pScore else if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) 1.0f else 0.0f
-                        }
-                    } else {
-                        canvas.drawBitmap(b, null, scratchRect, scratchPaint)
-                    }
-                } else {
-                    drawable.setBounds(0, 0, INPUT_DIM, INPUT_DIM)
-                    drawable.draw(canvas)
-                }
-                sBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
-
-                executeInferenceOnPixels(interp, buf)
-            } catch (t: Throwable) {
-                Log.w(TAG, "Drawable classification warning: ${t.message}")
-                val pScore = classifyPotatoFastScore(drawable, ctx)
-                if (pScore >= 0.30f) {
-                    pScore
-                } else if (shouldCensorPosters(ctx) || !ctx.isNsfwEnabled()) {
-                    1.0f
-                } else {
-                    0.0f
-                }
-            }
+        return try {
+            session.execute(drawable, ctx)
+        } finally {
+            returnSession(session)
         }
     }
 
@@ -1095,13 +1147,12 @@ object OnDeviceNsfwClassifier {
     @Synchronized
     fun release() {
         try {
-            interpreter?.close()
-            interpreter = null
-            inputBuffer = null
-            scratchBitmap?.recycle()
-            scratchBitmap = null
-            scratchCanvas = null
-            isModelLoaded = false
+            while (true) {
+                val session = sessionPool.poll() ?: break
+                session.release()
+                activeSessionCount.decrementAndGet()
+            }
+            sharedModelBuffer = null
             synchronized(potatoLock) {
                 potatoBitmap?.recycle()
                 potatoBitmap = null
