@@ -22,6 +22,7 @@ import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.databinding.DialogNsfwSensitivityThresholdsBinding
 import com.lagradost.cloudstream3.ui.APIRepository
+import com.lagradost.cloudstream3.utils.AppContextUtils
 import com.lagradost.cloudstream3.utils.ImageLoader
 import java.util.Locale
 
