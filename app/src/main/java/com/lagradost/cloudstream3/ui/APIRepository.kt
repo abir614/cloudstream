@@ -30,11 +30,193 @@ import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 import java.io.File
 
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.cloudstream3.AnimeSearchResponse
+import com.lagradost.cloudstream3.MovieSearchResponse
+import com.lagradost.cloudstream3.TvSeriesSearchResponse
+import com.lagradost.cloudstream3.LiveSearchResponse
+import com.lagradost.cloudstream3.TorrentSearchResponse
+import com.lagradost.cloudstream3.Score
+import com.lagradost.cloudstream3.SearchQuality
+import com.lagradost.cloudstream3.HomePageList
+
+data class CachedSearchResponseItem(
+    @JsonProperty("name") override val name: String = "",
+    @JsonProperty("url") override val url: String = "",
+    @JsonProperty("apiName") override val apiName: String = "",
+    @JsonProperty("type") override var type: TvType? = null,
+    @JsonProperty("posterUrl") override var posterUrl: String? = null,
+    @JsonProperty("id") override var id: Int? = null,
+    @JsonProperty("quality") override var quality: SearchQuality? = null,
+    @JsonProperty("posterHeaders") override var posterHeaders: Map<String, String>? = null,
+    @JsonProperty("year") var year: Int? = null,
+    @JsonProperty("episodes") var episodes: Int? = null,
+    @JsonProperty("lang") var lang: String? = null,
+    @JsonProperty("dubStatus") var dubStatus: Set<DubStatus>? = null,
+    @JsonProperty("concreteType") var concreteType: String? = null
+) : SearchResponse {
+    override var score: Score? = null
+
+    fun toConcreteSearchResponse(): SearchResponse {
+        return when (concreteType) {
+            "AnimeSearchResponse" -> {
+                @Suppress("DEPRECATION_ERROR")
+                AnimeSearchResponse(
+                    name = name,
+                    url = url,
+                    apiName = apiName,
+                    type = type,
+                    posterUrl = posterUrl,
+                    year = year,
+                    dubStatus = dubStatus?.toMutableSet(),
+                    id = id,
+                    quality = quality,
+                    posterHeaders = posterHeaders
+                )
+            }
+            "TvSeriesSearchResponse" -> {
+                @Suppress("DEPRECATION_ERROR")
+                TvSeriesSearchResponse(
+                    name = name,
+                    url = url,
+                    apiName = apiName,
+                    type = type,
+                    posterUrl = posterUrl,
+                    year = year,
+                    episodes = episodes,
+                    id = id,
+                    quality = quality,
+                    posterHeaders = posterHeaders
+                )
+            }
+            "LiveSearchResponse" -> {
+                @Suppress("DEPRECATION_ERROR")
+                LiveSearchResponse(
+                    name = name,
+                    url = url,
+                    apiName = apiName,
+                    type = type,
+                    posterUrl = posterUrl,
+                    id = id,
+                    quality = quality,
+                    posterHeaders = posterHeaders,
+                    lang = lang
+                )
+            }
+            "TorrentSearchResponse" -> {
+                @Suppress("DEPRECATION_ERROR")
+                TorrentSearchResponse(
+                    name = name,
+                    url = url,
+                    apiName = apiName,
+                    type = type,
+                    posterUrl = posterUrl,
+                    id = id,
+                    quality = quality,
+                    posterHeaders = posterHeaders
+                )
+            }
+            else -> {
+                @Suppress("DEPRECATION_ERROR")
+                MovieSearchResponse(
+                    name = name,
+                    url = url,
+                    apiName = apiName,
+                    type = type,
+                    posterUrl = posterUrl,
+                    year = year,
+                    id = id,
+                    quality = quality,
+                    posterHeaders = posterHeaders
+                )
+            }
+        }
+    }
+
+    companion object {
+        fun fromSearchResponse(res: SearchResponse): CachedSearchResponseItem {
+            val year = (res as? MovieSearchResponse)?.year ?: (res as? TvSeriesSearchResponse)?.year ?: (res as? AnimeSearchResponse)?.year
+            val ep = (res as? TvSeriesSearchResponse)?.episodes
+            val lang = (res as? LiveSearchResponse)?.lang
+            val dub = (res as? AnimeSearchResponse)?.dubStatus
+            val concreteType = when (res) {
+                is AnimeSearchResponse -> "AnimeSearchResponse"
+                is TvSeriesSearchResponse -> "TvSeriesSearchResponse"
+                is LiveSearchResponse -> "LiveSearchResponse"
+                is TorrentSearchResponse -> "TorrentSearchResponse"
+                else -> "MovieSearchResponse"
+            }
+            return CachedSearchResponseItem(
+                name = res.name,
+                url = res.url,
+                apiName = res.apiName,
+                type = res.type,
+                posterUrl = res.posterUrl,
+                id = res.id,
+                quality = res.quality,
+                posterHeaders = res.posterHeaders,
+                year = year,
+                episodes = ep,
+                lang = lang,
+                dubStatus = dub,
+                concreteType = concreteType
+            )
+        }
+    }
+}
+
+data class CachedHomePageListItem(
+    @JsonProperty("name") val name: String = "",
+    @JsonProperty("list") val list: List<CachedSearchResponseItem> = emptyList(),
+    @JsonProperty("isHorizontalImages") val isHorizontalImages: Boolean = false
+) {
+    fun toHomePageList(): HomePageList {
+        return HomePageList(
+            name = name,
+            list = list.map { it.toConcreteSearchResponse() },
+            isHorizontalImages = isHorizontalImages
+        )
+    }
+
+    companion object {
+        fun fromHomePageList(item: HomePageList): CachedHomePageListItem {
+            return CachedHomePageListItem(
+                name = item.name,
+                list = item.list.map { CachedSearchResponseItem.fromSearchResponse(it) },
+                isHorizontalImages = item.isHorizontalImages
+            )
+        }
+    }
+}
+
+data class CachedHomePageResponseItem(
+    @JsonProperty("items") val items: List<CachedHomePageListItem> = emptyList(),
+    @JsonProperty("hasNext") val hasNext: Boolean = false
+) {
+    fun toHomePageResponse(): HomePageResponse {
+        @Suppress("DEPRECATION_ERROR")
+        return HomePageResponse(
+            items = items.map { it.toHomePageList() },
+            hasNext = hasNext
+        )
+    }
+
+    companion object {
+        fun fromHomePageResponse(res: HomePageResponse?): CachedHomePageResponseItem? {
+            if (res == null) return null
+            return CachedHomePageResponseItem(
+                items = res.items.map { CachedHomePageListItem.fromHomePageList(it) },
+                hasNext = res.hasNext
+            )
+        }
+    }
+}
+
 data class MainPageDiskCacheEntry(
-    val unixTime: Long,
-    val apiName: String,
-    val page: Int,
-    val data: List<HomePageResponse?>
+    @JsonProperty("unixTime") val unixTime: Long = 0L,
+    @JsonProperty("apiName") val apiName: String = "",
+    @JsonProperty("page") val page: Int = 0,
+    @JsonProperty("data") val data: List<CachedHomePageResponseItem?> = emptyList()
 )
 
 object MainPageDiskCache {
@@ -56,7 +238,7 @@ object MainPageDiskCache {
             val text = file.readText()
             val entry = tryParseJson<MainPageDiskCacheEntry>(text) ?: return null
             if (unixTime - entry.unixTime < DISK_TTL_SECONDS) {
-                entry.data
+                entry.data.map { it?.toHomePageResponse() }
             } else {
                 null
             }
@@ -70,11 +252,12 @@ object MainPageDiskCache {
         ioSafe {
             try {
                 val file = getCacheFile(apiName, page) ?: return@ioSafe
+                val cachedData = response.map { CachedHomePageResponseItem.fromHomePageResponse(it) }
                 val entry = MainPageDiskCacheEntry(
                     unixTime = unixTime,
                     apiName = apiName,
                     page = page,
-                    data = response
+                    data = cachedData
                 )
                 file.writeText(entry.toJsonLiteral())
             } catch (t: Throwable) {
@@ -151,6 +334,11 @@ class APIRepository(val api: MainAPI) {
             }
             if (mem != null) return mem
             return MainPageDiskCache.get(apiName, page)
+        }
+
+        fun clearMainPageCache() {
+            mainPageCache.clear()
+            MainPageDiskCache.clear()
         }
     }
 

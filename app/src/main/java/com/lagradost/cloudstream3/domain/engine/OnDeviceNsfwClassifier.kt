@@ -34,12 +34,18 @@ import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.DeviceTier
 import com.lagradost.cloudstream3.utils.ImageLoader
 import org.tensorflow.lite.Interpreter
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.lang.ref.WeakReference
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
+import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.RejectedExecutionHandler
 import java.util.concurrent.ThreadPoolExecutor
@@ -109,8 +115,23 @@ object OnDeviceNsfwClassifier {
     private var potatoCanvas: Canvas? = null
     private val potatoLock = Any()
 
-    // Two-tier high-speed caching: 1,000 recent URLs mapped to inference confidence score (0.0f - 1.0f)
-    private val scoreCache = LruCache<String, Float>(1000)
+    // Persistent high-speed caching: up to 5,000 URLs mapped to inference confidence score (0.0f - 1.0f)
+    private const val SCORE_CACHE_CAPACITY = 5000
+    private const val SCORES_FILE_NAME = "cs3_visual_scores.bin"
+    private const val SCORES_MAGIC = 0x43533353 // "CS3S"
+    private const val SCORES_VERSION = 1
+
+    private val scoreCache = LruCache<String, Float>(SCORE_CACHE_CAPACITY)
+    private val persistentScoreLock = Any()
+    @Volatile private var isScoresLoaded = false
+    @Volatile private var isScoresDirty = false
+
+    private val scoreFlushExecutor by lazy {
+        Executors.newSingleThreadScheduledExecutor { r ->
+            Thread(r, "CS3ScoreFlusher").apply { isDaemon = true }
+        }
+    }
+    private var pendingFlushTask: java.util.concurrent.ScheduledFuture<*>? = null
 
     // Main thread handler for UI updates
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -311,16 +332,7 @@ object OnDeviceNsfwClassifier {
                     }
                 }
 
-                val currentView = weakImageView.get() ?: return
                 val drawable = weakDrawable.get() ?: return
-                val activeTag = try {
-                    currentView.getTag(R.id.coil_image_url_tag)
-                } catch (_: Throwable) {
-                    null
-                }
-                if (activeTag != imageKey) {
-                    return
-                }
 
                 // If device is under severe memory pressure, safely guard without leaking unclassified images
                 if (isDeviceUnderMemoryPressure(appContext)) {
@@ -343,7 +355,7 @@ object OnDeviceNsfwClassifier {
                 }
 
                 val score = classifyDrawableScore(appContext, drawable)
-                scoreCache.put(imageKey, score)
+                recordScore(imageKey, score, appContext)
 
                 val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
                 mainHandler.post {
@@ -471,11 +483,87 @@ object OnDeviceNsfwClassifier {
         }
     }
 
+    fun ensureScoresLoaded(ctx: Context) {
+        if (isScoresLoaded) return
+        synchronized(persistentScoreLock) {
+            if (isScoresLoaded) return
+            try {
+                val file = ctx.filesDir.resolve(SCORES_FILE_NAME)
+                if (file.exists() && file.isFile) {
+                    DataInputStream(BufferedInputStream(FileInputStream(file), 16384)).use { dis ->
+                        val magic = dis.readInt()
+                        val version = dis.readInt()
+                        if (magic == SCORES_MAGIC && version == SCORES_VERSION) {
+                            val count = dis.readInt()
+                            for (i in 0 until count) {
+                                val key = dis.readUTF()
+                                val score = dis.readFloat()
+                                scoreCache.put(key, score)
+                            }
+                        } else {
+                            file.delete()
+                        }
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Failed to load visual scores: ${t.message}")
+            } finally {
+                isScoresLoaded = true
+            }
+        }
+    }
+
+    private fun recordScore(imageKey: String, score: Float, ctx: Context) {
+        scoreCache.put(imageKey, score)
+        isScoresDirty = true
+        scheduleFlush(ctx)
+    }
+
+    private fun scheduleFlush(ctx: Context) {
+        val appContext = ctx.applicationContext ?: ctx
+        synchronized(persistentScoreLock) {
+            pendingFlushTask?.cancel(false)
+            pendingFlushTask = scoreFlushExecutor.schedule({
+                flushScoresToDisk(appContext)
+            }, 2000L, TimeUnit.MILLISECONDS)
+        }
+    }
+
+    fun flushScoresToDisk(ctx: Context) {
+        synchronized(persistentScoreLock) {
+            if (!isScoresDirty) return
+            try {
+                val file = ctx.filesDir.resolve(SCORES_FILE_NAME)
+                val tmpFile = ctx.filesDir.resolve("$SCORES_FILE_NAME.tmp")
+                val snapshot = scoreCache.snapshot()
+                val validEntries = snapshot.entries.filter { it.key.length <= 2048 }
+                DataOutputStream(BufferedOutputStream(FileOutputStream(tmpFile), 16384)).use { dos ->
+                    dos.writeInt(SCORES_MAGIC)
+                    dos.writeInt(SCORES_VERSION)
+                    dos.writeInt(validEntries.size)
+                    for (entry in validEntries) {
+                        dos.writeUTF(entry.key)
+                        dos.writeFloat(entry.value)
+                    }
+                    dos.flush()
+                }
+                if (tmpFile.exists()) {
+                    if (file.exists()) file.delete()
+                    tmpFile.renameTo(file)
+                }
+                isScoresDirty = false
+            } catch (t: Throwable) {
+                Log.w(TAG, "Failed to flush visual scores: ${t.message}")
+            }
+        }
+    }
+
     /**
      * Checks if a poster URL has already been evaluated and crosses the active sensitivity threshold.
      * Guaranteed < 0.001 ms response.
      */
     fun isCachedNsfw(imageKey: String, ctx: Context? = null, overrideLevel: NsfwFilterLevel? = null): Boolean {
+        (ctx ?: CloudStreamApp.context)?.let { ensureScoresLoaded(it) }
         val score = scoreCache.get(imageKey) ?: return false
         val threshold = overrideLevel?.let { NsfwFilterEngine.getVisualThreshold(ctx, it) } ?: NsfwFilterEngine.getVisualThreshold(ctx)
         return score >= threshold
@@ -486,6 +574,7 @@ object OnDeviceNsfwClassifier {
      * Guaranteed < 0.001 ms response.
      */
     fun isCachedSafe(imageKey: String, ctx: Context? = null, overrideLevel: NsfwFilterLevel? = null): Boolean {
+        (ctx ?: CloudStreamApp.context)?.let { ensureScoresLoaded(it) }
         val score = scoreCache.get(imageKey) ?: return false
         val threshold = overrideLevel?.let { NsfwFilterEngine.getVisualThreshold(ctx, it) } ?: NsfwFilterEngine.getVisualThreshold(ctx)
         return score < threshold
@@ -494,7 +583,8 @@ object OnDeviceNsfwClassifier {
     /**
      * Returns the cached numerical score for an imageKey, or null if not yet evaluated.
      */
-    fun getCachedScore(imageKey: String): Float? {
+    fun getCachedScore(imageKey: String, ctx: Context? = null): Float? {
+        (ctx ?: CloudStreamApp.context)?.let { ensureScoresLoaded(it) }
         return scoreCache.get(imageKey)
     }
 
@@ -502,7 +592,19 @@ object OnDeviceNsfwClassifier {
      * Clears cached scores upon filter level updates.
      */
     fun clearCache() {
-        scoreCache.evictAll()
+        synchronized(persistentScoreLock) {
+            scoreCache.evictAll()
+            isScoresDirty = false
+            pendingFlushTask?.cancel(false)
+            try {
+                val ctx = CloudStreamApp.context
+                val file = ctx?.filesDir?.resolve(SCORES_FILE_NAME)
+                if (file?.exists() == true) file.delete()
+                val tmpFile = ctx?.filesDir?.resolve("$SCORES_FILE_NAME.tmp")
+                if (tmpFile?.exists() == true) tmpFile.delete()
+            } catch (_: Throwable) {
+            }
+        }
     }
 
     /**

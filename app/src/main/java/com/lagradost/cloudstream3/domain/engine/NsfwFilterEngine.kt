@@ -88,8 +88,14 @@ object NsfwFilterEngine {
         cachedThresholdModerate = null
         cachedThresholdLow = null
         AppContextUtils.resetNsfwPreferenceCache()
+        com.lagradost.cloudstream3.ui.APIRepository.clearMainPageCache()
+        OnDeviceNsfwClassifier.clearCache()
         CloudStreamApp.context?.let { ImageLoader.reconfigure(it) } ?: ImageLoader.resetImageClient()
         _configVersion.value += 1
+        try {
+            com.lagradost.cloudstream3.MainActivity.reloadHomeEvent.invoke(true)
+        } catch (_: Throwable) {
+        }
     }
 
     /**

@@ -99,12 +99,24 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             val nsfwLevelKey = getString(R.string.nsfw_filter_level_key)
             val enableNsfwKey = getString(R.string.enable_nsfw_on_providers_key)
             val censorPostersKey = getString(R.string.censor_nsfw_posters_key)
+            val threshExtremeKey = getString(R.string.nsfw_visual_threshold_extreme_key)
+            val threshModKey = getString(R.string.nsfw_visual_threshold_moderate_key)
+            val threshLowKey = getString(R.string.nsfw_visual_threshold_low_key)
             prefChangeListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-                if (key == nsfwLevelKey || key == enableNsfwKey || key == censorPostersKey) {
+                if (key == nsfwLevelKey || key == enableNsfwKey || key == censorPostersKey ||
+                    key == threshExtremeKey || key == threshModKey || key == threshLowKey
+                ) {
                     com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.onFilterConfigChanged()
                 }
             }
             prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
+        } catch (_: Throwable) {
+        }
+
+        try {
+            thread(start = true, isDaemon = true, name = "StartupScoreCacheWarmup") {
+                com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.ensureScoresLoaded(this)
+            }
         } catch (_: Throwable) {
         }
 
@@ -153,6 +165,11 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                     com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
                     com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
                 } catch (_: Throwable) {
+                }
+            }
+            if (level >= TRIM_MEMORY_UI_HIDDEN) {
+                thread(start = true, isDaemon = true, name = "BackgroundScoreFlush") {
+                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(this)
                 }
             }
             if (level >= TRIM_MEMORY_RUNNING_CRITICAL) {
