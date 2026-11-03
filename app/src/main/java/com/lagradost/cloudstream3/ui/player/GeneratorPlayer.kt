@@ -249,6 +249,15 @@ class GeneratorPlayer : FullScreenPlayer() {
                 (uri != null && dubRegex.containsMatchIn(uri.name))
     }
 
+    private fun matchesLanguageToken(text: String, token: String): Boolean {
+        if (text.isBlank() || token.isBlank()) return false
+        return if (token.length <= 3) {
+            Regex("""(?:\b|[^a-zA-Z])${Regex.escape(token)}(?:\b|[^a-zA-Z])""", RegexOption.IGNORE_CASE).containsMatchIn(text)
+        } else {
+            text.contains(token, ignoreCase = true)
+        }
+    }
+
     private fun findLinkMatchingLanguage(candidateLinks: List<DisplayLink>, targetLang: String): DisplayLink? {
         if (targetLang.isBlank() || targetLang == "none") return null
 
@@ -300,10 +309,10 @@ class GeneratorPlayer : FullScreenPlayer() {
             val uri = candidate.link.second
 
             namesToCheck.any { name ->
-                (ext != null && (ext.name.contains(name, ignoreCase = true) ||
-                 ext.source.contains(name, ignoreCase = true) ||
-                 ext.url.contains(name, ignoreCase = true))) ||
-                (uri != null && uri.name.contains(name, ignoreCase = true))
+                (ext != null && (matchesLanguageToken(ext.name, name) ||
+                 matchesLanguageToken(ext.source, name) ||
+                 matchesLanguageToken(ext.url, name))) ||
+                (uri != null && matchesLanguageToken(uri.name, name))
             }
         }
     }
