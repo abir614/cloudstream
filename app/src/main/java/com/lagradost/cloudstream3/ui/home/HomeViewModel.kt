@@ -34,12 +34,14 @@ import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel
+import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.utils.AppContextUtils.addProgramsToContinueWatching
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterHomePageListByFilmQuality
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterProviderByPreferredMedia
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterSearchResultByFilmQuality
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.loadResult
+import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.DOWNLOAD_HEADER_CACHE
@@ -347,7 +349,7 @@ class HomeViewModel : ViewModel() {
             val allRows = homeData.mapNotNull { it?.items }.flatten()
             val totalItems = allRows.sumOf { it.list.size }
 
-            val shouldFilter = !nsfwEnabled || (context != null && AppContextUtils.shouldCensorPosters(context))
+            val shouldFilter = !nsfwEnabled || (context?.shouldCensorPosters() == true)
             val filterMsg = context?.getString(R.string.content_filtering_in_progress) ?: "Content Filtering in Progress"
 
             if (shouldFilter && totalItems > 0) {
