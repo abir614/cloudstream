@@ -733,12 +733,6 @@ object OnDeviceNsfwClassifier {
 
     /**
      * Memory-maps the TFLite model from assets without loading bytes into JVM heap memory.
-     * Incorporates potato-device protections and safe multi-tier fallbacks.
-     */
-    @Synchronized
-    private fun ensureModelInitialized(ctx: Context): Boolean {
-    /**
-     * Memory-maps the TFLite model from assets without loading bytes into JVM heap memory.
      * Reused across all parallel inference sessions via Linux shared virtual memory (mmap).
      */
     private fun ensureModelBufferLoaded(ctx: Context): MappedByteBuffer? {
