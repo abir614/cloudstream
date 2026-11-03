@@ -930,11 +930,16 @@ class CS3IPlayer : IPlayer {
 
         private fun getTrackSelector(context: Context, maxVideoHeight: Int?): TrackSelector {
             val trackSelector = DefaultTrackSelector(context)
+            val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
+            val primarySub = settingsManager.getString(context.getString(R.string.primary_sub_language_key), null)
+            val isNonePreferred = primarySub.equals("none", ignoreCase = true)
+
             trackSelector.parameters = trackSelector.buildUponParameters()
                 // This will not force higher quality videos to fail
                 // but will make the m3u8 pick the correct preferred
                 .setMaxVideoSize(Int.MAX_VALUE, maxVideoHeight ?: Int.MAX_VALUE)
                 .setPreferredAudioLanguage(null)
+                .setTrackTypeDisabled(TRACK_TYPE_TEXT, isNonePreferred)
                 .build()
             return trackSelector
         }

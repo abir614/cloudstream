@@ -341,14 +341,17 @@ class HomeViewModel : ViewModel() {
     private suspend fun populateHomeFromData(homeData: List<HomePageResponse?>) {
         try {
             expandable.clear()
-            val nsfwEnabled = context?.isNsfwEnabled() ?: false
+            val nsfwEnabled = context?.isNsfwEnabled() ?: true
             val isPotato = context?.let { com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.isPotatoDevice(it) } ?: false
 
             val allRows = homeData.mapNotNull { it?.items }.flatten()
             val totalItems = allRows.sumOf { it.list.size }
 
-            if (!nsfwEnabled && totalItems > 0) {
-                _contentFilterProgress.postValue(ContentFilterProgress(isFiltering = true, current = 0, total = totalItems))
+            val shouldFilter = !nsfwEnabled || (context != null && AppContextUtils.shouldCensorPosters(context))
+            val filterMsg = context?.getString(R.string.content_filtering_in_progress) ?: "Content Filtering in Progress"
+
+            if (shouldFilter && totalItems > 0) {
+                _contentFilterProgress.postValue(ContentFilterProgress(isFiltering = true, current = 0, total = totalItems, message = filterMsg))
             }
 
             var processedCount = 0
@@ -356,17 +359,18 @@ class HomeViewModel : ViewModel() {
                 home?.items?.forEach { list ->
                     val nsfwFiltered = NsfwFilterEngine.filterHomePageList(list, nsfwEnabled)
                     processedCount += list.list.size
-                    if (!nsfwEnabled && totalItems > 0) {
+                    if (shouldFilter && totalItems > 0) {
                         _contentFilterProgress.postValue(
                             ContentFilterProgress(
                                 isFiltering = true,
                                 current = processedCount.coerceAtMost(totalItems),
-                                total = totalItems
+                                total = totalItems,
+                                message = filterMsg
                             )
                         )
                         if (isPotato) {
-                            // Single-threaded pacing for potato (<=2GB) devices
-                            kotlinx.coroutines.delay(10L)
+                            // Single-threaded pacing for potato (<=2GB) devices to prevent CPU/LMK memory spikes
+                            kotlinx.coroutines.delay(12L)
                         }
                     }
                     if (nsfwFiltered != null) {

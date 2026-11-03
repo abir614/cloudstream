@@ -275,7 +275,7 @@ object AppContextUtils {
         if (!nsfwGloballyEnabled) {
             return false
         }
-        return prefs.getBoolean(ctx.getString(R.string.censor_nsfw_posters_key), false)
+        return prefs.getBoolean(ctx.getString(R.string.censor_nsfw_posters_key), true)
     }
 
     fun isNsfwGloballyEnabled(): Boolean {

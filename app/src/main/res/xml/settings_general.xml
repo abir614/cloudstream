@@ -80,7 +80,7 @@
             android:title="@string/nsfw_filter_level_title" />
 
         <SwitchPreference
-            android:defaultValue="false"
+            android:defaultValue="true"
             android:dependency="@string/enable_nsfw_on_providers_key"
             android:icon="@drawable/ic_baseline_warning_24"
             android:key="@string/censor_nsfw_posters_key"

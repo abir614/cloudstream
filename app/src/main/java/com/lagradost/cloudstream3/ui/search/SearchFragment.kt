@@ -246,11 +246,12 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                 val index = pinnedOrder.indexOf(providerName)
                 if (index == -1) Int.MAX_VALUE else index
             })
-            val newItems = sortedList.map { (providerName, providerData) ->
+            val newItems = sortedList.mapNotNull { (providerName, providerData) ->
                 val dataList = providerData.list
                 val dataListFiltered = filterSearchResults(
                     context?.filterSearchResultByFilmQuality(dataList) ?: dataList
                 )
+                if (dataListFiltered.isEmpty()) return@mapNotNull null
                 val homePageList = HomePageList(providerName, dataListFiltered)
                 HomeViewModel.ExpandableHomepageList(
                     homePageList,
@@ -594,11 +595,12 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                 })
 
                 (binding.searchMasterRecycler.adapter as? ParentItemAdapter)?.apply {
-                    val newItems = sortedList.map { (providerName, providerData) ->
+                    val newItems = sortedList.mapNotNull { (providerName, providerData) ->
                         val dataList = providerData.list
                         val dataListFiltered = filterSearchResults(
                             context?.filterSearchResultByFilmQuality(dataList) ?: dataList
                         )
+                        if (dataListFiltered.isEmpty()) return@mapNotNull null
 
                         val homePageList = HomePageList(
                             providerName,

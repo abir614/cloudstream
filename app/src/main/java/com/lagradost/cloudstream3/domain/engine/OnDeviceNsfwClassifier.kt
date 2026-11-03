@@ -272,7 +272,7 @@ object OnDeviceNsfwClassifier {
     ) : Runnable {
         fun onEvicted() {
             // Task was evicted from queue during rapid scrolling.
-            // If the view is still active and bound to this image, display it safely to prevent placeholder stalls.
+            // Check view binding and apply safety guards: never leak unclassified posters when filtering or censoring is active!
             val view = weakImageView.get() ?: return
             val drawable = weakDrawable.get() ?: return
             val currentTag = try {
@@ -289,7 +289,14 @@ object OnDeviceNsfwClassifier {
                         null
                     }
                     if (checkTag == imageKey) {
-                        setSmoothPosterDrawable(activeView, drawable, false)
+                        if (!appContext.isNsfwEnabled()) {
+                            activeView.setImageDrawable(null)
+                            hideParentItem(activeView)
+                        } else if (appContext.shouldCensorPosters()) {
+                            ImageLoader.applyCensoredPoster(activeView)
+                        } else {
+                            setSmoothPosterDrawable(activeView, drawable, false)
+                        }
                     }
                 }
             }
@@ -316,7 +323,7 @@ object OnDeviceNsfwClassifier {
                     return
                 }
 
-                // If device is under severe memory pressure, safely bypass heavy classification
+                // If device is under severe memory pressure, safely guard without leaking unclassified images
                 if (isDeviceUnderMemoryPressure(appContext)) {
                     mainHandler.post {
                         val activeView = weakImageView.get() ?: return@post
@@ -326,7 +333,14 @@ object OnDeviceNsfwClassifier {
                             null
                         }
                         if (checkTag == imageKey) {
-                            setSmoothPosterDrawable(activeView, drawable, false)
+                            if (!appContext.isNsfwEnabled()) {
+                                activeView.setImageDrawable(null)
+                                hideParentItem(activeView)
+                            } else if (appContext.shouldCensorPosters()) {
+                                ImageLoader.applyCensoredPoster(activeView)
+                            } else {
+                                setSmoothPosterDrawable(activeView, drawable, false)
+                            }
                         }
                     }
                     return
@@ -350,6 +364,12 @@ object OnDeviceNsfwClassifier {
                                 hideParentItem(activeView)
                             } else if (appContext.shouldCensorPosters()) {
                                 ImageLoader.applyCensoredPoster(activeView)
+                            } else {
+                                setSmoothPosterDrawable(
+                                    activeView,
+                                    drawable,
+                                    DeviceProfile.tier(activeView.context) != DeviceTier.LOW
+                                )
                             }
                         } else {
                             setSmoothPosterDrawable(
@@ -366,38 +386,64 @@ object OnDeviceNsfwClassifier {
         }
     }
 
-    // Dedicated background executor with bounded queue and smart eviction
-    private val workerExecutor = ThreadPoolExecutor(
-        1,
-        1,
-        0L,
-        TimeUnit.MILLISECONDS,
-        LinkedBlockingQueue<Runnable>(MAX_QUEUE_CAPACITY),
-        { runnable ->
-            Thread {
-                try {
-                    Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
-                } catch (_: Throwable) {
-                }
-                runnable.run()
-            }.apply {
-                name = "cs-nsfw-ai-worker"
-                isDaemon = true
-            }
-        },
-        RejectedExecutionHandler { r, executor ->
-            if (!executor.isShutdown) {
-                val evicted = executor.queue.poll()
-                if (evicted is SafeClassificationTask) {
-                    evicted.onEvicted()
-                }
-                try {
-                    executor.execute(r)
-                } catch (_: Throwable) {
-                }
-            }
+    // Hardware-adaptive background executor with bounded queue and smart eviction
+    private val workerExecutor by lazy {
+        createAdaptiveWorkerExecutor()
+    }
+
+    private fun createAdaptiveWorkerExecutor(): ThreadPoolExecutor {
+        val ctx = CloudStreamApp.context
+        val isPotato = ctx?.let { isPotatoDevice(it) } ?: false
+        val tier = ctx?.let { DeviceProfile.tier(it) } ?: DeviceTier.MID
+
+        val (threads, queueCap) = when {
+            isPotato || tier == DeviceTier.LOW -> Pair(1, 16)
+            tier == DeviceTier.HIGH -> Pair(
+                Runtime.getRuntime().availableProcessors().coerceIn(3, 4),
+                128
+            )
+            else -> Pair(2, 48)
         }
-    )
+
+        return ThreadPoolExecutor(
+            threads,
+            threads,
+            60L,
+            TimeUnit.SECONDS,
+            LinkedBlockingQueue<Runnable>(queueCap),
+            { runnable ->
+                Thread {
+                    try {
+                        val prio = if (tier == DeviceTier.HIGH) {
+                            Process.THREAD_PRIORITY_DEFAULT
+                        } else {
+                            Process.THREAD_PRIORITY_BACKGROUND
+                        }
+                        Process.setThreadPriority(prio)
+                    } catch (_: Throwable) {
+                    }
+                    runnable.run()
+                }.apply {
+                    name = "cs-nsfw-ai-worker"
+                    isDaemon = true
+                }
+            },
+            RejectedExecutionHandler { r, executor ->
+                if (!executor.isShutdown) {
+                    val evicted = executor.queue.poll()
+                    if (evicted is SafeClassificationTask) {
+                        evicted.onEvicted()
+                    }
+                    try {
+                        executor.execute(r)
+                    } catch (_: Throwable) {
+                    }
+                }
+            }
+        ).apply {
+            allowCoreThreadTimeOut(true)
+        }
+    }
 
     /**
      * Checks if the device is currently experiencing critical memory pressure.
@@ -668,6 +714,8 @@ object OnDeviceNsfwClassifier {
                     hideParentItem(imageView)
                 } else if (appContext.shouldCensorPosters()) {
                     ImageLoader.applyCensoredPoster(imageView)
+                } else {
+                    setSmoothPosterDrawable(imageView, drawable, DeviceProfile.tier(imageView.context) != DeviceTier.LOW)
                 }
             } else {
                 setSmoothPosterDrawable(imageView, drawable, DeviceProfile.tier(imageView.context) != DeviceTier.LOW)
@@ -685,15 +733,29 @@ object OnDeviceNsfwClassifier {
             return
         }
 
-        // Fast fallback if device is under memory pressure
+        // Fast fallback if device is under memory pressure: strictly sanitize without leaking
         if (isDeviceUnderMemoryPressure(appContext)) {
-            setSmoothPosterDrawable(imageView, drawable, false)
+            if (!appContext.isNsfwEnabled()) {
+                imageView.setImageDrawable(null)
+                hideParentItem(imageView)
+            } else if (appContext.shouldCensorPosters()) {
+                ImageLoader.applyCensoredPoster(imageView)
+            } else {
+                setSmoothPosterDrawable(imageView, drawable, false)
+            }
             return
         }
 
         // Potato / low-tier device scroll protection: throttle background worker queue to maintain smooth 60fps scrolling
-        if (isPotatoDevice(appContext) && workerExecutor.queue.size >= 4) {
-            setSmoothPosterDrawable(imageView, drawable, false)
+        if (isPotatoDevice(appContext) && workerExecutor.queue.size >= 8) {
+            if (!appContext.isNsfwEnabled()) {
+                imageView.setImageDrawable(null)
+                hideParentItem(imageView)
+            } else if (appContext.shouldCensorPosters()) {
+                ImageLoader.applyCensoredPoster(imageView)
+            } else {
+                setSmoothPosterDrawable(imageView, drawable, false)
+            }
             return
         }
 
@@ -709,8 +771,15 @@ object OnDeviceNsfwClassifier {
                 )
             )
         } catch (_: Throwable) {
-            // If submission fails due to executor rejection, safely apply drawable directly
-            setSmoothPosterDrawable(imageView, drawable, false)
+            // If submission fails due to executor rejection, safely apply safe fallback
+            if (!appContext.isNsfwEnabled()) {
+                imageView.setImageDrawable(null)
+                hideParentItem(imageView)
+            } else if (appContext.shouldCensorPosters()) {
+                ImageLoader.applyCensoredPoster(imageView)
+            } else {
+                setSmoothPosterDrawable(imageView, drawable, false)
+            }
         }
     }
 

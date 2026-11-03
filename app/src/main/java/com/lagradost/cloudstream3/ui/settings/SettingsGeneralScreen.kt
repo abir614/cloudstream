@@ -273,7 +273,7 @@ object SettingsGeneralScreen : SearchableSettings {
                         title = stringResource(R.string.nsfw_filter_level_title),
                         subtitle = sensitivitySummary,
                         icon = painterResource(R.drawable.ic_baseline_tune_24),
-                        enabled = !nsfwGloballyEnabled,
+                        enabled = true,
                         onClick = {
                             val act = (context as? Activity)
                                 ?: com.lagradost.cloudstream3.CommonActivity.activity
@@ -295,7 +295,7 @@ object SettingsGeneralScreen : SearchableSettings {
                         subtitle = stringResource(R.string.censor_nsfw_posters_summary),
                         icon = painterResource(R.drawable.ic_baseline_warning_24),
                         preference = settings.general.censorNsfwPosters,
-                        enabled = !nsfwGloballyEnabled,
+                        enabled = nsfwGloballyEnabled,
                         onValueChanged = {
                             com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.clearCache()
                             com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()

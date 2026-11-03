@@ -536,8 +536,8 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
         context?.let { ctx ->
             val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
             val isAdult = settingsManager.getBoolean(getString(R.string.enable_nsfw_on_providers_key), true)
-            getPref(R.string.nsfw_filter_level_key)?.isEnabled = !isAdult
-            getPref(R.string.censor_nsfw_posters_key)?.isEnabled = !isAdult
+            getPref(R.string.nsfw_filter_level_key)?.isEnabled = true
+            getPref(R.string.censor_nsfw_posters_key)?.isEnabled = isAdult
 
             val currentLevel =
                 settingsManager.getString(getString(R.string.nsfw_filter_level_key), "moderate") ?: "moderate"

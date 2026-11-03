@@ -345,18 +345,20 @@ class SearchViewModel : ViewModel() {
                                 if (search is Resource.Success) {
                                     val searchValue = search.value
                                     val filteredItems = NsfwFilterEngine.filterSearchResults(searchValue.items, nsfwEnabled)
-                                    expandableSearches[a.name] =
-                                        ExpandableSearchList(filteredItems, 1, searchValue.hasNext)
+                                    if (filteredItems.isNotEmpty()) {
+                                        expandableSearches[a.name] =
+                                            ExpandableSearchList(filteredItems, 1, searchValue.hasNext)
 
-                                    val snapshot = expandableSearches.toMap()
-                                    _currentSearch.postValue(snapshot)
+                                        val snapshot = expandableSearches.toMap()
+                                        _currentSearch.postValue(snapshot)
 
-                                    // Progressive batch update for search grid (debounced every 350ms)
-                                    val now = System.currentTimeMillis()
-                                    if (now - lastProgressivePostMs >= 350L) {
-                                        lastProgressivePostMs = now
-                                        val partialList = bundleSearch(snapshot, query, nsfwEnabled)
-                                        _searchResponse.postValue(Resource.Success(partialList))
+                                        // Progressive batch update for search grid (debounced every 350ms)
+                                        val now = System.currentTimeMillis()
+                                        if (now - lastProgressivePostMs >= 350L) {
+                                            lastProgressivePostMs = now
+                                            val partialList = bundleSearch(snapshot, query, nsfwEnabled)
+                                            _searchResponse.postValue(Resource.Success(partialList))
+                                        }
                                     }
                                 }
                             }

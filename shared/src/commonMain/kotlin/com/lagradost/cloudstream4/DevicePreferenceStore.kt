@@ -210,9 +210,9 @@ class GeneralPreferences(preferences: PreferenceStore) {
     val batterOptimization = preferences.getBoolean("battery_optimisation_key", false)
 
     /** Content & Family Safety: Allow adult/NSFW 18+ content */
-    val enableNsfw = preferences.getBoolean("enable_nsfw_on_providers_key", false)
+    val enableNsfw = preferences.getBoolean("enable_nsfw_on_providers_key", true)
     val nsfwFilterLevel = preferences.getString("nsfw_filter_level_key", "moderate")
-    val censorNsfwPosters = preferences.getBoolean("censor_nsfw_posters_key", false)
+    val censorNsfwPosters = preferences.getBoolean("censor_nsfw_posters_key", true)
     val visualThresholdExtreme = preferences.getFloat("nsfw_visual_threshold_extreme_key", 0.15f)
     val visualThresholdModerate = preferences.getFloat("nsfw_visual_threshold_moderate_key", 0.30f)
     val visualThresholdLow = preferences.getFloat("nsfw_visual_threshold_low_key", 0.55f)
