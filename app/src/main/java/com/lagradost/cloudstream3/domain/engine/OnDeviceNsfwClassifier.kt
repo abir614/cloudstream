@@ -833,11 +833,17 @@ object OnDeviceNsfwClassifier {
     private fun borrowSession(ctx: Context): InferenceSession? {
         sessionPool.poll()?.let { return it }
         val max = maxSessions
-        if (activeSessionCount.get() < max) {
-            val session = createInferenceSession(ctx)
-            if (session != null) {
-                activeSessionCount.incrementAndGet()
-                return session
+        while (true) {
+            val current = activeSessionCount.get()
+            if (current >= max) break
+            if (activeSessionCount.compareAndSet(current, current + 1)) {
+                val session = createInferenceSession(ctx)
+                if (session != null) {
+                    return session
+                } else {
+                    activeSessionCount.decrementAndGet()
+                    break
+                }
             }
         }
         // If all sessions are currently checked out, briefly wait for one to be returned (up to 60ms)
@@ -854,7 +860,15 @@ object OnDeviceNsfwClassifier {
     }
 
     private fun returnSession(session: InferenceSession) {
-        sessionPool.offer(session)
+        if (sharedModelBuffer == null) {
+            try {
+                session.release()
+            } catch (_: Throwable) {
+            }
+            activeSessionCount.decrementAndGet()
+        } else {
+            sessionPool.offer(session)
+        }
     }
 
     /**
