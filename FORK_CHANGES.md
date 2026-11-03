@@ -140,11 +140,16 @@ This document catalogues all intentional architectural deviations, security hard
 
 - **Hybrid Filtering**: Hybrid Rust native token analysis and JVM token matching.
 - **Anime Disguise Detection**: Reliably identifies hentai tagged as `TvType.Anime` or `TvType.OVA` by title tokens, URL slug analysis, adult studio markers, and tags without false positives on clean mainstream anime (e.g. Attack on Titan, Hunter x Hunter, Assassination Classroom, Spy x Family, Frieren, Demon Slayer).
-- **Default-Off Safety**: Adult content is filtered out by default on Feed, Carousel, Search, and Extension discovery. Unlocked only when user explicitly toggles `enable_nsfw_on_providers_key`.
-- **500MB Potato Device & Android TV Optimization ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
-  - On devices with $\le 1024\text{ MB}$ total RAM, `isLowRamDevice` (Android Go), or `DeviceTier.LOW`, heavy TFLite native tensor arenas (35MB+ native RAM) are completely bypassed in favor of a zero-allocation, sub-millisecond (< 0.05ms) multi-spectrum skin chrominance analyzer (`classifyPotatoFastScore`) consuming $< 15\text{ KB}$ heap on a static 48×48 RGB_565 scratchpad.
-  - **Backdrop and Noise Rejection**: Dual-zone ratio evaluation rejects monochromatic yellow/gold/beige poster art (> 60% uniform upper and body skin hue) and dispersed noise (< 22% concentrated row skin density), guaranteeing clean mainstream media is never falsely blocked.
-  - **Butter-Smooth 60/120fps UI**: safe `WeakReference<Drawable>` task queuing with active scroll throttling prevents GC sweeps and eliminates frame stuttering even during rapid remote scrolling. Full TV D-pad focus grid geometry is preserved to prevent Leanback remote navigation crashes.
+- **Default-On Content**: Adult content is enabled by default on Feed, Carousel, Search, and Extension discovery (`enable_nsfw_on_providers_key` defaults to `true`).
+- **1GB/2GB Potato Device Hardening ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
+  - Devices with $\le 2200\text{ MB}$ total RAM, `isLowRamDevice` (Android Go), or `DeviceTier.LOW` bypass heavy TFLite native tensor arenas (35MB+ native RAM) in favor of the zero-native-allocation multi-spectrum skin chrominance analyzer (`classifyPotatoFastScore`) operating on a tiny 48×48 RGB_565 scratchpad.
+  - **Single-Threaded Pacing**: Single-threaded worker daemon with deliberate 35ms sleep pacing on potato devices eliminates CPU spikes and gives Android's GC room to collect, preventing Low Memory Killer (`LMK`) terminations on 1GB and 2GB TV sticks and phones.
+  - **OOM-Proof Hardware Bitmaps**: Bitmaps with `Bitmap.Config.HARDWARE` are downscaled directly to 48×48 instead of creating full-size 8MB copies, eliminating out-of-memory errors on cheap devices.
+- **Content Filtering Progress Indicator**: Real-time "Content Filtering in Progress (X%)" loading screen with horizontal progress bar so users know exactly how much work remains during content scan passes.
+- **Player Language Source Auto-Loading & Episode Continuity ([`GeneratorPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/GeneratorPlayer.kt))**:
+  - Automatically loads the video source matching the user's Primary Audio Language selected in player settings by default.
+  - If a source in that language is not explicitly available, falls back to sources labeled with `"dub"` or `"dubbed"` (e.g. anime dubs), then to the user's Secondary Audio Language.
+  - **Episode Continuity**: If the user explicitly selects a specific source in a previous episode, that choice is strictly preserved and matched across all subsequent episodes.
 
 ---
 

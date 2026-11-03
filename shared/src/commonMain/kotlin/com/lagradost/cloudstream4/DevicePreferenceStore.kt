@@ -154,7 +154,7 @@ class ProviderPreferences(preferences: PreferenceStore) {
     )
 
     val enableNsfw = preferences.getBoolean(
-        "enable_nsfw_on_providers_key", false
+        "enable_nsfw_on_providers_key", true
     )
 }
 

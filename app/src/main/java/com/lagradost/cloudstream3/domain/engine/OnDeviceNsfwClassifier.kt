@@ -116,7 +116,7 @@ object OnDeviceNsfwClassifier {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Checks if the device is a potato device (≤ 1024MB RAM, Android Go, or Low Tier).
+     * Checks if the device is a potato device (≤ 2200MB RAM, Android Go, or Low Tier).
      * On potato devices, the heavy 5.7MB TFLite model and native tensor arenas are completely bypassed
      * to save 35MB+ RAM and eliminate OOM crashes and native SIMD SIGILL/SIGSEGV traps.
      */
@@ -127,7 +127,8 @@ object OnDeviceNsfwClassifier {
         val mi = ActivityManager.MemoryInfo()
         am?.getMemoryInfo(mi)
         val totalMb = if (mi.totalMem > 0) mi.totalMem / (1024 * 1024) else 1024L
-        return totalMb <= 1024L
+        if (totalMb <= 2200L) return true
+        return DeviceProfile.isLowEnd(ctx) || DeviceProfile.isUltraPotato(ctx)
     }
 
     private fun getPotatoCanvas(): Canvas? {
@@ -160,7 +161,11 @@ object OnDeviceNsfwClassifier {
                     val b = drawable.bitmap
                     if (b == null || b.isRecycled) return 0.0f
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
-                        val copy = try { b.copy(Bitmap.Config.ARGB_8888, false) } catch (_: Throwable) { null }
+                        val copy = try {
+                            Bitmap.createScaledBitmap(b, POTATO_DIM, POTATO_DIM, true)
+                        } catch (_: Throwable) {
+                            try { b.copy(Bitmap.Config.RGB_565, false) } catch (_: Throwable) { null }
+                        }
                         if (copy != null) {
                             try {
                                 canvas.drawBitmap(copy, null, potatoRect, potatoPaint)
@@ -292,6 +297,14 @@ object OnDeviceNsfwClassifier {
 
         override fun run() {
             try {
+                if (isPotatoDevice(appContext)) {
+                    // Pacing on potato devices (<=2GB RAM): deliberate pacing to ensure zero CPU/LMK spikes
+                    try {
+                        Thread.sleep(35L)
+                    } catch (_: InterruptedException) {
+                    }
+                }
+
                 val currentView = weakImageView.get() ?: return
                 val drawable = weakDrawable.get() ?: return
                 val activeTag = try {
@@ -579,7 +592,11 @@ object OnDeviceNsfwClassifier {
                 val b = drawable.bitmap
                 if (b == null || b.isRecycled) return 0.0f
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
-                    val copy = try { b.copy(Bitmap.Config.ARGB_8888, false) } catch (_: Throwable) { null }
+                    val copy = try {
+                        Bitmap.createScaledBitmap(b, INPUT_DIM, INPUT_DIM, true)
+                    } catch (_: Throwable) {
+                        try { b.copy(Bitmap.Config.ARGB_8888, false) } catch (_: Throwable) { null }
+                    }
                     if (copy != null) {
                         try {
                             canvas.drawBitmap(copy, null, scratchRect, scratchPaint)
@@ -674,8 +691,8 @@ object OnDeviceNsfwClassifier {
             return
         }
 
-        // Low-tier device scroll protection: throttle background worker queue to maintain smooth 60fps scrolling
-        if (DeviceProfile.isLowEnd(appContext) && workerExecutor.queue.size >= 4) {
+        // Potato / low-tier device scroll protection: throttle background worker queue to maintain smooth 60fps scrolling
+        if (isPotatoDevice(appContext) && workerExecutor.queue.size >= 4) {
             setSmoothPosterDrawable(imageView, drawable, false)
             return
         }

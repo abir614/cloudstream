@@ -34,7 +34,20 @@
                 android:indeterminate="true"
                 android:indeterminateTint="?attr/colorPrimary" />
 
+            <ProgressBar
+                android:id="@+id/home_filtering_progress_bar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="280dp"
+                android:layout_height="10dp"
+                android:layout_marginTop="10dp"
+                android:indeterminate="false"
+                android:progressTint="?attr/colorPrimary"
+                android:visibility="gone"
+                tools:visibility="visible"
+                tools:progress="45" />
+
             <TextView
+                android:id="@+id/home_loading_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"

@@ -208,6 +208,16 @@ class HomeViewModel : ViewModel() {
         var hasNext: Boolean,
     )
 
+    data class ContentFilterProgress(
+        val isFiltering: Boolean,
+        val current: Int = 0,
+        val total: Int = 0,
+        val message: String = "Content Filtering in Progress"
+    )
+
+    private val _contentFilterProgress = MutableLiveData<ContentFilterProgress?>()
+    val contentFilterProgress: LiveData<ContentFilterProgress?> = _contentFilterProgress
+
     private val expandable: MutableMap<String, ExpandableHomepageList> = mutableMapOf()
     private val _page =
         MutableLiveData<Resource<Map<String, ExpandableHomepageList>>>(Resource.Loading())
@@ -332,9 +342,33 @@ class HomeViewModel : ViewModel() {
         try {
             expandable.clear()
             val nsfwEnabled = context?.isNsfwEnabled() ?: false
+            val isPotato = context?.let { com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.isPotatoDevice(it) } ?: false
+
+            val allRows = homeData.mapNotNull { it?.items }.flatten()
+            val totalItems = allRows.sumOf { it.list.size }
+
+            if (!nsfwEnabled && totalItems > 0) {
+                _contentFilterProgress.postValue(ContentFilterProgress(isFiltering = true, current = 0, total = totalItems))
+            }
+
+            var processedCount = 0
             homeData.forEach { home ->
                 home?.items?.forEach { list ->
                     val nsfwFiltered = NsfwFilterEngine.filterHomePageList(list, nsfwEnabled)
+                    processedCount += list.list.size
+                    if (!nsfwEnabled && totalItems > 0) {
+                        _contentFilterProgress.postValue(
+                            ContentFilterProgress(
+                                isFiltering = true,
+                                current = processedCount.coerceAtMost(totalItems),
+                                total = totalItems
+                            )
+                        )
+                        if (isPotato) {
+                            // Single-threaded pacing for potato (<=2GB) devices
+                            kotlinx.coroutines.delay(10L)
+                        }
+                    }
                     if (nsfwFiltered != null) {
                         val filteredList =
                             context?.filterHomePageListByFilmQuality(nsfwFiltered) ?: nsfwFiltered
@@ -349,6 +383,8 @@ class HomeViewModel : ViewModel() {
                     }
                 }
             }
+
+            _contentFilterProgress.postValue(null)
 
             // Render home sections IMMEDIATELY without waiting for preview banner detail scrapes!
             _page.postValue(Resource.Success(expandable))

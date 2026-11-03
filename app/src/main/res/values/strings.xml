@@ -404,7 +404,8 @@
     <string name="preferred_media_settings">Preferred media</string>
     <string name="pref_category_content_safety">Content &amp; Family Safety</string>
     <string name="enable_nsfw_on_providers">Show Adult (18+) / NSFW Content</string>
-    <string name="enable_nsfw_summary">Allow adult content in searches, categories, and filters (disabled by default)</string>
+    <string name="enable_nsfw_summary">Allow adult content in searches, categories, and filters (enabled by default)</string>
+    <string name="content_filtering_in_progress">Content Filtering in Progress</string>
     <string name="nsfw_filter_level_title">NSFW Filter Sensitivity</string>
     <string name="nsfw_filter_level_summary">Configure adult content detection sensitivity level</string>
     <string-array name="nsfw_filter_level_entries">

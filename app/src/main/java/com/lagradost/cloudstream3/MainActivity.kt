@@ -1196,7 +1196,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
         val settingsForProvider = SettingsJson()
         settingsForProvider.enableAdult =
-            settingsManager.getBoolean(getString(R.string.enable_nsfw_on_providers_key), false)
+            settingsManager.getBoolean(getString(R.string.enable_nsfw_on_providers_key), true)
 
         MainAPI.settingsForProvider = settingsForProvider
 

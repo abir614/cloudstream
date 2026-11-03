@@ -801,6 +801,25 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             }
         }
 
+        observe(homeViewModel.contentFilterProgress) { progress ->
+            binding.apply {
+                if (progress != null && progress.isFiltering) {
+                    homeLoading.isVisible = true
+                    homeLoadingIndicator.isVisible = true
+                    homeLoadingProgress.isGone = true
+                    homeFilteringProgressBar.isVisible = true
+                    homeFilteringProgressBar.max = progress.total.coerceAtLeast(1)
+                    homeFilteringProgressBar.progress = progress.current
+                    val percent = if (progress.total > 0) (progress.current * 100 / progress.total).coerceIn(0, 100) else 0
+                    homeLoadingText.text = "${progress.message} ($percent%)"
+                } else {
+                    homeFilteringProgressBar.isGone = true
+                    homeLoadingProgress.isVisible = true
+                    homeLoadingText.text = getString(R.string.loading)
+                }
+            }
+        }
+
         observe(homeViewModel.page) { data ->
             binding.apply {
                 if (isLayout(TV or EMULATOR)) {

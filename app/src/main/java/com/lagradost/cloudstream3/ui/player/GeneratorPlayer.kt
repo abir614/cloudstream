@@ -239,30 +239,128 @@ class GeneratorPlayer : FullScreenPlayer() {
     private var preferredSubtitleId: String? = null
     private var preferredSubtitleDisabled: Boolean = false
 
+    private fun isDubLink(link: DisplayLink): Boolean {
+        val ext = link.link.first ?: return false
+        val dubRegex = Regex("""\b(dub|dubbed|dual[\s_-]*audio)\b""", RegexOption.IGNORE_CASE)
+        return dubRegex.containsMatchIn(ext.name) ||
+                dubRegex.containsMatchIn(ext.source) ||
+                dubRegex.containsMatchIn(ext.url) ||
+                dubRegex.containsMatchIn(link.name)
+    }
+
+    private fun findLinkMatchingLanguage(candidateLinks: List<DisplayLink>, targetLang: String): DisplayLink? {
+        if (targetLang.isBlank() || targetLang == "none") return null
+
+        val targetMetadata: SubtitleHelper.LanguageMetadata? = SubtitleHelper.getLanguageDataFromCode(targetLang)
+            ?: SubtitleHelper.languages.find {
+                it.IETF_tag.equals(targetLang, ignoreCase = true) ||
+                it.ISO_639_1.equals(targetLang, ignoreCase = true) ||
+                it.ISO_639_2_B.equals(targetLang, ignoreCase = true) ||
+                it.ISO_639_3.equals(targetLang, ignoreCase = true) ||
+                it.languageName.equals(targetLang, ignoreCase = true) ||
+                it.nativeName.equals(targetLang, ignoreCase = true)
+            }
+
+        val namesToCheck = mutableListOf(targetLang)
+        if (targetMetadata != null) {
+            namesToCheck.addAll(listOfNotNull(
+                targetMetadata.languageName,
+                targetMetadata.nativeName,
+                targetMetadata.ISO_639_1,
+                targetMetadata.ISO_639_2_B,
+                targetMetadata.ISO_639_3,
+                targetMetadata.IETF_tag
+            ))
+        }
+
+        // Common language abbreviations and regional tokens
+        if (targetLang.equals("en", ignoreCase = true) || targetMetadata?.ISO_639_1.equals("en", ignoreCase = true)) {
+            namesToCheck.addAll(listOf("eng", "english", "dub", "dubbed"))
+        } else if (targetLang.equals("es", ignoreCase = true) || targetMetadata?.ISO_639_1.equals("es", ignoreCase = true)) {
+            namesToCheck.addAll(listOf("spa", "spanish", "español", "latino", "castellano"))
+        } else if (targetLang.equals("ja", ignoreCase = true) || targetMetadata?.ISO_639_1.equals("ja", ignoreCase = true)) {
+            namesToCheck.addAll(listOf("jpn", "japanese", "nihongo", "sub", "raw"))
+        } else if (targetLang.equals("fr", ignoreCase = true) || targetMetadata?.ISO_639_1.equals("fr", ignoreCase = true)) {
+            namesToCheck.addAll(listOf("fra", "french", "français", "vf", "vostfr"))
+        } else if (targetLang.equals("de", ignoreCase = true) || targetMetadata?.ISO_639_1.equals("de", ignoreCase = true)) {
+            namesToCheck.addAll(listOf("deu", "ger", "german", "deutsch"))
+        } else if (targetLang.equals("it", ignoreCase = true) || targetMetadata?.ISO_639_1.equals("it", ignoreCase = true)) {
+            namesToCheck.addAll(listOf("ita", "italian", "italiano"))
+        } else if (targetLang.equals("pt", ignoreCase = true) || targetMetadata?.ISO_639_1.equals("pt", ignoreCase = true)) {
+            namesToCheck.addAll(listOf("por", "portuguese", "português", "dublado"))
+        } else if (targetLang.equals("ru", ignoreCase = true) || targetMetadata?.ISO_639_1.equals("ru", ignoreCase = true)) {
+            namesToCheck.addAll(listOf("rus", "russian", "русский"))
+        } else if (targetLang.equals("hi", ignoreCase = true) || targetMetadata?.ISO_639_1.equals("hi", ignoreCase = true)) {
+            namesToCheck.addAll(listOf("hin", "hindi"))
+        }
+
+        return candidateLinks.find { candidate ->
+            val ext = candidate.link.first ?: return@find false
+            if (ext.audioTracks.any { track -> matchesLanguage(track.language, track.label, targetLang) }) {
+                return@find true
+            }
+
+            namesToCheck.any { name ->
+                ext.name.contains(name, ignoreCase = true) ||
+                ext.source.contains(name, ignoreCase = true) ||
+                ext.url.contains(name, ignoreCase = true) ||
+                candidate.name.contains(name, ignoreCase = true)
+            }
+        }
+    }
+
     private fun findPreferredLink(candidateLinks: List<DisplayLink>): DisplayLink? {
         val seriesKey = currentSeriesKey
-        val remSource = preferredVideoSource ?: (seriesKey?.let { getKey<String>(SHOW_LINK_SOURCE_PREFIX + it) }) ?: return null
+        val remSource = preferredVideoSource ?: (seriesKey?.let { getKey<String>(SHOW_LINK_SOURCE_PREFIX + it) })
         val remName = preferredVideoSourceName ?: (seriesKey?.let { getKey<String>(SHOW_LINK_NAME_PREFIX + it) })
         val remQuality = preferredVideoSourceQuality ?: (seriesKey?.let { getKey<Int>(SHOW_LINK_QUALITY_PREFIX + it) })
 
-        // 1. Exact source AND name match (highest fidelity)
-        if (!remName.isNullOrBlank()) {
-            val match = candidateLinks.find {
-                it.link.first?.source == remSource && it.link.first?.name.equals(remName, ignoreCase = true)
+        // 1. Explicit user selection in previous episode / series takes HIGHEST PRIORITY
+        if (!remSource.isNullOrBlank()) {
+            // 1a. Exact source AND name match (highest fidelity)
+            if (!remName.isNullOrBlank()) {
+                val match = candidateLinks.find {
+                    it.link.first?.source == remSource && it.link.first?.name.equals(remName, ignoreCase = true)
+                }
+                if (match != null) return match
             }
-            if (match != null) return match
+
+            // 1b. Exact source AND quality match
+            if (remQuality != null && remQuality > 0) {
+                val match = candidateLinks.find {
+                    it.link.first?.source == remSource && it.link.first?.quality == remQuality
+                }
+                if (match != null) return match
+            }
+
+            // 1c. Same source/extractor match
+            val sourceMatch = candidateLinks.find { it.link.first?.source == remSource }
+            if (sourceMatch != null) return sourceMatch
         }
 
-        // 2. Exact source AND quality match
-        if (remQuality != null && remQuality > 0) {
-            val match = candidateLinks.find {
-                it.link.first?.source == remSource && it.link.first?.quality == remQuality
-            }
-            if (match != null) return match
+        // 2. Default source selection based on Player Language Settings
+        val ctx = context ?: return null
+        val settingsManager = PreferenceManager.getDefaultSharedPreferences(ctx)
+        val primaryAudio = settingsManager.getString(ctx.getString(R.string.primary_audio_language_key), null)
+        val secondaryAudio = settingsManager.getString(ctx.getString(R.string.secondary_audio_language_key), null)
+
+        // 2a. Match Primary Audio Language chosen by user
+        if (!primaryAudio.isNullOrBlank() && primaryAudio != "none") {
+            val primaryMatch = findLinkMatchingLanguage(candidateLinks, primaryAudio)
+            if (primaryMatch != null) return primaryMatch
         }
 
-        // 3. Same source/extractor match
-        return candidateLinks.find { it.link.first?.source == remSource }
+        // 2b. If cannot find desired source, try finding sources with "dub"
+        val dubMatch = candidateLinks.find { isDubLink(it) }
+        if (dubMatch != null) return dubMatch
+
+        // 2c. Fallback to Secondary Audio Language chosen by user
+        if (!secondaryAudio.isNullOrBlank() && secondaryAudio != "none") {
+            val secondaryMatch = findLinkMatchingLanguage(candidateLinks, secondaryAudio)
+            if (secondaryMatch != null) return secondaryMatch
+        }
+
+        return null
     }
     private val allMeta: List<ResultEpisode>?
         get() = viewModel.state.generatorState?.allMeta?.filterIsInstance<ResultEpisode>()
