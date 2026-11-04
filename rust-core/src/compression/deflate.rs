@@ -58,7 +58,10 @@ mod tests {
     fn test_deflate_compression_ratio_on_repetitive_data() {
         let repetitive = "#EXTM3U\n#EXTINF:-1 tvg-id=\"1\" group-title=\"Live\",Channel 1\nhttp://example.com/live/1.m3u8\n".repeat(100);
         let compressed = compress_string(&repetitive);
-        assert!(compressed.len() < repetitive.len() / 4, "Repetitive data should compress by at least 75%");
+        assert!(
+            compressed.len() < repetitive.len() / 4,
+            "Repetitive data should compress by at least 75%"
+        );
         let restored = decompress_string(&compressed).expect("restoration must succeed");
         assert_eq!(restored, repetitive);
     }

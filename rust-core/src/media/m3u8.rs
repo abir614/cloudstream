@@ -208,7 +208,10 @@ https://stream.server.com/espn/live.m3u8
         assert_eq!(channels.len(), 2);
         assert_eq!(channels[0].name, "CNN HD");
         assert_eq!(channels[0].tvg_id.as_deref(), Some("cnn.us"));
-        assert_eq!(channels[0].logo.as_deref(), Some("https://logo.com/cnn.png"));
+        assert_eq!(
+            channels[0].logo.as_deref(),
+            Some("https://logo.com/cnn.png")
+        );
         assert_eq!(channels[0].group.as_deref(), Some("News"));
         assert_eq!(channels[0].url, "https://stream.server.com/cnn/live.m3u8");
     }

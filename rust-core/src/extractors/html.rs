@@ -20,9 +20,15 @@ pub fn extract_media_links(html: &str) -> Vec<ExtractedMediaLink> {
 
     while offset < html.len() {
         // Find next tag occurrence among iframe, video, source
-        let next_iframe = lower[offset..].find("<iframe").map(|i| (offset + i, "iframe"));
-        let next_video = lower[offset..].find("<video").map(|i| (offset + i, "video"));
-        let next_source = lower[offset..].find("<source").map(|i| (offset + i, "source"));
+        let next_iframe = lower[offset..]
+            .find("<iframe")
+            .map(|i| (offset + i, "iframe"));
+        let next_video = lower[offset..]
+            .find("<video")
+            .map(|i| (offset + i, "video"));
+        let next_source = lower[offset..]
+            .find("<source")
+            .map(|i| (offset + i, "source"));
 
         let candidates = [next_iframe, next_video, next_source];
         let next_match = candidates

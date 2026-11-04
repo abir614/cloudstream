@@ -77,10 +77,22 @@ fn test_url_sanitizer_and_resolver() {
 
     // Relative URL resolution
     let base = "https://media.server.com/hls/movies/2026/master.m3u8";
-    assert_eq!(resolve_url(base, "segment001.ts"), "https://media.server.com/hls/movies/2026/segment001.ts");
-    assert_eq!(resolve_url(base, "/subtitles/eng.srt"), "https://media.server.com/subtitles/eng.srt");
-    assert_eq!(resolve_url(base, "//cdn2.server.com/audio.aac"), "https://cdn2.server.com/audio.aac");
-    assert_eq!(resolve_url(base, "https://external.cdn/stream.m3u8"), "https://external.cdn/stream.m3u8");
+    assert_eq!(
+        resolve_url(base, "segment001.ts"),
+        "https://media.server.com/hls/movies/2026/segment001.ts"
+    );
+    assert_eq!(
+        resolve_url(base, "/subtitles/eng.srt"),
+        "https://media.server.com/subtitles/eng.srt"
+    );
+    assert_eq!(
+        resolve_url(base, "//cdn2.server.com/audio.aac"),
+        "https://cdn2.server.com/audio.aac"
+    );
+    assert_eq!(
+        resolve_url(base, "https://external.cdn/stream.m3u8"),
+        "https://external.cdn/stream.m3u8"
+    );
 }
 
 // ============================================================================
@@ -90,36 +102,130 @@ fn test_url_sanitizer_and_resolver() {
 #[test]
 fn test_nsfw_text_and_guardian_matrix() {
     // 1. Explicit anime & hentai titles
-    assert!(is_nsfw_text("High School DxD Born", "https://stream.to/ep1", None));
-    assert!(is_nsfw_text("Overflow Uncensored", "https://stream.to/ep2", None));
-    assert!(is_nsfw_text("Episode 1", "https://site.to/video", Some("Ecchi, Harem")));
-    assert!(is_nsfw_text("Random", "https://site.to/r18/video.m3u8", None));
+    assert!(is_nsfw_text(
+        "High School DxD Born",
+        "https://stream.to/ep1",
+        None
+    ));
+    assert!(is_nsfw_text(
+        "Overflow Uncensored",
+        "https://stream.to/ep2",
+        None
+    ));
+    assert!(is_nsfw_text(
+        "Episode 1",
+        "https://site.to/video",
+        Some("Ecchi, Harem")
+    ));
+    assert!(is_nsfw_text(
+        "Random",
+        "https://site.to/r18/video.m3u8",
+        None
+    ));
 
     // 2. Summer, Beach & Swimwear keywords (Allowed in Low & Moderate, Filtered in Extreme)
-    assert!(!is_nsfw_text_with_level("Summer Beach OVA", "https://site.to/ova", None, LEVEL_LOW));
-    assert!(!is_nsfw_text_with_level("Summer Beach OVA", "https://site.to/ova", None, LEVEL_MODERATE));
-    assert!(is_nsfw_text_with_level("Summer Beach OVA", "https://site.to/ova", None, LEVEL_EXTREME));
-    assert!(!is_nsfw_text_with_level("Hot Bikini Special", "https://site.to/special", None, LEVEL_MODERATE));
-    assert!(is_nsfw_text_with_level("Hot Bikini Special", "https://site.to/special", None, LEVEL_EXTREME));
-    assert!(!is_nsfw_text_with_level("Swimsuit Edition", "https://site.to/stream", None, LEVEL_MODERATE));
-    assert!(is_nsfw_text_with_level("Swimsuit Edition", "https://site.to/stream", None, LEVEL_EXTREME));
-    assert!(!is_nsfw_text_with_level("Summer Time Rendering", "https://site.to/str", None, LEVEL_MODERATE));
+    assert!(!is_nsfw_text_with_level(
+        "Summer Beach OVA",
+        "https://site.to/ova",
+        None,
+        LEVEL_LOW
+    ));
+    assert!(!is_nsfw_text_with_level(
+        "Summer Beach OVA",
+        "https://site.to/ova",
+        None,
+        LEVEL_MODERATE
+    ));
+    assert!(is_nsfw_text_with_level(
+        "Summer Beach OVA",
+        "https://site.to/ova",
+        None,
+        LEVEL_EXTREME
+    ));
+    assert!(!is_nsfw_text_with_level(
+        "Hot Bikini Special",
+        "https://site.to/special",
+        None,
+        LEVEL_MODERATE
+    ));
+    assert!(is_nsfw_text_with_level(
+        "Hot Bikini Special",
+        "https://site.to/special",
+        None,
+        LEVEL_EXTREME
+    ));
+    assert!(!is_nsfw_text_with_level(
+        "Swimsuit Edition",
+        "https://site.to/stream",
+        None,
+        LEVEL_MODERATE
+    ));
+    assert!(is_nsfw_text_with_level(
+        "Swimsuit Edition",
+        "https://site.to/stream",
+        None,
+        LEVEL_EXTREME
+    ));
+    assert!(!is_nsfw_text_with_level(
+        "Summer Time Rendering",
+        "https://site.to/str",
+        None,
+        LEVEL_MODERATE
+    ));
 
     // 3. CJK Unicode adult stems
-    assert!(!is_nsfw_text_with_level("水着の彼女", "https://jp.to/v1", None, LEVEL_LOW));
-    assert!(!is_nsfw_text_with_level("水着の彼女", "https://jp.to/v1", None, LEVEL_MODERATE));
-    assert!(is_nsfw_text_with_level("水着の彼女", "https://jp.to/v1", None, LEVEL_EXTREME));
+    assert!(!is_nsfw_text_with_level(
+        "水着の彼女",
+        "https://jp.to/v1",
+        None,
+        LEVEL_LOW
+    ));
+    assert!(!is_nsfw_text_with_level(
+        "水着の彼女",
+        "https://jp.to/v1",
+        None,
+        LEVEL_MODERATE
+    ));
+    assert!(is_nsfw_text_with_level(
+        "水着の彼女",
+        "https://jp.to/v1",
+        None,
+        LEVEL_EXTREME
+    ));
     assert!(is_nsfw_text("18禁 成年向け", "https://jp.to/v2", None));
     assert!(is_nsfw_text("エロマンガ", "https://jp.to/v3", None));
-    assert!(is_nsfw_text_with_level("裏垢女子の秘密", "https://jp.to/v4", None, LEVEL_EXTREME));
+    assert!(is_nsfw_text_with_level(
+        "裏垢女子の秘密",
+        "https://jp.to/v4",
+        None,
+        LEVEL_EXTREME
+    ));
 
     // 4. Super Extreme romance/ecchi tropes (Filtered in Extreme)
-    assert!(!is_nsfw_text_with_level("Domestic Girlfriend Special", "https://site.to/dg", None, LEVEL_MODERATE));
-    assert!(is_nsfw_text_with_level("Domestic Girlfriend Special", "https://site.to/dg", None, LEVEL_EXTREME));
+    assert!(!is_nsfw_text_with_level(
+        "Domestic Girlfriend Special",
+        "https://site.to/dg",
+        None,
+        LEVEL_MODERATE
+    ));
+    assert!(is_nsfw_text_with_level(
+        "Domestic Girlfriend Special",
+        "https://site.to/dg",
+        None,
+        LEVEL_EXTREME
+    ));
 
     // 4. Clean mainstream titles pass cleanly
-    assert!(!is_nsfw_text("Interstellar", "https://imdb.com/title/tt0816692", Some("Sci-Fi, Adventure")));
-    assert!(!is_nsfw_text("Demon Slayer: Kimetsu no Yaiba", "https://site.to/ds", Some("Action, Shounen")));
+    assert!(!is_nsfw_text(
+        "Interstellar",
+        "https://imdb.com/title/tt0816692",
+        Some("Sci-Fi, Adventure")
+    ));
+    assert!(!is_nsfw_text(
+        "Demon Slayer: Kimetsu no Yaiba",
+        "https://site.to/ds",
+        Some("Action, Shounen")
+    ));
 }
 
 // ============================================================================
@@ -128,7 +234,8 @@ fn test_nsfw_text_and_guardian_matrix() {
 
 #[test]
 fn test_backup_encryption_roundtrip_and_authentication() {
-    let raw_payload = b"{\"watchlist\":[\"tt0944947\",\"tt1375666\"],\"settings\":{\"hw_accel\":true}}";
+    let raw_payload =
+        b"{\"watchlist\":[\"tt0944947\",\"tt1375666\"],\"settings\":{\"hw_accel\":true}}";
     let password = "SuperSecretStrongPassword2026!";
 
     // 1. Encrypt payload
@@ -145,14 +252,20 @@ fn test_backup_encryption_roundtrip_and_authentication() {
 
     // 3. Wrong password fails authentication immediately
     let wrong_pass_res = decrypt_backup_payload(&encrypted, "WrongPassword123!");
-    assert!(wrong_pass_res.is_err(), "Decryption must fail with wrong passphrase");
+    assert!(
+        wrong_pass_res.is_err(),
+        "Decryption must fail with wrong passphrase"
+    );
 
     // 4. Bit-tampering in ciphertext triggers Poly1305 MAC failure
     let mut tampered = encrypted.clone();
     let last_idx = tampered.len() - 1;
     tampered[last_idx] ^= 0x01; // Flip 1 bit in tag/ciphertext
     let tamper_res = decrypt_backup_payload(&tampered, password);
-    assert!(tamper_res.is_err(), "Bit-flipped ciphertext must fail authentication");
+    assert!(
+        tamper_res.is_err(),
+        "Bit-flipped ciphertext must fail authentication"
+    );
 
     // 5. Empty password rejected
     assert!(encrypt_backup_payload(raw_payload, "").is_err());
@@ -181,7 +294,11 @@ fn test_ed25519_manifest_signatures() {
 
     // Tampered manifest
     let tampered_manifest = format!("{}\nmalicious_payload: true", manifest);
-    assert!(!verify_manifest_signature(&tampered_manifest, &sig_hex, &pub_hex));
+    assert!(!verify_manifest_signature(
+        &tampered_manifest,
+        &sig_hex,
+        &pub_hex
+    ));
 
     // Tampered signature
     let mut bad_sig_hex = sig_hex.clone();
@@ -204,7 +321,10 @@ fn test_apk_verifier_and_attestation() {
     let nonce2 = generate_session_nonce().expect("Nonce 2 should generate");
     assert_eq!(nonce1.len(), 64); // 256 bits in hex
     assert_eq!(nonce2.len(), 64);
-    assert_ne!(nonce1, nonce2, "Subsequent nonces must be cryptographically distinct");
+    assert_ne!(
+        nonce1, nonce2,
+        "Subsequent nonces must be cryptographically distinct"
+    );
 
     // 2. Attestation Token Generation & Verification
     let pkg = "com.lagradost.cloudstream3";
@@ -215,17 +335,48 @@ fn test_apk_verifier_and_attestation() {
     let token = generate_attestation_token(&nonce1, hash, pkg, cert, version_code)
         .expect("Attestation token must generate");
 
-    assert!(verify_attestation_token(&nonce1, &token, hash, pkg, cert, version_code));
+    assert!(verify_attestation_token(
+        &nonce1,
+        &token,
+        hash,
+        pkg,
+        cert,
+        version_code
+    ));
 
     // Tampered parameters fail verification
-    assert!(!verify_attestation_token(&nonce2, &token, hash, pkg, cert, version_code)); // Wrong nonce
-    assert!(!verify_attestation_token(&nonce1, &token, "bad_hash", pkg, cert, version_code));
-    assert!(!verify_attestation_token(&nonce1, &token, hash, "com.evil.app", cert, version_code));
-    assert!(!verify_attestation_token(&nonce1, &token, hash, pkg, cert, 999i64)); // Wrong version
+    assert!(!verify_attestation_token(
+        &nonce2,
+        &token,
+        hash,
+        pkg,
+        cert,
+        version_code
+    )); // Wrong nonce
+    assert!(!verify_attestation_token(
+        &nonce1,
+        &token,
+        "bad_hash",
+        pkg,
+        cert,
+        version_code
+    ));
+    assert!(!verify_attestation_token(
+        &nonce1,
+        &token,
+        hash,
+        "com.evil.app",
+        cert,
+        version_code
+    ));
+    assert!(!verify_attestation_token(
+        &nonce1, &token, hash, pkg, cert, 999i64
+    )); // Wrong version
 
     // 3. File SHA-256 calculation
     let mut temp = tempfile::NamedTempFile::new().expect("Temp file should create");
-    temp.write_all(b"CloudStream APK binary test payload").expect("Write payload");
+    temp.write_all(b"CloudStream APK binary test payload")
+        .expect("Write payload");
     let file_hash = compute_file_sha256(temp.path()).expect("File hash should compute");
     assert_eq!(file_hash.len(), 64);
 }
@@ -256,11 +407,15 @@ fn test_lru_cache_and_adaptive_compression() {
     assert_eq!(cache.get("k2"), None, "k2 should have been evicted as LRU");
 
     // Adaptive compression on large entries (>= 256 bytes)
-    let large_json = "{\"stream_url\":\"https://cdn.example.com/hls/master.m3u8\",\"resolution\":\"1080p\"},".repeat(20);
+    let large_json =
+        "{\"stream_url\":\"https://cdn.example.com/hls/master.m3u8\",\"resolution\":\"1080p\"},"
+            .repeat(20);
     assert!(large_json.len() > 1000);
 
     cache.put("large_key".to_string(), large_json.clone());
-    let restored = cache.get("large_key").expect("Restored string should match");
+    let restored = cache
+        .get("large_key")
+        .expect("Restored string should match");
     assert_eq!(restored, large_json);
 
     // Clear and remove
@@ -319,7 +474,10 @@ fn test_m3u8_master_and_iptv_parser() {
     // Verified sorted by bandwidth descending (1080p first, then 720p, then 360p)
     assert_eq!(streams[0].bandwidth, 5000000);
     assert_eq!(streams[0].resolution, Some("1920x1080".to_string()));
-    assert_eq!(streams[0].url, "https://cdn.example.com/hls/1080p/index.m3u8");
+    assert_eq!(
+        streams[0].url,
+        "https://cdn.example.com/hls/1080p/index.m3u8"
+    );
 
     assert_eq!(streams[1].bandwidth, 2500000);
     assert_eq!(streams[1].resolution, Some("1280x720".to_string()));
@@ -401,7 +559,8 @@ fn test_html_media_and_json_extraction() {
 
     let json = extract_script_json(script_html, "playerConfig");
     assert!(json.is_some());
-    let parsed: serde_json::Value = serde_json::from_str(&json.unwrap()).expect("Extracted JSON must parse");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&json.unwrap()).expect("Extracted JSON must parse");
     assert_eq!(parsed["title"], "Example Movie");
     assert_eq!(parsed["file"], "https://cdn.example.com/hls.m3u8");
 }

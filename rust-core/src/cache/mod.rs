@@ -1,3 +1,3 @@
 pub mod lru;
 
-pub use lru::{LruCache, cache_get, cache_put, cache_remove, cache_clear};
+pub use lru::{cache_clear, cache_get, cache_put, cache_remove, LruCache};

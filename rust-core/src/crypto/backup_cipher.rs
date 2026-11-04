@@ -1,6 +1,6 @@
+use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{ChaCha20Poly1305, Nonce};
-use argon2::{Argon2, Algorithm, Version, Params};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -29,7 +29,8 @@ fn derive_key(passphrase: &str, salt: &[u8]) -> Result<[u8; 32], BackupCipherErr
         .map_err(|e| BackupCipherError::KdfError(e.to_string()))?;
     let argon2 = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
 
-    argon2.hash_password_into(passphrase.as_bytes(), salt, &mut key)
+    argon2
+        .hash_password_into(passphrase.as_bytes(), salt, &mut key)
         .map_err(|e| BackupCipherError::KdfError(e.to_string()))?;
 
     Ok(key)
@@ -39,12 +40,13 @@ fn derive_key(passphrase: &str, salt: &[u8]) -> Result<[u8; 32], BackupCipherErr
 /// Output format: [MAGIC: 6 bytes] [SALT: 16 bytes] [NONCE: 12 bytes] [CIPHERTEXT + TAG]
 pub fn encrypt_backup_payload(data: &[u8], passphrase: &str) -> Result<Vec<u8>, BackupCipherError> {
     if passphrase.trim().is_empty() {
-        return Err(BackupCipherError::EncryptionError("Passphrase cannot be empty".to_string()));
+        return Err(BackupCipherError::EncryptionError(
+            "Passphrase cannot be empty".to_string(),
+        ));
     }
 
     let mut salt: [u8; SALT_LEN] = core::array::from_fn(|_| 0);
-    getrandom::getrandom(&mut salt)
-        .map_err(|e| BackupCipherError::RandomError(e.to_string()))?;
+    getrandom::getrandom(&mut salt).map_err(|e| BackupCipherError::RandomError(e.to_string()))?;
 
     let mut nonce_bytes: [u8; NONCE_LEN] = core::array::from_fn(|_| 0);
     getrandom::getrandom(&mut nonce_bytes)
@@ -55,10 +57,12 @@ pub fn encrypt_backup_payload(data: &[u8], passphrase: &str) -> Result<Vec<u8>, 
         .map_err(|e| BackupCipherError::EncryptionError(e.to_string()))?;
 
     let nonce = Nonce::from(nonce_bytes);
-    let ciphertext = cipher.encrypt(&nonce, data)
+    let ciphertext = cipher
+        .encrypt(&nonce, data)
         .map_err(|e| BackupCipherError::EncryptionError(e.to_string()))?;
 
-    let mut result = Vec::with_capacity(BACKUP_MAGIC.len() + SALT_LEN + NONCE_LEN + ciphertext.len());
+    let mut result =
+        Vec::with_capacity(BACKUP_MAGIC.len() + SALT_LEN + NONCE_LEN + ciphertext.len());
     result.extend_from_slice(BACKUP_MAGIC);
     result.extend_from_slice(&salt);
     result.extend_from_slice(&nonce_bytes);
@@ -69,7 +73,10 @@ pub fn encrypt_backup_payload(data: &[u8], passphrase: &str) -> Result<Vec<u8>, 
 
 /// Decrypts an encrypted backup blob with a user passphrase.
 /// Verifies the Poly1305 authentication tag; fails immediately if passphrase is wrong or file is tampered.
-pub fn decrypt_backup_payload(encrypted_blob: &[u8], passphrase: &str) -> Result<Vec<u8>, BackupCipherError> {
+pub fn decrypt_backup_payload(
+    encrypted_blob: &[u8],
+    passphrase: &str,
+) -> Result<Vec<u8>, BackupCipherError> {
     let min_len = BACKUP_MAGIC.len() + SALT_LEN + NONCE_LEN + 16; // 16 bytes minimum for Poly1305 tag
     if encrypted_blob.len() < min_len {
         return Err(BackupCipherError::InvalidHeader);
@@ -94,7 +101,8 @@ pub fn decrypt_backup_payload(encrypted_blob: &[u8], passphrase: &str) -> Result
 
     let nonce = Nonce::try_from(nonce_bytes)
         .map_err(|e| BackupCipherError::DecryptionError(e.to_string()))?;
-    let plaintext = cipher.decrypt(&nonce, ciphertext)
+    let plaintext = cipher
+        .decrypt(&nonce, ciphertext)
         .map_err(|e| BackupCipherError::DecryptionError(e.to_string()))?;
 
     Ok(plaintext)
@@ -114,14 +122,14 @@ mod tests {
         let plaintext = b"{\"settings\":{\"theme\":\"dark\"},\"history\":[1,2,3]}";
         let password = "super_secret_user_passphrase_123";
 
-        let encrypted = encrypt_backup_payload(plaintext, password)
-            .expect("Encryption should succeed");
+        let encrypted =
+            encrypt_backup_payload(plaintext, password).expect("Encryption should succeed");
 
         assert!(is_encrypted_backup(&encrypted));
         assert_ne!(plaintext.as_slice(), encrypted.as_slice());
 
-        let decrypted = decrypt_backup_payload(&encrypted, password)
-            .expect("Decryption should succeed");
+        let decrypted =
+            decrypt_backup_payload(&encrypted, password).expect("Decryption should succeed");
 
         assert_eq!(plaintext.as_slice(), decrypted.as_slice());
     }
@@ -139,8 +147,8 @@ mod tests {
     #[test]
     fn test_tampered_ciphertext_fails_auth() {
         let plaintext = b"sensitive backup data";
-        let mut encrypted = encrypt_backup_payload(plaintext, "password")
-            .expect("Encryption should succeed");
+        let mut encrypted =
+            encrypt_backup_payload(plaintext, "password").expect("Encryption should succeed");
 
         // Tamper with the last byte (authentication tag)
         let last_idx = encrypted.len() - 1;

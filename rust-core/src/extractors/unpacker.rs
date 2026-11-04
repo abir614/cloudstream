@@ -93,13 +93,21 @@ pub fn extract_stream_urls(content: &str) -> Vec<String> {
         let mut offset = 0;
         while let Some(ext_idx) = lower[offset..].find(ext) {
             let real_ext_idx = offset + ext_idx;
-            
+
             // Backtrack to find start of URL ("http" or quotes)
             let bytes = content.as_bytes();
             let mut start = real_ext_idx;
             while start > 0 {
                 let b = bytes[start - 1];
-                if b == b'"' || b == b'\'' || b == b'(' || b == b'>' || b == b'=' || b == b' ' || b == b'\n' || b == b'\r' {
+                if b == b'"'
+                    || b == b'\''
+                    || b == b'('
+                    || b == b'>'
+                    || b == b'='
+                    || b == b' '
+                    || b == b'\n'
+                    || b == b'\r'
+                {
                     break;
                 }
                 start -= 1;
@@ -109,14 +117,24 @@ pub fn extract_stream_urls(content: &str) -> Vec<String> {
             let mut end = real_ext_idx + ext.len();
             while end < content.len() {
                 let b = bytes[end];
-                if b == b'"' || b == b'\'' || b == b')' || b == b'<' || b == b' ' || b == b'\n' || b == b'\r' || b == b';' {
+                if b == b'"'
+                    || b == b'\''
+                    || b == b')'
+                    || b == b'<'
+                    || b == b' '
+                    || b == b'\n'
+                    || b == b'\r'
+                    || b == b';'
+                {
                     break;
                 }
                 end += 1;
             }
 
             let candidate = &content[start..end];
-            if (candidate.starts_with("http://") || candidate.starts_with("https://")) && !urls.contains(&candidate.to_string()) {
+            if (candidate.starts_with("http://") || candidate.starts_with("https://"))
+                && !urls.contains(&candidate.to_string())
+            {
                 urls.push(candidate.to_string());
             }
 
@@ -185,7 +203,10 @@ mod tests {
         "#;
         let urls = extract_stream_urls(html);
         assert_eq!(urls.len(), 2);
-        assert_eq!(urls[0], "https://cdn.stream.com/hls/video_1080p.m3u8?token=abc123");
+        assert_eq!(
+            urls[0],
+            "https://cdn.stream.com/hls/video_1080p.m3u8?token=abc123"
+        );
         assert_eq!(urls[1], "https://backup.stream.com/files/movie.mp4");
     }
 }

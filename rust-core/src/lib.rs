@@ -11,12 +11,14 @@ pub mod search;
 pub mod security;
 pub mod subtitles;
 
-pub use compression::{compress_deflate, compress_string, compress_zlib, decompress_deflate, decompress_string, decompress_zlib, CompressionError};
 pub use cache::{cache_clear, cache_get, cache_put, cache_remove, LruCache};
+pub use compression::{
+    compress_deflate, compress_string, compress_zlib, decompress_deflate, decompress_string,
+    decompress_zlib, CompressionError,
+};
 pub use crypto::{
-    fast_hash32, fast_hash64, fast_hash64_str, md5_hex, sha256_hex,
-    verify_ed25519_signature, verify_manifest_signature,
-    encrypt_backup_payload, decrypt_backup_payload, is_encrypted_backup,
+    decrypt_backup_payload, encrypt_backup_payload, fast_hash32, fast_hash64, fast_hash64_str,
+    is_encrypted_backup, md5_hex, sha256_hex, verify_ed25519_signature, verify_manifest_signature,
 };
 pub use extractors::html::{extract_media_links, extract_script_json, ExtractedMediaLink};
 pub use extractors::unpacker::{extract_stream_urls, unpack_dean_edwards};
@@ -29,7 +31,8 @@ pub use security::apk_verifier::{
     compute_file_sha256, generate_attestation_token, generate_session_nonce, verify_apk_identity,
     verify_attestation_token, ApkVerificationResult, VerifierError,
 };
-pub use security::nsfw_classifier::{is_nsfw_text, is_nsfw_text_with_level, LEVEL_LOW, LEVEL_MODERATE, LEVEL_EXTREME};
+pub use security::nsfw_classifier::{
+    is_nsfw_text, is_nsfw_text_with_level, LEVEL_EXTREME, LEVEL_LOW, LEVEL_MODERATE,
+};
 pub use security::ssrf::{validate_ip_safety, validate_url_safety, NetworkSecurityError};
 pub use subtitles::{parse_srt, SubtitleCue};
-

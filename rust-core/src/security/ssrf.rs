@@ -1,6 +1,6 @@
 use std::net::IpAddr;
-use url::Url;
 use thiserror::Error;
+use url::Url;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum NetworkSecurityError {
@@ -18,8 +18,8 @@ pub enum NetworkSecurityError {
 /// Prevents Server-Side Request Forgery (SSRF) against LAN routers, local services,
 /// and metadata endpoints.
 pub fn validate_url_safety(raw_url: &str) -> Result<Url, NetworkSecurityError> {
-    let parsed = Url::parse(raw_url)
-        .map_err(|e| NetworkSecurityError::InvalidUrl(e.to_string()))?;
+    let parsed =
+        Url::parse(raw_url).map_err(|e| NetworkSecurityError::InvalidUrl(e.to_string()))?;
 
     // Rule 1: Strict Scheme Whitelist
     match parsed.scheme() {
@@ -28,13 +28,16 @@ pub fn validate_url_safety(raw_url: &str) -> Result<Url, NetworkSecurityError> {
     }
 
     // Rule 2: Host must exist
-    let host_str = parsed.host_str().ok_or_else(|| {
-        NetworkSecurityError::InvalidUrl("Missing host in URL".to_string())
-    })?;
+    let host_str = parsed
+        .host_str()
+        .ok_or_else(|| NetworkSecurityError::InvalidUrl("Missing host in URL".to_string()))?;
 
     // Rule 3: Check for localhost hostnames
     let lower_host = host_str.to_lowercase();
-    if lower_host == "localhost" || lower_host.ends_with(".localhost") || lower_host.ends_with(".local") {
+    if lower_host == "localhost"
+        || lower_host.ends_with(".localhost")
+        || lower_host.ends_with(".local")
+    {
         return Err(NetworkSecurityError::PrivateNetworkBlocked(lower_host));
     }
 
@@ -76,13 +79,25 @@ pub fn validate_ip_safety(ip: &IpAddr) -> Result<(), NetworkSecurityError> {
             }
             let segments = ipv6.segments();
             // Check IPv4-mapped IPv6 (::ffff:w.x.y.z)
-            if segments[0] == 0 && segments[1] == 0 && segments[2] == 0 && segments[3] == 0 && segments[4] == 0 && segments[5] == 0xffff {
+            if segments[0] == 0
+                && segments[1] == 0
+                && segments[2] == 0
+                && segments[3] == 0
+                && segments[4] == 0
+                && segments[5] == 0xffff
+            {
                 let octets = ipv6.octets();
                 let v4 = std::net::Ipv4Addr::new(octets[12], octets[13], octets[14], octets[15]);
                 return validate_ip_safety(&IpAddr::V4(v4));
             }
             // Check NAT64 well-known prefix (64:ff9b::/96)
-            if segments[0] == 0x0064 && segments[1] == 0xff9b && segments[2] == 0 && segments[3] == 0 && segments[4] == 0 && segments[5] == 0 {
+            if segments[0] == 0x0064
+                && segments[1] == 0xff9b
+                && segments[2] == 0
+                && segments[3] == 0
+                && segments[4] == 0
+                && segments[5] == 0
+            {
                 let octets = ipv6.octets();
                 let v4 = std::net::Ipv4Addr::new(octets[12], octets[13], octets[14], octets[15]);
                 return validate_ip_safety(&IpAddr::V4(v4));
@@ -118,7 +133,9 @@ mod tests {
         );
         assert_eq!(
             validate_url_safety("javascript:alert(1)"),
-            Err(NetworkSecurityError::BlockedScheme("javascript".to_string()))
+            Err(NetworkSecurityError::BlockedScheme(
+                "javascript".to_string()
+            ))
         );
     }
 
@@ -135,7 +152,9 @@ mod tests {
     fn test_blocked_cloud_metadata() {
         assert_eq!(
             validate_url_safety("http://169.254.169.254/latest/meta-data/"),
-            Err(NetworkSecurityError::CloudMetadataBlocked("169.254.169.254".to_string()))
+            Err(NetworkSecurityError::CloudMetadataBlocked(
+                "169.254.169.254".to_string()
+            ))
         );
     }
 

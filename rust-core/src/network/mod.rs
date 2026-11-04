@@ -1,3 +1,3 @@
 pub mod cleaner;
 
-pub use cleaner::{sanitize_url, resolve_url};
+pub use cleaner::{resolve_url, sanitize_url};

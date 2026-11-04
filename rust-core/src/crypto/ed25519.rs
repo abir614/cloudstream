@@ -18,19 +18,25 @@ pub fn verify_ed25519_signature(
     signature_bytes: &[u8],
 ) -> Result<bool, Ed25519Error> {
     if public_key_bytes.len() != 32 {
-        return Err(Ed25519Error::InvalidPublicKey("Key must be 32 bytes".to_string()));
+        return Err(Ed25519Error::InvalidPublicKey(
+            "Key must be 32 bytes".to_string(),
+        ));
     }
     if signature_bytes.len() != 64 {
-        return Err(Ed25519Error::InvalidSignature("Signature must be 64 bytes".to_string()));
+        return Err(Ed25519Error::InvalidSignature(
+            "Signature must be 64 bytes".to_string(),
+        ));
     }
 
-    let key_array: [u8; 32] = public_key_bytes.try_into()
+    let key_array: [u8; 32] = public_key_bytes
+        .try_into()
         .map_err(|_| Ed25519Error::InvalidPublicKey("Failed to read 32 bytes".to_string()))?;
 
     let verifying_key = VerifyingKey::from_bytes(&key_array)
         .map_err(|e| Ed25519Error::InvalidPublicKey(e.to_string()))?;
 
-    let sig_array: [u8; 64] = signature_bytes.try_into()
+    let sig_array: [u8; 64] = signature_bytes
+        .try_into()
         .map_err(|_| Ed25519Error::InvalidSignature("Failed to read 64 bytes".to_string()))?;
 
     let signature = Signature::from_bytes(&sig_array);
@@ -78,11 +84,9 @@ mod tests {
         let message = b"CloudStream-v4.0.0-release.apk SHA256: 0123456789abcdef";
         let signature = signing_key.sign(message);
 
-        let is_valid = verify_ed25519_signature(
-            verifying_key.as_bytes(),
-            message,
-            &signature.to_bytes(),
-        ).expect("verification should run");
+        let is_valid =
+            verify_ed25519_signature(verifying_key.as_bytes(), message, &signature.to_bytes())
+                .expect("verification should run");
 
         assert!(is_valid);
     }
@@ -98,11 +102,9 @@ mod tests {
         let tampered = b"tampered release manifest";
         let signature = signing_key.sign(message);
 
-        let is_valid = verify_ed25519_signature(
-            verifying_key.as_bytes(),
-            tampered,
-            &signature.to_bytes(),
-        ).expect("verification should run");
+        let is_valid =
+            verify_ed25519_signature(verifying_key.as_bytes(), tampered, &signature.to_bytes())
+                .expect("verification should run");
 
         assert!(!is_valid);
     }
@@ -114,13 +116,18 @@ mod tests {
         let signing_key = SigningKey::from_bytes(&seed);
         let verifying_key = signing_key.verifying_key();
 
-        let manifest = "SHA256SUMS\n5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8  app.apk";
+        let manifest =
+            "SHA256SUMS\n5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8  app.apk";
         let signature = signing_key.sign(manifest.as_bytes());
 
         let sig_hex = hex::encode(signature.to_bytes());
         let pk_hex = hex::encode(verifying_key.as_bytes());
 
         assert!(verify_manifest_signature(manifest, &sig_hex, &pk_hex));
-        assert!(!verify_manifest_signature("tampered manifest", &sig_hex, &pk_hex));
+        assert!(!verify_manifest_signature(
+            "tampered manifest",
+            &sig_hex,
+            &pk_hex
+        ));
     }
 }

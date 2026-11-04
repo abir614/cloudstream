@@ -253,12 +253,8 @@ const SUGGESTIVE_ECCHI_PHRASES: &[&str] = &[
 ];
 
 /// Extreme Sensitivity Phrases (Active in MODERATE & EXTREME).
-const EXTREME_SENSITIVITY_PHRASES: &[&str] = &[
-    "hot spring",
-    "fan service",
-    "panty shot",
-    "mixed bath",
-];
+const EXTREME_SENSITIVITY_PHRASES: &[&str] =
+    &["hot spring", "fan service", "panty shot", "mixed bath"];
 
 /// Super Extreme Adult Franchise Multi-Word Phrases (Active ONLY in EXTREME).
 const SUPER_EXTREME_PHRASES: &[&str] = &[
@@ -358,45 +354,195 @@ const CJK_EXTREME_STEMS: &[&str] = &[
 
 /// CJK Super Extreme Stems (Active ONLY in EXTREME).
 const CJK_SUPER_EXTREME_STEMS: &[&str] = &[
-    "裏垢", "パパ活", "援助交際", "援交", "買春", "売春", "風俗", "ソープ", "ピンサロ", "セクキャバ",
-    "デリヘル", "出会い系", "官能", "夜這い", "近親相姦", "義母", "義妹", "義姉", "義父", "催眠",
-    "触手", "露出狂", "女体盛り", "媚薬", "肉感", "巨尻", "美尻", "谷間", "パンスト", "下着姿",
-    "半裸", "全裸", "裸体", "肢体", "艶", "秘部", "水着姿", "エロアニメ", "エロ動画",
+    "裏垢",
+    "パパ活",
+    "援助交際",
+    "援交",
+    "買春",
+    "売春",
+    "風俗",
+    "ソープ",
+    "ピンサロ",
+    "セクキャバ",
+    "デリヘル",
+    "出会い系",
+    "官能",
+    "夜這い",
+    "近親相姦",
+    "義母",
+    "義妹",
+    "義姉",
+    "義父",
+    "催眠",
+    "触手",
+    "露出狂",
+    "女体盛り",
+    "媚薬",
+    "肉感",
+    "巨尻",
+    "美尻",
+    "谷間",
+    "パンスト",
+    "下着姿",
+    "半裸",
+    "全裸",
+    "裸体",
+    "肢体",
+    "艶",
+    "秘部",
+    "水着姿",
+    "エロアニメ",
+    "エロ動画",
 ];
 
 /// Hardcore Adult Substring Stems (Active in ALL levels).
 const HARDCORE_STEMS: &[&str] = &[
-    "hentai", "hanime", "porn", "porno", "xxx", "r18", "+18", "18+", "eroti", "bukkake",
-    "nakadashi", "paizuri", "chikan", "shibari", "creampie", "blowjob", "deepthroat", "swinger",
-    "cuckold", "cunnilingus", "pegging", "gangbang", "incest", "stepmom", "stepmother",
-    "stepsister", "stepdaughter", "stepson", "stepbrother", "nudity", "topless",
-    "uncensor", "decensor", "rule34", "onlyfans", "fansly", "striptease", "stripper", "camgirl",
-    "playboy", "playmate", "nhentai", "tsumino", "spankbang", "eporner", "missav", "supjav", "javhd",
+    "hentai",
+    "hanime",
+    "porn",
+    "porno",
+    "xxx",
+    "r18",
+    "+18",
+    "18+",
+    "eroti",
+    "bukkake",
+    "nakadashi",
+    "paizuri",
+    "chikan",
+    "shibari",
+    "creampie",
+    "blowjob",
+    "deepthroat",
+    "swinger",
+    "cuckold",
+    "cunnilingus",
+    "pegging",
+    "gangbang",
+    "incest",
+    "stepmom",
+    "stepmother",
+    "stepsister",
+    "stepdaughter",
+    "stepson",
+    "stepbrother",
+    "nudity",
+    "topless",
+    "uncensor",
+    "decensor",
+    "rule34",
+    "onlyfans",
+    "fansly",
+    "striptease",
+    "stripper",
+    "camgirl",
+    "playboy",
+    "playmate",
+    "nhentai",
+    "tsumino",
+    "spankbang",
+    "eporner",
+    "missav",
+    "supjav",
+    "javhd",
 ];
 
 /// Suggestive & Ecchi Substring Stems (Active in ALL levels - LOW hardened to Moderate).
 const SUGGESTIVE_STEMS: &[&str] = &[
-    "ecchi", "ero-anime", "eroanime", "eroge", "ahegao", "doujin", "futanari", "netorare",
-    "smut", "lewd", "oppai", "boob", "busty", "lingerie", "milf", "thong", "panty", "panties",
-    "fetish", "bdsm", "bondage", "sensual", "chijo", "eromanga", "dxd",
+    "ecchi",
+    "ero-anime",
+    "eroanime",
+    "eroge",
+    "ahegao",
+    "doujin",
+    "futanari",
+    "netorare",
+    "smut",
+    "lewd",
+    "oppai",
+    "boob",
+    "busty",
+    "lingerie",
+    "milf",
+    "thong",
+    "panty",
+    "panties",
+    "fetish",
+    "bdsm",
+    "bondage",
+    "sensual",
+    "chijo",
+    "eromanga",
+    "dxd",
 ];
 
 /// Extreme Sensitivity Substring Stems (Active ONLY in EXTREME).
 const EXTREME_STEMS: &[&str] = &[
-    "bikini", "monokini", "microkini", "mizugi", "halfbody",
-    "half-body", "half body", "exposed", "topless", "bareback", "barechested",
-    "underboob", "sideboob", "cleavage", "onsen", "bathhouse", "hotspring",
-    "pantyshot", "panty-shot", "spank", "seductive", "provocative",
+    "bikini",
+    "monokini",
+    "microkini",
+    "mizugi",
+    "halfbody",
+    "half-body",
+    "half body",
+    "exposed",
+    "topless",
+    "bareback",
+    "barechested",
+    "underboob",
+    "sideboob",
+    "cleavage",
+    "onsen",
+    "bathhouse",
+    "hotspring",
+    "pantyshot",
+    "panty-shot",
+    "spank",
+    "seductive",
+    "provocative",
 ];
 
 /// Super Extreme Substring Stems (Active ONLY in EXTREME).
 const SUPER_EXTREME_STEMS: &[&str] = &[
-    "succubus", "incubus", "peeping", "voyeur", "upskirt", "downblouse", "nudis", "naturis",
-    "bunnygirl", "bunny-girl", "bunny girl", "crossdress", "femboy", "otokonoko", "concubine",
-    "courtesan", "brothel", "prostitut", "callgirl", "redlight", "soapland", "aphrodisiac",
-    "seductress", "temptress", "negligee", "babydoll", "fishnet", "nukige", "galge", "tentacle",
-    "pantsu", "monmusu", "tsugumomo", "step-sister", "step-brother", "step-mother", "step-father",
-    "step-daughter", "step-son",
+    "succubus",
+    "incubus",
+    "peeping",
+    "voyeur",
+    "upskirt",
+    "downblouse",
+    "nudis",
+    "naturis",
+    "bunnygirl",
+    "bunny-girl",
+    "bunny girl",
+    "crossdress",
+    "femboy",
+    "otokonoko",
+    "concubine",
+    "courtesan",
+    "brothel",
+    "prostitut",
+    "callgirl",
+    "redlight",
+    "soapland",
+    "aphrodisiac",
+    "seductress",
+    "temptress",
+    "negligee",
+    "babydoll",
+    "fishnet",
+    "nukige",
+    "galge",
+    "tentacle",
+    "pantsu",
+    "monmusu",
+    "tsugumomo",
+    "step-sister",
+    "step-brother",
+    "step-mother",
+    "step-father",
+    "step-daughter",
+    "step-son",
 ];
 
 /// Evaluates whether a single text string contains adult/NSFW markers according to sensitivity level.
@@ -576,71 +722,266 @@ mod tests {
 
     #[test]
     fn test_text_classification_explicit_and_ecchi() {
-        assert!(is_nsfw_text("High School DxD Season 1", "https://anime.tv/hsdxd", None));
-        assert!(is_nsfw_text("Clean Title", "https://hentaistream.org/watch/123", None));
-        assert!(is_nsfw_text("Anime Episode 1", "https://cdn.net/ep1.mp4", Some("Ecchi, Harem, Romance")));
-        assert!(is_nsfw_text("Random Show", "https://provider.to/xxx/stream", None));
-        assert!(is_nsfw_text("Boku no Pico OVA", "https://cdn.me/video.mp4", None));
+        assert!(is_nsfw_text(
+            "High School DxD Season 1",
+            "https://anime.tv/hsdxd",
+            None
+        ));
+        assert!(is_nsfw_text(
+            "Clean Title",
+            "https://hentaistream.org/watch/123",
+            None
+        ));
+        assert!(is_nsfw_text(
+            "Anime Episode 1",
+            "https://cdn.net/ep1.mp4",
+            Some("Ecchi, Harem, Romance")
+        ));
+        assert!(is_nsfw_text(
+            "Random Show",
+            "https://provider.to/xxx/stream",
+            None
+        ));
+        assert!(is_nsfw_text(
+            "Boku no Pico OVA",
+            "https://cdn.me/video.mp4",
+            None
+        ));
     }
 
     #[test]
     fn test_text_classification_beach_and_summer() {
-        assert!(!is_nsfw_text_with_level("Summer Beach Special OVA", "https://stream.to/v1", None, LEVEL_LOW));
-        assert!(!is_nsfw_text_with_level("Summer Beach Special OVA", "https://stream.to/v1", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("Summer Beach Special OVA", "https://stream.to/v1", None, LEVEL_EXTREME));
-        assert!(!is_nsfw_text_with_level("Hot Spring & Bikini Vacation", "https://stream.to/v2", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("Hot Spring & Bikini Vacation", "https://stream.to/v2", None, LEVEL_EXTREME));
-        assert!(!is_nsfw_text_with_level("Girl in Swimsuit", "https://stream.to/v3", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("Girl in Swimsuit", "https://stream.to/v3", None, LEVEL_EXTREME));
-        assert!(!is_nsfw_text_with_level("Island Summer Edition", "https://stream.to/v4", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("Island Summer Edition", "https://stream.to/v4", None, LEVEL_EXTREME));
-        assert!(!is_nsfw_text_with_level("Summer Time Rendering", "https://stream.to/str", None, LEVEL_MODERATE));
+        assert!(!is_nsfw_text_with_level(
+            "Summer Beach Special OVA",
+            "https://stream.to/v1",
+            None,
+            LEVEL_LOW
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "Summer Beach Special OVA",
+            "https://stream.to/v1",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "Summer Beach Special OVA",
+            "https://stream.to/v1",
+            None,
+            LEVEL_EXTREME
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "Hot Spring & Bikini Vacation",
+            "https://stream.to/v2",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "Hot Spring & Bikini Vacation",
+            "https://stream.to/v2",
+            None,
+            LEVEL_EXTREME
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "Girl in Swimsuit",
+            "https://stream.to/v3",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "Girl in Swimsuit",
+            "https://stream.to/v3",
+            None,
+            LEVEL_EXTREME
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "Island Summer Edition",
+            "https://stream.to/v4",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "Island Summer Edition",
+            "https://stream.to/v4",
+            None,
+            LEVEL_EXTREME
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "Summer Time Rendering",
+            "https://stream.to/str",
+            None,
+            LEVEL_MODERATE
+        ));
     }
 
     #[test]
     fn test_text_classification_cjk_stems() {
-        assert!(!is_nsfw_text_with_level("水着の美少女", "https://jp.anime/play", None, LEVEL_LOW));
-        assert!(!is_nsfw_text_with_level("水着の美少女", "https://jp.anime/play", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("水着の美少女", "https://jp.anime/play", None, LEVEL_EXTREME));
-        assert!(is_nsfw_text("18禁 成年コミック アニメ化", "https://jp.anime/play", None));
-        assert!(!is_nsfw_text_with_level("ビキニグラビア", "https://jp.anime/play", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("ビキニグラビア", "https://jp.anime/play", None, LEVEL_EXTREME));
-        assert!(is_nsfw_text("エロマンガ先生", "https://jp.anime/play", None));
-        assert!(is_nsfw_text_with_level("裏垢女子の秘密", "https://jp.anime/play", None, LEVEL_EXTREME));
+        assert!(!is_nsfw_text_with_level(
+            "水着の美少女",
+            "https://jp.anime/play",
+            None,
+            LEVEL_LOW
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "水着の美少女",
+            "https://jp.anime/play",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "水着の美少女",
+            "https://jp.anime/play",
+            None,
+            LEVEL_EXTREME
+        ));
+        assert!(is_nsfw_text(
+            "18禁 成年コミック アニメ化",
+            "https://jp.anime/play",
+            None
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "ビキニグラビア",
+            "https://jp.anime/play",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "ビキニグラビア",
+            "https://jp.anime/play",
+            None,
+            LEVEL_EXTREME
+        ));
+        assert!(is_nsfw_text(
+            "エロマンガ先生",
+            "https://jp.anime/play",
+            None
+        ));
+        assert!(is_nsfw_text_with_level(
+            "裏垢女子の秘密",
+            "https://jp.anime/play",
+            None,
+            LEVEL_EXTREME
+        ));
     }
 
     #[test]
     fn test_text_classification_sensitivity_levels() {
         // Hardcore should trigger on LOW, MODERATE, and EXTREME
-        assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_LOW));
-        assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("Hentai Haven Episode 1", "https://h.org", None, LEVEL_EXTREME));
+        assert!(is_nsfw_text_with_level(
+            "Hentai Haven Episode 1",
+            "https://h.org",
+            None,
+            LEVEL_LOW
+        ));
+        assert!(is_nsfw_text_with_level(
+            "Hentai Haven Episode 1",
+            "https://h.org",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "Hentai Haven Episode 1",
+            "https://h.org",
+            None,
+            LEVEL_EXTREME
+        ));
 
         // Ecchi is allowed on LOW, and strictly filtered in MODERATE and EXTREME
-        assert!(!is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_LOW));
-        assert!(is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("High School DxD Season 1", "https://stream.org", None, LEVEL_EXTREME));
+        assert!(!is_nsfw_text_with_level(
+            "High School DxD Season 1",
+            "https://stream.org",
+            None,
+            LEVEL_LOW
+        ));
+        assert!(is_nsfw_text_with_level(
+            "High School DxD Season 1",
+            "https://stream.org",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "High School DxD Season 1",
+            "https://stream.org",
+            None,
+            LEVEL_EXTREME
+        ));
 
         // Beach / Swimsuit is allowed on LOW and MODERATE, and strictly filtered in EXTREME
-        assert!(!is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_LOW));
-        assert!(!is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("Girl in Swimsuit OVA", "https://stream.org", None, LEVEL_EXTREME));
+        assert!(!is_nsfw_text_with_level(
+            "Girl in Swimsuit OVA",
+            "https://stream.org",
+            None,
+            LEVEL_LOW
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "Girl in Swimsuit OVA",
+            "https://stream.org",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "Girl in Swimsuit OVA",
+            "https://stream.org",
+            None,
+            LEVEL_EXTREME
+        ));
 
         // Harem / Fanservice tag is strictly filtered in EXTREME
-        assert!(!is_nsfw_text_with_level("Ordinary Show", "https://site.org", Some("Harem"), LEVEL_LOW));
-        assert!(!is_nsfw_text_with_level("Ordinary Show", "https://site.org", Some("Harem"), LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("Ordinary Show", "https://site.org", Some("Harem"), LEVEL_EXTREME));
+        assert!(!is_nsfw_text_with_level(
+            "Ordinary Show",
+            "https://site.org",
+            Some("Harem"),
+            LEVEL_LOW
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "Ordinary Show",
+            "https://site.org",
+            Some("Harem"),
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "Ordinary Show",
+            "https://site.org",
+            Some("Harem"),
+            LEVEL_EXTREME
+        ));
 
         // Super Extreme romance/ecchi tropes trigger on EXTREME
-        assert!(!is_nsfw_text_with_level("Domestic Girlfriend Special", "https://site.org", None, LEVEL_LOW));
-        assert!(!is_nsfw_text_with_level("Domestic Girlfriend Special", "https://site.org", None, LEVEL_MODERATE));
-        assert!(is_nsfw_text_with_level("Domestic Girlfriend Special", "https://site.org", None, LEVEL_EXTREME));
+        assert!(!is_nsfw_text_with_level(
+            "Domestic Girlfriend Special",
+            "https://site.org",
+            None,
+            LEVEL_LOW
+        ));
+        assert!(!is_nsfw_text_with_level(
+            "Domestic Girlfriend Special",
+            "https://site.org",
+            None,
+            LEVEL_MODERATE
+        ));
+        assert!(is_nsfw_text_with_level(
+            "Domestic Girlfriend Special",
+            "https://site.org",
+            None,
+            LEVEL_EXTREME
+        ));
     }
 
     #[test]
     fn test_text_classification_clean_mainstream() {
-        assert!(!is_nsfw_text("Attack on Titan Season 4", "https://crunchy.com/aot-s4", Some("Action, Fantasy")));
-        assert!(!is_nsfw_text("Breaking Bad", "https://netflix.com/title/123", Some("Drama, Crime")));
-        assert!(!is_nsfw_text("Spider-Man: Across the Spider-Verse", "https://sony.com/spiderman", None));
+        assert!(!is_nsfw_text(
+            "Attack on Titan Season 4",
+            "https://crunchy.com/aot-s4",
+            Some("Action, Fantasy")
+        ));
+        assert!(!is_nsfw_text(
+            "Breaking Bad",
+            "https://netflix.com/title/123",
+            Some("Drama, Crime")
+        ));
+        assert!(!is_nsfw_text(
+            "Spider-Man: Across the Spider-Verse",
+            "https://sony.com/spiderman",
+            None
+        ));
     }
 }

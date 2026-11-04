@@ -19,16 +19,13 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Err(_) => return 0,
     };
 
-    let safe_res = std::panic::catch_unwind(|| {
-        validate_url_safety(&url_str)
-    });
+    let safe_res = std::panic::catch_unwind(|| validate_url_safety(&url_str));
 
     match safe_res {
         Ok(Ok(_)) => 1,
         _ => 0,
     }
 }
-
 
 /// Get native core version and architecture
 #[no_mangle]
@@ -112,7 +109,11 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         match env.get_string(&repo_header_hex_input) {
             Ok(s) => {
                 let str_val: String = s.into();
-                if str_val.trim().is_empty() { None } else { Some(str_val) }
+                if str_val.trim().is_empty() {
+                    None
+                } else {
+                    Some(str_val)
+                }
             }
             Err(_) => None,
         }
@@ -132,8 +133,9 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         repo_header_hex.as_deref(),
     );
 
-    let json_output = serde_json::to_string(&result)
-        .unwrap_or_else(|_| "{\"is_valid\":false,\"error_message\":\"Serialization error\"}".to_string());
+    let json_output = serde_json::to_string(&result).unwrap_or_else(|_| {
+        "{\"is_valid\":false,\"error_message\":\"Serialization error\"}".to_string()
+    });
     match env.new_string(json_output) {
         Ok(js) => js.into_raw(),
         Err(_) => std::ptr::null_mut(),
@@ -231,8 +233,16 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
                 }
             };
 
-            let fuel = if initial_fuel <= 0 { 500_000 } else { initial_fuel as u64 };
-            let max_mem = if max_memory_bytes <= 0 { 16 * 1024 * 1024 } else { max_memory_bytes as usize };
+            let fuel = if initial_fuel <= 0 {
+                500_000
+            } else {
+                initial_fuel as u64
+            };
+            let max_mem = if max_memory_bytes <= 0 {
+                16 * 1024 * 1024
+            } else {
+                max_memory_bytes as usize
+            };
 
             let res = match sandbox.run_extension(&bytes, fuel, max_mem) {
                 Ok(logs) => serde_json::json!({
@@ -300,7 +310,11 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
     };
 
     let safe_res = std::panic::catch_unwind(|| {
-        crate::crypto::ed25519::verify_manifest_signature(&manifest, &signature_hex, &public_key_hex)
+        crate::crypto::ed25519::verify_manifest_signature(
+            &manifest,
+            &signature_hex,
+            &public_key_hex,
+        )
     });
 
     match safe_res {
@@ -390,5 +404,9 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Err(_) => return 0,
     };
 
-    if crate::crypto::backup_cipher::is_encrypted_backup(&data) { 1 } else { 0 }
+    if crate::crypto::backup_cipher::is_encrypted_backup(&data) {
+        1
+    } else {
+        0
+    }
 }

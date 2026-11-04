@@ -1,6 +1,6 @@
+use crate::compression::{compress_string, decompress_string};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Mutex, OnceLock};
-use crate::compression::{compress_string, decompress_string};
 
 /// Threshold in bytes beyond which cache entries are compressed in memory
 /// using fast DEFLATE to eliminate heap footprint on 512MB/1GB TV devices.
@@ -130,13 +130,17 @@ fn get_registry() -> &'static Mutex<HashMap<String, LruCache>> {
 
 pub fn cache_get(cache_name: &str, key: &str) -> Option<String> {
     let mut reg = get_registry().lock().ok()?;
-    let cache = reg.entry(cache_name.to_string()).or_insert_with(|| LruCache::new(500));
+    let cache = reg
+        .entry(cache_name.to_string())
+        .or_insert_with(|| LruCache::new(500));
     cache.get(key)
 }
 
 pub fn cache_put(cache_name: &str, key: String, value: String) {
     if let Ok(mut reg) = get_registry().lock() {
-        let cache = reg.entry(cache_name.to_string()).or_insert_with(|| LruCache::new(500));
+        let cache = reg
+            .entry(cache_name.to_string())
+            .or_insert_with(|| LruCache::new(500));
         cache.put(key, value);
     }
 }
@@ -187,7 +191,9 @@ mod tests {
     #[test]
     fn test_adaptive_compression_reduces_ram() {
         let mut cache = LruCache::new(10);
-        let large_payload = "#EXTINF:-1 tvg-id=\"Stream1\", Channel Name\nhttps://example.com/hls/live.m3u8\n".repeat(50);
+        let large_payload =
+            "#EXTINF:-1 tvg-id=\"Stream1\", Channel Name\nhttps://example.com/hls/live.m3u8\n"
+                .repeat(50);
         let raw_len = large_payload.len();
 
         cache.put("playlist".to_string(), large_payload.clone());
@@ -198,6 +204,9 @@ mod tests {
 
         // Verify stored bytes are significantly less than raw bytes
         let mem_usage = cache.memory_usage_bytes();
-        assert!(mem_usage < raw_len / 3, "Memory usage should be compressed to < 1/3 of raw payload");
+        assert!(
+            mem_usage < raw_len / 3,
+            "Memory usage should be compressed to < 1/3 of raw payload"
+        );
     }
 }

@@ -745,18 +745,21 @@ object OnDeviceNsfwClassifier {
         synchronized(modelBufferLock) {
             sharedModelBuffer?.let { return it }
             return try {
-                val assetFd: AssetFileDescriptor = ctx.assets.openFd(MODEL_ASSET_PATH)
-                val inputStream = FileInputStream(assetFd.fileDescriptor)
-                val fileChannel = inputStream.channel
-                val startOffset = assetFd.startOffset
-                val declaredLength = assetFd.declaredLength
-                val buffer = fileChannel.map(
-                    FileChannel.MapMode.READ_ONLY,
-                    startOffset,
-                    declaredLength
-                )
-                sharedModelBuffer = buffer
-                buffer
+                ctx.assets.openFd(MODEL_ASSET_PATH).use { assetFd ->
+                    FileInputStream(assetFd.fileDescriptor).use { inputStream ->
+                        inputStream.channel.use { fileChannel ->
+                            val startOffset = assetFd.startOffset
+                            val declaredLength = assetFd.declaredLength
+                            val buffer = fileChannel.map(
+                                FileChannel.MapMode.READ_ONLY,
+                                startOffset,
+                                declaredLength
+                            )
+                            sharedModelBuffer = buffer
+                            buffer
+                        }
+                    }
+                }
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to memory map TFLite model: ${t.message}")
                 isModelPermanentlyUnavailable = true

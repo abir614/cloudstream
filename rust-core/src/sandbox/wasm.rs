@@ -1,8 +1,6 @@
-use wasmi::{
-    Config, Engine, Linker, Module, Store, StoreLimits, StoreLimitsBuilder,
-};
-use thiserror::Error;
 use crate::security::ssrf::validate_url_safety;
+use thiserror::Error;
+use wasmi::{Config, Engine, Linker, Module, Store, StoreLimits, StoreLimitsBuilder};
 
 #[derive(Error, Debug)]
 pub enum SandboxError {
@@ -56,53 +54,72 @@ impl WasmSandbox {
 
         // Capability 1: host_log
         linker
-            .func_wrap("env", "host_log", |mut caller: wasmi::Caller<HostContext>, ptr: i32, len: i32| -> Result<(), wasmi::Error> {
-                let memory = caller
-                    .get_export("memory")
-                    .and_then(|ext| ext.into_memory())
-                    .ok_or_else(|| wasmi::Error::new("Failed to get linear memory"))?;
+            .func_wrap(
+                "env",
+                "host_log",
+                |mut caller: wasmi::Caller<HostContext>,
+                 ptr: i32,
+                 len: i32|
+                 -> Result<(), wasmi::Error> {
+                    let memory = caller
+                        .get_export("memory")
+                        .and_then(|ext| ext.into_memory())
+                        .ok_or_else(|| wasmi::Error::new("Failed to get linear memory"))?;
 
-                let maybe_msg = {
+                    let maybe_msg = {
+                        let data = memory.data(&caller);
+                        let start = ptr as usize;
+                        let end = start + len as usize;
+
+                        if end <= data.len() {
+                            std::str::from_utf8(&data[start..end])
+                                .ok()
+                                .map(|s| s.to_string())
+                        } else {
+                            None
+                        }
+                    };
+
+                    if let Some(msg) = maybe_msg {
+                        caller.data_mut().logs.push(msg);
+                    }
+                    Ok(())
+                },
+            )
+            .map_err(|e| SandboxError::Instantiation(e.to_string()))?;
+
+        // Capability 2: host_validate_url (Anti-SSRF gate)
+        linker
+            .func_wrap(
+                "env",
+                "host_validate_url",
+                |caller: wasmi::Caller<HostContext>,
+                 ptr: i32,
+                 len: i32|
+                 -> Result<i32, wasmi::Error> {
+                    let memory = match caller
+                        .get_export("memory")
+                        .and_then(|ext| ext.into_memory())
+                    {
+                        Some(m) => m,
+                        None => return Ok(0),
+                    };
+
                     let data = memory.data(&caller);
                     let start = ptr as usize;
                     let end = start + len as usize;
 
                     if end <= data.len() {
-                        std::str::from_utf8(&data[start..end]).ok().map(|s| s.to_string())
-                    } else {
-                        None
+                        if let Ok(url_str) = std::str::from_utf8(&data[start..end]) {
+                            return match validate_url_safety(url_str) {
+                                Ok(_) => Ok(1),  // URL is safe
+                                Err(_) => Ok(0), // Blocked
+                            };
+                        }
                     }
-                };
-
-                if let Some(msg) = maybe_msg {
-                    caller.data_mut().logs.push(msg);
-                }
-                Ok(())
-            })
-            .map_err(|e| SandboxError::Instantiation(e.to_string()))?;
-
-        // Capability 2: host_validate_url (Anti-SSRF gate)
-        linker
-            .func_wrap("env", "host_validate_url", |caller: wasmi::Caller<HostContext>, ptr: i32, len: i32| -> Result<i32, wasmi::Error> {
-                let memory = match caller.get_export("memory").and_then(|ext| ext.into_memory()) {
-                    Some(m) => m,
-                    None => return Ok(0),
-                };
-
-                let data = memory.data(&caller);
-                let start = ptr as usize;
-                let end = start + len as usize;
-
-                if end <= data.len() {
-                    if let Ok(url_str) = std::str::from_utf8(&data[start..end]) {
-                        return match validate_url_safety(url_str) {
-                            Ok(_) => Ok(1), // URL is safe
-                            Err(_) => Ok(0), // Blocked
-                        };
-                    }
-                }
-                Ok(0)
-            })
+                    Ok(0)
+                },
+            )
             .map_err(|e| SandboxError::Instantiation(e.to_string()))?;
 
         Ok(Self { engine, linker })
@@ -120,7 +137,9 @@ impl WasmSandbox {
 
         let context = HostContext::new(max_memory_bytes);
         let mut store = Store::new(&self.engine, context);
-        store.set_fuel(initial_fuel).map_err(|e| SandboxError::Instantiation(e.to_string()))?;
+        store
+            .set_fuel(initial_fuel)
+            .map_err(|e| SandboxError::Instantiation(e.to_string()))?;
 
         let instance = self
             .linker

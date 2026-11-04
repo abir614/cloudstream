@@ -110,7 +110,8 @@ mod tests {
 
     #[test]
     fn test_sanitize_url_removes_tracking() {
-        let input = "https://example.com/watch?id=123&utm_source=twitter&utm_medium=social&token=abc";
+        let input =
+            "https://example.com/watch?id=123&utm_source=twitter&utm_medium=social&token=abc";
         let cleaned = sanitize_url(input);
         assert_eq!(cleaned, "https://example.com/watch?id=123&token=abc");
 
