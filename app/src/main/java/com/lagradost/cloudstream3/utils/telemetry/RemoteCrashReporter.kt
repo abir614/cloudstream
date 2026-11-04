@@ -332,7 +332,7 @@ object RemoteCrashReporter {
             payload.put("kernel", DeviceProfile.getKernelVersion())
 
             // 6. Application Version & Environment
-            payload.put("version", "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.BUILD_NUMBER})")
+            payload.put("version", "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})")
             payload.put("plugin", PluginManager.currentlyLoading ?: "None")
 
             // 7. Exception & Thread Diagnostics
