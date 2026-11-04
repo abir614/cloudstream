@@ -249,7 +249,7 @@ android {
         }
         create("prerelease") {
             dimension = "state"
-            applicationIdSuffix = ".prerelease"
+            applicationIdSuffix = ".csb"
             if (signingConfigs.names.contains("prerelease")) {
                 signingConfig = signingConfigs.getByName("prerelease").takeIf { it.storeFile != null }
             } else {

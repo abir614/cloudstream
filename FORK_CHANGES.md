@@ -267,5 +267,18 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 - **Document Offloading**: Long stack traces exceeding 1,200 characters are attached as `.txt` files directly via the Telegram Bot API.
 - **In-App Verification**: Added a dedicated **"Test Telemetry Alert"** action preference in **Settings -> Updates** ([`SettingsUpdatesScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsUpdatesScreen.kt)) with immediate feedback toasts.
 
+---
+
+## 13. Independent Application Identity & Side-by-Side Co-existence (`CSB`)
+
+### 13.1 Distinct Package Name (`com.lagradost.cloudstream3.csb`)
+- **Upstream Separation**: Upstream CloudStream Beta uses `com.lagradost.cloudstream3.prerelease`. To enable users to test this fork side-by-side with official CloudStream Beta without signature conflicts or package collision, the pre-release product flavor configures `applicationIdSuffix = ".csb"`, producing the unique package identifier:
+  `com.lagradost.cloudstream3.csb`
+- **Dynamic Authority & In-App Update Alignment**: `FileProvider` (`${applicationId}.provider`), intent filters, and in-app update identity gates in [`InAppUpdater.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/InAppUpdater.kt) automatically align to `com.lagradost.cloudstream3.csb`.
+
+### 13.2 Pre-Release App Name: `CSB`
+- Configured `<string name="app_name">CSB</string>` and `<string name="play_with_app_name">Play with CSB</string>` in [`app/src/prerelease/res/values/strings.xml`](app/src/prerelease/res/values/strings.xml), providing immediate visual differentiation on the Android launcher and system share sheets.
+
+
 
 
