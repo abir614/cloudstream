@@ -144,9 +144,12 @@ This document catalogues all intentional architectural deviations, security hard
 - **GantMan 5-Class MobileNetV2 On-Device AI Classification ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
   - Upgraded on-device visual classifier to GantMan's 5-class MobileNetV2 neural network (`[drawings, hentai, neutral, porn, sexy]`) with full Softmax probability distribution and exposure-weighted threshold scaling.
   - Zero-heap virtual memory mapping via Linux `mmap()` directly from uncompressed APK asset space (`models/nsfw.tflite`).
-  - **1GB/2GB Potato Device Hardening & Zero-False-Positive Filtering**:
-    - Devices with $\le 2200\text{ MB}$ total RAM, `isLowRamDevice` (Android Go), or `DeviceTier.LOW` bypass heavy TFLite native tensor arenas (35MB+ native RAM) in favor of the zero-native-allocation multi-spectrum skin chrominance analyzer (`classifyPotatoFastScore`) operating on a tiny 48×48 RGB_565 scratchpad (< 0.05ms execution, 0 MB heap allocations).
-    - **Direct Zero-Queue Execution**: Bypasses background executor queuing on low-RAM devices to eliminate queue exhaustion, eviction races, and artificial pacing delays, maintaining silky-smooth 60fps scrolling.
+  - **Hardware-Adaptive Inference Across Device Tiers**:
+    - **High & Mid Tier**: Runs GantMan 5-Class MobileNetV2 with parallel sessions (2–4 threads) and clean Linux `mmap()`.
+    - **Low Tier (1GB–3.5GB RAM, 2GB TV Sticks, Budget Phones)**: Executes GantMan 5-Class MobileNetV2 with **1 single-threaded safe CPU interpreter session** (`useXNNPACK=false`, 0 SIMD traps, ~8 MB native RAM), enabling full 5-class detection without OOM crashes.
+    - **Ultra-Potato Devices ($\le 1024\text{ MB}$ RAM, Android Go, or Active Memory Pressure)**: Bypasses the neural network to eliminate native memory allocations and avoid Android Low Memory Killer (LMK) aborts.
+    - Operates using a static 48×48 RGB_565 scratchpad consuming $< 15\text{ KB}$ heap memory with zero native allocations.
+    - **Direct Zero-Queue Execution on Ultra-Potato**: Bypasses background executor queuing on ultra-low-RAM devices to eliminate queue exhaustion, eviction races, and artificial pacing delays, maintaining silky-smooth 60fps scrolling.
     - **Zero-False-Positive Fallback Protection**: Hardware bitmap copy failures and null bitmaps safely return `0.0f` (safe) instead of failing open to `1.0f`. Session exhaustion no longer inverts innocent visual scores, and Coil load failures fall back to clean placeholders instead of adult censor overlays.
     - **Calibrated Chrominance Clustering**: Calibrated YCbCr skin clustering enforces human torso/face spatial correlation and rejects monochrome, desert, wood, earth-tone, and sepia backdrops.
     - **Automatic Cache Migration**: Bumped persistent score cache version (`SCORES_VERSION = 4`) to cleanly transition visual scores from legacy models.

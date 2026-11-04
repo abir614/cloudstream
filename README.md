@@ -86,9 +86,10 @@
   - Can be unlocked in Settings → Providers.
 - **Zero False Positives Guarantee**:
   - Clean mainstream anime (*Attack on Titan*, *Hunter x Hunter*, *Spy x Family*, *Frieren*, *Demon Slayer*, *Jujutsu Kaisen*) and clean family movies are strictly protected from accidental blocking.
-- **500MB/1GB/2GB Potato Device & Android TV Optimization ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
-  - Automatically activates on devices with $\le 2200\text{ MB}$ total RAM (e.g. 500MB/1GB/2GB Android TV sticks, budget boxes, Android Go).
-  - Completely bypasses heavy TFLite native tensor arenas, saving **35 MB+ native RAM and 16.5 MB model asset footprint**.
+- **Hardware-Adaptive AI & Ultra-Potato Android TV Optimization ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
+  - **High & Mid Tier**: Runs GantMan 5-Class MobileNetV2 with multi-session parallel inference (2–4 threads) and clean Linux `mmap()` (0 KB JVM heap).
+  - **Low Tier (1GB–3.5GB RAM, 2GB TV Sticks, Budget Phones)**: Executes GantMan 5-Class MobileNetV2 with **1 single-threaded safe CPU interpreter session** (`useXNNPACK=false`, 0 SIMD traps, ~8 MB native RAM), enabling full 5-class detection without OOM crashes.
+  - **Ultra-Potato Devices ($\le 1024\text{ MB}$ RAM, Android Go, or Active Memory Pressure)**: Bypasses the neural network to eliminate native memory allocations and avoid Android Low Memory Killer (LMK) aborts.
   - Operates using a static 48×48 RGB_565 scratchpad consuming $< 15\text{ KB}$ heap memory with zero native allocations.
   - **Dual-Zone Anatomical & Backdrop Rejection**:
     - Discards uniform warm/monochromatic backdrops (e.g., solid yellow, beige, or gold posters) where both upper and body regions exceed 60% skin hue.

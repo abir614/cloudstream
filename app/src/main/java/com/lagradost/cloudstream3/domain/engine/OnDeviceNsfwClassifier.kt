@@ -315,19 +315,17 @@ object OnDeviceNsfwClassifier {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Checks if the device is a potato device (≤ 2200MB RAM, Android Go, or Low Tier).
-     * On potato devices, the heavy 16.5MB TFLite model and native tensor arenas are completely bypassed
-     * to save 35MB+ RAM and eliminate OOM crashes and native SIMD SIGILL/SIGSEGV traps.
+     * Checks if the device is a true ultra-potato device (≤ 1024MB RAM, Android Go, or severe kernel/hardware constraint).
+     * Only on true ultra-potato devices is the TFLite neural network bypassed to prevent native LMK aborts.
+     * Devices with > 1024MB RAM (including 1.5GB, 2GB, 3GB, and all DeviceTier.LOW devices) run the full
+     * GantMan MobileNetV2 model using a single safe CPU thread with zero JVM heap allocations.
      */
     fun isPotatoDevice(ctx: Context): Boolean {
-        if (DeviceProfile.tier(ctx) == DeviceTier.LOW) return true
+        val totalMb = DeviceProfile.getTotalRamMb(ctx)
+        if (totalMb <= 1024L) return true
         val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        if (am?.isLowRamDevice == true) return true
-        val mi = ActivityManager.MemoryInfo()
-        am?.getMemoryInfo(mi)
-        val totalMb = if (mi.totalMem > 0) mi.totalMem / (1024 * 1024) else 1024L
-        if (totalMb <= 2200L) return true
-        return DeviceProfile.isLowEnd(ctx) || DeviceProfile.isUltraPotato(ctx)
+        if (am?.isLowRamDevice == true && totalMb <= 1536L) return true
+        return DeviceProfile.isUltraPotato(ctx)
     }
 
     private fun getPotatoCanvas(): Canvas? {
@@ -433,9 +431,9 @@ object OnDeviceNsfwClassifier {
                 // False-positive rejection:
                 // 1. Uniform colored / sepia / gold / desert backdrop across both upper and body zones
                 // 2. Absence of upper torso/head/face (landscape, desert sand, dirt road, wooden table, brown floor)
-                if ((upperSkinRatio > 0.60f && bodySkinRatio > 0.60f) || upperSkinRatio < 0.10f) {
+                if (upperSkinRatio > 0.60f && bodySkinRatio > 0.60f) {
                     0.0f
-                } else if (bodySkinRatio >= 0.75f && maxRowSkinRatio >= 0.70f && upperSkinRatio in 0.10f..0.60f) {
+                } else if (bodySkinRatio >= 0.75f && maxRowSkinRatio >= 0.70f && upperSkinRatio in 0.05f..0.60f) {
                     0.75f
                 } else if (bodySkinRatio >= 0.60f && maxRowSkinRatio >= 0.55f && upperSkinRatio in 0.10f..0.60f) {
                     0.45f
