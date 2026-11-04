@@ -240,7 +240,22 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
         }
     }
 
+    protected fun dismissAllDialogs() {
+        val act = activity
+        selectSourceDialog.dismissSafe(act)
+        selectSourceDialog = null
+        selectTrackDialog.dismissSafe(act)
+        selectTrackDialog = null
+        selectSpeedDialog.dismissSafe(act)
+        selectSpeedDialog = null
+        selectSubtitlesDialog.dismissSafe(act)
+        selectSubtitlesDialog = null
+        selectCompressorDialog.dismissSafe(act)
+        selectCompressorDialog = null
+    }
+
     override fun onDestroyView() {
+        dismissAllDialogs()
         playerHostView?.releaseOverlayLayoutListener()
         playerBinding = null
         super.onDestroyView()
@@ -494,6 +509,7 @@ open class FullScreenPlayer : AbstractPlayerFragment<FragmentPlayerBinding>(
     }
 
     override fun onDestroy() {
+        dismissAllDialogs()
         playerHostView?.exitFullscreen()
         super.onDestroy()
     }

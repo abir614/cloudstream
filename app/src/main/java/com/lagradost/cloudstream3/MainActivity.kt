@@ -725,6 +725,8 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
     }
 
     override fun onDestroy() {
+        hidePreviewPopupDialog()
+        binding = null
         filesToDelete.forEach { path ->
             val result = File(path).deleteRecursively()
             if (result) {
