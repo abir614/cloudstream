@@ -201,7 +201,10 @@ pub fn verify_apk_identity(
     }
 
     // 2. Anti-Rollback Protection (stable requires strictly greater versionCode; pre-release allows same versionCode tracking git commits)
-    let is_prerelease = actual_pkg.contains("prerelease") || expected_pkg.contains("prerelease");
+    let is_prerelease = actual_pkg.contains("prerelease")
+        || expected_pkg.contains("prerelease")
+        || actual_pkg.ends_with(".beta")
+        || expected_pkg.ends_with(".beta");
     let is_rollback = if is_prerelease {
         apk_version_code < installed_version_code
     } else {
@@ -398,7 +401,7 @@ mod tests {
             .contains("Anti-rollback"));
 
         // Pre-release allows same version code (tracks commits)
-        let prerelease_pkg = "com.lagradost.cloudstream3.prerelease";
+        let prerelease_pkg = "com.lagradost.cloudstream3.beta";
         let prerelease_same_version = verify_apk_identity(
             path,
             &nonce,

@@ -183,6 +183,8 @@ android {
         versionName = getAutoVersionName()
 
         manifestPlaceholders["target_sdk_version"] = libs.versions.targetSdk.get()
+        manifestPlaceholders["appLabel"] = "@string/app_name"
+        manifestPlaceholders["playWithAppLabel"] = "@string/play_with_app_name"
 
         // Reads local.properties
         val localProperties = gradleLocalProperties(rootDir, project.providers)
@@ -242,6 +244,9 @@ android {
     productFlavors {
         create("stable") {
             dimension = "state"
+            applicationIdSuffix = ".stable"
+            manifestPlaceholders["appLabel"] = "@string/app_name"
+            manifestPlaceholders["playWithAppLabel"] = "@string/play_with_app_name"
             if (signingConfigs.names.contains("prerelease")) {
                 signingConfig = signingConfigs.getByName("prerelease").takeIf { it.storeFile != null }
             }
@@ -249,7 +254,9 @@ android {
         }
         create("prerelease") {
             dimension = "state"
-            applicationIdSuffix = ".csb"
+            applicationIdSuffix = ".beta"
+            manifestPlaceholders["appLabel"] = "CSB"
+            manifestPlaceholders["playWithAppLabel"] = "Play with CSB"
             if (signingConfigs.names.contains("prerelease")) {
                 signingConfig = signingConfigs.getByName("prerelease").takeIf { it.storeFile != null }
             } else {

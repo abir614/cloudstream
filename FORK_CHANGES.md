@@ -271,14 +271,15 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 
 ## 13. Independent Application Identity & Side-by-Side Co-existence (`CSB`)
 
-### 13.1 Distinct Package Name (`com.lagradost.cloudstream3.csb`)
-- **Upstream Separation**: Upstream CloudStream Beta uses `com.lagradost.cloudstream3.prerelease`. To enable users to test this fork side-by-side with official CloudStream Beta without signature conflicts or package collision, the pre-release product flavor configures `applicationIdSuffix = ".csb"`, producing the unique package identifier:
-  `com.lagradost.cloudstream3.csb`
-- **Dynamic Authority & In-App Update Alignment**: `FileProvider` (`${applicationId}.provider`), intent filters, and in-app update identity gates in [`InAppUpdater.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/InAppUpdater.kt) automatically align to `com.lagradost.cloudstream3.csb`.
+### 13.1 Distinct Package Identifiers
+- **Upstream Separation**: Official upstream CloudStream Beta uses `com.lagradost.cloudstream3.prerelease` and official stable uses `com.lagradost.cloudstream3`. Installing our fork alongside upstream previously caused package name and signature collisions (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`).
+- **Dedicated Fork Package Names**:
+  - **Pre-Release Flavor**: `applicationIdSuffix = ".beta"` produces:
+    `com.lagradost.cloudstream3.beta`
+  - **Stable Flavor**: `applicationIdSuffix = ".stable"` produces:
+    `com.lagradost.cloudstream3.stable`
+- **Dynamic Authority & In-App Update Alignment**: `FileProvider` (`${applicationId}.provider`), intent filters, `downloadedplayer` task affinity (`${applicationId}.downloadedplayer`), and in-app update identity gates in [`InAppUpdater.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/InAppUpdater.kt) (`PRERELEASE_PACKAGE_NAME = "com.lagradost.cloudstream3.beta"`) automatically align to the respective application ID.
 
-### 13.2 Pre-Release App Name: `CSB`
-- Configured `<string name="app_name">CSB</string>` and `<string name="play_with_app_name">Play with CSB</string>` in [`app/src/prerelease/res/values/strings.xml`](app/src/prerelease/res/values/strings.xml), providing immediate visual differentiation on the Android launcher and system share sheets.
-
-
-
-
+### 13.2 Launcher Identity & App Name: `CSB`
+- **Unconditional Launcher Label**: `manifestPlaceholders["appLabel"] = "CSB"` directly inlines the string `"CSB"` into `<application android:label="${appLabel}">` and launcher `<activity android:label="${appLabel}">` in [`AndroidManifest.xml`](app/src/main/AndroidManifest.xml), guaranteeing that the launcher and system app list unconditionally display **`CSB`** on all devices across all system locales.
+- **Resource Definition**: [`app/src/prerelease/res/values/strings.xml`](app/src/prerelease/res/values/strings.xml) defines `<string name="app_name">CSB</string>` and `<string name="play_with_app_name">Play with CSB</string>`, providing visual differentiation on launcher icons, TV home channels, and system share sheets.

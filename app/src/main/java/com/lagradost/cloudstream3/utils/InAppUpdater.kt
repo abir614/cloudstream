@@ -53,7 +53,7 @@ object InAppUpdater {
     private const val GITHUB_USER_NAME = "abir614"
     private const val GITHUB_REPO = "cloudstream"
 
-    private const val PRERELEASE_PACKAGE_NAME = "com.lagradost.cloudstream3.csb"
+    private const val PRERELEASE_PACKAGE_NAME = "com.lagradost.cloudstream3.beta"
     private const val LOG_TAG = "InAppUpdater"
 
     @Serializable
