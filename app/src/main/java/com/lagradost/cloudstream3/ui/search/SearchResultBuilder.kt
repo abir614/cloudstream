@@ -36,6 +36,21 @@ import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
 import com.lagradost.cloudstream3.utils.getImageFromDrawable
 
 object SearchResultBuilder {
+    private class CardViewHolder(
+        val cardView: ImageView,
+        val cardText: TextView?,
+        val textIsDub: TextView?,
+        val textIsSub: TextView?,
+        val textFlag: TextView?,
+        val rating: TextView?,
+        val textQuality: TextView?,
+        val shadow: View?,
+        val bg: CardView,
+        val bar: ProgressBar?,
+        val playImg: ImageView?,
+        val episodeText: TextView?
+    )
+
     @Volatile var cachedShowSub: Boolean = false; private set
     @Volatile var cachedShowDub: Boolean = false; private set
     @Volatile var cachedShowTitle: Boolean = false; private set
@@ -70,22 +85,33 @@ object SearchResultBuilder {
         if (!isCacheInitialized) {
             updateCache(itemView.context)
         }
-        val cardView: ImageView = itemView.findViewById(R.id.imageView)
-        val cardText: TextView? = itemView.findViewById(R.id.imageText)
+        val vh = (itemView.getTag(R.id.card_view_holder_tag) as? CardViewHolder) ?: CardViewHolder(
+            cardView = itemView.findViewById(R.id.imageView),
+            cardText = itemView.findViewById(R.id.imageText),
+            textIsDub = itemView.findViewById(R.id.text_is_dub),
+            textIsSub = itemView.findViewById(R.id.text_is_sub),
+            textFlag = itemView.findViewById(R.id.text_flag),
+            rating = itemView.findViewById(R.id.text_rating),
+            textQuality = itemView.findViewById(R.id.text_quality),
+            shadow = itemView.findViewById(R.id.title_shadow),
+            bg = itemView.findViewById(R.id.background_card),
+            bar = itemView.findViewById(R.id.watchProgress),
+            playImg = itemView.findViewById(R.id.search_item_download_play),
+            episodeText = itemView.findViewById(R.id.episode_text)
+        ).also { itemView.setTag(R.id.card_view_holder_tag, it) }
 
-        val textIsDub: TextView? = itemView.findViewById(R.id.text_is_dub)
-        val textIsSub: TextView? = itemView.findViewById(R.id.text_is_sub)
-        val textFlag: TextView? = itemView.findViewById(R.id.text_flag)
-        val rating: TextView? = itemView.findViewById(R.id.text_rating)
-
-        val textQuality: TextView? = itemView.findViewById(R.id.text_quality)
-        val shadow: View? = itemView.findViewById(R.id.title_shadow)
-
-        val bg: CardView = itemView.findViewById(R.id.background_card)
-
-        val bar: ProgressBar? = itemView.findViewById(R.id.watchProgress)
-        val playImg: ImageView? = itemView.findViewById(R.id.search_item_download_play)
-        val episodeText: TextView? = itemView.findViewById(R.id.episode_text)
+        val cardView = vh.cardView
+        val cardText = vh.cardText
+        val textIsDub = vh.textIsDub
+        val textIsSub = vh.textIsSub
+        val textFlag = vh.textFlag
+        val rating = vh.rating
+        val textQuality = vh.textQuality
+        val shadow = vh.shadow
+        val bg = vh.bg
+        val bar = vh.bar
+        val playImg = vh.playImg
+        val episodeText = vh.episodeText
 
         // Do logic
 
@@ -154,9 +180,9 @@ object SearchResultBuilder {
 
         fun hideCardItem() {
             cardView.setImageDrawable(null)
-            itemView.findViewById<View>(R.id.background_card)?.isVisible = false
-            itemView.findViewById<View>(R.id.imageText)?.isVisible = false
-            itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
+            bg.isVisible = false
+            cardText?.isVisible = false
+            shadow?.isVisible = false
             itemView.setOnClickListener(null)
             itemView.setOnLongClickListener(null)
             itemView.onFocusChangeListener = null
@@ -186,9 +212,9 @@ object SearchResultBuilder {
         itemView.isClickable = true
         itemView.isFocusable = true
         itemView.isFocusableInTouchMode = true
-        itemView.findViewById<View>(R.id.background_card)?.isVisible = true
-        itemView.findViewById<View>(R.id.imageText)?.isVisible = showTitle
-        itemView.findViewById<View>(R.id.title_shadow)?.isVisible = true
+        bg.isVisible = true
+        cardText?.isVisible = showTitle
+        shadow?.isVisible = true
         val lp = itemView.layoutParams
         if (lp != null && (lp.width == 0 || lp.height == 0)) {
             lp.width = ViewGroup.LayoutParams.WRAP_CONTENT
