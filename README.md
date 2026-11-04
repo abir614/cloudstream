@@ -88,14 +88,14 @@
   - Clean mainstream anime (*Attack on Titan*, *Hunter x Hunter*, *Spy x Family*, *Frieren*, *Demon Slayer*, *Jujutsu Kaisen*) and clean family movies are strictly protected from accidental blocking.
 - **500MB/1GB/2GB Potato Device & Android TV Optimization ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
   - Automatically activates on devices with $\le 2200\text{ MB}$ total RAM (e.g. 500MB/1GB/2GB Android TV sticks, budget boxes, Android Go).
-  - Completely bypasses heavy TFLite native tensor arenas, saving **35 MB native RAM and 5.7 MB Dalvik heap**.
+  - Completely bypasses heavy TFLite native tensor arenas, saving **35 MB+ native RAM and 16.5 MB model asset footprint**.
   - Operates using a static 48×48 RGB_565 scratchpad consuming $< 15\text{ KB}$ heap memory with zero native allocations.
   - **Dual-Zone Anatomical & Backdrop Rejection**:
     - Discards uniform warm/monochromatic backdrops (e.g., solid yellow, beige, or gold posters) where both upper and body regions exceed 60% skin hue.
     - Requires concentrated anatomical skin clustering ($\ge 22\%$ in at least one row) to prevent dispersed noise from falsely triggering filters.
   - **Safe Asynchronous Worker**:
-    - Uses `WeakReference<Drawable>` to eliminate GC pinning during fast remote scrolling.
-    - Rate-limits queue depth to maintain buttery smooth 60/120fps UI rendering with zero frame drops or OutOfMemory errors.
+    - Uses `WeakReference<ImageView>` to eliminate view recycling races and GC pinning during fast remote scrolling.
+    - Rate-limits queue depth with smart eviction to maintain buttery smooth 60/120fps UI rendering with zero frame drops or OutOfMemory errors.
 
 ### 8. Streamlined Release Packaging
 Each CI release generates exactly 6 organized artifacts with zero duplicate files:
