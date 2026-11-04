@@ -346,25 +346,41 @@ object SearchResultBuilder {
             }
         }
 
-        // This is the logic for making the rounded corners more round on the top and bottom element
-        // a bit dirty to do memory allocation, but it makes it more extensible and is easier to reason about
-        // then a large if statement
+        // Zero-allocation rounded corner styling for badges (ordering: textIsDub -> textIsSub -> rating)
+        val dubVis = textIsDub?.isVisible == true
+        val subVis = textIsSub?.isVisible == true
+        val ratingVis = rating?.isVisible == true
+        val badgeCount = (if (dubVis) 1 else 0) + (if (subVis) 1 else 0) + (if (ratingVis) 1 else 0)
 
-        // Requires that the ordering here is the same as in the xml
-        val boxes = arrayListOf<TextView>()
-        for (view in arrayOf(textIsDub, textIsSub, rating)) {
-            if (view?.isVisible == true) {
-                boxes.add(view)
+        when (badgeCount) {
+            1 -> {
+                when {
+                    dubVis -> textIsDub?.setBackgroundResource(R.drawable.bg_color_both)
+                    subVis -> textIsSub?.setBackgroundResource(R.drawable.bg_color_both)
+                    ratingVis -> rating?.setBackgroundResource(R.drawable.bg_color_both)
+                }
             }
-        }
-        if (boxes.size == 1) {
-            boxes[0].setBackgroundResource(R.drawable.bg_color_both)
-        } else if (boxes.size > 1) {
-            boxes[0].setBackgroundResource(R.drawable.bg_color_top)
-            for (i in 1 until boxes.size) {
-                boxes[i].setBackgroundResource(R.drawable.bg_color_center)
+            2 -> {
+                when {
+                    dubVis && subVis -> {
+                        textIsDub?.setBackgroundResource(R.drawable.bg_color_top)
+                        textIsSub?.setBackgroundResource(R.drawable.bg_color_bottom)
+                    }
+                    dubVis && ratingVis -> {
+                        textIsDub?.setBackgroundResource(R.drawable.bg_color_top)
+                        rating?.setBackgroundResource(R.drawable.bg_color_bottom)
+                    }
+                    subVis && ratingVis -> {
+                        textIsSub?.setBackgroundResource(R.drawable.bg_color_top)
+                        rating?.setBackgroundResource(R.drawable.bg_color_bottom)
+                    }
+                }
             }
-            boxes[boxes.size - 1].setBackgroundResource(R.drawable.bg_color_bottom)
+            3 -> {
+                textIsDub?.setBackgroundResource(R.drawable.bg_color_top)
+                textIsSub?.setBackgroundResource(R.drawable.bg_color_center)
+                rating?.setBackgroundResource(R.drawable.bg_color_bottom)
+            }
         }
         textIsDub?.apply {
             backgroundTintList = ColorStateList.valueOf(context.colorFromAttribute(R.attr.textColor))
