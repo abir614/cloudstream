@@ -104,12 +104,43 @@ object RemoteCrashReporter {
         }
     }
 
+    @Volatile
+    private var cachedDeviceId: String? = null
+
+    /**
+     * Retrieves or generates an anonymous, persistent installation ID for CGNAT-safe rate limiting.
+     */
+    private fun getOrCreateDeviceId(context: Context?): String {
+        cachedDeviceId?.let { return it }
+        val ctx = context ?: getContext() ?: return "unknown_device"
+        val id = try {
+            val file = ctx.filesDir.resolve("telemetry_device_id")
+            if (file.exists() && file.isFile) {
+                file.readText().trim().ifBlank {
+                    val newId = java.util.UUID.randomUUID().toString()
+                    file.writeText(newId)
+                    newId
+                }
+            } else {
+                val newId = java.util.UUID.randomUUID().toString()
+                file.writeText(newId)
+                newId
+            }
+        } catch (_: Throwable) {
+            "fallback_device_id"
+        }
+        cachedDeviceId = id
+        return id
+    }
+
     // --- Ephemeral ECDH & HKDF Cryptographic Protocol ---
 
     data class HandshakeTicket(
         val serverPublicKeyBytes: ByteArray,
         val epoch: Long,
-        val ticket: String
+        val ticket: String,
+        val challenge: String = "",
+        val difficulty: Int = 0
     )
 
     /**
@@ -123,13 +154,14 @@ object RemoteCrashReporter {
 
     /**
      * Performs a rotating handshake with the Cloudflare Worker edge.
-     * Transmits the client ephemeral public key and receives an encrypted session ticket.
+     * Transmits the client ephemeral public key and receives an encrypted session ticket + PoW challenge.
      */
     private fun performHandshake(clientKeyPair: KeyPair): HandshakeTicket? {
         return try {
             val clientPubSpki = clientKeyPair.public.encoded
             val reqJson = JSONObject().apply {
                 put("client_pub", base64Encode(clientPubSpki))
+                put("device_id", getOrCreateDeviceId(getContext()))
             }
 
             val request = Request.Builder()
@@ -151,15 +183,51 @@ object RemoteCrashReporter {
             val serverPubB64 = resJson.getString("server_pub")
             val epoch = resJson.getLong("epoch")
             val ticket = resJson.getString("ticket")
+            val challenge = resJson.optString("challenge", "")
+            val difficulty = resJson.optInt("difficulty", 0)
 
             HandshakeTicket(
                 serverPublicKeyBytes = base64Decode(serverPubB64),
                 epoch = epoch,
-                ticket = ticket
+                ticket = ticket,
+                challenge = challenge,
+                difficulty = difficulty
             )
         } catch (t: Throwable) {
             Log.w(TAG, "Handshake failed: ${t.message}")
             null
+        }
+    }
+
+    /**
+     * Solves the Proof-of-Work challenge using an allocation-free bitwise verification loop.
+     * Real device computation: ~10-25ms. Automated spam scripts: CPU throttled.
+     */
+    private fun solveProofOfWork(challenge: String, difficulty: Int): Long {
+        if (challenge.isBlank() || difficulty <= 0) return 0L
+        return try {
+            val md = java.security.MessageDigest.getInstance("SHA-256")
+            var nonce = 0L
+            val maxIterations = 1_000_000L
+            while (nonce < maxIterations) {
+                val input = "$challenge:$nonce".toByteArray(Charsets.UTF_8)
+                md.reset()
+                val hash = md.digest(input)
+                val b0 = hash[0].toInt() and 0xFF
+                val b1 = hash[1].toInt() and 0xFF
+                if (difficulty == 3) {
+                    if (b0 == 0 && (b1 shr 4) == 0) return nonce
+                } else if (difficulty == 4) {
+                    if (b0 == 0 && b1 == 0) return nonce
+                } else {
+                    val hex = hash.joinToString("") { "%02x".format(it) }
+                    if (hex.startsWith("0".repeat(difficulty))) return nonce
+                }
+                nonce++
+            }
+            0L
+        } catch (_: Throwable) {
+            0L
         }
     }
 
@@ -199,6 +267,7 @@ object RemoteCrashReporter {
     private fun encryptPayload(
         payloadJson: JSONObject,
         ticket: String,
+        nonce: Long,
         sessionKeyBytes: ByteArray
     ): JSONObject {
         val iv = ByteArray(12)
@@ -213,6 +282,7 @@ object RemoteCrashReporter {
 
         return JSONObject().apply {
             put("ticket", ticket)
+            put("nonce", nonce)
             put("iv", base64Encode(iv))
             put("ciphertext", base64Encode(ciphertextWithTag))
         }
@@ -226,13 +296,15 @@ object RemoteCrashReporter {
             val clientKeyPair = generateEphemeralKeyPair()
             val ticket = performHandshake(clientKeyPair) ?: return false
 
+            val nonce = solveProofOfWork(ticket.challenge, ticket.difficulty)
+
             val sessionKey = deriveSessionKey(
                 clientPrivateKey = clientKeyPair.private,
                 serverPubKeyBytes = ticket.serverPublicKeyBytes,
                 epoch = ticket.epoch
             )
 
-            val encryptedBody = encryptPayload(payload, ticket.ticket, sessionKey)
+            val encryptedBody = encryptPayload(payload, ticket.ticket, nonce, sessionKey)
 
             val request = Request.Builder()
                 .url(REPORT_ENDPOINT)
