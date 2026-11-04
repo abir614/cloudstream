@@ -396,9 +396,9 @@ object OnDeviceNsfwClassifier {
                 // 2. Absence of upper torso/head/face (landscape, desert sand, dirt road, wooden table, brown floor)
                 if ((upperSkinRatio > 0.60f && bodySkinRatio > 0.60f) || upperSkinRatio < 0.10f) {
                     0.0f
-                } else if (bodySkinRatio >= 0.75f && maxRowSkinRatio >= 0.70f && upperSkinRatio in 0.12f..0.60f) {
+                } else if (bodySkinRatio >= 0.75f && maxRowSkinRatio >= 0.70f && upperSkinRatio in 0.10f..0.60f) {
                     0.75f
-                } else if (bodySkinRatio >= 0.60f && maxRowSkinRatio >= 0.55f && upperSkinRatio in 0.12f..0.60f) {
+                } else if (bodySkinRatio >= 0.60f && maxRowSkinRatio >= 0.55f && upperSkinRatio in 0.10f..0.60f) {
                     0.45f
                 } else {
                     0.0f

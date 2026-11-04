@@ -86,8 +86,8 @@
   - Can be unlocked in Settings → Providers.
 - **Zero False Positives Guarantee**:
   - Clean mainstream anime (*Attack on Titan*, *Hunter x Hunter*, *Spy x Family*, *Frieren*, *Demon Slayer*, *Jujutsu Kaisen*) and clean family movies are strictly protected from accidental blocking.
-- **500MB Potato Device & Android TV Optimization ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
-  - Automatically activates on devices with $\le 1024\text{ MB}$ total RAM (e.g. 500MB/1GB Android TV sticks, budget boxes, Android Go).
+- **500MB/1GB/2GB Potato Device & Android TV Optimization ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
+  - Automatically activates on devices with $\le 2200\text{ MB}$ total RAM (e.g. 500MB/1GB/2GB Android TV sticks, budget boxes, Android Go).
   - Completely bypasses heavy TFLite native tensor arenas, saving **35 MB native RAM and 5.7 MB Dalvik heap**.
   - Operates using a static 48×48 RGB_565 scratchpad consuming $< 15\text{ KB}$ heap memory with zero native allocations.
   - **Dual-Zone Anatomical & Backdrop Rejection**:

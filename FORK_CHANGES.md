@@ -109,14 +109,14 @@ This document catalogues all intentional architectural deviations, security hard
 - **`HIGH`**: Devices with >4GB total RAM.
 
 ### 4.2 Network Concurrency Scaling
-- **LOW**: Max requests: 24, max per host: 4, idle connections: 3, keep-alive: 1 min.
-- **MID**: Max requests: 48, max per host: 5, idle connections: 5, keep-alive: 3 min.
-- **HIGH**: Max requests: 64, max per host: 6, idle connections: 8, keep-alive: 5 min.
+- **LOW**: Max requests: 32 (16 on ultra-potato), max per host: 10 (4 on ultra-potato), idle connections: 6 (2 on ultra-potato), keep-alive: 2 min (1 min on ultra-potato), disk cache: 30 MiB (15 MiB on ultra-potato).
+- **MID**: Max requests: 64, max per host: 16, idle connections: 12, keep-alive: 4 min, disk cache: 50 MiB.
+- **HIGH**: Max requests: 96, max per host: 24, idle connections: 20, keep-alive: 5 min, disk cache: 100 MiB.
 
 ### 4.3 Image Caching & Decoding (Coil) (§5.5)
-- **LOW**: 10% memory cache, crossfade disabled, hardware bitmaps disabled, `RGB_565` bitmap configuration (halving poster memory consumption).
-- **MID**: 20% memory cache, 150ms crossfade, `ARGB_8888`.
-- **HIGH**: 25% memory cache, 250ms crossfade, `ARGB_8888`.
+- **LOW**: 10% memory cache (5% on ultra-potato), crossfade disabled (0ms), hardware bitmaps disabled, `RGB_565` bitmap configuration (halving poster memory consumption).
+- **MID**: 20% memory cache, 150ms crossfade, hardware bitmaps enabled, `ARGB_8888`.
+- **HIGH**: 25% memory cache, 150ms crossfade, hardware bitmaps enabled, `ARGB_8888`.
 
 ### 4.4 Media3 / ExoPlayer LoadControl Buffers (§5.6)
 - **LOW**: Minimum buffer: 10s, maximum buffer: 25s, target buffer: 12 MB, back buffer: 5s.
