@@ -42,6 +42,7 @@ object SearchResultBuilder {
     @Volatile var cachedShowEpisodeText: Boolean = false; private set
     @Volatile var cachedShowHd: Boolean = false; private set
     @Volatile var cachedShowRatingView: Boolean = false; private set
+    @Volatile private var isCacheInitialized: Boolean = false
 
     fun updateCache(context: Context?) {
         if (context == null) return
@@ -53,6 +54,7 @@ object SearchResultBuilder {
         cachedShowEpisodeText = settingsManager.getBoolean(context.getString(R.string.show_episode_text_key), false)
         cachedShowHd = settingsManager.getBoolean(context.getString(R.string.show_hd_key), false)
         cachedShowRatingView = settingsManager.getBoolean(context.getString(R.string.show_rating_key), false)
+        isCacheInitialized = true
     }
 
     @SuppressLint("StringFormatInvalid")
@@ -65,6 +67,9 @@ object SearchResultBuilder {
         nextFocusDown: Int? = null,
         colorCallback: ((Palette) -> Unit)? = null
     ) {
+        if (!isCacheInitialized) {
+            updateCache(itemView.context)
+        }
         val cardView: ImageView = itemView.findViewById(R.id.imageView)
         val cardText: TextView? = itemView.findViewById(R.id.imageText)
 
