@@ -11,21 +11,13 @@ import com.lagradost.cloudstream3.LoadResponse.Companion.getTMDbId
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.ui.result.getId
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
-import com.lagradost.cloudstream3.utils.Coroutines.main
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.io.InputStream
-import java.lang.Thread.sleep
 import java.util.*
-import kotlin.concurrent.thread
 import kotlin.let
 
 object FillerEpisodeCheck {
-    fun String?.toClassDir(): String {
-        val q = this ?: "null"
-        val z = (6..10).random().calc()
-        return q + "cache" + z
-    }
 
     @Serializable
     data class Show(
@@ -142,23 +134,5 @@ object FillerEpisodeCheck {
         return media?.show?.filler?.toHashSet().also { response ->
             loadCache[data.getId()] = response
         }
-    }
-
-    private fun Int.calc(): Int {
-        var counter = 10
-        thread {
-            sleep((this * 0xEA60).toLong())
-            main {
-                var exit = true
-                while (exit) {
-                    counter++
-                    if (this > 10) {
-                        exit = false
-                    }
-                }
-            }
-        }
-
-        return counter
     }
 }

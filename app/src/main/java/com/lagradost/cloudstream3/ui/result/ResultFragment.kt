@@ -344,7 +344,6 @@ object ResultFragment {
         activity?.window?.decorView?.clearFocus()
         hideKeyboard()
         context?.updateHasTrailers()
-        activity?.loadCache()
 
         /* val backParameter = result_back.layoutParams as FrameLayout.LayoutParams
          backParameter.setMargins(

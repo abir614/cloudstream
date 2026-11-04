@@ -152,28 +152,60 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                 com.lagradost.cloudstream3.utils.telemetry.TelemetryService.Level.WARN
             )
             val memCache = SingletonImageLoader.get(this).memoryCache
-            if (memCache != null) {
-                if (level >= TRIM_MEMORY_RUNNING_LOW || level >= TRIM_MEMORY_MODERATE) {
-                    memCache.clear()
-                } else if (level >= TRIM_MEMORY_BACKGROUND) {
-                    memCache.trimToSize(memCache.size / 2)
+            when {
+                // Background LRU levels (ordered from most severe to least)
+                level >= TRIM_MEMORY_COMPLETE -> {
+                    memCache?.clear()
+                    try {
+                        com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
+                        com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
+                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
+                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
+                    } catch (_: Throwable) {
+                    }
+                    System.gc()
                 }
-            }
-            if (level >= TRIM_MEMORY_RUNNING_LOW || level >= TRIM_MEMORY_MODERATE) {
-                try {
-                    com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
-                    com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
-                    com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
-                } catch (_: Throwable) {
+                level >= TRIM_MEMORY_MODERATE -> {
+                    memCache?.clear()
+                    try {
+                        com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
+                        com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
+                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
+                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
+                    } catch (_: Throwable) {
+                    }
                 }
-            }
-            if (level >= TRIM_MEMORY_UI_HIDDEN) {
-                thread(start = true, isDaemon = true, name = "BackgroundScoreFlush") {
-                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(this)
+                level >= TRIM_MEMORY_BACKGROUND -> {
+                    memCache?.trimToSize(memCache.size / 2)
                 }
-            }
-            if (level >= TRIM_MEMORY_RUNNING_CRITICAL) {
-                System.gc()
+                level >= TRIM_MEMORY_UI_HIDDEN -> {
+                    thread(start = true, isDaemon = true, name = "BackgroundScoreFlush") {
+                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(this)
+                    }
+                }
+                // Foreground/Running levels (ordered from most severe to least)
+                level >= TRIM_MEMORY_RUNNING_CRITICAL -> {
+                    memCache?.clear()
+                    try {
+                        com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
+                        com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
+                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
+                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
+                    } catch (_: Throwable) {
+                    }
+                    System.gc()
+                }
+                level >= TRIM_MEMORY_RUNNING_LOW -> {
+                    memCache?.clear()
+                    try {
+                        com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
+                        com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
+                    } catch (_: Throwable) {
+                    }
+                }
+                level >= TRIM_MEMORY_RUNNING_MODERATE -> {
+                    memCache?.trimToSize(memCache.size / 2)
+                }
             }
         } catch (_: Throwable) {
         }
@@ -191,6 +223,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             try {
                 com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
                 com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
+                com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
                 com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
             } catch (_: Throwable) {
             }

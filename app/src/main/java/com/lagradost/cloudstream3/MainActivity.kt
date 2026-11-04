@@ -138,7 +138,6 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.isRtl
-import com.lagradost.cloudstream3.utils.AppContextUtils.loadCache
 import com.lagradost.cloudstream3.utils.AppContextUtils.loadRepository
 import com.lagradost.cloudstream3.utils.AppContextUtils.loadResult
 import com.lagradost.cloudstream3.utils.AppContextUtils.loadSearchResult
@@ -752,7 +751,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
     private fun handleAppIntent(intent: Intent?) {
         if (intent == null) return
         val str = intent.dataString
-        loadCache()
 
         handleAppIntentUrl(this, str, false, intent.extras)
     }
@@ -1908,7 +1906,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             }
         }
 
-        loadCache()
         updateHasTrailers()
         /*nav_view.setOnNavigationItemSelectedListener { item ->
             when (item.itemId) {
@@ -1958,7 +1955,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
         try {
             // this ensures that no unnecessary space is taken
-            loadCache()
             File(filesDir, "exoplayer").deleteRecursively() // old cache
             deleteFileOnExit(File(cacheDir, "exoplayer"))   // current cache
         } catch (e: Exception) {

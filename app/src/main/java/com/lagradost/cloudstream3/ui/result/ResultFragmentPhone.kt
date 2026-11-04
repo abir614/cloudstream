@@ -76,7 +76,6 @@ import com.lagradost.cloudstream3.ui.settings.SettingsGeneral.Companion.pickDown
 import com.lagradost.cloudstream3.ui.settings.utils.getChooseFolderLauncher
 import com.lagradost.cloudstream3.utils.AppContextUtils.getNameFull
 import com.lagradost.cloudstream3.utils.AppContextUtils.isCastApiAvailable
-import com.lagradost.cloudstream3.utils.AppContextUtils.loadCache
 import com.lagradost.cloudstream3.utils.AppContextUtils.openBrowser
 import com.lagradost.cloudstream3.utils.AppContextUtils.updateHasTrailers
 import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper.attachBackPressedCallback
@@ -450,7 +449,6 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         // ===== setup =====
         val storedData = getStoredData() ?: return
         activity?.window?.decorView?.clearFocus()
-        activity?.loadCache()
         context?.updateHasTrailers()
         hideKeyboard(binding.root)
         if (storedData.restart || !viewModel.hasLoaded())

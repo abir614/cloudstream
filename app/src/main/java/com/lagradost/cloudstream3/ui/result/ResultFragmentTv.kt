@@ -49,7 +49,6 @@ import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.AppContextUtils.getNameFull
 import com.lagradost.cloudstream3.utils.AppContextUtils.html
 import com.lagradost.cloudstream3.utils.AppContextUtils.isRtl
-import com.lagradost.cloudstream3.utils.AppContextUtils.loadCache
 import com.lagradost.cloudstream3.utils.AppContextUtils.updateHasTrailers
 import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper.attachBackPressedCallback
 import com.lagradost.cloudstream3.utils.BackPressedCallbackHelper.detachBackPressedCallback
@@ -262,7 +261,6 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
         // ===== setup =====
         val storedData = getStoredData() ?: return
         activity?.window?.decorView?.clearFocus()
-        activity?.loadCache()
         hideKeyboard()
         if (storedData.restart || !viewModel.hasLoaded())
             viewModel.load(

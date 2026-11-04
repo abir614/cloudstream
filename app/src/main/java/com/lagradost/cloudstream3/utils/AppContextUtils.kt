@@ -72,11 +72,8 @@ import com.lagradost.cloudstream3.ui.settings.extensions.PluginsFragment
 import com.lagradost.cloudstream3.ui.settings.extensions.RepositoryData
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.Coroutines.main
-import com.lagradost.cloudstream3.utils.FillerEpisodeCheck.toClassDir
-import com.lagradost.cloudstream3.utils.JsUnpacker.Companion.load
 import com.lagradost.cloudstream3.utils.UIHelper.navigate
 import com.lagradost.cloudstream4.AppSettings
-import okhttp3.Cache
 import java.io.File
 
 object AppContextUtils {
@@ -548,13 +545,6 @@ object AppContextUtils {
         } else null
     }
 
-    fun Activity?.loadCache() {
-        try {
-            cacheClass("android.net.NetworkCapabilities".load())
-        } catch (_: Exception) {
-        }
-    }
-
     private fun getResultsId(): Int {
         return if (Globals.isLayout(Globals.TV or Globals.EMULATOR)) {
             R.id.global_to_navigation_results_tv
@@ -712,18 +702,6 @@ object AppContextUtils {
         } else {
             @Suppress("DEPRECATION")
             connectionManager.activeNetworkInfo?.type == ConnectivityManager.TYPE_MOBILE
-        }
-    }
-
-
-    private fun Activity?.cacheClass(clazz: String?) {
-        clazz?.let { c ->
-            this?.cacheDir?.let {
-                Cache(
-                    directory = File(it, c.toClassDir()),
-                    maxSize = 20L * 1024L * 1024L // 20 MiB
-                )
-            }
         }
     }
 
