@@ -183,11 +183,10 @@ object OnDeviceNsfwClassifier {
                         val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
                         val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
 
-                        val isStandardSkin = y in 55..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8
-                        val isAnimeSkin = r in 205..255 && g in 175..245 && b in 150..235 && r > g && g > b && (r - b) in 8..70 && (r - g) in 4..40
-                        val isDarkerSkin = r in 70..190 && g in 45..150 && b in 25..110 && r > g && g > b && (r - b) >= 12 && (r - g) >= 8
+                        val isSkinChrominance = y in 50..240 && cb in 80..130 && cr in 133..175 && (cr - cb) in 12..65 && r > g && (r - b) >= 12
+                        val isAnimeSkin = r in 210..255 && g in 180..245 && b in 155..235 && r > g && g > b && (r - b) in 10..60 && (r - g) in 6..35
 
-                        if (isStandardSkin || isAnimeSkin || isDarkerSkin) {
+                        if (isSkinChrominance || isAnimeSkin) {
                             bodySkinPixels++
                         }
                     }
