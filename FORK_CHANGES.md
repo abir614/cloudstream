@@ -144,6 +144,7 @@ This document catalogues all intentional architectural deviations, security hard
 - **GantMan 5-Class MobileNetV2 On-Device AI Classification ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
   - Upgraded on-device visual classifier to GantMan's 5-class MobileNetV2 neural network (`[drawings, hentai, neutral, porn, sexy]`) with full Softmax probability distribution and exposure-weighted threshold scaling.
   - Zero-heap virtual memory mapping via Linux `mmap()` directly from uncompressed APK asset space (`models/nsfw.tflite`).
+  - **L1-Cache Normalization LUT & Zero-Allocation Buffers**: Pre-allocates native `FloatBuffer` and static 256-entry `BYTE_TO_FLOAT` lookup table, eliminating 150,528 floating-point divisions and per-inference object allocations on every frame.
   - **Hardware-Adaptive Inference Across Device Tiers**:
     - **High & Mid Tier**: Runs GantMan 5-Class MobileNetV2 with parallel sessions (2–4 threads) and clean Linux `mmap()`.
     - **Low Tier (1GB–3.5GB RAM, 2GB TV Sticks, Budget Phones)**: Executes GantMan 5-Class MobileNetV2 with **1 single-threaded safe CPU interpreter session** (`useXNNPACK=false`, 0 SIMD traps, ~8 MB native RAM), enabling full 5-class detection without OOM crashes.

@@ -43,6 +43,7 @@ import java.io.FileOutputStream
 import java.lang.ref.WeakReference
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.FloatBuffer
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -136,6 +137,9 @@ object OnDeviceNsfwClassifier {
         return isSkinChrominance || isAnimeSkin
     }
 
+    // Pre-computed lookup table to eliminate 150,528 floating-point divisions per inference frame
+    private val BYTE_TO_FLOAT = FloatArray(256) { it / 255.0f }
+
     /**
      * Completely isolated TFLite inference session.
      * Encapsulates its own Interpreter instance, native ByteBuffer, and scratch canvas/bitmap.
@@ -149,6 +153,7 @@ object OnDeviceNsfwClassifier {
         val scratchPixels: IntArray,
         val scratchFloatArray: FloatArray
     ) {
+        private val inputFloatBuffer: FloatBuffer = inputBuffer.asFloatBuffer()
         private val outputProb = Array(1) { FloatArray(5) }
         private val scratchRect = Rect(0, 0, INPUT_DIM, INPUT_DIM)
         private val scratchPaint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -205,18 +210,18 @@ object OnDeviceNsfwClassifier {
                     val g = (pixel shr 8) and 0xFF
                     val b = pixel and 0xFF
 
-                    // GantMan MobileNetV2 expects RGB normalized to [0.0, 1.0]
-                    scratchFloatArray[floatIdx++] = r.toFloat() / 255.0f
-                    scratchFloatArray[floatIdx++] = g.toFloat() / 255.0f
-                    scratchFloatArray[floatIdx++] = b.toFloat() / 255.0f
+                    // GantMan MobileNetV2 expects RGB normalized to [0.0, 1.0] via fast L1-cache lookup
+                    scratchFloatArray[floatIdx++] = BYTE_TO_FLOAT[r]
+                    scratchFloatArray[floatIdx++] = BYTE_TO_FLOAT[g]
+                    scratchFloatArray[floatIdx++] = BYTE_TO_FLOAT[b]
 
                     if (i >= bodyStartPixel && isSkinTone(r, g, b)) {
                         bodySkinPixels++
                     }
                 }
 
-                inputBuffer.rewind()
-                inputBuffer.asFloatBuffer().put(scratchFloatArray)
+                inputFloatBuffer.rewind()
+                inputFloatBuffer.put(scratchFloatArray)
                 inputBuffer.rewind()
 
                 interpreter.run(inputBuffer, outputProb)
@@ -885,7 +890,7 @@ object OnDeviceNsfwClassifier {
      * Uses hardware-adaptive multi-session parallelism with zero thread contention.
      */
     fun classifyDrawableScore(ctx: Context, drawable: Drawable): Float {
-        if (isPotatoDevice(ctx)) {
+        if (isPotatoDevice(ctx) || isDeviceUnderMemoryPressure(ctx)) {
             return classifyPotatoFastScore(drawable, ctx)
         }
         if (isModelPermanentlyUnavailable) return classifyPotatoFastScore(drawable, ctx)
