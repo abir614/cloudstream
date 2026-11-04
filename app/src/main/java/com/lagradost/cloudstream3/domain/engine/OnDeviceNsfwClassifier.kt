@@ -149,6 +149,7 @@ object OnDeviceNsfwClassifier {
         val scratchPixels: IntArray,
         val scratchFloatArray: FloatArray
     ) {
+        private val outputProb = Array(1) { FloatArray(5) }
         private val scratchRect = Rect(0, 0, INPUT_DIM, INPUT_DIM)
         private val scratchPaint = Paint(Paint.FILTER_BITMAP_FLAG)
 
@@ -216,8 +217,8 @@ object OnDeviceNsfwClassifier {
 
                 inputBuffer.rewind()
                 inputBuffer.asFloatBuffer().put(scratchFloatArray)
+                inputBuffer.rewind()
 
-                val outputProb = Array(1) { FloatArray(5) }
                 interpreter.run(inputBuffer, outputProb)
 
                 val drawings = outputProb[0][CLASS_DRAWINGS]
@@ -227,8 +228,18 @@ object OnDeviceNsfwClassifier {
                 val sexy = outputProb[0][CLASS_SEXY]
 
                 val sumProb = drawings + hentai + neutral + porn + sexy
-                val (pDrawings, pHentai, pNeutral, pPorn, pSexy) = if (sumProb in 0.95f..1.05f && drawings >= 0f && porn >= 0f) {
-                    floatArrayOf(drawings, hentai, neutral, porn, sexy)
+                val pDrawings: Float
+                val pHentai: Float
+                val pNeutral: Float
+                val pPorn: Float
+                val pSexy: Float
+
+                if (sumProb in 0.95f..1.05f && drawings >= 0f && porn >= 0f) {
+                    pDrawings = drawings
+                    pHentai = hentai
+                    pNeutral = neutral
+                    pPorn = porn
+                    pSexy = sexy
                 } else {
                     val maxLogit = maxOf(drawings, hentai, neutral, porn, sexy)
                     val exp0 = kotlin.math.exp((drawings - maxLogit).toDouble()).toFloat()
@@ -238,13 +249,26 @@ object OnDeviceNsfwClassifier {
                     val exp4 = kotlin.math.exp((sexy - maxLogit).toDouble()).toFloat()
                     val sumExp = exp0 + exp1 + exp2 + exp3 + exp4
                     if (sumExp > 0f) {
-                        floatArrayOf(exp0 / sumExp, exp1 / sumExp, exp2 / sumExp, exp3 / sumExp, exp4 / sumExp)
+                        pDrawings = exp0 / sumExp
+                        pHentai = exp1 / sumExp
+                        pNeutral = exp2 / sumExp
+                        pPorn = exp3 / sumExp
+                        pSexy = exp4 / sumExp
                     } else {
-                        floatArrayOf(0.2f, 0.2f, 0.2f, 0.2f, 0.2f)
+                        pDrawings = 0.2f
+                        pHentai = 0.2f
+                        pNeutral = 0.2f
+                        pPorn = 0.2f
+                        pSexy = 0.2f
                     }
                 }
 
-                val rawAiScore = (pPorn + pHentai + (pSexy * 0.70f)).coerceIn(0.0f, 1.0f)
+                val safeConfidence = maxOf(pDrawings, pNeutral)
+                val rawAiScore = if (safeConfidence > 0.75f && pPorn < 0.10f && pHentai < 0.10f) {
+                    ((pPorn + pHentai + (pSexy * 0.50f)) * 0.80f).coerceIn(0.0f, 1.0f)
+                } else {
+                    (pPorn + pHentai + (pSexy * 0.70f)).coerceIn(0.0f, 1.0f)
+                }
                 val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
 
                 if (rawAiScore >= 0.20f && bodySkinRatio > 0.30f) {
