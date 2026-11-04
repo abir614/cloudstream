@@ -110,6 +110,25 @@ object OnDeviceNsfwClassifier {
     }
 
     /**
+     * Calibrated skin tone chrominance analyzer.
+     * Combines YCbCr human skin cluster bounds with stylized anime peach tones.
+     * Inlined at bytecode level for zero function-call overhead in tight pixel loops.
+     */
+    @JvmStatic
+    inline fun isSkinTone(r: Int, g: Int, b: Int): Boolean {
+        val y = (77 * r + 150 * g + 29 * b) shr 8
+        val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
+        val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
+
+        // Robust YCbCr human skin chrominance cluster (light, medium, and dark skin tones)
+        val isSkinChrominance = y in 50..240 && cb in 80..130 && cr in 133..175 && (cr - cb) in 12..65 && r > g && (r - b) >= 12
+        // Stylized anime/illustrated peach tones
+        val isAnimeSkin = r in 210..255 && g in 180..245 && b in 155..235 && r > g && g > b && (r - b) in 10..60 && (r - g) in 6..35
+
+        return isSkinChrominance || isAnimeSkin
+    }
+
+    /**
      * Completely isolated TFLite inference session.
      * Encapsulates its own Interpreter instance, native ByteBuffer, and scratch canvas/bitmap.
      * Guaranteed 100% thread-safe: multiple worker threads execute in parallel with ZERO lock contention.
@@ -181,17 +200,8 @@ object OnDeviceNsfwClassifier {
                     scratchFloatArray[floatIdx++] = g.toFloat() - MEAN_G
                     scratchFloatArray[floatIdx++] = r.toFloat() - MEAN_R
 
-                    if (i >= bodyStartPixel) {
-                        val y = (77 * r + 150 * g + 29 * b) shr 8
-                        val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
-                        val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
-
-                        val isSkinChrominance = y in 50..240 && cb in 80..130 && cr in 133..175 && (cr - cb) in 12..65 && r > g && (r - b) >= 12
-                        val isAnimeSkin = r in 210..255 && g in 180..245 && b in 155..235 && r > g && g > b && (r - b) in 10..60 && (r - g) in 6..35
-
-                        if (isSkinChrominance || isAnimeSkin) {
-                            bodySkinPixels++
-                        }
+                    if (i >= bodyStartPixel && isSkinTone(r, g, b)) {
+                        bodySkinPixels++
                     }
                 }
 
@@ -340,16 +350,7 @@ object OnDeviceNsfwClassifier {
                     val g = (pixel shr 8) and 0xFF
                     val b = pixel and 0xFF
 
-                    val y = (77 * r + 150 * g + 29 * b) shr 8
-                    val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
-                    val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
-
-                    // Robust YCbCr human skin chrominance cluster (light, medium, and dark skin tones)
-                    val isSkinChrominance = y in 50..240 && cb in 80..130 && cr in 133..175 && (cr - cb) in 12..65 && r > g && (r - b) >= 12
-                    // Stylized anime/illustrated peach tones
-                    val isAnimeSkin = r in 210..255 && g in 180..245 && b in 155..235 && r > g && g > b && (r - b) in 10..60 && (r - g) in 6..35
-
-                    if (isSkinChrominance || isAnimeSkin) {
+                    if (isSkinTone(r, g, b)) {
                         upperSkinPixels++
                     }
                 }
@@ -369,14 +370,7 @@ object OnDeviceNsfwClassifier {
                         val g = (pixel shr 8) and 0xFF
                         val b = pixel and 0xFF
 
-                        val y = (77 * r + 150 * g + 29 * b) shr 8
-                        val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
-                        val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
-
-                        val isSkinChrominance = y in 50..240 && cb in 80..130 && cr in 133..175 && (cr - cb) in 12..65 && r > g && (r - b) >= 12
-                        val isAnimeSkin = r in 210..255 && g in 180..245 && b in 155..235 && r > g && g > b && (r - b) in 10..60 && (r - g) in 6..35
-
-                        if (isSkinChrominance || isAnimeSkin) {
+                        if (isSkinTone(r, g, b)) {
                             rowSkin++
                         }
                     }
