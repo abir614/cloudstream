@@ -927,7 +927,7 @@ object OnDeviceNsfwClassifier {
      * Decoupled Asynchronous Classifier for Coil ImageView loading.
      *
      * 1. Checks memory cache for instantaneous response (< 0.001 ms).
-     * 2. Offloads inference to a low-priority bounded worker daemon thread (queue size 8).
+     * 2. Offloads inference to a low-priority bounded worker daemon thread pool (queue size 16-128).
      * 3. Always stores raw score in LRU cache so sensitivity adjustments take effect immediately.
      * 4. Zero visual leakage: downloaded image is NEVER rendered until verified safe.
      * 5. Validates view tag before applying censorship to prevent recycling races in lists.
