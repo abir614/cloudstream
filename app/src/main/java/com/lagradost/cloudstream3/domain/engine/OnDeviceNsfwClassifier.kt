@@ -333,27 +333,21 @@ object OnDeviceNsfwClassifier {
         return DeviceProfile.isUltraPotato(ctx)
     }
 
-    private fun getPotatoCanvas(): Canvas? {
+    /**
+     * Ultra-fast zero-native-allocation skin chrominance analyzer for potato & low-RAM devices (< 0.05ms, 0 MB native RAM).
+     * Analyzes skin tone density and spatial distribution across the torso/body zone on a tiny 48x48 sample.
+     */
+    fun classifyPotatoFastScore(drawable: Drawable, ctx: Context? = null): Float {
         synchronized(potatoLock) {
             if (potatoBitmap == null || potatoBitmap?.isRecycled == true) {
                 try {
                     potatoBitmap = Bitmap.createBitmap(POTATO_DIM, POTATO_DIM, Bitmap.Config.RGB_565)
                     potatoCanvas = Canvas(potatoBitmap!!)
                 } catch (_: Throwable) {
-                    return null
+                    return 0.0f
                 }
             }
-            return potatoCanvas
-        }
-    }
-
-    /**
-     * Ultra-fast zero-native-allocation skin chrominance analyzer for potato & low-RAM devices (< 0.05ms, 0 MB native RAM).
-     * Analyzes skin tone density and spatial distribution across the torso/body zone on a tiny 48x48 sample.
-     */
-    fun classifyPotatoFastScore(drawable: Drawable, ctx: Context? = null): Float {
-        val canvas = getPotatoCanvas() ?: return 0.0f
-        synchronized(potatoLock) {
+            val canvas = potatoCanvas ?: return 0.0f
             val sBitmap = potatoBitmap ?: return 0.0f
             if (sBitmap.isRecycled) return 0.0f
 
@@ -645,6 +639,7 @@ object OnDeviceNsfwClassifier {
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Failed to load visual scores: ${t.message}")
+                try { ctx.filesDir.resolve(SCORES_FILE_NAME).delete() } catch (_: Throwable) {}
             } finally {
                 isScoresLoaded = true
             }
@@ -1175,6 +1170,7 @@ object OnDeviceNsfwClassifier {
     @Synchronized
     fun release() {
         try {
+            CloudStreamApp.context?.let { flushScoresToDisk(it) }
             while (true) {
                 val session = sessionPool.poll() ?: break
                 session.release()
