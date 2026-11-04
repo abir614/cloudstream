@@ -882,6 +882,16 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                             d.posterImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) || OnDeviceNsfwClassifier.isCachedNsfw(it, context, filterLevel) } == true ||
                             d.posterBackgroundImage?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) || OnDeviceNsfwClassifier.isCachedNsfw(it, context, filterLevel) } == true
 
+                        val error = listOf(
+                            R.drawable.profile_bg_dark_blue,
+                            R.drawable.profile_bg_blue,
+                            R.drawable.profile_bg_orange,
+                            R.drawable.profile_bg_pink,
+                            R.drawable.profile_bg_purple,
+                            R.drawable.profile_bg_red,
+                            R.drawable.profile_bg_teal
+                        ).random()
+
                         if (!isAdultAllowed && isNsfw) {
                             resultPoster.setImageResource(R.drawable.default_cover)
                             resultPoster.isVisible = true
@@ -895,7 +905,17 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                         } else {
                             resultPoster.isVisible = true
                             backgroundPoster.isVisible = true
-                            resultPoster.loadImage(d.posterImage, headers = d.posterHeaders)
+                            resultPoster.loadImage(d.posterImage, headers = d.posterHeaders) {
+                                error {
+                                    getImageFromDrawable(
+                                        context ?: return@error null,
+                                        R.drawable.default_cover
+                                    )
+                                }
+                            }
+                            backgroundPoster.loadImage(d.posterBackgroundImage, headers = d.posterHeaders) {
+                                error { getImageFromDrawable(context ?: return@error null, error) }
+                            }
                         }
 
                         var isExpanded = false
@@ -916,22 +936,6 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                                             .show()
                                     }
                                 }
-                            }
-                        }
-
-                        val error = listOf(
-                            R.drawable.profile_bg_dark_blue,
-                            R.drawable.profile_bg_blue,
-                            R.drawable.profile_bg_orange,
-                            R.drawable.profile_bg_pink,
-                            R.drawable.profile_bg_purple,
-                            R.drawable.profile_bg_red,
-                            R.drawable.profile_bg_teal
-                        ).random()
-
-                        if (!isNsfw) {
-                            backgroundPoster.loadImage(d.posterBackgroundImage, headers = d.posterHeaders) {
-                                error { getImageFromDrawable(context ?: return@error null, error) }
                             }
                         }
 
