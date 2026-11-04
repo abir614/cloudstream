@@ -8,8 +8,6 @@ import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.mvvm.safeAsync
 import com.lagradost.cloudstream3.ui.result.ResultEpisode
 import com.lagradost.cloudstream3.utils.txt
-import java.util.concurrent.ConcurrentHashMap
-
 
 enum class SkipType(@StringRes val res: Int) {
     Opening(R.string.skip_type_op),

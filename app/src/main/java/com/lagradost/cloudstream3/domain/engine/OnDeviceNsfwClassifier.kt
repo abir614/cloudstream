@@ -85,7 +85,6 @@ object OnDeviceNsfwClassifier {
     private const val INPUT_DIM = 224
     private const val BGR_CHANNELS = 3
     private const val BYTES_PER_FLOAT = 4
-    private const val MAX_QUEUE_CAPACITY = 8
 
     // Dataset mean normalization values
     private const val MEAN_B = 104.0f

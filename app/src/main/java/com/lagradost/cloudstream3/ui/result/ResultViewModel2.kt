@@ -92,7 +92,6 @@ import com.lagradost.cloudstream3.utils.Coroutines.ioWork
 import com.lagradost.cloudstream3.utils.Coroutines.ioWorkSafe
 import com.lagradost.cloudstream3.utils.Coroutines.main
 import com.lagradost.cloudstream3.utils.DOWNLOAD_HEADER_CACHE
-import com.lagradost.cloudstream3.utils.DataStore
 import com.lagradost.cloudstream3.utils.DataStore.editor
 import com.lagradost.cloudstream3.utils.DataStore.getFolderName
 import com.lagradost.cloudstream3.utils.DataStore.setKey

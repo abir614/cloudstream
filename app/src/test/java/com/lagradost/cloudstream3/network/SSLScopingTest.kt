@@ -3,7 +3,6 @@ package com.lagradost.cloudstream3.network
 import com.lagradost.cloudstream3.ui.player.SSLTrustManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import javax.net.ssl.HttpsURLConnection
 import javax.net.ssl.SSLContext

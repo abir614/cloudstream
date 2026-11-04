@@ -2,7 +2,6 @@ package com.lagradost.cloudstream3.ui.library
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.Context
 import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler

@@ -1,6 +1,5 @@
 package com.lagradost.cloudstream3.ui.settings
 
-import android.view.View
 import android.widget.ImageView
 import androidx.annotation.StringRes
 import androidx.core.view.children

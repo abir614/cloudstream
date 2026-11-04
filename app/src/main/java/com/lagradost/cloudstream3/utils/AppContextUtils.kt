@@ -74,7 +74,6 @@ import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.Coroutines.main
 import com.lagradost.cloudstream3.utils.UIHelper.navigate
 import com.lagradost.cloudstream4.AppSettings
-import java.io.File
 
 object AppContextUtils {
     fun RecyclerView.isRecyclerScrollable(): Boolean {

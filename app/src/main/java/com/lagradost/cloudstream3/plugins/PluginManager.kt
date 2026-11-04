@@ -28,7 +28,6 @@ import com.lagradost.cloudstream3.CloudStreamApp.Companion.removeKey
 import com.lagradost.cloudstream3.CloudStreamApp.Companion.setKey
 import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.InternalAPI
-import com.lagradost.cloudstream3.MainAPI
 import com.lagradost.cloudstream3.MainAPI.Companion.settingsForProvider
 import com.lagradost.cloudstream3.MainActivity.Companion.afterPluginsLoadedEvent
 import com.lagradost.cloudstream3.MainActivity.Companion.lastError
