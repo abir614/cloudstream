@@ -128,6 +128,17 @@ class TelemetryService(
                 Level.FATAL -> Log.wtf(tag, fullMsg, throwable)
             }
         }
+
+        // Automatically dispatch warnings and errors to remote telemetry proxy
+        if (level >= Level.WARN) {
+            RemoteCrashReporter.dispatchDiagnosticLogAsync(
+                level = level.name,
+                tag = tag,
+                message = safeMessage,
+                throwable = throwable,
+                data = data
+            )
+        }
     }
 
     /**

@@ -13,6 +13,7 @@
 .kotlin/*
 target/
 rust-core/target/
+cloudflare-worker/
 
 # Created by https://www.toptal.com/developers/gitignore/api/kotlin,java,android,androidstudio,visualstudiocode
 # Edit at https://www.toptal.com/developers/gitignore?templates=kotlin,java,android,androidstudio,visualstudiocode

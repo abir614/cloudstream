@@ -33,11 +33,13 @@ import kotlin.concurrent.thread
 import kotlin.system.exitProcess
 
 class ExceptionHandler(
+    val appContext: Context,
     val errorFile: File,
     val onError: (() -> Unit)
 ) : Thread.UncaughtExceptionHandler {
 
     override fun uncaughtException(thread: Thread, error: Throwable) {
+        var fullReport: String? = null
         try {
             val threadId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                 thread.threadId()
@@ -47,7 +49,7 @@ class ExceptionHandler(
             }
 
             try {
-                com.lagradost.cloudstream3.di.ServiceLocator.telemetry.captureCrash(error, errorFile)
+                fullReport = com.lagradost.cloudstream3.di.ServiceLocator.telemetry.captureCrash(error, errorFile)
             } catch (_: Throwable) {
                 // Fallback to basic printstream if telemetry fails
                 PrintStream(errorFile).use { ps ->
@@ -55,6 +57,20 @@ class ExceptionHandler(
                     ps.println("Fatal exception on thread ${thread.name} ($threadId)")
                     error.printStackTrace(ps)
                 }
+            }
+
+            // Silent, automated background crash report to secure Cloudflare proxy
+            try {
+                val sent = com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.dispatchSync(
+                    context = appContext,
+                    thread = thread,
+                    error = error,
+                    fullLog = fullReport
+                )
+                if (!sent && !fullReport.isNullOrBlank()) {
+                    com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.savePendingReport(appContext, fullReport)
+                }
+            } catch (_: Throwable) {
             }
         } catch (_: FileNotFoundException) {
         }
@@ -70,8 +86,9 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.init(this)
 
-        ExceptionHandler(filesDir.resolve("last_error")) {
+        ExceptionHandler(this, filesDir.resolve("last_error")) {
             val intent = this.packageManager.getLaunchIntentForPackage(this.packageName)
             intent?.component?.let { comp ->
                 startActivity(Intent.makeRestartActivityTask(comp))
@@ -80,6 +97,9 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             exceptionHandler = it
             Thread.setDefaultUncaughtExceptionHandler(it)
         }
+
+        // Flush any unsent crash dumps from previous sessions
+        com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.dispatchPendingOnStartup(this)
 
         AppDebug.isDebug = BuildConfig.DEBUG
 
