@@ -217,6 +217,25 @@ object SettingsUpdatesScreen : SearchableSettings {
                         }
                     ),
                     Preference.PreferenceItem.TextPreference(
+                        title = "Test Telemetry Alert",
+                        subtitle = "Send test encrypted diagnostic log to Telegram",
+                        icon = painterResource(R.drawable.baseline_network_ping_24),
+                        onClick = {
+                            kotlin.concurrent.thread(start = true, isDaemon = true) {
+                                com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.dispatchDiagnosticLogAsync(
+                                    level = "WARN",
+                                    tag = "ManualTest",
+                                    message = "Manual telemetry verification triggered from Settings",
+                                    throwable = null,
+                                    data = mapOf("TriggeredBy" to "UserSettingsMenu")
+                                )
+                                activity?.runOnUiThread {
+                                    com.lagradost.cloudstream3.CommonActivity.showToast("Encrypted telemetry sent! Check Telegram.")
+                                }
+                            }
+                        }
+                    ),
+                    Preference.PreferenceItem.TextPreference(
                         title = stringResource(R.string.redo_setup_process),
                         icon = painterResource(R.drawable.construction_24px),
                         onClick = {
