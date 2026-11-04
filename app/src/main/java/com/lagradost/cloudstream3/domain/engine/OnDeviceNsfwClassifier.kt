@@ -438,18 +438,7 @@ object OnDeviceNsfwClassifier {
                         val score = classifyPotatoFastScore(targetDrawable, appContext)
                         recordScore(imageKey, score, appContext)
                         val threshold = NsfwFilterEngine.getVisualThreshold(appContext)
-                        if (score >= threshold) {
-                            if (!appContext.isNsfwEnabled()) {
-                                activeView.setImageDrawable(null)
-                                hideParentItem(activeView)
-                            } else if (shouldCensorPosters(appContext)) {
-                                ImageLoader.applyCensoredPoster(activeView, imageKey)
-                            } else {
-                                setSmoothPosterDrawable(activeView, targetDrawable, false)
-                            }
-                        } else {
-                            setSmoothPosterDrawable(activeView, targetDrawable, false)
-                        }
+                        applyVisualFilterResult(activeView, imageKey, targetDrawable, score, threshold, appContext, false)
                     }
                 }
             }
@@ -472,18 +461,7 @@ object OnDeviceNsfwClassifier {
                             null
                         }
                         if (checkTag == imageKey) {
-                            if (score >= activeThreshold) {
-                                if (!appContext.isNsfwEnabled()) {
-                                    activeView.setImageDrawable(null)
-                                    hideParentItem(activeView)
-                                } else if (shouldCensorPosters(appContext)) {
-                                    ImageLoader.applyCensoredPoster(activeView, imageKey)
-                                } else {
-                                    setSmoothPosterDrawable(activeView, drawable, false)
-                                }
-                            } else {
-                                setSmoothPosterDrawable(activeView, drawable, false)
-                            }
+                            applyVisualFilterResult(activeView, imageKey, drawable, score, activeThreshold, appContext, false)
                         }
                     }
                     return
@@ -501,26 +479,8 @@ object OnDeviceNsfwClassifier {
                         null
                     }
                     if (checkTag == imageKey) {
-                        if (score >= activeThreshold) {
-                            if (!appContext.isNsfwEnabled()) {
-                                activeView.setImageDrawable(null)
-                                hideParentItem(activeView)
-                            } else if (shouldCensorPosters(appContext)) {
-                                ImageLoader.applyCensoredPoster(activeView, imageKey)
-                            } else {
-                                setSmoothPosterDrawable(
-                                    activeView,
-                                    drawable,
-                                    DeviceProfile.tier(activeView.context) != DeviceTier.LOW
-                                )
-                            }
-                        } else {
-                            setSmoothPosterDrawable(
-                                activeView,
-                                drawable,
-                                DeviceProfile.tier(activeView.context) != DeviceTier.LOW
-                            )
-                        }
+                        val animate = DeviceProfile.tier(activeView.context) != DeviceTier.LOW
+                        applyVisualFilterResult(activeView, imageKey, drawable, score, activeThreshold, appContext, animate)
                     }
                 }
             } catch (t: Throwable) {
@@ -939,18 +899,8 @@ object OnDeviceNsfwClassifier {
         // Fast LRU cache hit
         val cachedScore = scoreCache.get(imageKey)
         if (cachedScore != null) {
-            if (cachedScore >= threshold) {
-                if (!appContext.isNsfwEnabled()) {
-                    imageView.setImageDrawable(null)
-                    hideParentItem(imageView)
-                } else if (shouldCensorPosters(appContext)) {
-                    ImageLoader.applyCensoredPoster(imageView, imageKey)
-                } else {
-                    setSmoothPosterDrawable(imageView, drawable, DeviceProfile.tier(imageView.context) != DeviceTier.LOW)
-                }
-            } else {
-                setSmoothPosterDrawable(imageView, drawable, DeviceProfile.tier(imageView.context) != DeviceTier.LOW)
-            }
+            val animate = DeviceProfile.tier(imageView.context) != DeviceTier.LOW
+            applyVisualFilterResult(imageView, imageKey, drawable, cachedScore, threshold, appContext, animate)
             return
         }
 
@@ -969,18 +919,7 @@ object OnDeviceNsfwClassifier {
         if (isPotatoDevice(appContext) || isDeviceUnderMemoryPressure(appContext)) {
             val score = classifyPotatoFastScore(drawable, appContext)
             recordScore(imageKey, score, appContext)
-            if (score >= threshold) {
-                if (!appContext.isNsfwEnabled()) {
-                    imageView.setImageDrawable(null)
-                    hideParentItem(imageView)
-                } else if (shouldCensorPosters(appContext)) {
-                    ImageLoader.applyCensoredPoster(imageView, imageKey)
-                } else {
-                    setSmoothPosterDrawable(imageView, drawable, false)
-                }
-            } else {
-                setSmoothPosterDrawable(imageView, drawable, false)
-            }
+            applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
             return
         }
 
@@ -998,18 +937,33 @@ object OnDeviceNsfwClassifier {
             // If submission fails due to executor rejection, safely run potato classification immediately
             val score = classifyPotatoFastScore(drawable, appContext)
             recordScore(imageKey, score, appContext)
-            if (score >= threshold) {
-                if (!appContext.isNsfwEnabled()) {
-                    imageView.setImageDrawable(null)
-                    hideParentItem(imageView)
-                } else if (shouldCensorPosters(appContext)) {
-                    ImageLoader.applyCensoredPoster(imageView, imageKey)
-                } else {
-                    setSmoothPosterDrawable(imageView, drawable, false)
-                }
+            applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
+        }
+    }
+
+    /**
+     * Unified visual filter action dispatcher: sanitizes or applies posters according to score vs threshold.
+     */
+    private fun applyVisualFilterResult(
+        view: ImageView,
+        imageKey: String,
+        drawable: Drawable,
+        score: Float,
+        threshold: Float,
+        appContext: Context,
+        animate: Boolean = false
+    ) {
+        if (score >= threshold) {
+            if (!appContext.isNsfwEnabled()) {
+                view.setImageDrawable(null)
+                hideParentItem(view)
+            } else if (shouldCensorPosters(appContext)) {
+                ImageLoader.applyCensoredPoster(view, imageKey)
             } else {
-                setSmoothPosterDrawable(imageView, drawable, false)
+                setSmoothPosterDrawable(view, drawable, animate)
             }
+        } else {
+            setSmoothPosterDrawable(view, drawable, animate)
         }
     }
 
