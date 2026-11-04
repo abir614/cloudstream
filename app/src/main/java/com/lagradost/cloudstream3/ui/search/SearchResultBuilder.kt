@@ -148,7 +148,7 @@ object SearchResultBuilder {
         val isCardNsfw = NsfwFilterEngine.isNsfw(card, filterLevel)
         val isTv = isLayout(TV)
 
-        if (!isAdultAllowed && isCardNsfw) {
+        fun hideCardItem() {
             if (isTv) {
                 // On TV: Keep grid cell geometry intact so Leanback D-pad focus navigation never crashes
                 cardView.setImageDrawable(null)
@@ -175,7 +175,12 @@ object SearchResultBuilder {
                 cardView.setImageDrawable(null)
                 itemView.findViewById<View>(R.id.background_card)?.isVisible = false
                 itemView.findViewById<View>(R.id.imageText)?.isVisible = false
+                itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
             }
+        }
+
+        if (!isAdultAllowed && isCardNsfw) {
+            hideCardItem()
             return
         }
 
@@ -207,25 +212,8 @@ object SearchResultBuilder {
             }
         } else {
             if (!isAdultAllowed && filterLevel == NsfwFilterLevel.EXTREME) {
-                if (isTv) {
-                    cardView.setImageResource(R.drawable.default_cover)
-                    itemView.findViewById<View>(R.id.background_card)?.isVisible = false
-                    itemView.findViewById<View>(R.id.imageText)?.isVisible = false
-                    itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
-                    if (!itemView.hasFocus()) {
-                        itemView.isFocusable = false
-                        itemView.isFocusableInTouchMode = false
-                        itemView.isClickable = false
-                    }
-                    itemView.setOnClickListener(null)
-                    itemView.setOnLongClickListener(null)
-                    itemView.onFocusChangeListener = null
-                } else {
-                    itemView.isVisible = false
-                    itemView.findViewById<View>(R.id.background_card)?.isVisible = false
-                    itemView.findViewById<View>(R.id.imageText)?.isVisible = false
-                    itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
-                }
+                hideCardItem()
+                return
             } else {
                 cardView.loadImage(R.drawable.default_cover)
             }
