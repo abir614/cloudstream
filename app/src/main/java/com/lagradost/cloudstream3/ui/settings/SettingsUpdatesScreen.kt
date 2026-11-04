@@ -227,7 +227,8 @@ object SettingsUpdatesScreen : SearchableSettings {
                                     tag = "ManualTest",
                                     message = "Manual telemetry verification triggered from Settings",
                                     throwable = null,
-                                    data = mapOf("TriggeredBy" to "UserSettingsMenu")
+                                    data = mapOf("TriggeredBy" to "UserSettingsMenu"),
+                                    force = true
                                 )
                                 activity?.runOnUiThread {
                                     com.lagradost.cloudstream3.CommonActivity.showToast("Encrypted telemetry sent! Check Telegram.")

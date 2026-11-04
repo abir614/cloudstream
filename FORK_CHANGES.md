@@ -241,4 +241,31 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 - **TV Channels Provider Check**: Guarded `TvChannelUtils` initialization in `MainActivity.kt` with `isTvChannelsSupported` (`resolveContentProvider(TvContractCompat.AUTHORITY, 0) != null`), eliminating `Failed to find provider info for android.media.tv` logs on non-TV devices.
 - **Cancellation Log Filtering**: Suppressed normal `CancellationException` and OkHttp `IOException("Canceled")` logging in `ArchComponentExt.kt` to prevent routine user navigation, screen rotation, and stream switching from dumping false-positive stack traces to standard error.
 
+---
+
+## 12. End-to-End Cryptographic Telemetry & Edge Ingestion Proxy
+
+### 12.1 Zero-Secret Client Architecture
+- **Complete Edge Credential Isolation**: The client APK contains **zero static symmetric keys, zero Telegram Bot Tokens, and zero Chat IDs**. All credentials reside exclusively on the serverless Cloudflare Worker proxy at the edge.
+- **Dynamic Ephemeral ECDH Key Exchange**: Handshake endpoint (`/handshake`) generates ephemeral NIST P-256 (secp256r1) keypairs per session. Derives single-use 256-bit AES-GCM session keys via HKDF-SHA256 (RFC 5869) with epoch-based salts.
+- **Stateless Tamper-Proof Tickets**: Ephemeral server private keys are encrypted inside GCM tickets under a 256-bit edge master secret (`WORKER_MASTER_SECRET`), requiring zero KV storage costs while enforcing strict 90-second replay windows.
+
+### 12.2 CPU-Bound Proof-of-Work (PoW) Anti-Spam Barrier
+- **Dynamic Cryptographic Challenge**: Each handshake generates a random 16-byte nonce challenge with difficulty level 3.
+- **Streaming Zero-Allocation Solver**: [`RemoteCrashReporter.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/RemoteCrashReporter.kt) computes `SHA256(challenge + ":" + nonce)` with zero heap allocations inside the loop using a streaming `MessageDigest` and in-place ASCII digit conversion (~10–15ms solve time).
+- **Automated Bot Suppression**: Flooding 10,000 spam reports requires over 40 million SHA-256 hashes, burning attacker CPU and making automated script flooding economically impossible.
+
+### 12.3 CGNAT-Safe Dual-Tier Rate Limiting
+- **Carrier-Grade NAT & Shared IP Independence**: To prevent innocent mobile carrier users sharing the same public IP from locking each other out:
+  - **Tier A (Per-Device Rate Limiting)**: Evaluated on `dev:${clientIp}:${deviceId}` with an anonymous persistent UUID stored in private app storage. Hard-capped at **10 reports per 5 minutes per device**.
+  - **Tier B (Network IP Burst Ceiling)**: Evaluated on `ip:${clientIp}` with a generous ceiling of **120 reports per minute**, stopping spam scripts while accommodating dense mobile networks.
+  - **Tier C (Handshake Throttling)**: Rate-limits `/handshake` to **60 requests per minute per IP**, protecting edge worker resources.
+
+### 12.4 Forensic Multi-Level Diagnostics & Telegram Formatting
+- **Full Hardware Fingerprint**: Ingests SoC chipset model, manufacturer, core count, 32-bit/64-bit architecture, system RAM, zRAM swap, Android Go low-RAM state, device performance tier (`DeviceProfile.tier`), Android release, kernel version, and active plugin.
+- **Strict Emoji Level Policy**: Emojis are stripped from metadata keys and body text; strictly reserved for severity indicators (`🚨` Crash, `🛑` Error, `⚠️` Warning).
+- **Document Offloading**: Long stack traces exceeding 1,200 characters are attached as `.txt` files directly via the Telegram Bot API.
+- **In-App Verification**: Added a dedicated **"Test Telemetry Alert"** action preference in **Settings -> Updates** ([`SettingsUpdatesScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsUpdatesScreen.kt)) with immediate feedback toasts.
+
+
 

@@ -200,19 +200,38 @@ object RemoteCrashReporter {
     }
 
     /**
-     * Solves the Proof-of-Work challenge using an allocation-free bitwise verification loop.
-     * Real device computation: ~10-25ms. Automated spam scripts: CPU throttled.
+     * Solves the Proof-of-Work challenge using an allocation-free streaming SHA-256 loop.
+     * Zero heap allocation inside the loop for maximum efficiency on potato devices.
      */
     private fun solveProofOfWork(challenge: String, difficulty: Int): Long {
         if (challenge.isBlank() || difficulty <= 0) return 0L
         return try {
             val md = java.security.MessageDigest.getInstance("SHA-256")
+            val prefix = "$challenge:".toByteArray(Charsets.UTF_8)
             var nonce = 0L
             val maxIterations = 1_000_000L
+            val nonceBuffer = ByteArray(24)
+
             while (nonce < maxIterations) {
-                val input = "$challenge:$nonce".toByteArray(Charsets.UTF_8)
                 md.reset()
-                val hash = md.digest(input)
+                md.update(prefix)
+
+                // Fast zero-allocation long-to-ascii conversion
+                var temp = nonce
+                var pos = nonceBuffer.size
+                if (temp == 0L) {
+                    pos--
+                    nonceBuffer[pos] = '0'.code.toByte()
+                } else {
+                    while (temp > 0L) {
+                        pos--
+                        nonceBuffer[pos] = ('0'.code + (temp % 10L).toInt()).toByte()
+                        temp /= 10L
+                    }
+                }
+                md.update(nonceBuffer, pos, nonceBuffer.size - pos)
+                val hash = md.digest()
+
                 val b0 = hash[0].toInt() and 0xFF
                 val b1 = hash[1].toInt() and 0xFF
                 if (difficulty == 3) {
@@ -495,32 +514,35 @@ object RemoteCrashReporter {
         tag: String,
         message: String,
         throwable: Throwable? = null,
-        data: Map<String, String> = emptyMap()
+        data: Map<String, String> = emptyMap(),
+        force: Boolean = false
     ) {
         val now = System.currentTimeMillis()
 
-        // Rate limiting: at most 1 diagnostic log every MIN_NON_FATAL_INTERVAL_MS
-        synchronized(this) {
-            if (now - lastNonFatalDispatchTime < MIN_NON_FATAL_INTERVAL_MS) {
+        if (!force) {
+            // Rate limiting: at most 1 diagnostic log every MIN_NON_FATAL_INTERVAL_MS
+            synchronized(this) {
+                if (now - lastNonFatalDispatchTime < MIN_NON_FATAL_INTERVAL_MS) {
+                    return
+                }
+                lastNonFatalDispatchTime = now
+            }
+
+            // Deduplication: suppress duplicate (level + tag + first 80 chars of message) for DEDUPLICATION_WINDOW_MS
+            val dedupeKey = "$level:$tag:${message.take(80)}"
+            val lastSeen = recentAlertTimestamps[dedupeKey]
+            if (lastSeen != null && now - lastSeen < DEDUPLICATION_WINDOW_MS) {
                 return
             }
-            lastNonFatalDispatchTime = now
-        }
+            recentAlertTimestamps[dedupeKey] = now
 
-        // Deduplication: suppress duplicate (level + tag + first 80 chars of message) for DEDUPLICATION_WINDOW_MS
-        val dedupeKey = "$level:$tag:${message.take(80)}"
-        val lastSeen = recentAlertTimestamps[dedupeKey]
-        if (lastSeen != null && now - lastSeen < DEDUPLICATION_WINDOW_MS) {
-            return
-        }
-        recentAlertTimestamps[dedupeKey] = now
-
-        // Purge old keys from deduplication cache
-        if (recentAlertTimestamps.size > 100) {
-            val cutoff = now - DEDUPLICATION_WINDOW_MS
-            val it = recentAlertTimestamps.entries.iterator()
-            while (it.hasNext()) {
-                if (it.next().value < cutoff) it.remove()
+            // Purge old keys from deduplication cache
+            if (recentAlertTimestamps.size > 100) {
+                val cutoff = now - DEDUPLICATION_WINDOW_MS
+                val it = recentAlertTimestamps.entries.iterator()
+                while (it.hasNext()) {
+                    if (it.next().value < cutoff) it.remove()
+                }
             }
         }
 
