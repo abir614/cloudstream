@@ -56,7 +56,8 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * Ultra-Lightweight, Production-Grade On-Device AI Classification Engine.
  *
- * Runs quantized neural network inference directly on-device via TensorFlow Lite.
+ * Runs GantMan's 5-class MobileNetV2 neural network inference ([drawings, hentai, neutral, porn, sexy])
+ * directly on-device via TensorFlow Lite.
  *
  * Engineering & Potato-Device Optimizations:
  * 1. ZERO-HEAP MMAP: Uses `AssetFileDescriptor` to memory-map the model directly from APK assets
@@ -83,13 +84,20 @@ object OnDeviceNsfwClassifier {
     private const val TAG = "OnDeviceNsfw"
     private const val MODEL_ASSET_PATH = "models/nsfw.tflite"
     private const val INPUT_DIM = 224
-    private const val BGR_CHANNELS = 3
+    private const val RGB_CHANNELS = 3
     private const val BYTES_PER_FLOAT = 4
 
-    // Dataset mean normalization values
-    private const val MEAN_B = 104.0f
-    private const val MEAN_G = 117.0f
-    private const val MEAN_R = 123.0f
+    // GantMan 5-Class MobileNetV2 Output Labels:
+    // 0: drawings (SFW illustrations, cartoons, anime)
+    // 1: hentai (sensitive illustrations / anime)
+    // 2: neutral (SFW everyday general photography)
+    // 3: porn (explicit real-world content)
+    // 4: sexy (suggestive / provocative real-world content)
+    const val CLASS_DRAWINGS = 0
+    const val CLASS_HENTAI = 1
+    const val CLASS_NEUTRAL = 2
+    const val CLASS_PORN = 3
+    const val CLASS_SEXY = 4
 
     // Thread-safe multi-session pool for hardware-adaptive parallel inference
     @Volatile private var sharedModelBuffer: MappedByteBuffer? = null
@@ -196,9 +204,10 @@ object OnDeviceNsfwClassifier {
                     val g = (pixel shr 8) and 0xFF
                     val b = pixel and 0xFF
 
-                    scratchFloatArray[floatIdx++] = b.toFloat() - MEAN_B
-                    scratchFloatArray[floatIdx++] = g.toFloat() - MEAN_G
-                    scratchFloatArray[floatIdx++] = r.toFloat() - MEAN_R
+                    // GantMan MobileNetV2 expects RGB normalized to [0.0, 1.0]
+                    scratchFloatArray[floatIdx++] = r.toFloat() / 255.0f
+                    scratchFloatArray[floatIdx++] = g.toFloat() / 255.0f
+                    scratchFloatArray[floatIdx++] = b.toFloat() / 255.0f
 
                     if (i >= bodyStartPixel && isSkinTone(r, g, b)) {
                         bodySkinPixels++
@@ -208,24 +217,37 @@ object OnDeviceNsfwClassifier {
                 inputBuffer.rewind()
                 inputBuffer.asFloatBuffer().put(scratchFloatArray)
 
-                val outputProb = Array(1) { FloatArray(2) }
+                val outputProb = Array(1) { FloatArray(5) }
                 interpreter.run(inputBuffer, outputProb)
 
-                val z0 = outputProb[0][0]
-                val z1 = outputProb[0][1]
+                val drawings = outputProb[0][CLASS_DRAWINGS]
+                val hentai = outputProb[0][CLASS_HENTAI]
+                val neutral = outputProb[0][CLASS_NEUTRAL]
+                val porn = outputProb[0][CLASS_PORN]
+                val sexy = outputProb[0][CLASS_SEXY]
 
-                val rawAiScore = if (z0 + z1 in 0.98f..1.02f && z0 >= 0f && z1 >= 0f) {
-                    z1
+                val sumProb = drawings + hentai + neutral + porn + sexy
+                val (pDrawings, pHentai, pNeutral, pPorn, pSexy) = if (sumProb in 0.95f..1.05f && drawings >= 0f && porn >= 0f) {
+                    floatArrayOf(drawings, hentai, neutral, porn, sexy)
                 } else {
-                    val maxLogit = maxOf(z0, z1)
-                    val exp0 = kotlin.math.exp((z0 - maxLogit).toDouble()).toFloat()
-                    val exp1 = kotlin.math.exp((z1 - maxLogit).toDouble()).toFloat()
-                    val sum = exp0 + exp1
-                    if (sum > 0f) (exp1 / sum).coerceIn(0.0f, 1.0f) else 0.5f
+                    val maxLogit = maxOf(drawings, hentai, neutral, porn, sexy)
+                    val exp0 = kotlin.math.exp((drawings - maxLogit).toDouble()).toFloat()
+                    val exp1 = kotlin.math.exp((hentai - maxLogit).toDouble()).toFloat()
+                    val exp2 = kotlin.math.exp((neutral - maxLogit).toDouble()).toFloat()
+                    val exp3 = kotlin.math.exp((porn - maxLogit).toDouble()).toFloat()
+                    val exp4 = kotlin.math.exp((sexy - maxLogit).toDouble()).toFloat()
+                    val sumExp = exp0 + exp1 + exp2 + exp3 + exp4
+                    if (sumExp > 0f) {
+                        floatArrayOf(exp0 / sumExp, exp1 / sumExp, exp2 / sumExp, exp3 / sumExp, exp4 / sumExp)
+                    } else {
+                        floatArrayOf(0.2f, 0.2f, 0.2f, 0.2f, 0.2f)
+                    }
                 }
+
+                val rawAiScore = (pPorn + pHentai + (pSexy * 0.70f)).coerceIn(0.0f, 1.0f)
                 val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
 
-                if (rawAiScore >= 0.35f && bodySkinRatio > 0.30f) {
+                if (rawAiScore >= 0.20f && bodySkinRatio > 0.30f) {
                     val exposureBoost = ((bodySkinRatio - 0.30f) * 1.5f).coerceIn(0.0f, 1.0f)
                     maxOf(rawAiScore, (rawAiScore * 0.70f) + (exposureBoost * 0.30f))
                 } else {
@@ -251,7 +273,7 @@ object OnDeviceNsfwClassifier {
     private const val SCORE_CACHE_CAPACITY = 5000
     private const val SCORES_FILE_NAME = "cs3_visual_scores.bin"
     private const val SCORES_MAGIC = 0x43533353 // "CS3S"
-    private const val SCORES_VERSION = 3
+    private const val SCORES_VERSION = 4
 
     private val scoreCache = LruCache<String, Float>(SCORE_CACHE_CAPACITY)
     private val persistentScoreLock = Any()
@@ -270,7 +292,7 @@ object OnDeviceNsfwClassifier {
 
     /**
      * Checks if the device is a potato device (≤ 2200MB RAM, Android Go, or Low Tier).
-     * On potato devices, the heavy 5.7MB TFLite model and native tensor arenas are completely bypassed
+     * On potato devices, the heavy 16.5MB TFLite model and native tensor arenas are completely bypassed
      * to save 35MB+ RAM and eliminate OOM crashes and native SIMD SIGILL/SIGSEGV traps.
      */
     fun isPotatoDevice(ctx: Context): Boolean {
@@ -771,13 +793,13 @@ object OnDeviceNsfwClassifier {
             }
         }
 
-        val buf = ByteBuffer.allocateDirect(1 * INPUT_DIM * INPUT_DIM * BGR_CHANNELS * BYTES_PER_FLOAT).apply {
+        val buf = ByteBuffer.allocateDirect(1 * INPUT_DIM * INPUT_DIM * RGB_CHANNELS * BYTES_PER_FLOAT).apply {
             order(ByteOrder.nativeOrder())
         }
         val sBitmap = Bitmap.createBitmap(INPUT_DIM, INPUT_DIM, Bitmap.Config.ARGB_8888)
         val sCanvas = Canvas(sBitmap)
         val sPixels = IntArray(INPUT_DIM * INPUT_DIM)
-        val sFloats = FloatArray(INPUT_DIM * INPUT_DIM * BGR_CHANNELS)
+        val sFloats = FloatArray(INPUT_DIM * INPUT_DIM * RGB_CHANNELS)
 
         return InferenceSession(
             interpreter = interp,
