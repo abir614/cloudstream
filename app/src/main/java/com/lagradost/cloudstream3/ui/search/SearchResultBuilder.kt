@@ -10,7 +10,6 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.core.view.isVisible
-import androidx.viewpager2.widget.ViewPager2
 import androidx.palette.graphics.Palette
 import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.AnimeSearchResponse
@@ -370,16 +369,5 @@ object SearchResultBuilder {
         textIsDub?.apply {
             backgroundTintList = ColorStateList.valueOf(context.colorFromAttribute(R.attr.textColor))
         }
-    }
-
-    private fun isInsideViewPager2(view: View): Boolean {
-        if (view.findViewById<View>(R.id.home_scroll_preview) != null) return true
-        var current: View? = view
-        while (current != null) {
-            if (current is ViewPager2) return true
-            val parent = current.parent
-            current = parent as? View
-        }
-        return false
     }
 }
