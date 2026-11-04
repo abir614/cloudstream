@@ -123,7 +123,7 @@ class MALApi : SyncAPI() {
     }
 
     override fun urlToId(url: String): String? =
-        Regex("""/anime/((.*)/|(.*))""").find(url)!!.groupValues.first()
+        Regex("""/anime/((.*)/|(.*))""").find(url)?.groupValues?.firstOrNull()
 
     override suspend fun updateStatus(
         auth: AuthData?,

@@ -98,7 +98,11 @@
     - Uses `WeakReference<ImageView>` to eliminate view recycling races and GC pinning during fast remote scrolling.
     - Rate-limits queue depth with smart eviction to maintain buttery smooth 60/120fps UI rendering with zero frame drops or OutOfMemory errors.
 
-### 8. Streamlined Release Packaging
+### 8. Streamlined Release Packaging & Independent App Identity
+- **Pre-Release Builds**: Package ID `com.lagradost.cloudstream3.beta`, App Name **`CSB`**.
+- **Stable Builds**: Package ID `com.lagradost.cloudstream3.stable`, App Name **`CloudStream`**.
+- *Side-by-Side Coexistence*: Both flavors can be installed simultaneously alongside official upstream releases without signature collisions.
+
 Each CI release generates exactly 6 organized artifacts with zero duplicate files:
 * `CloudStream-prerelease-v<BUILD>-arm64-v8a.apk`: Optimized for modern 64-bit ARM devices (Helio G100, Snapdragon, Dimensity).
 * `CloudStream-prerelease-v<BUILD>-armeabi-v7a.apk`: For older 32-bit devices and budget Android TV sticks.

@@ -149,7 +149,7 @@ open class StreamSB : ExtractorApi() {
             Regex("(embed-[a-zA-Z\\d]{0,8}[a-zA-Z\\d_-]+|/e/[a-zA-Z\\d]{0,8}[a-zA-Z\\d_-]+)")
         val id = regexId.findAll(url).map {
             it.value.replace(Regex("(embed-|/e/)"), "")
-        }.first()
+        }.firstOrNull() ?: return
         val master = "$mainUrl/375664356a494546326c4b797c7c6e756577776778623171737/${encodeId(id)}"
         val headers = mapOf("watchsb" to "sbstream")
         val mapped = app.get(

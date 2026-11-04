@@ -67,7 +67,7 @@ object ShortLink {
 
     suspend fun unshortenAdfly(url: String): String {
         val html = app.get(url).text
-        val ysmm = Regex("""var ysmm =.*;?""").find(html)!!.value
+        val ysmm = Regex("""var ysmm =.*;?""").find(html)?.value ?: return url
         if (ysmm.isNotEmpty()) {
             var left = ""
             var right = ""
@@ -141,7 +141,7 @@ object ShortLink {
         }
         if (url.contains("snip.")) {
             if (url.contains("out_generator")) {
-                url = Regex("url=(.*)\$").find(url)!!.value
+                url = Regex("url=(.*)\$").find(url)?.value ?: url
             } else if (url.contains("/decode/")) {
                 url = app.get(url, allowRedirects = true).url
             }
@@ -150,14 +150,15 @@ object ShortLink {
     }
 
     fun unshortenLinksafe(url: String): String {
-        return base64Decode(url.split("?url=").last())
+        val target = url.split("?url=").lastOrNull() ?: return url
+        return base64Decode(target)
     }
 
     suspend fun unshortenNuovoIndirizzo(url: String): String {
         val soup = app.get(url, allowRedirects = true)
         val header = soup.headers["refresh"]
         val link: String = if (header != null) {
-            soup.headers["refresh"]!!.substringAfter("=")
+            header.substringAfter("=")
         } else {
             "non trovato"
         }

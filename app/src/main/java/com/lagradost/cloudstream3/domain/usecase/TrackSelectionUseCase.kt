@@ -82,14 +82,15 @@ class TrackSelectionUseCase {
      * Ranks candidates of the same language by subtitle origin.
      * Local downloaded files take precedence over remote URLs, which take precedence over embedded tracks.
      */
-    fun rankSubtitleCandidates(candidates: List<SubtitleData>): SubtitleData {
+    fun rankSubtitleCandidates(candidates: List<SubtitleData>): SubtitleData? {
+        if (candidates.isEmpty()) return null
         return candidates.minByOrNull { sub ->
             when (sub.origin) {
                 SubtitleOrigin.DOWNLOADED_FILE -> 0
                 SubtitleOrigin.URL -> 1
                 SubtitleOrigin.EMBEDDED_IN_VIDEO -> 2
             }
-        } ?: candidates.first()
+        } ?: candidates.firstOrNull()
     }
 
     /**

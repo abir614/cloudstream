@@ -2127,15 +2127,16 @@ object VideoDownloadManager {
             }
 
             // Profiles should always contain a download type
-            val profile = QualityDataHelper.getProfiles().first {
+            val profile = QualityDataHelper.getProfiles().firstOrNull {
                 it.types.contains(
                     QualityDataHelper.QualityProfileType.Download
                 )
-            }
+            } ?: QualityDataHelper.getProfiles().firstOrNull()
 
+            val profileId = profile?.id ?: 0
             val sortedLinks = currentLinks.sortedBy { link ->
                 // Negative, because the highest priority should be first
-                -getLinkPriority(profile.id, link)
+                -getLinkPriority(profileId, link)
             }
 
             downloadEpisodeWithLinks(

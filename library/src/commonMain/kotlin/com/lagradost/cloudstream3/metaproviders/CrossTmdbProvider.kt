@@ -82,7 +82,7 @@ class CrossTmdbProvider : TmdbProvider() {
                     val data = validApis.amap { api ->
                         try {
                             if (api.supportedTypes.contains(TvType.Movie)) { //|| api.supportedTypes.contains(TvType.AnimeMovie)
-                                return@amap api.search(this.name)?.first {
+                                return@amap api.search(this.name)?.firstOrNull {
                                     if (filterName(it.name).equals(
                                             matchName,
                                             ignoreCase = true
@@ -90,9 +90,9 @@ class CrossTmdbProvider : TmdbProvider() {
                                     ) {
                                         if (it is MovieSearchResponse)
                                             if (it.year != null && this.year != null && it.year != this.year) // if year exist then do a check
-                                                return@first false
+                                                return@firstOrNull false
 
-                                        return@first true
+                                        return@firstOrNull true
                                     }
                                     false
                                 }?.let { search ->
