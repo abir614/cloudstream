@@ -149,33 +149,27 @@ object SearchResultBuilder {
         val isTv = isLayout(TV)
 
         fun hideCardItem() {
+            cardView.setImageDrawable(null)
+            itemView.findViewById<View>(R.id.background_card)?.isVisible = false
+            itemView.findViewById<View>(R.id.imageText)?.isVisible = false
+            itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
+            itemView.setOnClickListener(null)
+            itemView.setOnLongClickListener(null)
+            itemView.onFocusChangeListener = null
+
             if (isTv) {
                 // On TV: Keep grid cell geometry intact so Leanback D-pad focus navigation never crashes
-                cardView.setImageDrawable(null)
                 cardView.setImageResource(R.drawable.default_cover)
-                itemView.findViewById<View>(R.id.background_card)?.isVisible = false
-                itemView.findViewById<View>(R.id.imageText)?.isVisible = false
-                itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
                 if (!itemView.hasFocus()) {
                     itemView.isFocusable = false
                     itemView.isFocusableInTouchMode = false
                     itemView.isClickable = false
                 }
-                itemView.setOnClickListener(null)
-                itemView.setOnLongClickListener(null)
-                itemView.onFocusChangeListener = null
             } else {
                 itemView.isVisible = false
                 itemView.isFocusable = false
                 itemView.isFocusableInTouchMode = false
                 itemView.isClickable = false
-                itemView.setOnClickListener(null)
-                itemView.setOnLongClickListener(null)
-                itemView.onFocusChangeListener = null
-                cardView.setImageDrawable(null)
-                itemView.findViewById<View>(R.id.background_card)?.isVisible = false
-                itemView.findViewById<View>(R.id.imageText)?.isVisible = false
-                itemView.findViewById<View>(R.id.title_shadow)?.isVisible = false
             }
         }
 

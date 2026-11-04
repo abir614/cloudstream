@@ -74,15 +74,10 @@ object ExtensionSandboxClient {
     }
 
     /**
-     * Checks if the device is a low-memory / potato hardware tier (<= 768MB RAM or isLowRamDevice).
+     * Checks if the device is a low-memory / potato hardware tier.
      */
     fun isPotatoDevice(context: Context): Boolean {
-        if (com.lagradost.cloudstream3.utils.DeviceProfile.tier(context) == com.lagradost.cloudstream3.utils.DeviceTier.LOW) return true
-        val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
-        if (actManager?.isLowRamDevice == true) return true
-        val memInfo = android.app.ActivityManager.MemoryInfo()
-        actManager?.getMemoryInfo(memInfo)
-        return memInfo.totalMem in 1..805306368L
+        return com.lagradost.cloudstream3.utils.DeviceProfile.isLowEnd(context)
     }
 
     /**
