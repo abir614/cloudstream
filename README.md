@@ -93,7 +93,7 @@
   - Operates using a static 48×48 RGB_565 scratchpad consuming $< 15\text{ KB}$ heap memory with zero native allocations.
   - **Dual-Zone Anatomical & Backdrop Rejection**:
     - Discards uniform warm/monochromatic backdrops (e.g., solid yellow, beige, or gold posters) where both upper and body regions exceed 60% skin hue.
-    - Requires concentrated anatomical skin clustering ($\ge 22\%$ in at least one row) to prevent dispersed noise from falsely triggering filters.
+    - Requires concentrated anatomical skin clustering ($\ge 55\%$ in at least one row) to prevent dispersed noise from falsely triggering filters.
   - **Safe Asynchronous Worker**:
     - Uses `WeakReference<ImageView>` to eliminate view recycling races and GC pinning during fast remote scrolling.
     - Rate-limits queue depth with smart eviction to maintain buttery smooth 60/120fps UI rendering with zero frame drops or OutOfMemory errors.
