@@ -372,7 +372,7 @@ class HomeViewModel : ViewModel() {
                             )
                         )
                         if (isPotato) {
-                            // Single-threaded pacing for potato (<=2GB) devices to prevent CPU/LMK memory spikes
+                            // Single-threaded pacing for ultra-potato (<=1GB) devices to prevent CPU/LMK memory spikes
                             kotlinx.coroutines.delay(12L)
                         }
                     }
