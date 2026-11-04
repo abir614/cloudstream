@@ -139,9 +139,13 @@ object OnDeviceNsfwClassifier {
                     if (b == null || b.isRecycled) return 0.0f
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
                         val copy = try {
-                            b.copy(Bitmap.Config.ARGB_8888, false)
+                            b.copy(Bitmap.Config.RGB_565, false)
                         } catch (_: Throwable) {
-                            null
+                            try {
+                                b.copy(Bitmap.Config.ARGB_8888, false)
+                            } catch (_: Throwable) {
+                                null
+                            }
                         }
                         if (copy != null) {
                             try {
@@ -302,9 +306,13 @@ object OnDeviceNsfwClassifier {
                     if (b == null || b.isRecycled) return 0.0f
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
                         val copy = try {
-                            b.copy(Bitmap.Config.ARGB_8888, false)
+                            b.copy(Bitmap.Config.RGB_565, false)
                         } catch (_: Throwable) {
-                            null
+                            try {
+                                b.copy(Bitmap.Config.ARGB_8888, false)
+                            } catch (_: Throwable) {
+                                null
+                            }
                         }
                         if (copy != null) {
                             try {

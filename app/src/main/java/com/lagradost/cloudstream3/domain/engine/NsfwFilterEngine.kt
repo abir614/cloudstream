@@ -89,9 +89,8 @@ object NsfwFilterEngine {
         cachedThresholdModerate = null
         cachedThresholdLow = null
         AppContextUtils.resetNsfwPreferenceCache()
-        com.lagradost.cloudstream3.ui.APIRepository.clearMainPageCache()
-        OnDeviceNsfwClassifier.clearCache()
-        CloudStreamApp.context?.let { ImageLoader.reconfigure(it) } ?: ImageLoader.resetImageClient()
+        // Preserve raw continuous [0.0 - 1.0] visual scores in memory and disk cache.
+        // Sensitivity thresholding takes effect dynamically at query time without expensive re-inference!
         _configVersion.value += 1
         try {
             com.lagradost.cloudstream3.MainActivity.reloadHomeEvent.invoke(true)
