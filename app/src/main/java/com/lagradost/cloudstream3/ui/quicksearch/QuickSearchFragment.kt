@@ -43,6 +43,7 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.isRecyclerScrollable
 import com.lagradost.cloudstream3.utils.AppContextUtils.ownHide
 import com.lagradost.cloudstream3.utils.AppContextUtils.ownShow
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
+import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.UIHelper.fixSystemBarsPadding
 import com.lagradost.cloudstream3.utils.UIHelper.getSpanCount
 import com.lagradost.cloudstream3.utils.UIHelper.hideKeyboard
@@ -155,6 +156,8 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
         if (isSingleProvider && firstProvider != null) {
             binding.quickSearchAutofitResults.apply {
                 setRecycledViewPool(SearchAdapter.sharedPool)
+                setHasFixedSize(true)
+                setItemViewCacheSize(context?.let { DeviceProfile.getItemViewCacheSize(it) } ?: 4)
                 adapter = SearchAdapter(
                     this,
                 ) { callback ->
@@ -192,6 +195,8 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
             }
         } else {
             binding.quickSearchMasterRecycler.setRecycledViewPool(ParentItemAdapter.sharedPool)
+            binding.quickSearchMasterRecycler.setHasFixedSize(true)
+            binding.quickSearchMasterRecycler.setItemViewCacheSize(context?.let { DeviceProfile.getItemViewCacheSize(it) } ?: 4)
             binding.quickSearchMasterRecycler.adapter =
                 ParentItemAdapter(
                     id = "quickSearchMasterRecycler".hashCode(),

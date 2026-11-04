@@ -1,5 +1,6 @@
 package com.lagradost.cloudstream3.utils.videoskip
 
+import android.util.LruCache
 import androidx.annotation.StringRes
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.R
@@ -62,7 +63,11 @@ abstract class SkipAPI {
 
     companion object {
         private val skipApis: List<SkipAPI> = listOf(AniSkip(), TheIntroDBSkip(), IntroDbSkip(), AnimeSkip())
-        private val cachedStamps = ConcurrentHashMap<Int, List<VideoSkipStamp>>()
+        private val cachedStamps = LruCache<Int, List<VideoSkipStamp>>(256)
+
+        fun clearCache() {
+            cachedStamps.evictAll()
+        }
 
         /** Get all video timestamps from an episode */
         suspend fun videoStamps(
@@ -71,7 +76,7 @@ abstract class SkipAPI {
             episodeDurationMs: Long,
             hasNextEpisode: Boolean,
         ): List<VideoSkipStamp> {
-            cachedStamps[episode.id]?.let { list ->
+            cachedStamps.get(episode.id)?.let { list ->
                 return list
             }
 
@@ -94,8 +99,7 @@ abstract class SkipAPI {
                         source = api.name
                     )
                 }.also { stamps ->
-                    /** Put in cache, this is such small data, it should be fine to never clear it */
-                    cachedStamps[episode.id] = stamps
+                    cachedStamps.put(episode.id, stamps)
                 }
             }
             return emptyList()
