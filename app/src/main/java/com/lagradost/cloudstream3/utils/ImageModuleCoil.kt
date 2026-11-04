@@ -377,6 +377,8 @@ object ImageLoader {
                                 } else {
                                     this@loadImageInternal.setImageResource(R.drawable.default_cover)
                                 }
+                            } else if (shouldCensor) {
+                                applyCensoredPoster(this@loadImageInternal, imageKey)
                             } else {
                                 try {
                                     this@loadImageInternal.setImageDrawable(result.asDrawable(context.resources))

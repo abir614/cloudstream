@@ -495,6 +495,8 @@ object OnDeviceNsfwClassifier {
                     if (checkTag == imageKey) {
                         if (!appContext.isNsfwEnabled()) {
                             activeView.setImageResource(R.drawable.default_cover)
+                        } else if (shouldCensorPosters(appContext)) {
+                            ImageLoader.applyCensoredPoster(activeView, imageKey)
                         } else {
                             setSmoothPosterDrawable(activeView, targetDrawable, false)
                         }
