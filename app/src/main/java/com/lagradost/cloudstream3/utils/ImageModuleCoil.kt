@@ -351,18 +351,13 @@ object ImageLoader {
                         this@loadImageInternal.setImageDrawable(defaultPlaceholder)
                     },
                     onError = { error ->
+                        val defaultError = ContextCompat.getDrawable(context, R.drawable.default_cover)
+                        this@loadImageInternal.setImageDrawable(error?.asDrawable(context.resources) ?: defaultError)
                         if (!isAdultAllowed) {
-                            val defaultError = ContextCompat.getDrawable(context, R.drawable.default_cover)
-                            this@loadImageInternal.setImageDrawable(error?.asDrawable(context.resources) ?: defaultError)
                             val level = NsfwFilterEngine.getFilterLevel(context)
                             if (level == NsfwFilterLevel.EXTREME) {
                                 OnDeviceNsfwClassifier.hideParentItem(this@loadImageInternal)
                             }
-                        } else if (shouldCensor) {
-                            applyCensoredPoster(this@loadImageInternal, imageKey)
-                        } else {
-                            val defaultError = ContextCompat.getDrawable(context, R.drawable.default_cover)
-                            this@loadImageInternal.setImageDrawable(error?.asDrawable(context.resources) ?: defaultError)
                         }
                     },
                     onSuccess = { result ->
@@ -373,8 +368,7 @@ object ImageLoader {
                                 imageKey = imageKey,
                                 drawable = drawable
                             )
-                        } catch (t: Throwable) {
-                            // ZERO LEAK GUARANTEE: Never leak raw uncensored posters on classification error
+                        } catch (_: Throwable) {
                             if (!isAdultAllowed) {
                                 this@loadImageInternal.setImageDrawable(null)
                                 val level = NsfwFilterEngine.getFilterLevel(context)
@@ -383,10 +377,12 @@ object ImageLoader {
                                 } else {
                                     this@loadImageInternal.setImageResource(R.drawable.default_cover)
                                 }
-                            } else if (shouldCensor) {
-                                applyCensoredPoster(this@loadImageInternal, imageKey)
                             } else {
-                                this@loadImageInternal.setImageResource(R.drawable.default_cover)
+                                try {
+                                    this@loadImageInternal.setImageDrawable(result.asDrawable(context.resources))
+                                } catch (_: Throwable) {
+                                    this@loadImageInternal.setImageResource(R.drawable.default_cover)
+                                }
                             }
                         }
                     }
