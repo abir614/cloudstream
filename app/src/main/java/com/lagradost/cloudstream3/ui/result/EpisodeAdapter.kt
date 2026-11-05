@@ -30,6 +30,8 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.html
 import com.lagradost.cloudstream3.utils.Coroutines.main
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
 import com.lagradost.cloudstream3.utils.UIHelper.toPx
+import com.lagradost.cloudstream3.utils.UIHelper.applyTvCardFocusHover
+import com.lagradost.cloudstream3.utils.UIHelper.resetTvCardHover
 import com.lagradost.cloudstream3.utils.downloader.DownloadObjects
 import com.lagradost.cloudstream3.utils.downloader.VideoDownloadManager
 import com.lagradost.cloudstream3.utils.setText
@@ -364,7 +366,12 @@ class EpisodeAdapter(
                 if (isLayout(TV)) {
                     itemView.isFocusable = true
                     itemView.isFocusableInTouchMode = true
-                    //itemView.touchscreenBlocksFocus = false
+                    if (!itemView.hasFocus()) {
+                        itemView.resetTvCardHover()
+                    }
+                    itemView.setOnFocusChangeListener { view, hasFocus ->
+                        view.applyTvCardFocusHover(hasFocus, scale = 1.05f, elevation = 12f)
+                    }
                 }
 
                 itemView.setOnLongClickListener {
@@ -466,6 +473,12 @@ class EpisodeAdapter(
                     if (isLayout(TV)) {
                         itemView.isFocusable = true
                         itemView.isFocusableInTouchMode = true
+                        if (!itemView.hasFocus()) {
+                            itemView.resetTvCardHover()
+                        }
+                        itemView.setOnFocusChangeListener { view, hasFocus ->
+                            view.applyTvCardFocusHover(hasFocus, scale = 1.05f, elevation = 12f)
+                        }
                     }
 
                     itemView.setOnLongClickListener {

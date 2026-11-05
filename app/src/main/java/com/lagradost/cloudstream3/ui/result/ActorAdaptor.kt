@@ -18,8 +18,11 @@ import com.lagradost.cloudstream3.ui.NoStateAdapter
 import com.lagradost.cloudstream3.ui.ViewHolderState
 import com.lagradost.cloudstream3.ui.newSharedPool
 import com.lagradost.cloudstream3.ui.settings.Globals.PHONE
+import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
+import com.lagradost.cloudstream3.utils.UIHelper.applyTvCardFocusHover
+import com.lagradost.cloudstream3.utils.UIHelper.resetTvCardHover
 
 class ActorAdaptor(
     private var nextFocusUpId: Int? = null,
@@ -89,7 +92,13 @@ class ActorAdaptor(
                     itemView.nextFocusUpId = it
                 }
 
+                if (isLayout(TV) && !itemView.hasFocus()) {
+                    itemView.resetTvCardHover()
+                }
                 itemView.setOnFocusChangeListener { v, hasFocus ->
+                    if (isLayout(TV)) {
+                        v.applyTvCardFocusHover(hasFocus, scale = 1.08f, elevation = 12f)
+                    }
                     if (hasFocus) {
                         focusCallback(v)
                     }

@@ -680,6 +680,56 @@ object UIHelper {
         popup.show()
         return popup
     }
+
+    /**
+     * Applies a modern, fluid Android TV card hover-up scale and elevation animation
+     * when a content card or poster receives remote / D-pad focus.
+     *
+     * @param hasFocus Whether the view currently holds focus.
+     * @param scale Focused scale factor (default: 1.08f).
+     * @param elevation Focused translationZ in pixels (default: 16f).
+     * @param duration Animation duration in milliseconds (default: 180ms).
+     */
+    fun View.applyTvCardFocusHover(
+        hasFocus: Boolean,
+        scale: Float = 1.08f,
+        elevation: Float = 16f,
+        duration: Long = 180L
+    ) {
+        if (!isLayout(com.lagradost.cloudstream3.ui.settings.Globals.TV)) return
+
+        // Prevent parent containers from clipping the enlarged/hovering card
+        (this.parent as? ViewGroup)?.let { p ->
+            p.clipChildren = false
+            p.clipToPadding = false
+            (p.parent as? ViewGroup)?.let { gp ->
+                gp.clipChildren = false
+                gp.clipToPadding = false
+            }
+        }
+
+        val targetScale = if (hasFocus) scale else 1.0f
+        val targetZ = if (hasFocus) elevation else 0f
+
+        this.animate()
+            .scaleX(targetScale)
+            .scaleY(targetScale)
+            .translationZ(targetZ)
+            .setDuration(duration)
+            .setInterpolator(android.view.animation.DecelerateInterpolator(1.5f))
+            .start()
+    }
+
+    /**
+     * Resets any hover animation state on a recycled view.
+     */
+    fun View.resetTvCardHover() {
+        if (!isLayout(com.lagradost.cloudstream3.ui.settings.Globals.TV)) return
+        this.animate().cancel()
+        this.scaleX = 1.0f
+        this.scaleY = 1.0f
+        this.translationZ = 0f
+    }
 }
 
 private class CutoutOverlayDrawable(

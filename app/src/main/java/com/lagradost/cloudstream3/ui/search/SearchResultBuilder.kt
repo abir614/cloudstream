@@ -33,6 +33,8 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.SubtitleHelper
 import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
+import com.lagradost.cloudstream3.utils.UIHelper.applyTvCardFocusHover
+import com.lagradost.cloudstream3.utils.UIHelper.resetTvCardHover
 import com.lagradost.cloudstream3.utils.getImageFromDrawable
 
 object SearchResultBuilder {
@@ -304,6 +306,9 @@ object SearchResultBuilder {
         if (isLayout(TV)) {
             itemView.isFocusableInTouchMode = true
             itemView.isFocusable = true
+            if (!itemView.hasFocus()) {
+                itemView.resetTvCardHover()
+            }
         }
 
         itemView.setOnLongClickListener {
@@ -312,6 +317,9 @@ object SearchResultBuilder {
         }
 
         itemView.setOnFocusChangeListener { view, b ->
+            if (isLayout(TV)) {
+                view.applyTvCardFocusHover(b)
+            }
             focus(view, b)
         }
 
