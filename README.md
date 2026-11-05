@@ -38,7 +38,7 @@
 - **Resume Video Playback by Default**:
   - Videos automatically resume from the last saved position out of the box.
   - Periodic and lifecycle-safe playback position flushing (`onPause`, `onStop`).
-- **TheIntroDB Video Skip Integration ([`VideoSkipHelper.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/VideoSkipHelper.kt))**:
+- **TheIntroDB Video Skip Integration ([`TheIntroDBSkip.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/videoskip/TheIntroDBSkip.kt))**:
   - Seamless intro/recap/outro/credits skipping with graceful 404 and network fallback handling.
 - **Hardware-Adaptive Buffering (ExoPlayer / Media3)**:
   - Tiers buffers dynamically: Low-end (10s min / 25s max / 12 MB target), Mid-range (20s / 45s / 48 MB), and High-end (30s / 60s / 128 MB).

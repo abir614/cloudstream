@@ -42,8 +42,8 @@ open class VkExtractor : ExtractorApi() {
             if (linkType == "url") {
                 val regex = Regex(pattern = "\"url([0-9]+)\":\"([^\"]*)\"", options = setOf(RegexOption.IGNORE_CASE))
                 regex.findAll(response).forEach { url ->
-                    val video = url.groupValues[2].replace("\\", "")
-                    val quality = url.groupValues[1].replace("\\", "")
+                    val video = url.groupValues.getOrNull(2)?.replace("\\", "") ?: return@forEach
+                    val quality = url.groupValues.getOrNull(1)?.replace("\\", "") ?: ""
                     callback.invoke(
                         newExtractorLink(
                             this.name,

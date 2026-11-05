@@ -21,8 +21,8 @@ open class Vids : ExtractorApi() {
     ) {
         val doc = app.get(url).text
         val streamUrlMatch =
-            streamUrlRegex.find(doc) ?: throw RuntimeException("vids: failed to find stream link")
-        val streamUrl = streamUrlMatch.groupValues[1].replace("\\", "")
+            streamUrlRegex.find(doc) ?: return
+        val streamUrl = streamUrlMatch.groupValues.getOrNull(1)?.replace("\\", "") ?: return
 
         callback.invoke(
             newExtractorLink(

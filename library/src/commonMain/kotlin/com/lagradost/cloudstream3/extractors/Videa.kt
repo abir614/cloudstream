@@ -58,8 +58,8 @@ class Videa : ExtractorApi() {
             // Check for redirect in XML error
             val redirectMatch = """<error.*?"noembed".*>(.*)</error>""".toRegex().find(videaXml)
 
-            if (redirectMatch != null && redirectMatch.groupValues[1] != currentUrl) {
-                currentUrl = redirectMatch.groupValues[1]
+            if (redirectMatch != null && redirectMatch.groupValues.getOrNull(1) != currentUrl) {
+                currentUrl = redirectMatch.groupValues.getOrNull(1) ?: break
             } else {
                 parseVideoSources(videaXml, callback)
                 break
@@ -89,7 +89,7 @@ class Videa : ExtractorApi() {
             url
         } else {
             val iframeMatch = """<iframe.*?src="(/player\?[^\"]+)""".toRegex().find(html)
-            iframeMatch?.let { "$mainUrl${it.groupValues[1]}" } ?: return null
+            iframeMatch?.let { match -> match.groupValues.getOrNull(1)?.let { "$mainUrl$it" } } ?: return null
         }
 
         // Get player page to extract tokens
@@ -105,7 +105,8 @@ class Videa : ExtractorApi() {
 
         // Extract nonce and generate tokens
         val nonceMatch = """_xt\s*=\s*"([^"]+)""".toRegex().find(playerHtml) ?: return null
-        val (s, t, key) = generateTokens(nonceMatch.groupValues[1])
+        val nonce = nonceMatch.groupValues.getOrNull(1) ?: return null
+        val (s, t, key) = generateTokens(nonce)
 
         // Extract video parameter
         val videoParam = when {
@@ -140,9 +141,9 @@ class Videa : ExtractorApi() {
         val sources = sourceRegex.findAll(xml).toList()
 
         for (sourceMatch in sources) {
-            val sourceName = sourceMatch.groupValues[1]
-            val exp = sourceMatch.groupValues[2]
-            var sourceUrl = sourceMatch.groupValues[3]
+            val sourceName = sourceMatch.groupValues.getOrNull(1) ?: continue
+            val exp = sourceMatch.groupValues.getOrNull(2) ?: continue
+            var sourceUrl = sourceMatch.groupValues.getOrNull(3) ?: continue
 
             // Add https if needed
             if (sourceUrl.startsWith("//")) {
@@ -153,7 +154,7 @@ class Videa : ExtractorApi() {
             val hashMatch = """<hash_value_$sourceName>([^<]+)<""".toRegex().find(xml)
 
             hashMatch?.let { match ->
-                val hash = match.groupValues[1]
+                val hash = match.groupValues.getOrNull(1) ?: return@let
                 val finalUrl = "$sourceUrl?md5=$hash&expires=$exp".replace("&amp;", "&")
 
                 callback(

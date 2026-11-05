@@ -29,16 +29,16 @@ open class VidMoxy : ExtractorApi() {
             )
         }
 
-        var extractedValue  = Regex("""file": "(.*)",""").find(videoReq)?.groupValues?.get(1)
+        var extractedValue  = Regex("""file": "(.*)",""").find(videoReq)?.groupValues?.getOrNull(1)
         var decoded: String? = null
 
         if (extractedValue != null) {
             val bytes = extractedValue.split("\\x").filter { it.isNotEmpty() }.map { it.toInt(16).toByte() }.toByteArray()
             decoded   = bytes.decodeToString()
         } else {
-            val evaljwSetup = Regex("""\};\s*(eval\(function[\s\S]*?)var played = \d+;""").find(videoReq)?.groupValues?.get(1) ?: throw ErrorLoadingException("File not found")
+            val evaljwSetup = Regex("""\};\s*(eval\(function[\s\S]*?)var played = \d+;""").find(videoReq)?.groupValues?.getOrNull(1) ?: throw ErrorLoadingException("File not found")
             val jwSetup     = getAndUnpack(getAndUnpack(evaljwSetup)).replace("\\\\", "\\")
-            extractedValue  = Regex("""file":"(.*)","label""").find(jwSetup)?.groupValues?.get(1)?.replace("\\\\x", "")
+            extractedValue  = Regex("""file":"(.*)","label""").find(jwSetup)?.groupValues?.getOrNull(1)?.replace("\\\\x", "")
 
             val bytes = extractedValue?.chunked(2)?.map { it.toInt(16).toByte() }?.toByteArray()
             decoded   = bytes?.decodeToString() ?: throw ErrorLoadingException("File not found")

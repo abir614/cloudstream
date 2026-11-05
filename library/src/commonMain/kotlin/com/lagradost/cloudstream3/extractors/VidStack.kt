@@ -44,22 +44,22 @@ open class VidStack : ExtractorApi() {
 
         val decryptedText = ivList.firstNotNullOfOrNull { iv ->
             try {
-                AesHelper.decryptAES(encoded, key, iv)
+                VidStackAesHelper.decryptAES(encoded, key, iv)
             } catch (e: Exception) {
                 null
             }
-        } ?: throw Exception("Failed to decrypt with all IVs")
+        } ?: return
 
         val m3u8 = Regex("\"source\":\"(.*?)\"").find(decryptedText)
-            ?.groupValues?.get(1)
+            ?.groupValues?.getOrNull(1)
             ?.replace("\\/", "/") ?: ""
         val subtitlePattern = Regex("\"([^\"]+)\":\\s*\"([^\"]+)\"")
-        val subtitleSection = Regex("\"subtitle\":\\{(.*?)\\}").find(decryptedText)?.groupValues?.get(1)
+        val subtitleSection = Regex("\"subtitle\":\\{(.*?)\\}").find(decryptedText)?.groupValues?.getOrNull(1)
 
         subtitleSection?.let { section ->
             subtitlePattern.findAll(section).forEach { match ->
-                val lang = match.groupValues[1]
-                val rawPath = match.groupValues[2].split("#")[0]
+                val lang = match.groupValues.getOrNull(1) ?: return@forEach
+                val rawPath = match.groupValues.getOrNull(2)?.split("#")?.getOrNull(0) ?: ""
                 if (rawPath.isNotEmpty()) {
                     val path = rawPath.replace("\\/", "/")
                     val subUrl = "$mainUrl$path"
@@ -91,7 +91,7 @@ open class VidStack : ExtractorApi() {
     }
 }
 
-object AesHelper {
+private object VidStackAesHelper {
     private val aesCbc = CryptographyProvider.Default.get(AES.CBC)
 
     @OptIn(DelicateCryptographyApi::class)
