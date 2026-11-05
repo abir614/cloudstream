@@ -24,7 +24,7 @@ open class UpstreamExtractor : ExtractorApi() {
                 it.trim('|')
             }?.toList()
             reg = Regex("(?<=\\|file\\|)(.*)(?=\\|remove\\|)")
-            val domainList = reg.find(doc)?.groupValues?.get(1)?.split("|")
+            val domainList = reg.find(doc)?.groupValues?.getOrNull(1)?.split("|")
             var domain = when (!domainList.isNullOrEmpty()) {
                 true -> {
                     if (domainList.isNotEmpty()) {

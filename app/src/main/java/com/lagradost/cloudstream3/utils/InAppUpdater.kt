@@ -804,7 +804,7 @@ object InAppUpdater {
 
                 val logRegex = Regex("\\[(.*?)]\\((.*?)\\)")
                 val sanitizedChangelog = update.changelog?.replace(logRegex) { matchResult ->
-                    matchResult.groupValues[1]
+                    matchResult.groupValues.getOrNull(1) ?: matchResult.value
                 } // Sanitized because it looks cluttered
 
                 builder.setMessage(sanitizedChangelog)

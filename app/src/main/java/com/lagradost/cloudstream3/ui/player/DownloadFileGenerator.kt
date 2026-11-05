@@ -56,7 +56,7 @@ class DownloadFileGenerator(
             if (isMatchingSubtitle(name, display, cleanDisplay)) {
                 val cleanName = cleanDisplayName(name)
                 val lastNum = Regex(" ([0-9]+)$")
-                val nameSuffix = lastNum.find(cleanName)?.groupValues?.get(1) ?: ""
+                val nameSuffix = lastNum.find(cleanName)?.groupValues?.getOrNull(1) ?: ""
                 val originalName = cleanName.removePrefix(cleanDisplay).replace(lastNum, "").trim()
 
                 subtitleCallback(

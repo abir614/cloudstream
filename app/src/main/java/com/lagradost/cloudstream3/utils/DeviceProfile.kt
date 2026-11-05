@@ -404,8 +404,8 @@ object DeviceProfile {
         val kernel = getKernelVersion()
         val match = Regex("""(\d+)\.(\d+)""").find(kernel)
         val legacy = if (match != null) {
-            val major = match.groupValues[1].toIntOrNull() ?: 4
-            val minor = match.groupValues[2].toIntOrNull() ?: 14
+            val major = match.groupValues.getOrNull(1)?.toIntOrNull() ?: 4
+            val minor = match.groupValues.getOrNull(2)?.toIntOrNull() ?: 14
             major < 4 || (major == 4 && minor < 9)
         } else false
         cachedIsLegacyKernel = legacy

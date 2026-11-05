@@ -1090,7 +1090,7 @@ class SimklApi : SyncAPI() {
 
     override fun urlToId(url: String): String? {
         val simklUrlRegex = Regex("""https://simkl\.com/[^/]*/(\d+).*""")
-        return simklUrlRegex.find(url)?.groupValues?.get(1) ?: ""
+        return simklUrlRegex.find(url)?.groupValues?.getOrNull(1) ?: ""
     }
 
     override suspend fun pinRequest(): AuthPinData? {

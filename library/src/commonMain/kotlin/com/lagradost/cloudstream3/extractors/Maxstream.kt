@@ -11,9 +11,9 @@ open class Maxstream : ExtractorApi() {
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         val extractedLinksList: MutableList<ExtractorLink> = mutableListOf()
         val response = app.get(url).text
-        val jstounpack = Regex("cript\">eval((.|\\n)*?)</script>").find(response)?.groups?.get(1)?.value
-        val unpacjed = JsUnpacker(jstounpack).unpack()
-        val extractedUrl = unpacjed?.let { Regex("""src:"((.|\n)*?)",type""").find(it) }?.groups?.get(1)?.value.toString()
+        val jstounpack = Regex("cript\">eval((.|\\n)*?)</script>").find(response)?.groups?.get(1)?.value ?: return null
+        val unpacjed = JsUnpacker(jstounpack).unpack() ?: return null
+        val extractedUrl = Regex("""src:"((.|\n)*?)",type""").find(unpacjed)?.groups?.get(1)?.value ?: return null
 
         M3u8Helper.generateM3u8(
             name,

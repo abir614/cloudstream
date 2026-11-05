@@ -1033,7 +1033,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                     if (layoutManager is LinearListLayout && layoutManager.orientation == LinearLayoutManager.HORIZONTAL) {
                         val dx =
                             LinearSnapHelper().calculateDistanceToFinalSnap(layoutManager, newFocus)
-                                ?.get(0)
+                                ?.getOrNull(0)
 
                         if (dx != null) {
                             val rdx = if (LEFTMOST_MOVE_LIST) {

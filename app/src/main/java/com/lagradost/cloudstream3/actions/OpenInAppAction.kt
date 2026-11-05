@@ -35,8 +35,10 @@ fun makeTempM3U8Intent(
     intent: Intent,
     result: LinkLoadingResult
 ) {
+    if (result.links.isEmpty()) return
     if (result.links.size == 1) {
-        intent.setDataAndType(result.links.first().url.toUri(), "video/*")
+        val linkUrl = result.links.firstOrNull()?.url ?: return
+        intent.setDataAndType(linkUrl.toUri(), "video/*")
         return
     }
 

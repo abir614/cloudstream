@@ -26,7 +26,7 @@ open class GUpload: ExtractorApi() {
         val response = app.get(url, referer = referer).text
 
         val playerConfigString = response.substringAfter("const config = ").substringBefore(";")
-        val playerConfig = parseJson<VideoInfo>(playerConfigString)
+        val playerConfig = tryParseJson<VideoInfo>(playerConfigString) ?: return
 
         callback.invoke(
             newExtractorLink(
@@ -34,7 +34,7 @@ open class GUpload: ExtractorApi() {
                 name = name,
                 url = playerConfig.videoUrl,
             ) {
-                Regex("/(\\d+p)\\.").find(playerConfig.videoUrl)?.groupValues?.get(1)?.let {
+                Regex("/(\\d+p)\\.").find(playerConfig.videoUrl)?.groupValues?.getOrNull(1)?.let {
                     quality = getQualityFromName(it)
                 }
             }

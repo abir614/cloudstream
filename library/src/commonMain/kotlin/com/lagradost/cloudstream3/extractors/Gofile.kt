@@ -24,13 +24,13 @@ open class Gofile : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
     ) {
-        val id = Regex("/(?:\\?c=|d/)([\\da-zA-Z-]+)").find(url)?.groupValues?.get(1) ?: return
+        val id = Regex("/(?:\\?c=|d/)([\\da-zA-Z-]+)").find(url)?.groupValues?.getOrNull(1) ?: return
         val token = app.post(
             "$mainApi/accounts",
         ).parsedSafe<AccountResponse>()?.data?.token ?: return
 
         val globalRes = app.get("$mainUrl/dist/js/config.js").text
-        val wt = Regex("""appdata\.wt\s*=\s*[\"']([^\"']+)[\"']""").find(globalRes)?.groupValues?.get(1) ?: return
+        val wt = Regex("""appdata\.wt\s*=\s*[\"']([^\"']+)[\"']""").find(globalRes)?.groupValues?.getOrNull(1) ?: return
         val headers = mapOf(
             "Authorization" to "Bearer $token",
             "X-Website-Token" to wt,

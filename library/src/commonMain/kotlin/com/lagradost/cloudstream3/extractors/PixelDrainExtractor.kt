@@ -15,7 +15,7 @@ open class PixelDrain : ExtractorApi() {
     override val requiresReferer = true
 
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
-        val mId = Regex("/u/(.*)").find(url)?.groupValues?.get(1)
+        val mId = Regex("/u/(.*)").find(url)?.groupValues?.getOrNull(1)
         if (mId.isNullOrEmpty())
         {
             callback.invoke(

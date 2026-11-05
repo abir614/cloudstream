@@ -19,8 +19,8 @@ open class Cda : ExtractorApi() {
 
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink>? {
         val mediaId = url
-            .split("/").last()
-            .split("?").first()
+            .split("/").lastOrNull()
+            ?.split("?")?.firstOrNull() ?: return null
         val doc = app.get(
             "https://ebd.cda.pl/647x500/$mediaId", headers = mapOf(
                 "Referer" to "https://ebd.cda.pl/647x500/$mediaId",

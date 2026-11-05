@@ -61,7 +61,7 @@ class TelemetryService(
     fun sanitize(input: String): String {
         if (input.isBlank()) return input
         var cleaned = tokenRegex.replace(input) { match ->
-            "${match.groupValues[1]}=[REDACTED]"
+            match.groupValues.getOrNull(1)?.let { "$it=[REDACTED]" } ?: "[REDACTED]"
         }
         cleaned = ipRegex.replace(cleaned) { match ->
             val ip = match.value

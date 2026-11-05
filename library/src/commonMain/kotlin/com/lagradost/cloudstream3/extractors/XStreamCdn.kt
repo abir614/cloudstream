@@ -93,7 +93,7 @@ open class XStreamCdn : ExtractorApi() {
             "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0",
         )
 
-        val id = url.trimEnd('/').split("/").last()
+        val id = url.trimEnd('/').split("/").lastOrNull() ?: return
         val newUrl = "https://$domainUrl/api/source/$id"
         app.post(newUrl, headers = headers).let { res ->
             val sources = tryParseJson<ResponseJson>(res.text)
@@ -114,14 +114,16 @@ open class XStreamCdn : ExtractorApi() {
                 }
             }
 
-            val userData = sources?.player?.posterFile?.split("/")?.get(2)
-            sources?.captions?.map {
-                subtitleCallback.invoke(
-                    newSubtitleFile(
-                        it?.language.toString(),
-                        "$mainUrl/asset/userdata/$userData/caption/${it?.hash}/${it?.id}.${it?.extension}"
+            val userData = sources?.player?.posterFile?.split("/")?.getOrNull(2)
+            if (!userData.isNullOrBlank()) {
+                sources?.captions?.map {
+                    subtitleCallback.invoke(
+                        newSubtitleFile(
+                            it?.language.toString(),
+                            "$mainUrl/asset/userdata/$userData/caption/${it?.hash}/${it?.id}.${it?.extension}"
+                        )
                     )
-                )
+                }
             }
         }
     }

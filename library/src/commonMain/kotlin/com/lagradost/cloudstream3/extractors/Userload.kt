@@ -35,7 +35,7 @@ open class Userload : ExtractorApi() {
 
     private suspend fun decodeVideoJs(text: String): List<String> {
         text.replace("""\s+|/\*.*?\*/""".toRegex(), "")
-        val data = text.split("""+(ﾟДﾟ)[ﾟoﾟ]""")[1]
+        val data = text.split("""+(ﾟДﾟ)[ﾟoﾟ]""").getOrNull(1) ?: return emptyList()
         val chars = data.split("""+ (ﾟДﾟ)[ﾟεﾟ]+""").drop(1)
         val newchars = chars.map { char ->
             char.replace("(oﾟｰﾟo)", "u")
@@ -57,9 +57,11 @@ open class Userload : ExtractorApi() {
         }
         var txtresult = ""
         subchar.forEach {
-            txtresult = txtresult.plus(it.toInt(8).toChar())
+            it.toIntOrNull(8)?.let { code ->
+                txtresult = txtresult.plus(code.toChar())
+            }
         }
-        val val1 = Regex(""""morocco="((.|\\n)*?)"&mycountry="""").find(txtresult)?.groups?.get(1)?.value.toString().drop(1).dropLast(1)
+        val val1 = Regex(""""morocco="((.|\\n)*?)"&mycountry="""").find(txtresult)?.groups?.get(1)?.value?.drop(1)?.dropLast(1) ?: ""
         val val2 = txtresult.substringAfter("""&mycountry="+""").substringBefore(")")
 
         return listOf(val1, val2)
@@ -69,19 +71,21 @@ open class Userload : ExtractorApi() {
         val extractedLinksList: MutableList<ExtractorLink> = mutableListOf()
 
         val response = app.get(url).text
-        val jsToUnpack = Regex("ext/javascript\">eval((.|\\n)*?)</script>").find(response)?.groups?.get(1)?.value
-        val unpacked = JsUnpacker(jsToUnpack).unpack()
+        val jsToUnpack = Regex("ext/javascript\">eval((.|\\n)*?)</script>").find(response)?.groups?.get(1)?.value ?: return null
+        val unpacked = JsUnpacker(jsToUnpack).unpack() ?: return null
         val videoJs = app.get("$mainUrl/api/assets/userload/js/videojs.js")
         val videoJsToDecode = videoJs.text
         val values = decodeVideoJs(videoJsToDecode)
-        val morocco = unpacked!!.split(";").filter { it.contains(values[0]) }[0].split("=")[1].drop(1).dropLast(1)
-        val mycountry = unpacked.split(";").filter { it.contains(values[1]) }[0].split("=")[1].drop(1).dropLast(1)
+        if (values.size < 2 || values[0].isBlank() || values[1].isBlank()) return null
+        val morocco = unpacked.split(";").firstOrNull { it.contains(values[0]) }?.split("=")?.getOrNull(1)?.drop(1)?.dropLast(1) ?: return null
+        val mycountry = unpacked.split(";").firstOrNull { it.contains(values[1]) }?.split("=")?.getOrNull(1)?.drop(1)?.dropLast(1) ?: return null
         val videoLinkPage = app.post("$mainUrl/api/request/", data = mapOf(
             "morocco" to morocco,
             "mycountry" to mycountry
         ))
         val videoLink = videoLinkPage.text
-        val nameSource = app.get(url).document.head().selectFirst("title")!!.text()
+        if (videoLink.isBlank()) return null
+        val nameSource = app.get(url).document.head().selectFirst("title")?.text().orEmpty()
         extractedLinksList.add(
             newExtractorLink(
                 name,

@@ -91,8 +91,10 @@ open class Gdriveplayer : ExtractorApi() {
         val sourceData = decryptedData?.substringAfter("sources:[")?.substringBefore("],")
         val subData = decryptedData?.substringAfter("tracks:[")?.substringBefore("],")
 
-        Regex("\"file\":\"(\\S+?)\".*?res=(\\d+)").findAll(sourceData ?: return).map {
-            it.groupValues[1] to it.groupValues[2]
+        Regex("\"file\":\"(\\S+?)\".*?res=(\\d+)").findAll(sourceData ?: return).mapNotNull {
+            val link = it.groupValues.getOrNull(1) ?: return@mapNotNull null
+            val quality = it.groupValues.getOrNull(2) ?: return@mapNotNull null
+            link to quality
         }.toList().distinctBy { it.second }.map { (link, quality) ->
             callback.invoke(
                 newExtractorLink(
@@ -120,7 +122,7 @@ open class Gdriveplayer : ExtractorApi() {
     }
 
     @Serializable
-    data class Tracks(
+    private data class Tracks(
         @JsonProperty("file") @SerialName("file") val file: String,
         @JsonProperty("kind") @SerialName("kind") val kind: String,
         @JsonProperty("label") @SerialName("label") val label: String,

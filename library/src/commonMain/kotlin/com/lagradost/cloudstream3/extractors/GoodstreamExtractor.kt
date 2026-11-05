@@ -20,12 +20,12 @@ class GoodstreamExtractor : ExtractorApi() {
         app.get(url).document.select("script").map { script ->
             if (script.data().contains(Regex("file|player"))) {
                 val urlRegex = Regex("file: \"(https:\\/\\/[a-z0-9.\\/-_?=&]+)\",")
-                urlRegex.find(script.data())?.groupValues?.get(1).let { link ->
+                urlRegex.find(script.data())?.groupValues?.getOrNull(1)?.let { link ->
                     callback.invoke(
                         newExtractorLink(
                             name,
                             name,
-                            link!!,
+                            link,
                         ) {
                             this.referer = mainUrl
                         }

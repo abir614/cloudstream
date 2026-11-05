@@ -18,19 +18,19 @@ open class YourUpload : ExtractorApi() {
     override suspend fun getUrl(url: String, referer: String?): List<ExtractorLink> {
         val sources = mutableListOf<ExtractorLink>()
         with(app.get(url).document) {
-            val quality = Regex("\\d{3,4}p").find(this.select("title").text())?.groupValues?.get(0)
+            val quality = Regex("\\d{3,4}p").find(this.select("title").text())?.groupValues?.getOrNull(0)
             this.select("script").map { script ->
                 if (script.data().contains("var jwplayerOptions = {")) {
                     val data = script.data().substringAfter("var jwplayerOptions = {").substringBefore(",\n")
                     val link = tryParseJson<ResponseSource>(
                         "{${data.replace("file", "\"file\"").replace("'", "\"")}}"
-                    )
+                    ) ?: return@map
 
                     sources.add(
                         newExtractorLink(
                             source = name,
                             name = name,
-                            url = link!!.file,
+                            url = link.file,
                         ) {
                             this.referer = url
                             this.quality = getQualityFromName(quality)

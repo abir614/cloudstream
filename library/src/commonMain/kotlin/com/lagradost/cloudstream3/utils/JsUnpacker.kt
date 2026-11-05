@@ -13,7 +13,7 @@ class JsUnpacker(packedJS: String?) {
      * @return true if it's P.A.C.K.E.R. coded.
      */
     fun detect(): Boolean {
-        val js = packedJS!!.replace(" ", "")
+        val js = packedJS?.replace(" ", "") ?: return false
         return Regex("eval\\(function\\(p,a,c,k,e,[rd]").containsMatchIn(js)
     }
 
@@ -29,11 +29,11 @@ class JsUnpacker(packedJS: String?) {
             val match = Regex(
                 """(?s)\}\s*\('(.*)',\s*(.*?),\s*(\d+),\s*'(.*?)'\.split\('\|'\)"""
             ).find(js)
-            if (match != null && match.groupValues.size == 5) {
-                val payload = match.groupValues[1].replace("\\'", "'")
-                val radixStr = match.groupValues[2]
-                val countStr = match.groupValues[3]
-                val symtab = match.groupValues[4].split("|").toTypedArray()
+            if (match != null && match.groupValues.size >= 5) {
+                val payload = match.groupValues.getOrNull(1)?.replace("\\'", "'") ?: return null
+                val radixStr = match.groupValues.getOrNull(2)
+                val countStr = match.groupValues.getOrNull(3)
+                val symtab = match.groupValues.getOrNull(4)?.split("|")?.toTypedArray() ?: return null
                 var radix = 36
                 var count = 0
                 try {

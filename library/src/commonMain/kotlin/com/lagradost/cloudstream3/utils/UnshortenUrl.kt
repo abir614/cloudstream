@@ -106,7 +106,7 @@ object ShortLink {
             url.contains("/tv/") -> url = url.replace("/tv/", "/tva/")
             url.contains("delta") -> url = url.replace("/delta/", "/adelta/")
             (url.contains("/ga/") || url.contains("/ga2/")) -> url =
-                base64Decode(url.split('/').last()).trim()
+                url.split('/').lastOrNull()?.let { base64Decode(it).trim() } ?: url
 
             url.contains("/speedx/") -> url =
                 url.replace("http://linkup.pro/speedx", "http://speedvideo.net")
@@ -118,7 +118,7 @@ object ShortLink {
                     Regex("<iframe[^<>]*src=\\'([^'>]*)\\'[^<>]*>").find(r.text)?.value
                         ?: Regex("""action="(?:[^/]+.*?/[^/]+/([a-zA-Z0-9_]+))">""").find(r.text)?.value
                         ?: Regex("""href","((.|\\n)*?)"""").findAll(r.text)
-                            .elementAtOrNull(1)?.groupValues?.get(1)
+                            .elementAtOrNull(1)?.groupValues?.getOrNull(1)
 
                 if (link != null) {
                     url = link

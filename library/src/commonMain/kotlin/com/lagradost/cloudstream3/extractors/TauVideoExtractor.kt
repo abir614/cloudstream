@@ -20,9 +20,9 @@ open class TauVideo : ExtractorApi() {
         callback: (ExtractorLink) -> Unit,
     ) {
         val extRef = referer ?: ""
-        val videoKey = url.split("/").last()
+        val videoKey = url.trimEnd('/').split("/").lastOrNull() ?: return
         val videoUrl = "$mainUrl/api/video/$videoKey"
-        val api = app.get(videoUrl).parsedSafe<TauVideoUrls>() ?: throw ErrorLoadingException("TauVideo")
+        val api = app.get(videoUrl).parsedSafe<TauVideoUrls>() ?: return
 
         for (video in api.urls) {
             callback.invoke(

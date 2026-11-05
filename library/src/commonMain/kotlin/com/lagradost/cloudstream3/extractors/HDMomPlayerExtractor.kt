@@ -26,15 +26,15 @@ open class HDMomPlayer : ExtractorApi() {
         val iSource = app.get(url, referer = extRef).text
         val bePlayer = Regex("""bePlayer\('([^']+)',\s*'(\{[^\}]+\})'\);""").find(iSource)?.groupValues
         if (bePlayer != null) {
-            val bePlayerPass = bePlayer.get(1)
-            val bePlayerData = bePlayer.get(2)
-            val encrypted = AesHelper.cryptoAESHandler(bePlayerData, bePlayerPass.encodeToByteArray(), false)?.replace("\\", "") ?: throw ErrorLoadingException("failed to decrypt")
-            m3uLink = Regex("""video_location\":\"([^\"]+)""").find(encrypted)?.groupValues?.get(1)
+            val bePlayerPass = bePlayer.getOrNull(1) ?: return
+            val bePlayerData = bePlayer.getOrNull(2) ?: return
+            val encrypted = AesHelper.cryptoAESHandler(bePlayerData, bePlayerPass.encodeToByteArray(), false)?.replace("\\", "")
+            m3uLink = Regex("""video_location\":\"([^\"]+)""").find(encrypted ?: "")?.groupValues?.getOrNull(1)
         } else {
-            m3uLink = Regex("""file:\"([^\"]+)""").find(iSource)?.groupValues?.get(1)
-            val trackStr = Regex("""tracks:\[([^\]]+)""").find(iSource)?.groupValues?.get(1)
+            m3uLink = Regex("""file:\"([^\"]+)""").find(iSource)?.groupValues?.getOrNull(1)
+            val trackStr = Regex("""tracks:\[([^\]]+)""").find(iSource)?.groupValues?.getOrNull(1)
             if (trackStr != null) {
-                val tracks = parseJson<List<Track>>("[${trackStr}]")
+                val tracks = tryParseJson<List<Track>>("[${trackStr}]") ?: emptyList()
                 for (track in tracks) {
                     if (track.file == null || track.label == null) continue
                     if (track.label.contains("Forced")) continue

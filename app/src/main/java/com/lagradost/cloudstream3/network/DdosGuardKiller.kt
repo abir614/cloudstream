@@ -37,7 +37,7 @@ class DdosGuardKiller(private val alwaysBypass: Boolean) : Interceptor {
             app.get(
                 "https://check.ddos-guard.net/check.js"
             ).text
-        )?.groupValues?.get(1)
+        )?.groupValues?.getOrNull(1)
 
         val cookies =
             savedCookiesMap[request.url.host]

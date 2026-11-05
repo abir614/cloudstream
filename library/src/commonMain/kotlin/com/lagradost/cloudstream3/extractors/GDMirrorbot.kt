@@ -34,15 +34,15 @@ open class GDMirrorbot : ExtractorApi() {
             Pair(url.substringAfterLast("embed/"), getBaseUrl(app.get(url).url))
         } else {
             var pageText = app.get(url).text
-            val finalId = Regex("""FinalID\s*=\s*"([^"]+)"""").find(pageText)?.groupValues?.get(1)
-            val myKey = Regex("""myKey\s*=\s*"([^"]+)"""").find(pageText)?.groupValues?.get(1)
-            val idType = Regex("""idType\s*=\s*"([^"]+)"""").find(pageText)?.groupValues?.get(1) ?: "imdbid"
-            val baseUrl = Regex("""let\s+baseUrl\s*=\s*"([^"]+)"""").find(pageText)?.groupValues?.get(1)
+            val finalId = Regex("""FinalID\s*=\s*"([^"]+)"""").find(pageText)?.groupValues?.getOrNull(1)
+            val myKey = Regex("""myKey\s*=\s*"([^"]+)"""").find(pageText)?.groupValues?.getOrNull(1)
+            val idType = Regex("""idType\s*=\s*"([^"]+)"""").find(pageText)?.groupValues?.getOrNull(1) ?: "imdbid"
+            val baseUrl = Regex("""let\s+baseUrl\s*=\s*"([^"]+)"""").find(pageText)?.groupValues?.getOrNull(1)
             val hostUrl = baseUrl?.let { getBaseUrl(it) }
             if (finalId != null && myKey != null) {
                 val apiUrl = if (url.contains("/tv/")) {
-                    val season = Regex("""/tv/\d+/(\d+)/""").find(url)?.groupValues?.get(1) ?: "1"
-                    val episode = Regex("""/tv/\d+/\d+/(\d+)""").find(url)?.groupValues?.get(1) ?: "1"
+                    val season = Regex("""/tv/\d+/(\d+)/""").find(url)?.groupValues?.getOrNull(1) ?: "1"
+                    val episode = Regex("""/tv/\d+/\d+/(\d+)""").find(url)?.groupValues?.getOrNull(1) ?: "1"
                     "$mainUrl/myseriesapi?tmdbid=$finalId&season=$season&epname=$episode&key=$myKey"
                 } else "$mainUrl/mymovieapi?$idType=$finalId&key=$myKey"
                 pageText = app.get(apiUrl).text

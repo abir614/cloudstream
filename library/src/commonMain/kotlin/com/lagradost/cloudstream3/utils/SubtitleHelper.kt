@@ -258,7 +258,7 @@ object SubtitleHelper {
     fun getFlagFromIso(inp: String?): String? {
         if (inp.isNullOrBlank() || inp.length < 2) return null
 
-        val country = countryRegex.find(inp)?.groupValues?.get(1)
+        val country = countryRegex.find(inp)?.groupValues?.getOrNull(1)
 
         val flagEmoji =
             getFlagFromCountry2Letters(lang2country[inp.lowercase()]) ?:

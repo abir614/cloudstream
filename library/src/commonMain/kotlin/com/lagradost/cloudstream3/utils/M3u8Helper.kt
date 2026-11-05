@@ -325,11 +325,11 @@ object M3u8Helper2 {
         val match = ENCRYPTION_URL_IV_REGEX.find(playlistResponse)?.groupValues
         val encryptionState: Boolean
 
-        if (!match.isNullOrEmpty()) {
+        if (!match.isNullOrEmpty() && match.size >= 4) {
             encryptionState = true
-            val encryptionUrl = resolveUrl(playlistStream.streamUrl, match[2])
+            val encryptionUrl = resolveUrl(playlistStream.streamUrl, match.getOrNull(2) ?: "")
 
-            encryptionIv = match[3].encodeToByteArray()
+            encryptionIv = match.getOrNull(3)?.encodeToByteArray() ?: byteArrayOf()
             val encryptionKeyResponse =
                 app.get(encryptionUrl, headers = playlistStream.headers, verify = false)
             val body = encryptionKeyResponse.body
@@ -340,10 +340,11 @@ object M3u8Helper2 {
         }
 
         val relativeUrl = getParentLink(playlistStream.streamUrl)
-        val allTsList = TS_EXTENSION_REGEX.findAll(playlistResponse + "\n").map { ts ->
-            val time = ts.groupValues[1]
-            val url = resolveUrl(playlistStream.streamUrl, ts.groupValues[3].trim())
-            TsLink(url = url, time = time.toDoubleOrNull())
+        val allTsList = TS_EXTENSION_REGEX.findAll(playlistResponse + "\n").mapNotNull { ts ->
+            val time = ts.groupValues.getOrNull(1)
+            val path = ts.groupValues.getOrNull(3)?.trim() ?: return@mapNotNull null
+            val url = resolveUrl(playlistStream.streamUrl, path)
+            TsLink(url = url, time = time?.toDoubleOrNull())
         }.toList()
 
         if (allTsList.isEmpty()) throw IllegalStateException("M3u8 must contains TS files")

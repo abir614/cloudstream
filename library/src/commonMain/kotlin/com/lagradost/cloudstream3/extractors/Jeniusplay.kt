@@ -24,13 +24,13 @@ open class Jeniusplay : ExtractorApi() {
         callback: (ExtractorLink) -> Unit,
     ) {
         val document = app.get(url, referer = "$mainUrl/").document
-        val hash = url.split("/").last().substringAfter("data=")
+        val hash = url.split("/").lastOrNull()?.substringAfter("data=") ?: return
         val m3uLink = app.post(
             url = "$mainUrl/player/index.php?data=$hash&do=getVideo",
             data = mapOf("hash" to hash, "r" to "$referer"),
             referer = url,
             headers = mapOf("X-Requested-With" to "XMLHttpRequest"),
-        ).parsed<ResponseSource>().videoSource
+        ).parsedSafe<ResponseSource>()?.videoSource ?: return
 
         M3u8Helper.generateM3u8(
             this.name,

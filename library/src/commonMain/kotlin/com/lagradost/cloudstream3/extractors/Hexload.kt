@@ -26,12 +26,14 @@ class Hexload: ExtractorApi() {
         callback: (ExtractorLink) -> Unit
     ) {
         val respData = app.get(url).text.substringAfter("data: {").substringBefore("success")
-        val requestArgs = jsDictEntryRegex.findAll(respData).associate {
-            it.groupValues[1] to it.groupValues[2]
-        }
+        val requestArgs = jsDictEntryRegex.findAll(respData).mapNotNull {
+            val k = it.groupValues.getOrNull(1) ?: return@mapNotNull null
+            val v = it.groupValues.getOrNull(2) ?: return@mapNotNull null
+            k to v
+        }.toMap()
         Log.d("requestArgs", requestArgs.toString())
         val streamResponse = app.post("$mainUrl/download", data = requestArgs)
-            .parsed<StreamResponse>()
+            .parsedSafe<StreamResponse>() ?: return
 
         callback.invoke(newExtractorLink(
             name = name,

@@ -104,9 +104,9 @@
 - *Side-by-Side Coexistence*: Both flavors can be installed simultaneously alongside official upstream releases without signature collisions.
 
 Each CI release generates exactly 6 organized artifacts with zero duplicate files:
-* `CloudStream-prerelease-v<BUILD>-arm64-v8a.apk`: Optimized for modern 64-bit ARM devices (Helio G100, Snapdragon, Dimensity).
-* `CloudStream-prerelease-v<BUILD>-armeabi-v7a.apk`: For older 32-bit devices and budget Android TV sticks.
-* `CloudStream-prerelease-v<BUILD>-universal.apk`: All-in-one universal binary.
+* `CSB-prerelease-v<BUILD>-arm64-v8a.apk`: Optimized for modern 64-bit ARM devices (Helio G100, Snapdragon, Dimensity).
+* `CSB-prerelease-v<BUILD>-armeabi-v7a.apk`: For older 32-bit devices and budget Android TV sticks.
+* `CSB-prerelease-v<BUILD>-universal.apk`: All-in-one universal binary.
 * `SHA256SUMS`: Cryptographic integrity manifest for offline attestation.
 * `classes.jar`: API stub for provider and plugin developers.
 * `app-sources.jar`: API source documentation for extensions.

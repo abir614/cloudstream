@@ -32,7 +32,7 @@ open class Moviehab : ExtractorApi() {
                 url
             ).forEach(callback)
 
-            Regex("src[\"|'],\\s[\"|'](\\S+)[\"|']\\)").find(res.text)?.groupValues?.get(1).let {sub ->
+            Regex("src[\"|'],\\s[\"|'](\\S+)[\"|']\\)").find(res.text)?.groupValues?.getOrNull(1)?.let { sub ->
                 subtitleCallback.invoke(
                     newSubtitleFile(
                         it.select("track").attr("label"),

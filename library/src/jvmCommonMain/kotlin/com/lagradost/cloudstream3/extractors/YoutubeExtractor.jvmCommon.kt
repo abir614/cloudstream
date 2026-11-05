@@ -87,7 +87,7 @@ actual open class YoutubeExtractor actual constructor() : ExtractorApi() {
             "(?:youtu\\.be/|youtube(?:-nocookie)?\\.com/(?:.*v=|v/|u/\\w/|embed/|shorts/|live/))([\\w-]{11})"
         )
 
-        return regex.find(url)?.groupValues?.get(1)
+        return regex.find(url)?.groupValues?.getOrNull(1)
             ?: throw IllegalArgumentException("Invalid YouTube URL: $url")
     }
 

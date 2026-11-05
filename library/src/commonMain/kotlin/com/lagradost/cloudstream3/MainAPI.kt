@@ -873,8 +873,8 @@ suspend fun getRhinoContext(): org.mozilla.javascript.Context {
  * @see imdbUrlToIdNullable
  * */
 fun imdbUrlToId(url: String): String? {
-    return Regex("/title/(tt[0-9]*)").find(url)?.groupValues?.get(1)
-        ?: Regex("tt[0-9]{5,}").find(url)?.groupValues?.get(0)
+    return Regex("/title/(tt[0-9]*)").find(url)?.groupValues?.getOrNull(1)
+        ?: Regex("tt[0-9]{5,}").find(url)?.groupValues?.getOrNull(0)
 }
 
 /** https://www.imdb.com/title/tt2861424/ -> tt2861424

@@ -145,7 +145,7 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
             var trimmed = text?.trim() ?: return this
             // https://github.com/androidx/media/blob/main/libraries/extractor/src/main/java/androidx/media3/extractor/text/ssa/SsaStyle.java
             // exoplayer can already parse this, however for eg webvtt it fails
-            locationRegex.find(trimmed)?.groupValues?.get(1)?.toIntOrNull()?.let { alignment ->
+            locationRegex.find(trimmed)?.groupValues?.getOrNull(1)?.toIntOrNull()?.let { alignment ->
                 // toLineAnchor
                 this.setSubtitleAlignment(alignment)
             }

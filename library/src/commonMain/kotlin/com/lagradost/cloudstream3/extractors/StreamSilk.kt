@@ -22,7 +22,7 @@ open class StreamSilk : ExtractorApi() {
             it.html().contains("h,u,n,t,e,r")
         }?.html()?.let { hunted ->
             JsHunter(hunted).dehunt()?.let { script ->
-                srcRegex.find(script)?.groupValues?.get(1)?.trim()?.let { link ->
+                srcRegex.find(script)?.groupValues?.getOrNull(1)?.trim()?.let { link ->
                     val headers = mapOf(
                         "Origin" to mainUrl,
                         "Referer" to "$mainUrl/",

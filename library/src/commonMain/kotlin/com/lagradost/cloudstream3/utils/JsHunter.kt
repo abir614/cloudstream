@@ -24,14 +24,12 @@ class JsHunter(private val hunterJS: String) {
     fun dehunt(): String? {
         try {
             val regex = Regex("""(?s)\}\("([^"]+)",[^,]+,\s*"([^"]+)",\s*(\d+),\s*(\d+)""")
-            val match = regex.find(hunterJS)
-            if (match != null && match.groupValues.size == 5) {
-                val h = match.groupValues[1]
-                val n = match.groupValues[2]
-                val t = match.groupValues[3].toInt()
-                val e = match.groupValues[4].toInt()
-                return hunter(h, n, t, e)
-            }
+            val match = regex.find(hunterJS) ?: return null
+            val h = match.groupValues.getOrNull(1) ?: return null
+            val n = match.groupValues.getOrNull(2) ?: return null
+            val t = match.groupValues.getOrNull(3)?.toIntOrNull() ?: return null
+            val e = match.groupValues.getOrNull(4)?.toIntOrNull() ?: return null
+            return hunter(h, n, t, e)
         } catch (e: Exception) {
             logError(e)
         }

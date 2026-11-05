@@ -26,9 +26,9 @@ open class SBPlay : ExtractorApi() {
             val name = "${this.name} - ${item.text()}"
             try {
                 Regex("download_video\\('(.*?)','(.*?)','(.*?)'\\)").matchEntire(onDownload)?.let {
-                    val id = it.groupValues[1]
-                    val mode = it.groupValues[2]
-                    val hash = it.groupValues[3]
+                    val id = it.groupValues.getOrNull(1) ?: return@let
+                    val mode = it.groupValues.getOrNull(2) ?: return@let
+                    val hash = it.groupValues.getOrNull(3) ?: return@let
                     val href = "https://sbplay.one/dl?op=download_orig&id=$id&mode=$mode&hash=$hash"
                     val hrefResponse = app.get(href).text
                     app.post(

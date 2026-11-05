@@ -19,7 +19,7 @@ open class Wibufile : ExtractorApi() {
         callback: (ExtractorLink) -> Unit
     ) {
         val res = app.get(url).text
-        val video = Regex("src: ['\"](.*?)['\"]").find(res)?.groupValues?.get(1)
+        val video = Regex("src: ['\"](.*?)['\"]").find(res)?.groupValues?.getOrNull(1)
 
         callback.invoke(
             newExtractorLink(

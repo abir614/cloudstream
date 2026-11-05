@@ -35,9 +35,9 @@ object SyncUtil {
         Log.i(TAG, "getIdsFromUrl $url")
         for (regex in regexs) {
             regex.find(url)?.let { match ->
-                if (match.groupValues.size == 3) {
-                    val site = match.groupValues[1]
-                    val slug = match.groupValues[2]
+                if (match.groupValues.size >= 3) {
+                    val site = match.groupValues.getOrNull(1) ?: return@let
+                    val slug = match.groupValues.getOrNull(2) ?: return@let
                     matchList[site]?.let { realSite ->
                         getIdsFromSlug(slug, realSite)?.let {
                             return it

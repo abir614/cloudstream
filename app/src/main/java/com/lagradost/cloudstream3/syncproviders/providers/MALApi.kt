@@ -539,7 +539,7 @@ class MALApi : SyncAPI() {
             val data: MalList = getMalAnimeListSlice(token, offset)
             fullList.addAll(data.data)
             offset =
-                data.paging.next?.let { offsetRegex.find(it)?.groupValues?.get(1)?.toInt() }
+                data.paging.next?.let { offsetRegex.find(it)?.groupValues?.getOrNull(1)?.toIntOrNull() }
                     ?: break
         }
         return fullList.toTypedArray()

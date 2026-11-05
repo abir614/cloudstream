@@ -16,7 +16,7 @@ class Vido : ExtractorApi() {
         val methode = app.get(url.replace("/e/", "/embed-")) // fix wiflix and mesfilms
         with(methode) {
             if (!methode.isSuccessful) return null
-            srcRegex.find(this.text)?.groupValues?.get(1)?.let { link ->
+            srcRegex.find(this.text)?.groupValues?.getOrNull(1)?.let { link ->
                 return listOf(
                     newExtractorLink(
                         source = name,

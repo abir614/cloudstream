@@ -112,11 +112,11 @@ object HlsPlaylistParser {
 
     @Throws(ParserException::class)
     private fun parseIntAttr(line: String, pattern: Regex): Int {
-        return parseStringAttr(line, pattern, emptyMap()).toInt()
+        return parseStringAttr(line, pattern, emptyMap()).toIntOrNull() ?: 0
     }
 
     private fun parseOptionalIntAttr(line: String, pattern: Regex, defaultValue: Int): Int =
-        pattern.find(line)?.groupValues?.get(1)?.toInt() ?: defaultValue
+        pattern.find(line)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: defaultValue
 
     data class SchemeData(
         /**
@@ -1085,7 +1085,7 @@ object HlsPlaylistParser {
         defaultValue: String?,
         variableDefinitions: Map<String, String>?
     ): String? {
-        val value: String? = pattern.find(line)?.groupValues?.get(1) ?: defaultValue
+        val value: String? = pattern.find(line)?.groupValues?.getOrNull(1) ?: defaultValue
         return if (variableDefinitions.isNullOrEmpty() || value == null)
             value
         else
@@ -1096,7 +1096,7 @@ object HlsPlaylistParser {
         string: String, variableDefinitions: Map<String, String>?
     ): String =
         string.replace(REGEX_VARIABLE_REFERENCE) { matchResult ->
-            variableDefinitions?.get(matchResult.groupValues[1]) ?: matchResult.value
+            variableDefinitions?.get(matchResult.groupValues.getOrNull(1)) ?: matchResult.value
         }
 
 
@@ -1197,7 +1197,7 @@ object HlsPlaylistParser {
     private fun parseOptionalBooleanAttribute(
         line: String, pattern: Regex, defaultValue: Boolean
     ): Boolean {
-        val matcher = pattern.find(line)?.groupValues?.get(1)
+        val matcher = pattern.find(line)?.groupValues?.getOrNull(1)
         return if (matcher != null) {
             matcher == BOOLEAN_TRUE
         } else {

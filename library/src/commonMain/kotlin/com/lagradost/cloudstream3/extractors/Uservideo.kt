@@ -45,7 +45,7 @@ open class Uservideo : ExtractorApi() {
     }
 
     @Serializable
-    data class Sources(
+    private data class Sources(
         @JsonProperty("src") @SerialName("src") val src: String? = null,
         @JsonProperty("type") @SerialName("type") val type: String? = null,
         @JsonProperty("label") @SerialName("label") val label: String? = null,

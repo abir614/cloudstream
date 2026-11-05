@@ -71,7 +71,7 @@ open class Streamplay : ExtractorApi() {
     }
 
     @Serializable
-    data class Source(
+    private data class Source(
         @JsonProperty("file") @SerialName("file") val file: String? = null,
         @JsonProperty("label") @SerialName("label") val label: String? = null,
     )
