@@ -410,3 +410,59 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         0
     }
 }
+
+/// JNI bridge to evaluate text safety against adult and NSFW tokens using native Rust classifier.
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeIsNsfwText(
+    mut env: JNIEnv,
+    _class: JClass,
+    title_input: JString,
+    url_input: JString,
+    tags_input: JString,
+    level: jni::sys::jint,
+) -> jboolean {
+    let title: String = if !title_input.is_null() {
+        match env.get_string(&title_input) {
+            Ok(s) => s.into(),
+            Err(_) => String::new(),
+        }
+    } else {
+        String::new()
+    };
+    let url: String = if !url_input.is_null() {
+        match env.get_string(&url_input) {
+            Ok(s) => s.into(),
+            Err(_) => String::new(),
+        }
+    } else {
+        String::new()
+    };
+    let tags: Option<String> = if !tags_input.is_null() {
+        match env.get_string(&tags_input) {
+            Ok(s) => Some(s.into()),
+            Err(_) => None,
+        }
+    } else {
+        None
+    };
+
+    let lvl = match level {
+        0 => crate::security::nsfw_classifier::LEVEL_LOW,
+        2 => crate::security::nsfw_classifier::LEVEL_EXTREME,
+        _ => crate::security::nsfw_classifier::LEVEL_MODERATE,
+    };
+
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::security::nsfw_classifier::is_nsfw_text_with_level(
+            &title,
+            &url,
+            tags.as_deref(),
+            lvl,
+        )
+    });
+
+    match safe_res {
+        Ok(true) => 1,
+        _ => 0,
+    }
+}

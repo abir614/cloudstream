@@ -599,6 +599,14 @@ object NsfwFilterEngine {
         tags: String? = null,
         level: NsfwFilterLevel = getFilterLevel()
     ): Boolean {
+        if (com.lagradost.cloudstream3.services.NativeCoreBridge.isNativeReady()) {
+            val lvlInt = when (level) {
+                NsfwFilterLevel.LOW -> 0
+                NsfwFilterLevel.MODERATE -> 1
+                NsfwFilterLevel.EXTREME -> 2
+            }
+            return com.lagradost.cloudstream3.services.NativeCoreBridge.isNsfwText(title, url, tags, lvlInt)
+        }
         return isTextNsfwSingle(title, level) ||
                isTextNsfwSingle(url, level) ||
                (tags != null && isTextNsfwSingle(tags, level))

@@ -138,4 +138,21 @@ object NativeCoreBridge {
             data.size >= 6 && data.sliceArray(0 until 6).contentEquals("CSENC1".toByteArray(Charsets.UTF_8))
         }
     }
+
+    // --- Native Multi-Level Text & Adult Token Classification ---
+    external fun nativeIsNsfwText(
+        title: String?,
+        url: String?,
+        tags: String?,
+        level: Int
+    ): Boolean
+
+    fun isNsfwText(
+        title: String?,
+        url: String?,
+        tags: String? = null,
+        level: Int = 1
+    ): Boolean {
+        return if (isLoaded) nativeIsNsfwText(title, url, tags, level) else false
+    }
 }
