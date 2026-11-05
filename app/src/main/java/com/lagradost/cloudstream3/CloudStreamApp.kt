@@ -104,7 +104,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                 getProcessName() == packageName
             } else true
             if (isMainProc) {
-                com.lagradost.cloudstream3.utils.telemetry.AutoLogcatMonitor.start()
+                com.lagradost.cloudstream3.utils.telemetry.AutoLogcatMonitor.start(this)
             }
         } catch (_: Throwable) {
         }

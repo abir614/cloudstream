@@ -205,7 +205,7 @@ object RemoteCrashReporter {
                 difficulty = difficulty
             )
         } catch (t: Throwable) {
-            Log.w(TAG, "Handshake failed: ${t.message}")
+            Log.d(TAG, "Handshake failed: ${t.message}")
             null
         }
     }
@@ -346,7 +346,7 @@ object RemoteCrashReporter {
             response.close()
             successful
         } catch (t: Throwable) {
-            Log.w(TAG, "Encrypted dispatch error: ${t.message}")
+            Log.d(TAG, "Encrypted dispatch error: ${t.message}")
             false
         }
     }
@@ -466,7 +466,7 @@ object RemoteCrashReporter {
                 payload.put("extraData", dataJson)
             }
         } catch (t: Throwable) {
-            Log.w(TAG, "Error building payload: ${t.message}")
+            Log.d(TAG, "Error building payload: ${t.message}")
         }
 
         return payload
@@ -497,7 +497,7 @@ object RemoteCrashReporter {
             )
             dispatchEncrypted(payload)
         } catch (t: Throwable) {
-            Log.w(TAG, "Sync crash dispatch failed: ${t.message}")
+            Log.d(TAG, "Sync crash dispatch failed: ${t.message}")
             false
         }
     }
@@ -545,7 +545,7 @@ object RemoteCrashReporter {
                     )
                     dispatchEncrypted(payload)
                 } catch (t: Throwable) {
-                    Log.w(TAG, "Force diagnostic dispatch failed: ${t.message}")
+                    Log.d(TAG, "Force diagnostic dispatch failed: ${t.message}")
                 }
             }
             return
@@ -602,9 +602,22 @@ object RemoteCrashReporter {
                             fullLog = null,
                             extraData = event.data
                         )
-                        dispatchEncrypted(payload)
+                        val sent = dispatchEncrypted(payload)
+                        if (!sent) {
+                            // If network failed (e.g. offline device), back off to preserve battery
+                            try {
+                                Thread.sleep(10_000L)
+                            } catch (_: InterruptedException) {
+                                break
+                            }
+                        }
                     } catch (t: Throwable) {
-                        Log.w(TAG, "Queued diagnostic dispatch error: ${t.message}")
+                        Log.d(TAG, "Queued diagnostic dispatch error: ${t.message}")
+                        try {
+                            Thread.sleep(10_000L)
+                        } catch (_: InterruptedException) {
+                            break
+                        }
                     }
 
                     try {

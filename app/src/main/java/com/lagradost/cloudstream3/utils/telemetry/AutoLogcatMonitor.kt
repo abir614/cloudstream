@@ -1,9 +1,11 @@
 package com.lagradost.cloudstream3.utils.telemetry
 
+import android.content.Context
 import android.os.Build
 import android.os.Process
 import android.util.Log
 import com.lagradost.cloudstream3.di.ServiceLocator
+import com.lagradost.cloudstream3.utils.DeviceProfile
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicBoolean
@@ -14,6 +16,11 @@ import kotlin.concurrent.thread
  *
  * Continuously streams and monitors logcat for WARNING, ERROR, and FATAL entries
  * produced by the CloudStream app process and forwards actionable events to Telemetry.
+ *
+ * Tier-Adaptive:
+ * - On Ultra-Potato devices (<= 1024MB RAM or legacy Linux kernel), skips spawning the
+ *   external logcat subprocess to conserve CPU and RAM, relying fully on in-memory error hooks.
+ * - On Standard/High-End devices, monitors real-time process logs with strict noise and recursion filtering.
  */
 object AutoLogcatMonitor {
     private const val TAG = "AutoLogcatMonitor"
@@ -42,8 +49,23 @@ object AutoLogcatMonitor {
         "RenderThread"
     )
 
-    fun start() {
+    fun start(context: Context? = null) {
         if (!isRunning.compareAndSet(false, true)) return
+
+        // Potato-tier optimization: On devices with <= 1024MB RAM, do not spawn an external Unix process.
+        // In-memory errorReporter in ArchComponentExt already captures 100% of caught exceptions with zero overhead.
+        if (context != null && DeviceProfile.isUltraPotato(context)) {
+            try {
+                ServiceLocator.telemetry.recordBreadcrumb(
+                    tag = TAG,
+                    message = "Subprocess disabled on ultra-potato device to conserve RAM/CPU; in-memory exception hook active",
+                    level = TelemetryService.Level.INFO
+                )
+            } catch (_: Throwable) {
+            }
+            isRunning.set(false)
+            return
+        }
 
         val myPid = Process.myPid()
 
@@ -85,6 +107,16 @@ object AutoLogcatMonitor {
                             }
 
                             if (tag in noiseTagDenylist || tag == TAG || tag == "RemoteCrashReporter") {
+                                continue
+                            }
+
+                            // Strict recursion protection: never report network errors or debug logs from the telemetry system itself
+                            if (message.contains("app-log-collector", ignoreCase = true) ||
+                                message.contains("workers.dev", ignoreCase = true) ||
+                                message.contains("AutoLogcatMonitor", ignoreCase = true) ||
+                                message.contains("RemoteCrashReporter", ignoreCase = true) ||
+                                message.contains("telemetry", ignoreCase = true)
+                            ) {
                                 continue
                             }
 
