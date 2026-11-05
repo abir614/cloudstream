@@ -122,7 +122,7 @@ open class Gdriveplayer : ExtractorApi() {
     }
 
     @Serializable
-    private data class Tracks(
+    data class Tracks(
         @JsonProperty("file") @SerialName("file") val file: String,
         @JsonProperty("kind") @SerialName("kind") val kind: String,
         @JsonProperty("label") @SerialName("label") val label: String,

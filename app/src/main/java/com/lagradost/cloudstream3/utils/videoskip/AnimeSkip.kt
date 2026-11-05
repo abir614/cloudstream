@@ -184,12 +184,12 @@ class AnimeSkip : SkipAPI() {
     }
 
     @Serializable
-    private data class Root(
+    data class Root(
         @JsonProperty("data") @SerialName("data") val data: Data,
     )
 
     @Serializable
-    private data class Data(
+    data class Data(
         @JsonProperty("searchShows") @SerialName("searchShows") val searchShows: List<SearchShow>,
     )
 

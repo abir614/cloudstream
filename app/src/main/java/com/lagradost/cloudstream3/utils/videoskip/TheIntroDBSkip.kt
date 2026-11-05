@@ -55,7 +55,7 @@ class TheIntroDBSkip : SkipAPI() {
     }
 
     @Serializable
-    private data class Root(
+    data class Root(
         @JsonProperty("tmdb_id") @SerialName("tmdb_id") val tmdbId: Long? = null,
         @JsonProperty("type") @SerialName("type") val type: String? = null,
         @JsonProperty("intro") @SerialName("intro") val intro: List<Stamp> = emptyList(),
@@ -66,7 +66,7 @@ class TheIntroDBSkip : SkipAPI() {
     )
 
     @Serializable
-    private data class Stamp(
+    data class Stamp(
         @JsonProperty("start_ms") @SerialName("start_ms") val startMs: Long?,
         @JsonProperty("end_ms") @SerialName("end_ms") val endMs: Long?,
     )

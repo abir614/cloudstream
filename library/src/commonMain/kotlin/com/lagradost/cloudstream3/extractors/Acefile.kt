@@ -37,7 +37,7 @@ open class Acefile : ExtractorApi() {
     }
 
     @Serializable
-    private data class Source(
+    data class Source(
         @JsonProperty("data") @SerialName("data") val data: String? = null,
     )
 }

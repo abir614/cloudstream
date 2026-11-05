@@ -173,27 +173,27 @@ open class Rabbitstream : ExtractorApi() {
     }
 
     @Serializable
-    private data class Tracks(
+    data class Tracks(
         @JsonProperty("file") @SerialName("file") val file: String? = null,
         @JsonProperty("label") @SerialName("label") val label: String? = null,
         @JsonProperty("kind") @SerialName("kind") val kind: String? = null,
     )
 
     @Serializable
-    private data class Sources(
+    data class Sources(
         @JsonProperty("file") @SerialName("file") val file: String? = null,
         @JsonProperty("type") @SerialName("type") val type: String? = null,
         @JsonProperty("label") @SerialName("label") val label: String? = null,
     )
 
     @Serializable
-    private data class SourcesResponses(
+    data class SourcesResponses(
         @JsonProperty("sources") @SerialName("sources") val sources: List<Sources?>? = emptyList(),
         @JsonProperty("tracks") @SerialName("tracks") val tracks: List<Tracks?>? = emptyList(),
     )
 
     @Serializable
-    private data class SourcesEncrypted(
+    data class SourcesEncrypted(
         @JsonProperty("sources") @SerialName("sources") val sources: String? = null,
         @JsonProperty("encrypted") @SerialName("encrypted") val encrypted: Boolean? = null,
         @JsonProperty("tracks") @SerialName("tracks") val tracks: List<Tracks?>? = emptyList(),

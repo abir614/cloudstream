@@ -58,7 +58,7 @@ class AniSkip : SkipAPI() {
     )
 
     @Serializable
-    private data class Stamp(
+    data class Stamp(
         @JsonProperty("interval") @SerialName("interval") val interval: AniSkipInterval,
         @JsonProperty("skipType") @SerialName("skipType") val skipType: String,
         @JsonProperty("skipId") @SerialName("skipId") val skipId: String,
