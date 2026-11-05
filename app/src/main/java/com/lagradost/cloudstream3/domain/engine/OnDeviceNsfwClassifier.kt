@@ -538,8 +538,8 @@ object OnDeviceNsfwClassifier {
             try {
                 val drawable = targetDrawable
 
-                // If device is under severe memory pressure, use zero-heap potato fast score directly
-                if (isDeviceUnderMemoryPressure(appContext)) {
+                // If device is an ultra-potato device (<=1024MB RAM) or under severe memory pressure, use zero-heap potato fast score directly
+                if (isPotatoDevice(appContext) || isDeviceUnderMemoryPressure(appContext)) {
                     val score = classifyPotatoFastScore(drawable, appContext)
                     recordScore(imageKey, score, appContext)
                     val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
@@ -934,7 +934,7 @@ object OnDeviceNsfwClassifier {
      * Uses hardware-adaptive multi-session parallelism with zero thread contention.
      */
     fun classifyDrawableScore(ctx: Context, drawable: Drawable): Float {
-        if (isDeviceUnderMemoryPressure(ctx)) {
+        if (isPotatoDevice(ctx) || isDeviceUnderMemoryPressure(ctx)) {
             return classifyPotatoFastScore(drawable, ctx)
         }
         if (isModelPermanentlyUnavailable) return classifyPotatoFastScore(drawable, ctx)
@@ -955,7 +955,7 @@ object OnDeviceNsfwClassifier {
      */
     fun classifyBitmapScore(ctx: Context, bitmap: Bitmap): Float {
         if (bitmap.isRecycled) return 0.0f
-        if (isDeviceUnderMemoryPressure(ctx)) {
+        if (isPotatoDevice(ctx) || isDeviceUnderMemoryPressure(ctx)) {
             return classifyPotatoFastScore(BitmapDrawable(ctx.resources, bitmap), ctx)
         }
         if (isModelPermanentlyUnavailable) {
@@ -1174,8 +1174,8 @@ object OnDeviceNsfwClassifier {
             return
         }
 
-        // If device is under critical memory pressure (<20MB available RAM), execute fast heuristic immediately
-        if (isDeviceUnderMemoryPressure(appContext)) {
+        // If device is an ultra-potato device (<=1024MB RAM) or under critical memory pressure (<20MB available RAM), execute fast heuristic immediately
+        if (isPotatoDevice(appContext) || isDeviceUnderMemoryPressure(appContext)) {
             val score = classifyPotatoFastScore(drawable, appContext)
             recordScore(imageKey, score, appContext)
             applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
