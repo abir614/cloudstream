@@ -128,6 +128,46 @@ jobs:
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
+
+        # Determine immediate previous pre-release SHA before moving the tag
+        PREV_PRE_SHA=$(git rev-parse origin/tags/pre-release 2>/dev/null || git ls-remote origin refs/tags/pre-release | awk '{print $1}')
+        if [ -z "$PREV_PRE_SHA" ] || [ "$PREV_PRE_SHA" = "${{ github.sha }}" ]; then
+          PREV_PRE_SHA=$(git rev-parse HEAD~1 2>/dev/null || echo "")
+        fi
+
+        # Determine latest stable release tag
+        LATEST_STABLE_TAG=$(git tag -l "v*" | grep -E '^v[0-9]+$' | sort -V | tail -n 1)
+        if [ -z "$LATEST_STABLE_TAG" ]; then
+          LATEST_STABLE_TAG="v220"
+        fi
+
+        # Generate scoped, readable changelog for in-app updates and release notes
+        cat << 'EOF' > release_body.md
+## ⚡ CloudStream Beta (CSB) Pre-release
+
+EOF
+
+        echo "### 🔄 Changes Since Immediate Previous Pre-release" >> release_body.md
+        if [ -n "$PREV_PRE_SHA" ]; then
+          PREV_SHORT=$(git rev-parse --short "$PREV_PRE_SHA" 2>/dev/null || echo "$PREV_PRE_SHA")
+          CHANGES=$(git log --no-merges --pretty=format:"- %s ([%h](https://github.com/${{ github.repository }}/commit/%H))" "${PREV_PRE_SHA}..HEAD")
+          if [ -n "$CHANGES" ]; then
+            echo "$CHANGES" >> release_body.md
+          else
+            echo "- Incremental maintenance & stabilization updates." >> release_body.md
+          fi
+          echo "" >> release_body.md
+          echo "[View pre-release diff (${PREV_SHORT}...${{ github.sha }})](https://github.com/${{ github.repository }}/compare/${PREV_PRE_SHA}...${{ github.sha }})" >> release_body.md
+        else
+          echo "- Latest pre-release build updates." >> release_body.md
+        fi
+
+        echo "" >> release_body.md
+        echo "### 🏷️ Comparison with Latest Stable (${LATEST_STABLE_TAG})" >> release_body.md
+        echo "- **Stable Release**: [${LATEST_STABLE_TAG}](https://github.com/${{ github.repository }}/releases/tag/${LATEST_STABLE_TAG})" >> release_body.md
+        echo "- **Diff with Stable**: [Compare ${LATEST_STABLE_TAG}...this build](https://github.com/${{ github.repository }}/compare/${LATEST_STABLE_TAG}...${{ github.sha }})" >> release_body.md
+        echo "" >> release_body.md
+
         git tag -f pre-release ${{ github.sha }}
         git push origin -f pre-release || true
 
@@ -155,8 +195,9 @@ jobs:
         tag_name: "pre-release"
         target_commitish: ${{ github.sha }}
         name: "Pre-release Build #${{ steps.build_count.outputs.count }}"
+        body_path: release_body.md
         prerelease: true
-        generate_release_notes: true
+        generate_release_notes: false
         make_latest: false
         fail_on_unmatched_files: false
         files: |

@@ -24,14 +24,8 @@ open class TRsTX : ExtractorApi() {
         val videoReq = app.get(url, referer = extRef).text
         val file = Regex("""file\":\"([^\"]+)""").find(videoReq)?.groupValues?.getOrNull(1) ?: return
         val postLink = "$mainUrl/" + file.replace("\\", "")
-        val postText = app.post(postLink, referer = extRef).text
-        val postJson: List<TrstxVideoData> = tryParseJson<List<TrstxVideoData>>(postText)?.drop(1)
-            ?: (tryParseJson<List<Map<String, String>>>(postText)?.drop(1)?.mapNotNull { mapItem ->
-                TrstxVideoData(
-                    title = mapItem["title"],
-                    file = mapItem["file"],
-                )
-            } ?: return)
+        val postJson: List<TrstxVideoData> = app.post(postLink, referer = extRef)
+            .parsedSafe<List<TrstxVideoData>>()?.drop(1) ?: return
 
         val vidLinks = mutableSetOf<String>()
         val vidMap = mutableListOf<Map<String, String>>()

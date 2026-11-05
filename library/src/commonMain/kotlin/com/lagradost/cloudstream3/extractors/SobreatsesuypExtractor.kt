@@ -24,14 +24,8 @@ open class Sobreatsesuyp : ExtractorApi() {
         val videoReq = app.get(url, referer = extRef).text
         val file = Regex("""file\":\"([^\"]+)""").find(videoReq)?.groupValues?.getOrNull(1) ?: return
         val postLink = "$mainUrl/" + file.replace("\\", "")
-        val postText = app.post(postLink, referer = extRef).text
-        val postJson: List<SobreatsesuypVideoData> = tryParseJson<List<SobreatsesuypVideoData>>(postText)?.drop(1)
-            ?: (tryParseJson<List<Map<String, String>>>(postText)?.drop(1)?.mapNotNull { mapItem ->
-                SobreatsesuypVideoData(
-                    title = mapItem["title"],
-                    file = mapItem["file"],
-                )
-            } ?: return)
+        val postJson: List<SobreatsesuypVideoData> = app.post(postLink, referer = extRef)
+            .parsedSafe<List<SobreatsesuypVideoData>>()?.drop(1) ?: return
 
         for (item in postJson) {
             if (item.file == null || item.title == null) continue
