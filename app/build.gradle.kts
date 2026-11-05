@@ -299,6 +299,18 @@ android {
             // across all Android devices and custom ROM package installers.
             useLegacyPackaging = true
         }
+        resources {
+            excludes += listOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/INDEX.LIST"
+            )
+        }
     }
 
     splits {
