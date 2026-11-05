@@ -94,6 +94,18 @@ This document catalogues all intentional architectural deviations, security hard
 - **Native Rust Compression Bridge ([`NativeCoreBridge.kt`](app/src/main/java/com/lagradost/cloudstream3/services/NativeCoreBridge.kt) & [`jni_bridge.rs`](rust-core/src/jni_bridge.rs))**:
   - Exposes `miniz_oxide` high-performance memory-safe DEFLATE and ZLIB routines via JNI with pure-JVM fallback.
 
+### 2.11 Fail-Closed Sandbox Boundary Execution
+- **Guaranteed Isolation**: [`ExtensionSandboxClient.kt`](app/src/main/java/com/lagradost/cloudstream3/services/ExtensionSandboxClient.kt) strictly fails closed on IPC timeout or sandbox binding failure, returning `WasmExecutionResult(false, ...)` rather than executing untrusted extension code within the main application process.
+
+### 2.12 Strict Update Security Gate & Ephemeral Challenge Enforcement
+- **Non-Bypassable Verification**: [`UpdateSecurityGate.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/UpdateSecurityGate.kt) mandates an unexpired, unconsumed challenge session pre-issued by verified updater callers, and rejects verification outright if the target SHA-256 checksum is missing or mismatched.
+
+### 2.13 Consent-Based Diagnostic Telemetry & Opt-Out Control
+- **User-Controlled Privacy**: Integrated an anonymous crash reporting toggle in [`SettingsUpdatesScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsUpdatesScreen.kt) and [`DevicePreferenceStore.kt`](shared/src/commonMain/kotlin/com/lagradost/cloudstream4/DevicePreferenceStore.kt). Diagnostic dispatch, startup crash flush, and [`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt) strictly obey this preference.
+
+### 2.14 Fail-Closed Stream URL Safety & Analytics Sanitization
+- **Strict Parsing & Sanitization**: [`StreamSecurityUseCase.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/usecase/StreamSecurityUseCase.kt) parses stream URLs via `java.net.URI`, strictly blocks loopback and private IP literals without blocking synchronous DNS, and strips tracking query parameters (`utm_*`, `fbclid`, `gclid`, etc.).
+
 ---
 
 ## 3. Native Rust Core & JNI Hardening
