@@ -22,6 +22,7 @@ import okhttp3.ResponseBody
 import okio.BufferedSource
 import okio.GzipSource
 import okio.InflaterSource
+import okio.Source
 import okio.buffer
 import org.conscrypt.Conscrypt
 import java.io.File
@@ -189,15 +190,17 @@ class NetworkCompressionInterceptor : Interceptor {
                         false
                     }
                     val inflater = Inflater(!isZlib)
-                    object : InflaterSource(rawSource, inflater) {
+                    val inflaterSource = InflaterSource(rawSource, inflater)
+                    val safeSource = object : Source by inflaterSource {
                         override fun close() {
                             try {
-                                super.close()
+                                inflaterSource.close()
                             } finally {
                                 inflater.end()
                             }
                         }
-                    }.buffer()
+                    }
+                    safeSource.buffer()
                 } catch (_: Throwable) {
                     return response
                 }

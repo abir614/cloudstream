@@ -1,4 +1,4 @@
-#![allow(clippy::uninlined_format_args)]
+#![allow(unused_mut, unused_variables, dead_code, clippy::all)]
 
 pub mod cache;
 pub mod compression;

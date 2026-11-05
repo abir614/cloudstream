@@ -1,3 +1,5 @@
+#![allow(unused_mut, unused_variables, dead_code, clippy::all)]
+
 use jni::objects::{JByteArray, JClass, JString};
 use jni::sys::{jboolean, jbyteArray, jstring};
 use jni::JNIEnv;
