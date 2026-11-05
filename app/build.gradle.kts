@@ -166,9 +166,17 @@ android {
                 rootProject.file("keystore/release.keystore").exists() -> rootProject.file("keystore/release.keystore")
                 else -> null
             }
-            storePassword = System.getenv("CS_KEYSTORE_PASSWORD") ?: System.getenv("SIGNING_STORE_PASSWORD") ?: "android"
-            keyAlias = System.getenv("CS_KEY_ALIAS") ?: System.getenv("SIGNING_KEY_ALIAS") ?: "key0"
-            keyPassword = System.getenv("CS_KEY_PASSWORD") ?: System.getenv("SIGNING_KEY_PASSWORD") ?: "android"
+            val pwd = System.getenv("CS_KEYSTORE_PASSWORD") ?: System.getenv("SIGNING_STORE_PASSWORD")
+            val alias = System.getenv("CS_KEY_ALIAS") ?: System.getenv("SIGNING_KEY_ALIAS")
+            val keyPwd = System.getenv("CS_KEY_PASSWORD") ?: System.getenv("SIGNING_KEY_PASSWORD") ?: pwd
+
+            if (storeFile != null && !pwd.isNullOrBlank() && !alias.isNullOrBlank()) {
+                storePassword = pwd
+                keyAlias = alias
+                keyPassword = keyPwd
+            } else {
+                storeFile = null
+            }
         }
     }
 

@@ -216,6 +216,12 @@ object SettingsUpdatesScreen : SearchableSettings {
                             showDialog = true
                         }
                     ),
+                    Preference.PreferenceItem.SwitchPreference(
+                        title = "Anonymous Error & Crash Reporting",
+                        subtitle = "Send end-to-end encrypted crash dumps to developers for forensic debugging",
+                        preference = settings.updates.telemetryEnabled,
+                        icon = painterResource(R.drawable.article_24px)
+                    ),
                     Preference.PreferenceItem.TextPreference(
                         title = "Test Telemetry Alert",
                         subtitle = "Send test encrypted diagnostic log to Telegram",

@@ -149,7 +149,7 @@ object ExtensionSandboxClient {
         bind(context)
         val messenger = serviceMessenger
         if (messenger == null) {
-            return@withContext NativeCoreBridge.runWasmExtension(wasmBytes, fuel, maxMemoryBytes)
+            return@withContext NativeCoreBridge.WasmExecutionResult(false, emptyList(), "Sandbox process unavailable / not bound")
         }
 
         val deferred = CompletableDeferred<NativeCoreBridge.WasmExecutionResult>()
@@ -182,7 +182,7 @@ object ExtensionSandboxClient {
                 ?: NativeCoreBridge.WasmExecutionResult(false, emptyList(), "IPC timeout after ${IPC_TIMEOUT_MS}ms")
         } catch (t: Throwable) {
             Log.w(TAG, "IPC WASM execution failed: ${t.message}")
-            NativeCoreBridge.runWasmExtension(wasmBytes, fuel, maxMemoryBytes)
+            NativeCoreBridge.WasmExecutionResult(false, emptyList(), "Sandbox IPC error: ${t.message}")
         }
     }
 }

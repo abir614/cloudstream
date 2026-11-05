@@ -132,20 +132,12 @@ object UpdateSecurityGate {
         apkFile: File,
         expectedSha256: String? = null
     ): VerificationOutcome = synchronized(gateLock) {
-        var session = activeSession
-        if (session == null || session.isConsumed ||
-            (System.currentTimeMillis() - session.createdAt > SESSION_TIMEOUT_MS)
-        ) {
-            // Auto-mint a valid session nonce so that verified updater callers
-            // are never rejected due to download latency or transient session reset.
-            requestUpdateChallenge()
-            session = activeSession
-        }
-
-        val currentSession = session ?: run {
+        val currentSession = activeSession?.takeIf {
+            !it.isConsumed && (System.currentTimeMillis() - it.createdAt <= SESSION_TIMEOUT_MS)
+        } ?: run {
             purgeFile(apkFile)
             lockGate()
-            return VerificationOutcome.Rejected("No active or unexpired challenge session found.")
+            return VerificationOutcome.Rejected("No active or unexpired challenge session found. Request a challenge before verification.")
         }
 
         if (!apkFile.exists() || !apkFile.canRead() || apkFile.length() <= 0) {
@@ -244,16 +236,22 @@ object UpdateSecurityGate {
                 return VerificationOutcome.Rejected(reason)
             }
 
-            if (!expectedSha256.isNullOrBlank()) {
-                val cleanExpected = expectedSha256.trim().lowercase()
-                val actual = verificationResult.fileSha256.trim().lowercase()
-                if (cleanExpected != actual) {
-                    purgeFile(apkFile)
-                    lockGate()
-                    val reason = "SHA-256 checksum mismatch: expected $cleanExpected, got $actual"
-                    Log.e(TAG, reason)
-                    return VerificationOutcome.Rejected(reason)
-                }
+            if (expectedSha256.isNullOrBlank()) {
+                purgeFile(apkFile)
+                lockGate()
+                val reason = "Update rejected: expected SHA-256 checksum manifest was not provided."
+                Log.e(TAG, reason)
+                return VerificationOutcome.Rejected(reason)
+            }
+
+            val cleanExpected = expectedSha256.trim().lowercase()
+            val actual = verificationResult.fileSha256.trim().lowercase()
+            if (cleanExpected != actual) {
+                purgeFile(apkFile)
+                lockGate()
+                val reason = "SHA-256 checksum mismatch: expected $cleanExpected, got $actual"
+                Log.e(TAG, reason)
+                return VerificationOutcome.Rejected(reason)
             }
 
             // 4. Mark challenge consumed and generate single-use Gate Authorization Token

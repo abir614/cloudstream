@@ -103,7 +103,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             val isMainProc = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                 getProcessName() == packageName
             } else true
-            if (isMainProc) {
+            if (isMainProc && com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.isTelemetryEnabled(this)) {
                 com.lagradost.cloudstream3.utils.telemetry.AutoLogcatMonitor.start(this)
             }
         } catch (_: Throwable) {
@@ -119,8 +119,10 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             Thread.setDefaultUncaughtExceptionHandler(it)
         }
 
-        // Flush any unsent crash dumps from previous sessions
-        com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.dispatchPendingOnStartup(this)
+        // Flush any unsent crash dumps from previous sessions if telemetry is enabled
+        if (com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.isTelemetryEnabled(this)) {
+            com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.dispatchPendingOnStartup(this)
+        }
 
         AppDebug.isDebug = BuildConfig.DEBUG
 

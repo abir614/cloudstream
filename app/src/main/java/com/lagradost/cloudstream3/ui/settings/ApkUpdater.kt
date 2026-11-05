@@ -96,6 +96,7 @@ object ApkUpdater : AppUpdater {
             val expectedSha256 = if (digest?.algorithm?.equals("sha256", ignoreCase = true) == true) {
                 digest.digest.joinToString("") { "%02x".format(it) }
             } else null
+            UpdateSecurityGate.requestUpdateChallenge()
             val outcome = UpdateSecurityGate.verifyAndAuthorize(activity, stagedFile, expectedSha256)
             if (outcome !is UpdateSecurityGate.VerificationOutcome.Authorized) {
                 val reason = (outcome as? UpdateSecurityGate.VerificationOutcome.Rejected)?.reason
@@ -235,6 +236,7 @@ object ApkUpdater : AppUpdater {
             val expectedSha256 = if (digest?.algorithm?.equals("sha256", ignoreCase = true) == true) {
                 digest.digest.joinToString("") { "%02x".format(it) }
             } else null
+            UpdateSecurityGate.requestUpdateChallenge()
             val outcome = UpdateSecurityGate.verifyAndAuthorize(activity, downloadedFile, expectedSha256)
             when (outcome) {
                 is UpdateSecurityGate.VerificationOutcome.Authorized -> {

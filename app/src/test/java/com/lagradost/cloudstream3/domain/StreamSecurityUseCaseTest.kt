@@ -11,10 +11,13 @@ class StreamSecurityUseCaseTest {
     private val useCase = StreamSecurityUseCase()
 
     @Test
-    fun `test sanitizeUrl returns url`() {
-        val rawUrl = "https://example.com/video.m3u8?utm_source=tracker"
-        val result = useCase.sanitizeUrl(rawUrl)
-        assertEquals(rawUrl, result)
+    fun `test sanitizeUrl strips tracking params while preserving functional params`() {
+        val trackingUrl = "https://example.com/video.m3u8?utm_source=tracker&token=xyz123"
+        val sanitized = useCase.sanitizeUrl(trackingUrl)
+        assertEquals("https://example.com/video.m3u8?token=xyz123", sanitized)
+
+        val cleanUrl = "https://example.com/video.m3u8"
+        assertEquals(cleanUrl, useCase.sanitizeUrl(cleanUrl))
     }
 
     @Test
@@ -42,6 +45,9 @@ class StreamSecurityUseCaseTest {
         assertFalse(useCase.isSafeFallback("http://localhost:3000/stream.m3u8"))
         assertFalse(useCase.isSafeFallback("http://169.254.169.254/latest/meta-data/"))
         assertFalse(useCase.isSafeFallback("http://0.0.0.0:8000/test"))
+        assertFalse(useCase.isSafeFallback("http://192.168.1.1/video.mp4"))
+        assertFalse(useCase.isSafeFallback("http://10.0.0.5:8080/stream"))
+        assertFalse(useCase.isSafeFallback("http://172.16.0.10:3000/media"))
 
         // Public URLs are safe under fallback
         assertTrue(useCase.isSafeFallback("https://edge.mediaserver.com/live/stream.m3u8"))

@@ -118,6 +118,7 @@ class PackageInstallerService : Service() {
                     }
                 }
 
+                UpdateSecurityGate.requestUpdateChallenge()
                 val outcome = UpdateSecurityGate.verifyAndAuthorize(this@PackageInstallerService, stagedFile, expectedSha256)
                 if (outcome !is UpdateSecurityGate.VerificationOutcome.Authorized) {
                     val reason = (outcome as? UpdateSecurityGate.VerificationOutcome.Rejected)?.reason

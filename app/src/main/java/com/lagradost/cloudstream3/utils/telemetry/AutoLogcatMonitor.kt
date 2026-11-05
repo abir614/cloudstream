@@ -52,6 +52,11 @@ object AutoLogcatMonitor {
     fun start(context: Context? = null) {
         if (!isRunning.compareAndSet(false, true)) return
 
+        if (context != null && !RemoteCrashReporter.isTelemetryEnabled(context)) {
+            isRunning.set(false)
+            return
+        }
+
         // Potato-tier optimization: On devices with <= 1024MB RAM, do not spawn an external Unix process.
         // In-memory errorReporter in ArchComponentExt already captures 100% of caught exceptions with zero overhead.
         if (context != null && DeviceProfile.isUltraPotato(context)) {

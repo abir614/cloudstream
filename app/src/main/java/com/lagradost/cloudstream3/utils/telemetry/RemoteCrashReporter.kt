@@ -60,6 +60,18 @@ object RemoteCrashReporter {
 
     private var appContextRef: WeakReference<Context>? = null
 
+    const val PREF_KEY_TELEMETRY_ENABLED = "telemetry_enabled"
+
+    fun isTelemetryEnabled(context: Context? = null): Boolean {
+        val ctx = context ?: appContextRef?.get() ?: return true
+        return try {
+            val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(ctx)
+            prefs.getBoolean(PREF_KEY_TELEMETRY_ENABLED, true)
+        } catch (_: Throwable) {
+            true
+        }
+    }
+
     data class DiagnosticEvent(
         val level: String,
         val tag: String,
@@ -732,6 +744,7 @@ object RemoteCrashReporter {
         data: Map<String, String> = emptyMap(),
         force: Boolean = false
     ) {
+        if (!force && !isTelemetryEnabled()) return
         val now = System.currentTimeMillis()
 
         if (force) {
@@ -857,6 +870,7 @@ object RemoteCrashReporter {
      * (e.g. if the device was offline or lost connection during the crash) and transmits it.
      */
     fun dispatchPendingOnStartup(context: Context) {
+        if (!isTelemetryEnabled(context)) return
         init(context)
         thread(start = true, isDaemon = true, name = "StartupCrashFlush") {
             try {

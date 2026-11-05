@@ -47,6 +47,7 @@ class UpdatePreferences(preferences: PreferenceStore) {
     val showAppUpdates = preferences.getBoolean("auto_update", true)
     // Node id for this update
     val skipUpdate = preferences.getString("skip_update_key", "")
+    val telemetryEnabled = preferences.getBoolean("telemetry_enabled", true)
 }
 
 class SecurityPreferences(preferences: PreferenceStore) {

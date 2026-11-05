@@ -662,6 +662,7 @@ object InAppUpdater {
                     } catch (_: Throwable) {}
                 }
 
+                UpdateSecurityGate.requestUpdateChallenge()
                 val outcome = UpdateSecurityGate.verifyAndAuthorize(this, downloadedFile, expectedSha256)
                 when (outcome) {
                     is UpdateSecurityGate.VerificationOutcome.Authorized -> {
