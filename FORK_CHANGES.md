@@ -265,6 +265,9 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 - **Full Hardware Fingerprint**: Ingests SoC chipset model, manufacturer, core count, 32-bit/64-bit architecture, system RAM, zRAM swap, Android Go low-RAM state, device performance tier (`DeviceProfile.tier`), Android release, kernel version, and active plugin.
 - **Strict Emoji Level Policy**: Emojis are stripped from metadata keys and body text; strictly reserved for severity indicators (`🚨` Crash, `🛑` Error, `⚠️` Warning).
 - **Document Offloading**: Long stack traces exceeding 1,200 characters are attached as `.txt` files directly via the Telegram Bot API.
+- **Automatic Process Logcat Streaming (`AutoLogcatMonitor.kt`)**: Runs a resilient, low-overhead daemon that continuously streams the application process's logcat entries (`logcat -v brief --pid=<pid> *:W`), parses warning/error events, filters out framework noise, redacts credentials/IPs, and feeds actionable events to `RemoteCrashReporter`.
+- **Global Multiplatform Exception Bridge (`ArchComponentExt.errorReporter`)**: Pluggable callback hooked into `logError(throwable)` across the entire library and application, guaranteeing that every caught exception across scrapers, viewmodels, network layers, and download managers automatically reaches telemetry.
+- **Self-Draining Queued Dispatcher**: Replaced lossy synchronous drop throttling with a bounded FIFO `diagnosticQueue` in `RemoteCrashReporter.kt` that paces dispatches by 2 seconds, ensuring burst errors are not dropped while protecting edge rate limits.
 - **In-App Verification**: Added a dedicated **"Test Telemetry Alert"** action preference in **Settings -> Updates** ([`SettingsUpdatesScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsUpdatesScreen.kt)) with immediate feedback toasts.
 
 ---

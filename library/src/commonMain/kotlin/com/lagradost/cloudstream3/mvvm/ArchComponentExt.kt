@@ -66,6 +66,9 @@ sealed class Resource<out T> {
     }
 }
 
+/** Pluggable error reporter callback to bridge exceptions into telemetry systems */
+var errorReporter: ((tag: String, message: String, throwable: Throwable?) -> Unit)? = null
+
 fun logError(throwable: Throwable) {
     if (throwable is CancellationException) return
     val msg = throwable.message
@@ -76,6 +79,10 @@ fun logError(throwable: Throwable) {
     Log.d("ApiError", "safeApiCall: " + throwable.message)
     throwable.printStackTrace()
     Log.d("ApiError", "-------------------------------------------------------------------")
+    try {
+        errorReporter?.invoke("ApiError", msg ?: throwable.toString(), throwable)
+    } catch (_: Throwable) {
+    }
 }
 
 @Deprecated(

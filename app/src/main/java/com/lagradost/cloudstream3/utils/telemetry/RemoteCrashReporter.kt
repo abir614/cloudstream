@@ -57,11 +57,22 @@ object RemoteCrashReporter {
 
     private var appContextRef: WeakReference<Context>? = null
 
-    // Deduplication & Rate Limiting for non-fatal diagnostic logs
+    data class DiagnosticEvent(
+        val level: String,
+        val tag: String,
+        val message: String,
+        val throwable: Throwable?,
+        val data: Map<String, String>
+    )
+
+    // Deduplication & FIFO Dispatch Queue for non-fatal diagnostic logs
     private val recentAlertTimestamps = ConcurrentHashMap<String, Long>()
-    @Volatile private var lastNonFatalDispatchTime = 0L
-    private const val DEDUPLICATION_WINDOW_MS = 60_000L // Suppress identical (level + tag + msg) for 60s
-    private const val MIN_NON_FATAL_INTERVAL_MS = 10_000L // At most 1 diagnostic log every 10s globally
+    private const val DEDUPLICATION_WINDOW_MS = 30_000L // Suppress identical (level + tag + msg) for 30s
+    private const val DISPATCH_PACE_INTERVAL_MS = 2_000L // Pace dispatches by 2s to maintain healthy edge limits
+    private const val MAX_DIAGNOSTIC_QUEUE_CAPACITY = 30
+
+    private val diagnosticQueue = java.util.concurrent.ConcurrentLinkedQueue<DiagnosticEvent>()
+    private val isDispatcherRunning = java.util.concurrent.atomic.AtomicBoolean(false)
 
     private val httpClient by lazy {
         OkHttpClient.Builder()
@@ -519,48 +530,91 @@ object RemoteCrashReporter {
     ) {
         val now = System.currentTimeMillis()
 
-        if (!force) {
-            // Rate limiting: at most 1 diagnostic log every MIN_NON_FATAL_INTERVAL_MS
-            synchronized(this) {
-                if (now - lastNonFatalDispatchTime < MIN_NON_FATAL_INTERVAL_MS) {
-                    return
+        if (force) {
+            thread(start = true, isDaemon = true, name = "RemoteForceDiagnostic") {
+                try {
+                    val payload = buildPayload(
+                        context = getContext(),
+                        level = level,
+                        tag = tag,
+                        message = message,
+                        thread = Thread.currentThread(),
+                        error = throwable,
+                        fullLog = null,
+                        extraData = data
+                    )
+                    dispatchEncrypted(payload)
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Force diagnostic dispatch failed: ${t.message}")
                 }
-                lastNonFatalDispatchTime = now
             }
+            return
+        }
 
-            // Deduplication: suppress duplicate (level + tag + first 80 chars of message) for DEDUPLICATION_WINDOW_MS
-            val dedupeKey = "$level:$tag:${message.take(80)}"
-            val lastSeen = recentAlertTimestamps[dedupeKey]
-            if (lastSeen != null && now - lastSeen < DEDUPLICATION_WINDOW_MS) {
-                return
-            }
-            recentAlertTimestamps[dedupeKey] = now
+        // Deduplication: suppress duplicate (level + tag + first 80 chars of message) for DEDUPLICATION_WINDOW_MS
+        val dedupeKey = "$level:$tag:${message.take(80)}"
+        val lastSeen = recentAlertTimestamps[dedupeKey]
+        if (lastSeen != null && now - lastSeen < DEDUPLICATION_WINDOW_MS) {
+            return
+        }
+        recentAlertTimestamps[dedupeKey] = now
 
-            // Purge old keys from deduplication cache
-            if (recentAlertTimestamps.size > 100) {
-                val cutoff = now - DEDUPLICATION_WINDOW_MS
-                val it = recentAlertTimestamps.entries.iterator()
-                while (it.hasNext()) {
-                    if (it.next().value < cutoff) it.remove()
-                }
+        // Purge old keys from deduplication cache
+        if (recentAlertTimestamps.size > 100) {
+            val cutoff = now - DEDUPLICATION_WINDOW_MS
+            val it = recentAlertTimestamps.entries.iterator()
+            while (it.hasNext()) {
+                if (it.next().value < cutoff) it.remove()
             }
         }
 
-        thread(start = true, isDaemon = true, name = "RemoteDiagnosticReporter") {
+        // Enqueue diagnostic event without dropping different alerts
+        while (diagnosticQueue.size >= MAX_DIAGNOSTIC_QUEUE_CAPACITY) {
+            diagnosticQueue.poll()
+        }
+        diagnosticQueue.offer(DiagnosticEvent(level, tag, message, throwable, data))
+
+        ensureDispatcherRunning()
+    }
+
+    private fun ensureDispatcherRunning() {
+        if (!isDispatcherRunning.compareAndSet(false, true)) return
+        thread(start = true, isDaemon = true, name = "RemoteDiagnosticQueueWorker") {
             try {
-                val payload = buildPayload(
-                    context = getContext(),
-                    level = level,
-                    tag = tag,
-                    message = message,
-                    thread = Thread.currentThread(),
-                    error = throwable,
-                    fullLog = null,
-                    extraData = data
-                )
-                dispatchEncrypted(payload)
-            } catch (t: Throwable) {
-                Log.w(TAG, "Diagnostic dispatch failed: ${t.message}")
+                while (true) {
+                    val event = diagnosticQueue.poll()
+                    if (event == null) {
+                        isDispatcherRunning.set(false)
+                        if (diagnosticQueue.isNotEmpty() && isDispatcherRunning.compareAndSet(false, true)) {
+                            continue
+                        }
+                        break
+                    }
+
+                    try {
+                        val payload = buildPayload(
+                            context = getContext(),
+                            level = event.level,
+                            tag = event.tag,
+                            message = event.message,
+                            thread = Thread.currentThread(),
+                            error = event.throwable,
+                            fullLog = null,
+                            extraData = event.data
+                        )
+                        dispatchEncrypted(payload)
+                    } catch (t: Throwable) {
+                        Log.w(TAG, "Queued diagnostic dispatch error: ${t.message}")
+                    }
+
+                    try {
+                        Thread.sleep(DISPATCH_PACE_INTERVAL_MS)
+                    } catch (_: InterruptedException) {
+                        break
+                    }
+                }
+            } finally {
+                isDispatcherRunning.set(false)
             }
         }
     }

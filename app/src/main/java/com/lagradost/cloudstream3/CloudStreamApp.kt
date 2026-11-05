@@ -88,6 +88,27 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.init(this)
 
+        // Bridge all caught exceptions from library & extractors into Telemetry
+        com.lagradost.cloudstream3.mvvm.errorReporter = { tag, message, throwable ->
+            com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.dispatchDiagnosticLogAsync(
+                level = "ERROR",
+                tag = tag,
+                message = message,
+                throwable = throwable
+            )
+        }
+
+        // Start background auto-logcat monitor for real-time warning/error detection
+        try {
+            val isMainProc = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                getProcessName() == packageName
+            } else true
+            if (isMainProc) {
+                com.lagradost.cloudstream3.utils.telemetry.AutoLogcatMonitor.start()
+            }
+        } catch (_: Throwable) {
+        }
+
         ExceptionHandler(this, filesDir.resolve("last_error")) {
             val intent = this.packageManager.getLaunchIntentForPackage(this.packageName)
             intent?.component?.let { comp ->
