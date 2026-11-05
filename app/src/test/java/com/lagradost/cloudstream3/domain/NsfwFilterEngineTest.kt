@@ -212,4 +212,19 @@ class NsfwFilterEngineTest {
         assertTrue(adjE5 < adjM5)
         assertTrue(adjL5 > adjM5)
     }
+
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `test sexy and hot titles are filtered in Moderate and Extreme but permitted in Low`() {
+        val sexyItem = MovieSearchResponse("Sexy Models in Paradise", "https://site.to/sexy-models", "Provider", TvType.Movie, posterUrl = "https://cdn.net/sexy.jpg")
+        assertFalse(NsfwFilterEngine.isNsfw(sexyItem, NsfwFilterLevel.LOW))
+        assertTrue(NsfwFilterEngine.isNsfw(sexyItem, NsfwFilterLevel.MODERATE))
+        assertTrue(NsfwFilterEngine.isNsfw(sexyItem, NsfwFilterLevel.EXTREME))
+
+        val lingerieItem = MovieSearchResponse("Lingerie Fashion Gala", "https://site.to/lingerie", "Provider", TvType.Movie, posterUrl = "https://cdn.net/lingerie.jpg")
+        assertFalse(NsfwFilterEngine.isNsfw(lingerieItem, NsfwFilterLevel.LOW))
+        assertTrue(NsfwFilterEngine.isNsfw(lingerieItem, NsfwFilterLevel.MODERATE))
+        assertTrue(NsfwFilterEngine.isNsfw(lingerieItem, NsfwFilterLevel.EXTREME))
+    }
 }
+

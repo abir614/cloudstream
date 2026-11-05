@@ -154,7 +154,7 @@ class ProviderPreferences(preferences: PreferenceStore) {
     )
 
     val enableNsfw = preferences.getBoolean(
-        "enable_nsfw_on_providers_key", true
+        "enable_nsfw_on_providers_key", false
     )
 }
 
@@ -210,7 +210,7 @@ class GeneralPreferences(preferences: PreferenceStore) {
     val batterOptimization = preferences.getBoolean("battery_optimisation_key", false)
 
     /** Content & Family Safety: Allow adult/NSFW 18+ content */
-    val enableNsfw = preferences.getBoolean("enable_nsfw_on_providers_key", true)
+    val enableNsfw = preferences.getBoolean("enable_nsfw_on_providers_key", false)
     val nsfwFilterLevel = preferences.getString("nsfw_filter_level_key", "moderate")
     val censorNsfwPosters = preferences.getBoolean("censor_nsfw_posters_key", true)
     val visualThresholdExtreme = preferences.getFloat("nsfw_visual_threshold_extreme_key", 0.15f)

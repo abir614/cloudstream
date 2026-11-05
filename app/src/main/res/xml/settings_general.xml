@@ -66,7 +66,7 @@
 
     <PreferenceCategory android:title="@string/pref_category_content_safety">
         <SwitchPreference
-            android:defaultValue="true"
+            android:defaultValue="false"
             android:icon="@drawable/ic_outline_remove_red_eye_24"
             android:key="@string/enable_nsfw_on_providers_key"
             android:summary="@string/enable_nsfw_summary"

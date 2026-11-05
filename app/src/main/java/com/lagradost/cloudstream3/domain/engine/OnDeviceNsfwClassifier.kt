@@ -288,19 +288,52 @@ object OnDeviceNsfwClassifier {
             }
 
             val safeConfidence = maxOf(pDrawings, pNeutral)
-            val rawAiScore = if (safeConfidence > 0.75f && pPorn < 0.10f && pHentai < 0.10f) {
-                ((pPorn + pHentai + (pSexy * 0.50f)) * 0.80f).coerceIn(0.0f, 1.0f)
-            } else {
-                (pPorn + pHentai + (pSexy * 0.70f)).coerceIn(0.0f, 1.0f)
-            }
             val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
 
-            return if (rawAiScore >= 0.20f && bodySkinRatio > 0.30f) {
-                val exposureBoost = ((bodySkinRatio - 0.30f) * 1.5f).coerceIn(0.0f, 1.0f)
-                maxOf(rawAiScore, (rawAiScore * 0.70f) + (exposureBoost * 0.30f))
+            // 1. Explicit hardcore adult / hentai component
+            val explicitMax = maxOf(pPorn, pHentai)
+            val explicitScore = if (explicitMax >= 0.20f) {
+                (explicitMax * 0.75f + (pPorn + pHentai) * 0.25f + 0.35f).coerceIn(0.0f, 1.0f)
             } else {
-                rawAiScore
+                (pPorn + pHentai) * 1.5f
             }
+
+            // 2. Sexy / provocative photo component (calibrated for Family Safety in Moderate, Peak in Extreme, Allow in Low)
+            val sexyScore = when {
+                pSexy < 0.10f -> pSexy * 1.0f
+                pSexy < 0.30f -> 0.15f + ((pSexy - 0.10f) / 0.20f) * 0.13f // 0.15 .. 0.28: filters in Extreme, safe in Moderate & Low
+                else -> 0.32f + ((pSexy - 0.30f) / 0.70f) * 0.18f // 0.32 .. 0.50: filters in Moderate (Family Safe) & Extreme, allowed in Low
+            }
+
+            // Combine AI predictions
+            var combinedScore = maxOf(explicitScore, sexyScore)
+
+            // If neutral or drawing confidence is dominant and both porn and sexy are low, dampen score
+            if (safeConfidence > 0.75f && pPorn < 0.10f && pHentai < 0.10f && pSexy < 0.15f) {
+                combinedScore *= 0.60f
+            }
+
+            // 3. Physical body skin exposure calibration
+            val finalScore = when {
+                // Near-total nudity (>65% torso bare skin): push to explicit territory (blocks in Low >= 0.55)
+                bodySkinRatio >= 0.65f && combinedScore >= 0.25f -> {
+                    val nukeBoost = 0.58f + ((bodySkinRatio - 0.65f) * 1.2f).coerceIn(0.0f, 0.40f)
+                    maxOf(combinedScore, nukeBoost)
+                }
+                // High skin exposure (>40% bare skin, e.g. bikini, lingerie, shirtless): guarantee Family Safety in Moderate (>= 0.32)
+                bodySkinRatio >= 0.40f && combinedScore >= 0.15f -> {
+                    val modBoost = 0.32f + ((bodySkinRatio - 0.40f) * 0.60f).coerceIn(0.0f, 0.18f)
+                    maxOf(combinedScore, modBoost)
+                }
+                // Mild skin exposure (>25% bare skin, e.g. beach scene, summer): guarantee Extreme peak shield (>= 0.16)
+                bodySkinRatio >= 0.25f && combinedScore >= 0.08f -> {
+                    val extremeBoost = 0.16f + ((bodySkinRatio - 0.25f) * 0.40f).coerceIn(0.0f, 0.12f)
+                    maxOf(combinedScore, extremeBoost)
+                }
+                else -> combinedScore
+            }
+
+            return finalScore.coerceIn(0.0f, 1.0f)
         }
     }
 
@@ -317,7 +350,7 @@ object OnDeviceNsfwClassifier {
     private const val SCORE_CACHE_CAPACITY = 5000
     private const val SCORES_FILE_NAME = "cs3_visual_scores.bin"
     private const val SCORES_MAGIC = 0x43533353 // "CS3S"
-    private const val SCORES_VERSION = 4
+    private const val SCORES_VERSION = 5
 
     private val scoreCache = LruCache<String, Float>(SCORE_CACHE_CAPACITY)
     private val persistentScoreLock = Any()
@@ -447,10 +480,15 @@ object OnDeviceNsfwClassifier {
                 // 2. Absence of upper torso/head/face (landscape, desert sand, dirt road, wooden table, brown floor)
                 if (upperSkinRatio > 0.60f && bodySkinRatio > 0.60f) {
                     0.0f
-                } else if (bodySkinRatio >= 0.75f && maxRowSkinRatio >= 0.70f && upperSkinRatio in 0.05f..0.60f) {
+                } else if (bodySkinRatio >= 0.65f && maxRowSkinRatio >= 0.60f && upperSkinRatio in 0.05f..0.60f) {
+                    // Near-total nudity -> 0.75f (Blocks in Low >= 0.55, Moderate >= 0.30, Extreme >= 0.15)
                     0.75f
-                } else if (bodySkinRatio >= 0.60f && maxRowSkinRatio >= 0.55f && upperSkinRatio in 0.10f..0.60f) {
-                    0.45f
+                } else if (bodySkinRatio >= 0.42f && maxRowSkinRatio >= 0.40f && upperSkinRatio in 0.08f..0.60f) {
+                    // Sexy / lingerie / bikini / high exposure -> 0.42f (Blocks in Moderate >= 0.30 & Extreme >= 0.15; Allowed in Low < 0.55)
+                    0.42f
+                } else if (bodySkinRatio >= 0.28f && maxRowSkinRatio >= 0.25f && upperSkinRatio in 0.10f..0.60f) {
+                    // Mild beach / summer / cleavage -> 0.22f (Blocks in Extreme >= 0.15; Allowed in Moderate < 0.30 & Low < 0.55)
+                    0.22f
                 } else {
                     0.0f
                 }

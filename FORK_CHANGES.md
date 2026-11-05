@@ -139,9 +139,11 @@ This document catalogues all intentional architectural deviations, security hard
 ## 5. Content Filtering: Default NSFW & Anime-Blended Hentai
 
 - **Hybrid Filtering**: Hybrid Rust native token analysis and JVM token matching.
-- **Anime Disguise Detection**: Reliably identifies hentai tagged as `TvType.Anime` or `TvType.OVA` by title tokens, URL slug analysis, adult studio markers, and tags without false positives on clean mainstream anime (e.g. Attack on Titan, Hunter x Hunter, Assassination Classroom, Spy x Family, Frieren, Demon Slayer).
-- **Default-On Content**: Adult content is enabled by default on Feed, Carousel, Search, and Extension discovery (`enable_nsfw_on_providers_key` defaults to `true`).
-- **GantMan 5-Class MobileNetV2 On-Device AI Classification ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
+- **Family-Safe Default-Off Content**: Adult (18+) / NSFW content is disabled by default across Feed, Carousel, Search, and Extension discovery (`enable_nsfw_on_providers_key` defaults to `false`) for family-safe viewing.
+- **Calibrated Three-Tier Sensitivity & Visual Thresholds**:
+  - **Moderate (Default / Family Safe)**: Calibrated at threshold `0.30f`. Strictly blocks explicit adult content, ecchi, lewd, smut, and provocative/sexy photos (bikinis, lingerie, exposed cleavage, seductive poses) so family moments are never compromised.
+  - **Extreme (Peak Shield)**: Calibrated at threshold `0.15f`. Peak highest filtering blocking all adult, ecchi, beach/swimwear, mild exposure, waifu, provocative romance tropes, and empty posters.
+  - **Low (Hardcore Filter Only)**: Calibrated at threshold `0.55f`. Strictly filters explicit hardcore pornography, hentai, and near-total nudity, while permitting mild/moderate hot/sexy content.
   - Upgraded on-device visual classifier to a Full-INT8 Quantized (w8a8, ~4.8 MB) version of GantMan's 5-class MobileNetV2 neural network (`[drawings, hentai, neutral, porn, sexy]`) with UINT8 input tensor (`[1, 224, 224, 3]`) and FLOAT32 probability output.
   - **Zero-Heap MappedByteBuffer Loading**: Directly memory-maps uncompressed model bytes from APK assets via Linux `mmap()`, completely avoiding JVM heap allocation spikes (0 KB heap).
   - **UINT8 Raw Byte Preprocessing & RGB_565 Scratchpad**: Feeds raw 0–255 pixel bytes into a direct reusable native `ByteBuffer` (150,528 bytes) and an `RGB_565` scratch canvas, eliminating 150,528 floating-point normalizations per frame and cutting memory by 75% without GC thrashing.
