@@ -97,6 +97,75 @@ class NetworkCompressionTest {
     }
 
     @Test
+    fun `test NetworkCompressionInterceptor bypasses audio and Range requests`() {
+        val interceptor = NetworkCompressionInterceptor()
+
+        val audioUrls = listOf(
+            "https://example.com/audio/track.mp3",
+            "https://example.com/audio/track.m4a",
+            "https://example.com/audio/track.aac",
+            "https://example.com/images/anim.gif",
+            "https://example.com/images/poster.avif"
+        )
+
+        for (url in audioUrls) {
+            var captured: Request? = null
+            val chain = object : Interceptor.Chain {
+                override fun request(): Request = Request.Builder().url(url).build()
+                override fun proceed(request: Request): Response {
+                    captured = request
+                    return Response.Builder()
+                        .request(request)
+                        .protocol(Protocol.HTTP_1_1)
+                        .code(200)
+                        .message("OK")
+                        .body("bytes".toResponseBody("application/octet-stream".toMediaType()))
+                        .build()
+                }
+                override fun connection() = null
+                override fun call(): okhttp3.Call = throw NotImplementedError()
+                override fun connectTimeoutMillis() = 1000
+                override fun withConnectTimeout(timeout: Int, unit: java.util.concurrent.TimeUnit) = this
+                override fun readTimeoutMillis() = 1000
+                override fun withReadTimeout(timeout: Int, unit: java.util.concurrent.TimeUnit) = this
+                override fun writeTimeoutMillis() = 1000
+                override fun withWriteTimeout(timeout: Int, unit: java.util.concurrent.TimeUnit) = this
+            }
+            interceptor.intercept(chain)
+            assertTrue("Expected Accept-Encoding to be null for $url", captured?.header("Accept-Encoding") == null)
+        }
+
+        // Also verify HTTP Range request bypass
+        var rangeCaptured: Request? = null
+        val rangeChain = object : Interceptor.Chain {
+            override fun request(): Request = Request.Builder()
+                .url("https://example.com/api/data")
+                .header("Range", "bytes=0-1024")
+                .build()
+            override fun proceed(request: Request): Response {
+                rangeCaptured = request
+                return Response.Builder()
+                    .request(request)
+                    .protocol(Protocol.HTTP_1_1)
+                    .code(206)
+                    .message("Partial Content")
+                    .body("bytes".toResponseBody("application/octet-stream".toMediaType()))
+                    .build()
+            }
+            override fun connection() = null
+            override fun call(): okhttp3.Call = throw NotImplementedError()
+            override fun connectTimeoutMillis() = 1000
+            override fun withConnectTimeout(timeout: Int, unit: java.util.concurrent.TimeUnit) = this
+            override fun readTimeoutMillis() = 1000
+            override fun withReadTimeout(timeout: Int, unit: java.util.concurrent.TimeUnit) = this
+            override fun writeTimeoutMillis() = 1000
+            override fun withWriteTimeout(timeout: Int, unit: java.util.concurrent.TimeUnit) = this
+        }
+        interceptor.intercept(rangeChain)
+        assertTrue(rangeCaptured?.header("Accept-Encoding") == null)
+    }
+
+    @Test
     fun `test NetworkCompressionInterceptor transparently decompresses gzip response`() {
         val originalText = "{\"status\":\"ok\",\"channels\":[{\"id\":1,\"name\":\"Discovery\"}]}"
         val bos = ByteArrayOutputStream()

@@ -92,6 +92,12 @@ class ResumeItemAdapter(
             if (isLayout(TV)) {
                 isFocusableInTouchMode = true
                 isFocusable = true
+                if (!hasFocus()) {
+                    com.lagradost.cloudstream3.utils.UIHelper.resetTvCardHover(this)
+                }
+                setOnFocusChangeListener { v, hasFocus ->
+                    com.lagradost.cloudstream3.utils.UIHelper.applyTvCardFocusHover(v, hasFocus)
+                }
             }
             nextFocusUp?.let {
                 nextFocusUpId = it

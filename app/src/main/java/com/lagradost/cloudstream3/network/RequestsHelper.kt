@@ -229,7 +229,12 @@ class NetworkCompressionInterceptor : Interceptor {
         return path.endsWith(".ts") || path.endsWith(".m4s") ||
                 path.endsWith(".mp4") || path.endsWith(".mkv") ||
                 path.endsWith(".webm") || path.endsWith(".avi") ||
+                path.endsWith(".mp3") || path.endsWith(".m4a") ||
+                path.endsWith(".aac") || path.endsWith(".flac") ||
+                path.endsWith(".wav") || path.endsWith(".ogg") ||
+                path.endsWith(".opus") ||
                 path.endsWith(".jpg") || path.endsWith(".jpeg") ||
-                path.endsWith(".png") || path.endsWith(".webp")
+                path.endsWith(".png") || path.endsWith(".webp") ||
+                path.endsWith(".gif") || path.endsWith(".avif")
     }
 }

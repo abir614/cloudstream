@@ -417,8 +417,13 @@ object DeviceProfile {
         val totalMb = getTotalRamMb(ctx)
         val swapMb = getZramSwapMb()
         val isLegacyKernel = isLegacyLinuxKernel()
-        // Ultra-low RAM condition: <= 1024MB RAM, or <= 1536MB RAM with zero zRAM swap, or <= 2048MB with legacy Linux kernel (< 4.9)
-        return totalMb <= 1024 || (totalMb <= 1536 && swapMb == 0L) || (totalMb <= 2048 && isLegacyKernel)
+        val isLowRam = try {
+            (ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true
+        } catch (_: Throwable) {
+            false
+        }
+        // Ultra-low RAM condition: <= 1024MB RAM, Android Go <= 1536MB, <= 1536MB RAM with zero zRAM swap, or <= 2048MB with legacy Linux kernel (< 4.9)
+        return totalMb <= 1024 || (isLowRam && totalMb <= 1536) || (totalMb <= 1536 && swapMb == 0L) || (totalMb <= 2048 && isLegacyKernel)
     }
 
     fun getSearchConcurrency(ctx: Context?): Int {

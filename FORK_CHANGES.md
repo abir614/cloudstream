@@ -87,7 +87,7 @@ This document catalogues all intentional architectural deviations, security hard
   - Automatically negotiates and decompresses HTTP responses (`gzip`, `deflate`) for scraper manifests, repository indexers, JSON APIs, and subtitle files via a zero-allocation streaming interceptor (`NetworkCompressionInterceptor`).
   - RFC 1950 (zlib wrapper) vs RFC 1951 (raw deflate) auto-detection via 2-byte header inspection on the Okio buffer.
 - **Media Bitstream Preservation**:
-  - Video segments (`.ts`, `.m4s`, `.mp4`) and HTTP Range requests bypass compression negotiation, conserving CPU cycles and battery life on low-power devices.
+  - Video segments (`.ts`, `.m4s`, `.mp4`, `.mkv`), audio streams (`.mp3`, `.m4a`, `.aac`, `.flac`, `.opus`), animated images (`.gif`, `.avif`, posters), and HTTP Range requests bypass compression negotiation, conserving CPU cycles and battery life on low-power devices.
 - **Upstream Telemetry Gzip Compression ([`RemoteCrashReporter.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/RemoteCrashReporter.kt))**:
   - Telemetry payloads > 256 bytes are transparently compressed via Gzip before AES-256-GCM encryption, reducing transmission sizes by 85–92%.
   - Edge Cloudflare Worker decodes the stream using Web Streams `DecompressionStream("gzip")` with automatic magic-byte fallback (`0x1f 0x8b`), maintaining 100% backward compatibility.
@@ -228,7 +228,7 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 - **Linux Kernel Inspection**: Detects active kernel version via `/proc/version` (`getKernelVersion()`) and checks for legacy Linux kernels `< 4.9` (`isLegacyLinuxKernel()`).
 - **zRAM Swap Detection**: Reads total swap allocation from `/proc/meminfo` (`getZramSwapMb()`).
 - **Composite Ultra-Low Memory / Potato Engine (`isUltraPotato`)**:
-  - Dynamically triggers if $\le 1024\text{ MB}$ RAM, $\le 1536\text{ MB}$ RAM with zero zRAM swap, or $\le 2048\text{ MB}$ RAM on legacy Linux kernels.
+  - Dynamically triggers if $\le 1024\text{ MB}$ RAM, Android Go $\le 1536\text{ MB}$ RAM, $\le 1536\text{ MB}$ RAM with zero zRAM swap, or $\le 2048\text{ MB}$ RAM on legacy Linux kernels.
   - Search concurrency restricted to 2 concurrent tasks.
   - Video playback buffer bounded to 6MB target and 2s back-buffer.
   - Download buffer limit bounded to 5MB (down from 10MB/80MB).
