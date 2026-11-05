@@ -956,6 +956,7 @@ object OnDeviceNsfwClassifier {
         reqWidth: Int = INPUT_DIM,
         reqHeight: Int = INPUT_DIM
     ): Int {
+        if (reqWidth <= 0 || reqHeight <= 0) return 1
         val height = options.outHeight
         val width = options.outWidth
         var inSampleSize = 1
@@ -963,7 +964,7 @@ object OnDeviceNsfwClassifier {
         if (height > reqHeight || width > reqWidth) {
             val halfHeight = height / 2
             val halfWidth = width / 2
-            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+            while (inSampleSize <= 64 && (halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
                 inSampleSize *= 2
             }
         }
@@ -1008,6 +1009,7 @@ object OnDeviceNsfwClassifier {
         reqWidth: Int = INPUT_DIM,
         reqHeight: Int = INPUT_DIM
     ): Bitmap? {
+        if (!fileDescriptor.valid()) return null
         return try {
             val options = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
@@ -1035,6 +1037,7 @@ object OnDeviceNsfwClassifier {
         reqWidth: Int = INPUT_DIM,
         reqHeight: Int = INPUT_DIM
     ): Bitmap? {
+        if (path.isBlank() || !File(path).exists()) return null
         return try {
             val options = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
@@ -1063,7 +1066,7 @@ object OnDeviceNsfwClassifier {
         reqHeight: Int = INPUT_DIM
     ): Bitmap? {
         return try {
-            val bytes = inputStream.readBytes()
+            val bytes = inputStream.use { it.readBytes() }
             decodeSampledBitmap(bytes, 0, bytes.size, reqWidth, reqHeight)
         } catch (t: Throwable) {
             Log.w(TAG, "decodeSampledBitmap from InputStream failed: ${t.message}")
