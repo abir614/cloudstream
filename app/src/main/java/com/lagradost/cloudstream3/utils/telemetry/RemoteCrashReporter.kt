@@ -22,6 +22,7 @@ import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.PrivateKey
 import java.security.SecureRandom
+import java.security.Signature
 import java.security.spec.ECGenParameterSpec
 import java.security.spec.X509EncodedKeySpec
 import java.util.concurrent.ConcurrentHashMap
@@ -67,9 +68,10 @@ object RemoteCrashReporter {
 
     // Deduplication & FIFO Dispatch Queue for non-fatal diagnostic logs
     private val recentAlertTimestamps = ConcurrentHashMap<String, Long>()
-    private const val DEDUPLICATION_WINDOW_MS = 30_000L // Suppress identical (level + tag + msg) for 30s
+    private const val DEDUPLICATION_WINDOW_MS = 60_000L // Suppress identical fingerprint for 60s to prevent spam loops
     private const val DISPATCH_PACE_INTERVAL_MS = 2_000L // Pace dispatches by 2s to maintain healthy edge limits
-    private const val MAX_DIAGNOSTIC_QUEUE_CAPACITY = 30
+    private const val MAX_DIAGNOSTIC_QUEUE_CAPACITY = 100
+    private const val MAX_BATCH_SIZE = 10 // Consolidate up to 10 events per encrypted dispatch
 
     private val diagnosticQueue = java.util.concurrent.ConcurrentLinkedQueue<DiagnosticEvent>()
     private val isDispatcherRunning = java.util.concurrent.atomic.AtomicBoolean(false)
@@ -144,6 +146,75 @@ object RemoteCrashReporter {
         return id
     }
 
+    // Pinned Server Identity Public Key (ECDSA P-256 SPKI Base64)
+    // Mathematically guarantees that the handshake response originated exclusively from the authentic Cloudflare Worker edge.
+    private const val SERVER_IDENTITY_PUB_SPKI =
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9r3IxIQPhNgJItFRWGuVnWtnETwEj+KydjSeNQ3qQ8BgsUyDvdkIbsx+5eqfJf/Xd4UpZs1c4AHl0Lpr8AKmyw=="
+
+    /**
+     * Converts IEEE P1363 ECDSA signature (64 bytes: r[32] || s[32]) produced by WebCrypto
+     * to standard ASN.1 DER encoding required by Java/Android Signature verifier.
+     */
+    private fun p1363ToDer(p1363: ByteArray): ByteArray {
+        if (p1363.size != 64) return p1363
+        fun encodeInteger(bytes: ByteArray, offset: Int, length: Int): ByteArray {
+            var start = offset
+            val end = offset + length
+            while (start < end - 1 && bytes[start].toInt() == 0) {
+                start++
+            }
+            val len = end - start
+            val needsZero = (bytes[start].toInt() and 0x80) != 0
+            val outLen = if (needsZero) len + 1 else len
+            val result = ByteArray(2 + outLen)
+            result[0] = 0x02 // INTEGER tag
+            result[1] = outLen.toByte()
+            var pos = 2
+            if (needsZero) {
+                result[pos++] = 0x00
+            }
+            System.arraycopy(bytes, start, result, pos, len)
+            return result
+        }
+
+        val rDer = encodeInteger(p1363, 0, 32)
+        val sDer = encodeInteger(p1363, 32, 32)
+        val totalLen = rDer.size + sDer.size
+        val seq = ByteArray(2 + totalLen)
+        seq[0] = 0x30 // SEQUENCE tag
+        seq[1] = totalLen.toByte()
+        System.arraycopy(rDer, 0, seq, 2, rDer.size)
+        System.arraycopy(sDer, 0, seq, 2 + rDer.size, sDer.size)
+        return seq
+    }
+
+    private fun verifyServerSignature(
+        serverPubB64: String,
+        epoch: Long,
+        challenge: String,
+        difficulty: Int,
+        sigB64: String
+    ): Boolean {
+        if (sigB64.isBlank()) return false
+        return try {
+            val kf = KeyFactory.getInstance("EC")
+            val pubKeyBytes = base64Decode(SERVER_IDENTITY_PUB_SPKI)
+            val pubKey = kf.generatePublic(X509EncodedKeySpec(pubKeyBytes))
+
+            val expectedData = "CS-AUTH-V1:$serverPubB64:$epoch:$challenge:$difficulty".toByteArray(Charsets.UTF_8)
+            val sigBytes = base64Decode(sigB64)
+            val derSig = p1363ToDer(sigBytes)
+
+            val verifier = Signature.getInstance("SHA256withECDSA")
+            verifier.initVerify(pubKey)
+            verifier.update(expectedData)
+            verifier.verify(derSig)
+        } catch (t: Throwable) {
+            Log.w(TAG, "Zero-Trust check: Server signature verification error: ${t.message}")
+            false
+        }
+    }
+
     // --- Ephemeral ECDH & HKDF Cryptographic Protocol ---
 
     data class HandshakeTicket(
@@ -196,6 +267,13 @@ object RemoteCrashReporter {
             val ticket = resJson.getString("ticket")
             val challenge = resJson.optString("challenge", "")
             val difficulty = resJson.optInt("difficulty", 0)
+            val sigB64 = resJson.optString("sig", "")
+
+            // Zero-Trust Anti-MITM Verification: Verify server identity digital signature
+            if (!verifyServerSignature(serverPubB64, epoch, challenge, difficulty, sigB64)) {
+                Log.w(TAG, "Zero-Trust violation: Server identity signature verification failed! Potential MITM proxy or untrusted endpoint. Handshake aborted.")
+                return null
+            }
 
             HandshakeTicket(
                 serverPublicKeyBytes = base64Decode(serverPubB64),
@@ -351,6 +429,22 @@ object RemoteCrashReporter {
         }
     }
 
+    // --- Zero-Trust Sanitization ---
+    private val TOKEN_REGEX = Regex("""(?i)(token|key|secret|password|auth|bearer|access_token|refresh_token|session|signature)=([^&\\s"']+)""")
+    private val IPV4_REGEX = Regex("""\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b""")
+    private val EMAIL_REGEX = Regex("""[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}""")
+    private val BOT_TOKEN_REGEX = Regex("""\d{8,10}:[a-zA-Z0-9_-]{35}""")
+
+    fun sanitizeTelemetryText(raw: String?): String {
+        if (raw.isNullOrBlank()) return ""
+        var text = raw
+        text = TOKEN_REGEX.replace(text) { "${it.groupValues[1]}=[REDACTED]" }
+        text = BOT_TOKEN_REGEX.replace(text, "[REDACTED_BOT_TOKEN]")
+        text = IPV4_REGEX.replace(text, "[REDACTED_IP]")
+        text = EMAIL_REGEX.replace(text, "[REDACTED_EMAIL]")
+        return text
+    }
+
     // --- Structured Telemetry Payload Construction ---
 
     /**
@@ -370,8 +464,8 @@ object RemoteCrashReporter {
 
         try {
             payload.put("level", level)
-            payload.put("tag", tag)
-            payload.put("message", message)
+            payload.put("tag", sanitizeTelemetryText(tag))
+            payload.put("message", sanitizeTelemetryText(message))
             payload.put("timestamp", System.currentTimeMillis())
 
             // 1. Device Hardware & Model
@@ -379,7 +473,7 @@ object RemoteCrashReporter {
             val model = Build.MODEL ?: "Unknown"
             val product = Build.PRODUCT ?: ""
             val device = Build.DEVICE ?: ""
-            payload.put("device", "$manufacturer $model ($product, $device)")
+            payload.put("device", sanitizeTelemetryText("$manufacturer $model ($product, $device)"))
 
             // 2. Comprehensive SoC & Processor Architecture
             val hardware = Build.HARDWARE ?: ""
@@ -404,7 +498,7 @@ object RemoteCrashReporter {
                 if (board.isNotBlank() && board != hardware) append(" / ").append(board)
                 append(" • ").append(cpuCores).append(" Cores (").append(arch).append(")")
             }
-            payload.put("soc", socDetails.trim())
+            payload.put("soc", sanitizeTelemetryText(socDetails.trim()))
 
             // 3. System RAM & zRAM Metrics
             val totalRamMb = context?.let { DeviceProfile.getTotalRamMb(it) } ?: 0L
@@ -442,7 +536,7 @@ object RemoteCrashReporter {
             val exceptionName = error?.javaClass?.name ?: if (level == "FATAL") "FatalException" else "DiagnosticEvent"
             val exceptionMsg = error?.message ?: message
             payload.put("thread", threadName)
-            payload.put("exception", "$exceptionName: $exceptionMsg")
+            payload.put("exception", sanitizeTelemetryText("$exceptionName: $exceptionMsg"))
 
             // 8. Stack Trace & Breadcrumb Telemetry
             val stackTraceStr = when {
@@ -454,21 +548,109 @@ object RemoteCrashReporter {
                 !fullLog.isNullOrBlank() -> fullLog
                 else -> message
             }
-            payload.put("stackTrace", stackTraceStr)
+            payload.put("stackTrace", sanitizeTelemetryText(stackTraceStr))
 
             if (!fullLog.isNullOrBlank()) {
-                payload.put("fullLog", fullLog)
+                payload.put("fullLog", sanitizeTelemetryText(fullLog))
             }
 
             if (extraData.isNotEmpty()) {
                 val dataJson = JSONObject()
-                extraData.forEach { (k, v) -> dataJson.put(k, v) }
+                extraData.forEach { (k, v) -> dataJson.put(sanitizeTelemetryText(k), sanitizeTelemetryText(v)) }
                 payload.put("extraData", dataJson)
             }
         } catch (t: Throwable) {
             Log.d(TAG, "Error building payload: ${t.message}")
         }
 
+        return payload
+    }
+
+    /**
+     * Constructs a high-efficiency batched JSON payload consolidating up to MAX_BATCH_SIZE events
+     * under a single encrypted envelope to minimize Cloudflare Worker request count by up to 90%.
+     */
+    fun buildBatchPayload(
+        context: Context? = getContext(),
+        events: List<DiagnosticEvent>
+    ): JSONObject {
+        val payload = JSONObject()
+        try {
+            payload.put("type", "BATCH")
+            payload.put("timestamp", System.currentTimeMillis())
+            payload.put("count", events.size)
+
+            val manufacturer = Build.MANUFACTURER ?: "Unknown"
+            val model = Build.MODEL ?: "Unknown"
+            val product = Build.PRODUCT ?: ""
+            val device = Build.DEVICE ?: ""
+            payload.put("device", sanitizeTelemetryText("$manufacturer $model ($product, $device)"))
+
+            val hardware = Build.HARDWARE ?: ""
+            val board = Build.BOARD ?: ""
+            val socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL ?: "" else ""
+            val socMfr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MANUFACTURER ?: "" else ""
+            val cpuCores = Runtime.getRuntime().availableProcessors()
+            val has64Bit = try { Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() == true } catch (_: Throwable) { true }
+            val arch = if (has64Bit) "64-bit" else "32-bit"
+            val socDetails = buildString {
+                if (socModel.isNotBlank()) append(socModel).append(" ")
+                if (socMfr.isNotBlank()) append("($socMfr) ")
+                append(hardware)
+                if (board.isNotBlank() && board != hardware) append(" / ").append(board)
+                append(" • ").append(cpuCores).append(" Cores (").append(arch).append(")")
+            }
+            payload.put("soc", sanitizeTelemetryText(socDetails.trim()))
+
+            val totalRamMb = context?.let { DeviceProfile.getTotalRamMb(it) } ?: 0L
+            val zramSwapMb = DeviceProfile.getZramSwapMb()
+            val isLowRamDevice = try {
+                val am = context?.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                am?.isLowRamDevice == true
+            } catch (_: Throwable) { false }
+            val ramDetails = buildString {
+                append(totalRamMb).append(" MB RAM")
+                if (zramSwapMb > 0) append(" • ").append(zramSwapMb).append(" MB zRAM")
+                if (isLowRamDevice) append(" [Android Go Low-RAM]")
+            }
+            payload.put("ram", ramDetails)
+
+            val tier = context?.let { DeviceProfile.tier(it).name } ?: "STANDARD"
+            val isUltraPotato = context?.let { DeviceProfile.isUltraPotato(it) } ?: false
+            payload.put("tier", if (isUltraPotato) "$tier (Ultra-Potato Mode)" else tier)
+
+            val osRelease = Build.VERSION.RELEASE ?: "Unknown"
+            val osSdk = Build.VERSION.SDK_INT
+            payload.put("os", "Android $osRelease (API $osSdk)")
+            payload.put("kernel", DeviceProfile.getKernelVersion())
+            payload.put("version", "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})")
+            payload.put("plugin", PluginManager.currentlyLoading ?: "None")
+
+            val eventsArray = org.json.JSONArray()
+            for (ev in events) {
+                val evObj = JSONObject().apply {
+                    put("level", ev.level)
+                    put("tag", sanitizeTelemetryText(ev.tag))
+                    put("message", sanitizeTelemetryText(ev.message))
+                    put("timestamp", System.currentTimeMillis())
+                    ev.throwable?.let { t ->
+                        val sw = StringWriter()
+                        t.printStackTrace(PrintWriter(sw))
+                        put("exception", sanitizeTelemetryText("${t.javaClass.name}: ${t.message}"))
+                        put("stackTrace", sanitizeTelemetryText(sw.toString()))
+                    }
+                    if (ev.data.isNotEmpty()) {
+                        val dObj = JSONObject()
+                        ev.data.forEach { (k, v) -> dObj.put(sanitizeTelemetryText(k), sanitizeTelemetryText(v)) }
+                        put("data", dObj)
+                    }
+                }
+                eventsArray.put(evObj)
+            }
+            payload.put("events", eventsArray)
+        } catch (t: Throwable) {
+            Log.d(TAG, "Error building batch payload: ${t.message}")
+        }
         return payload
     }
 
@@ -551,8 +733,9 @@ object RemoteCrashReporter {
             return
         }
 
-        // Deduplication: suppress duplicate (level + tag + first 80 chars of message) for DEDUPLICATION_WINDOW_MS
-        val dedupeKey = "$level:$tag:${message.take(80)}"
+        // Deduplication: suppress duplicate (level + tag + hash of message and trace) for DEDUPLICATION_WINDOW_MS
+        val traceSnippet = throwable?.javaClass?.name ?: ""
+        val dedupeKey = "$level:$tag:${message.take(100)}:$traceSnippet"
         val lastSeen = recentAlertTimestamps[dedupeKey]
         if (lastSeen != null && now - lastSeen < DEDUPLICATION_WINDOW_MS) {
             return
@@ -560,7 +743,7 @@ object RemoteCrashReporter {
         recentAlertTimestamps[dedupeKey] = now
 
         // Purge old keys from deduplication cache
-        if (recentAlertTimestamps.size > 100) {
+        if (recentAlertTimestamps.size > 200) {
             val cutoff = now - DEDUPLICATION_WINDOW_MS
             val it = recentAlertTimestamps.entries.iterator()
             while (it.hasNext()) {
@@ -582,26 +765,41 @@ object RemoteCrashReporter {
         thread(start = true, isDaemon = true, name = "RemoteDiagnosticQueueWorker") {
             try {
                 while (true) {
-                    val event = diagnosticQueue.poll()
-                    if (event == null) {
+                    val batch = mutableListOf<DiagnosticEvent>()
+                    val first = diagnosticQueue.poll()
+                    if (first == null) {
                         isDispatcherRunning.set(false)
                         if (diagnosticQueue.isNotEmpty() && isDispatcherRunning.compareAndSet(false, true)) {
                             continue
                         }
                         break
                     }
+                    batch.add(first)
+                    while (batch.size < MAX_BATCH_SIZE) {
+                        val next = diagnosticQueue.poll() ?: break
+                        batch.add(next)
+                    }
 
                     try {
-                        val payload = buildPayload(
-                            context = getContext(),
-                            level = event.level,
-                            tag = event.tag,
-                            message = event.message,
-                            thread = Thread.currentThread(),
-                            error = event.throwable,
-                            fullLog = null,
-                            extraData = event.data
-                        )
+                        val payload = if (batch.size == 1) {
+                            val event = batch[0]
+                            buildPayload(
+                                context = getContext(),
+                                level = event.level,
+                                tag = event.tag,
+                                message = event.message,
+                                thread = Thread.currentThread(),
+                                error = event.throwable,
+                                fullLog = null,
+                                extraData = event.data
+                            )
+                        } else {
+                            buildBatchPayload(
+                                context = getContext(),
+                                events = batch
+                            )
+                        }
+
                         val sent = dispatchEncrypted(payload)
                         if (!sent) {
                             // If network failed (e.g. offline device), back off to preserve battery

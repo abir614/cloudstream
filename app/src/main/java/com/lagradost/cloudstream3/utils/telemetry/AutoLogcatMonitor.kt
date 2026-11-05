@@ -140,18 +140,8 @@ object AutoLogcatMonitor {
                             } catch (_: Throwable) {
                             }
 
-                            // For errors and relevant CloudStream/Network/Player warnings, dispatch to remote reporter
-                            val isCloudStreamTag = tag.contains("CloudStream", ignoreCase = true) ||
-                                    tag.contains("Player", ignoreCase = true) ||
-                                    tag.contains("Plugin", ignoreCase = true) ||
-                                    tag.contains("Api", ignoreCase = true) ||
-                                    tag.contains("ExoPlayer", ignoreCase = true) ||
-                                    tag.contains("OkHttp", ignoreCase = true) ||
-                                    tag.contains("Download", ignoreCase = true) ||
-                                    tag.contains("Extractor", ignoreCase = true) ||
-                                    tag.contains("Media", ignoreCase = true)
-
-                            if (level >= TelemetryService.Level.ERROR || isCloudStreamTag) {
+                            // Comprehensive app-wide capture: dispatch every warning (W), error (E), and fatal (F) from any component or function in the app
+                            if (level >= TelemetryService.Level.WARN) {
                                 RemoteCrashReporter.dispatchDiagnosticLogAsync(
                                     level = level.name,
                                     tag = tag,
