@@ -911,9 +911,9 @@ object OnDeviceNsfwClassifier {
 
     /**
      * Synchronously runs inference on a bitmap and returns raw confidence score (0.0f - 1.0f).
+     * Uses hardware-adaptive multi-session parallelism with zero thread contention.
      * Note: Must only be called on background threads.
      */
-    @Synchronized
     fun classifyBitmapScore(ctx: Context, bitmap: Bitmap): Float {
         if (bitmap.isRecycled) return 0.0f
         if (isDeviceUnderMemoryPressure(ctx)) {
