@@ -131,7 +131,9 @@ object M3u8Helper2 {
         // Ultra-fast native Rust M3U8 Master parser
         val nativeStreams = nativeM3u8Parser?.invoke(response, m3u8.streamUrl)
         if (!nativeStreams.isNullOrEmpty()) {
-            list.addAll(nativeStreams)
+            list.addAll(nativeStreams.map {
+                if (it.headers.isEmpty() && m3u8.headers.isNotEmpty()) it.copy(headers = m3u8.headers) else it
+            })
             if (returnThis) list += m3u8
             return list
         }
