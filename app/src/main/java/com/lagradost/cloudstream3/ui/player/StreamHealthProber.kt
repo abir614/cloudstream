@@ -141,7 +141,7 @@ object StreamHealthProber {
 
         // Find best responding link sorted by latency (lowest time-to-first-byte)
         val aliveResults = results.filter { it.isAlive }.sortedBy { it.latencyMs }
-        val bestLink = aliveResults.firstOrNull()?.link ?: candidates.firstOrNull { !deadLinks.contains(it) } ?: candidates.first()
+        val bestLink = aliveResults.firstOrNull()?.link ?: candidates.firstOrNull { !deadLinks.contains(it) } ?: candidates.firstOrNull() ?: return@withContext ProbedSelection(null, deadLinks)
 
         if (BuildConfig.DEBUG) Log.d(TAG, "Probed ${toProbe.size} links in parallel -> Winner: ${bestLink.first?.name ?: bestLink.first?.url}, Dead count: ${deadLinks.size}")
         ProbedSelection(bestLink, deadLinks)

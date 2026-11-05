@@ -149,7 +149,7 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
 
         val isSingleProvider = providers?.size == 1
         val isSingleProviderQuickSearch = if (isSingleProvider) {
-            getApiFromNameNull(providers?.first())?.hasQuickSearch ?: false
+            getApiFromNameNull(providers?.firstOrNull())?.hasQuickSearch ?: false
         } else false
 
         val firstProvider = providers?.firstOrNull()

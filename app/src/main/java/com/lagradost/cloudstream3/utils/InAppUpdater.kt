@@ -211,7 +211,7 @@ object InAppUpdater {
                 apkAssets.firstOrNull { it.name.contains("armeabi-v7a") }
             else -> null
         } ?: apkAssets.firstOrNull { it.name.contains("universal") }
-          ?: apkAssets.first()
+          ?: apkAssets.firstOrNull() ?: return Update(false, null, null, null, null)
 
         val remoteVersionStr = if (parseVersionScore(found.tagName) > 0L) {
             found.tagName
@@ -283,7 +283,7 @@ object InAppUpdater {
                 apkAssets.firstOrNull { it.name.contains("armeabi-v7a") }
             else -> null
         } ?: apkAssets.firstOrNull { it.name.contains("universal") }
-          ?: apkAssets.first()
+          ?: apkAssets.firstOrNull() ?: return Update(false, null, null, null, null)
 
         val releaseCommitSha = if (found.targetCommitish.matches(Regex("^[0-9a-fA-F]{7,40}$"))) {
             found.targetCommitish.trim().take(7)

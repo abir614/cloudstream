@@ -122,7 +122,7 @@ object GithubReleases {
                 apkAssets.firstOrNull { it.name.contains("x86") }
             else -> null
         } ?: apkAssets.firstOrNull { it.name.contains("universal") }
-          ?: apkAssets.first()
+          ?: apkAssets.firstOrNull() ?: return null
 
         val sumsAsset = latestRelease.assets.firstOrNull {
             it.name.equals("SHA256SUMS", ignoreCase = true) || it.name.equals("SHA256SUMS.txt", ignoreCase = true)

@@ -2005,11 +2005,11 @@ class GeneratorPlayer : FullScreenPlayer() {
             }
 
             runOnMainThread {
-                val winningLink = if (preferredLink != null && !deadLinks.contains(preferredLink.link)) {
+                val winningLink = (if (preferredLink != null && !deadLinks.contains(preferredLink.link)) {
                     preferredLink.link
                 } else {
-                    bestLink ?: availableLinks.first().link
-                }
+                    bestLink ?: availableLinks.firstOrNull()?.link
+                }) ?: return@runOnMainThread
                 loadLink(winningLink, false)
                 showPlayerMetadata()
             }
