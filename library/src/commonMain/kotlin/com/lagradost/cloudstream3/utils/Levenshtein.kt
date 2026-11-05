@@ -74,6 +74,8 @@ object Levenshtein {
     }
 
     private fun basicRatio(s1: String, s2: String): Double {
+        val nativeScore = nativeFuzzyRatioProvider?.invoke(s1, s2)
+        if (nativeScore != null) return nativeScore / 100.0
         val lensum = s1.length + s2.length
         if (lensum == 0) return 1.0
         val editDistance = levEditDistance(s1, s2, 1)

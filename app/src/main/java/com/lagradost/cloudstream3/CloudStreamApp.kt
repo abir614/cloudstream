@@ -133,6 +133,18 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             com.lagradost.cloudstream3.di.ServiceLocator.register<com.lagradost.cloudstream3.utils.persistence.DataRepository>(sqliteRepo)
             com.lagradost.cloudstream3.di.ServiceLocator.register(com.lagradost.cloudstream3.domain.usecase.ResumePlaybackUseCase(sqliteRepo))
             com.lagradost.cloudstream3.services.ExtensionSandboxClient.bind(this)
+
+            // Wire native high-performance accelerators into core library hooks
+            com.lagradost.cloudstream3.utils.Levenshtein.nativeFuzzyRatioProvider = { s1, s2 ->
+                com.lagradost.cloudstream3.services.NativeCoreBridge.fuzzyRatio(s1, s2)
+            }
+            com.lagradost.cloudstream3.utils.JsUnpacker.nativeUnpacker = { script ->
+                com.lagradost.cloudstream3.services.NativeCoreBridge.unpackJs(script)
+            }
+            com.lagradost.cloudstream3.utils.M3u8Helper2.nativeM3u8Parser = { content, baseUrl ->
+                com.lagradost.cloudstream3.services.NativeCoreBridge.parseM3u8(content, baseUrl)
+            }
+
             com.lagradost.cloudstream3.di.ServiceLocator.telemetry.recordBreadcrumb("App", "Application initialized successfully")
         } catch (_: Throwable) {
         }

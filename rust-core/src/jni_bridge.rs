@@ -1,7 +1,7 @@
 #![allow(unused_mut, unused_variables, dead_code, clippy::all)]
 
 use jni::objects::{JByteArray, JClass, JString};
-use jni::sys::{jboolean, jbyteArray, jstring};
+use jni::sys::{jboolean, jbyteArray, jint, jstring};
 use jni::JNIEnv;
 
 use crate::security::ssrf::validate_url_safety;
@@ -579,5 +579,85 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         },
         _ => std::ptr::null_mut(),
     }
+}
+
+/// JNI bridge to parse HLS Master Playlists in native Rust
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeParseM3u8(
+    mut env: JNIEnv,
+    _class: JClass,
+    content: JString,
+    base_url: JString,
+) -> jstring {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let content_str: String = match env.get_string(&content) {
+            Ok(s) => s.into(),
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let base_url_str: Option<String> = if !base_url.is_null() {
+            env.get_string(&base_url).ok().map(|s| s.into())
+        } else {
+            None
+        };
+        let streams = crate::media::m3u8::parse_master_playlist(&content_str, base_url_str.as_deref());
+        if streams.is_empty() {
+            return std::ptr::null_mut();
+        }
+        let json = match serde_json::to_string(&streams) {
+            Ok(j) => j,
+            Err(_) => return std::ptr::null_mut(),
+        };
+        match env.new_string(json) {
+            Ok(s) => s.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        }
+    }));
+    result.unwrap_or(std::ptr::null_mut())
+}
+
+/// JNI bridge to compute Levenshtein fuzzy similarity score (0..100)
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeFuzzyRatio(
+    mut env: JNIEnv,
+    _class: JClass,
+    s1: JString,
+    s2: JString,
+) -> jint {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let str1: String = match env.get_string(&s1) {
+            Ok(s) => s.into(),
+            Err(_) => return -1,
+        };
+        let str2: String = match env.get_string(&s2) {
+            Ok(s) => s.into(),
+            Err(_) => return -1,
+        };
+        crate::search::levenshtein::fuzzy_ratio(&str1, &str2) as jint
+    }));
+    result.unwrap_or(-1)
+}
+
+/// JNI bridge to unpack Dean Edwards obfuscated JavaScript
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeUnpackJs(
+    mut env: JNIEnv,
+    _class: JClass,
+    script: JString,
+) -> jstring {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let script_str: String = match env.get_string(&script) {
+            Ok(s) => s.into(),
+            Err(_) => return std::ptr::null_mut(),
+        };
+        let unpacked = match crate::extractors::unpacker::unpack_dean_edwards(&script_str) {
+            Some(u) => u,
+            None => return std::ptr::null_mut(),
+        };
+        match env.new_string(unpacked) {
+            Ok(s) => s.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        }
+    }));
+    result.unwrap_or(std::ptr::null_mut())
 }
 

@@ -111,10 +111,11 @@ This document catalogues all intentional architectural deviations, security hard
 ## 3. Native Rust Core & JNI Hardening
 
 ### 3.1 Accelerated Components
-- **Zero-Allocation IPTV Parser**: High-speed M3U/M3U8 master playlist and cue parser eliminating JVM heap churn.
-- **Fuzzy Levenshtein Search**: Native search matching and scoring.
-- **DEFLATE Compression**: In-memory string compression/decompression.
-- **Content Classifier**: Native adult & hentai classification engine.
+- **Zero-Allocation M3U8 Master Parser**: [`M3u8Helper2.nativeM3u8Parser`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) wired to native `parse_master_playlist` in Rust core via JNI, parsing stream quality variants in microseconds with zero JVM heap churn.
+- **Native Fuzzy Levenshtein Search**: [`Levenshtein.nativeFuzzyRatioProvider`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) wired to native `fuzzy_ratio`, accelerating title search and relevance filtering without 2D array allocations.
+- **Native Dean Edwards JS Unpacker**: [`JsUnpacker.nativeUnpacker`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) wired to native `unpack_dean_edwards`, unpacking obfuscated scraper scripts in microseconds without regex thrashing.
+- **DEFLATE / ZLIB Compression**: In-memory byte array compression and decompression via `miniz_oxide`.
+- **Content Classifier**: Native adult & hentai classification engine (`nativeIsNsfwText`).
 
 ### 3.2 FFI / JNI Boundary Safety
 - **Panic Boundary Safety**: Every JNI function in [`jni_bridge.rs`](rust-core/src/jni_bridge.rs) wraps Rust logic in `std::panic::catch_unwind` and validates input pointers, ensuring panics never cross the FFI boundary as undefined behavior.

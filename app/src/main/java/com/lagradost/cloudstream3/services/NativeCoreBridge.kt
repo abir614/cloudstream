@@ -245,4 +245,39 @@ object NativeCoreBridge {
             inflater.end()
         }
     }
+
+    // --- Native Accelerated M3U8, Fuzzy Matching & JS Unpacker ---
+    external fun nativeParseM3u8(content: String, baseUrl: String?): String?
+    external fun nativeFuzzyRatio(s1: String, s2: String): Int
+    external fun nativeUnpackJs(script: String): String?
+
+    fun parseM3u8(content: String, baseUrl: String?): List<com.lagradost.cloudstream3.utils.M3u8Helper.M3u8Stream>? {
+        if (!isLoaded) return null
+        return try {
+            val json = nativeParseM3u8(content, baseUrl) ?: return null
+            val array = org.json.JSONArray(json)
+            val list = ArrayList<com.lagradost.cloudstream3.utils.M3u8Helper.M3u8Stream>(array.length())
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val url = obj.getString("url")
+                val res = if (obj.isNull("resolution")) null else obj.optString("resolution")
+                val quality = res?.split("x")?.lastOrNull()?.toIntOrNull()
+                list.add(com.lagradost.cloudstream3.utils.M3u8Helper.M3u8Stream(streamUrl = url, quality = quality))
+            }
+            list
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    fun fuzzyRatio(s1: String, s2: String): Int? {
+        if (!isLoaded) return null
+        val score = nativeFuzzyRatio(s1, s2)
+        return if (score >= 0) score else null
+    }
+
+    fun unpackJs(script: String): String? {
+        if (!isLoaded) return null
+        return nativeUnpackJs(script)
+    }
 }
