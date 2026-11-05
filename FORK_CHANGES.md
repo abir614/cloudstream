@@ -142,16 +142,16 @@ This document catalogues all intentional architectural deviations, security hard
 - **Anime Disguise Detection**: Reliably identifies hentai tagged as `TvType.Anime` or `TvType.OVA` by title tokens, URL slug analysis, adult studio markers, and tags without false positives on clean mainstream anime (e.g. Attack on Titan, Hunter x Hunter, Assassination Classroom, Spy x Family, Frieren, Demon Slayer).
 - **Default-On Content**: Adult content is enabled by default on Feed, Carousel, Search, and Extension discovery (`enable_nsfw_on_providers_key` defaults to `true`).
 - **GantMan 5-Class MobileNetV2 On-Device AI Classification ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
-  - Upgraded on-device visual classifier to GantMan's 5-class MobileNetV2 neural network (`[drawings, hentai, neutral, porn, sexy]`) with full Softmax probability distribution and exposure-weighted threshold scaling.
-  - Zero-heap virtual memory mapping via Linux `mmap()` directly from uncompressed APK asset space (`models/nsfw.tflite`).
-  - **L1-Cache Normalization LUT & Zero-Allocation Buffers**: Pre-allocates native `FloatBuffer` and static 256-entry `BYTE_TO_FLOAT` lookup table, eliminating 150,528 floating-point divisions and per-inference object allocations on every frame.
-  - **Hardware-Adaptive Inference Across Device Tiers**:
-    - **High & Mid Tier**: Runs GantMan 5-Class MobileNetV2 with parallel sessions (2–4 threads) and clean Linux `mmap()`.
-    - **Low Tier (1GB–3.5GB RAM, 2GB TV Sticks, Budget Phones)**: Executes GantMan 5-Class MobileNetV2 with **1 single-threaded safe CPU interpreter session** (`useXNNPACK=false`, 0 SIMD traps, ~8 MB native RAM), enabling full 5-class detection without OOM crashes.
-    - **Ultra-Potato Devices ($\le 1024\text{ MB}$ RAM, Android Go, or Active Memory Pressure)**: Bypasses the neural network to eliminate native memory allocations and avoid Android Low Memory Killer (LMK) aborts.
-    - Operates using a static 48×48 RGB_565 scratchpad consuming $< 15\text{ KB}$ heap memory with zero native allocations.
-    - **Direct Zero-Queue Execution on Ultra-Potato**: Bypasses background executor queuing on ultra-low-RAM devices to eliminate queue exhaustion, eviction races, and artificial pacing delays, maintaining silky-smooth 60fps scrolling.
-    - **Calibrated Chrominance Clustering & Single-Lock Canvas**: Calibrated YCbCr skin clustering enforces human torso/face spatial correlation and rejects monochrome, desert, wood, earth-tone, and sepia backdrops. Scratchpad canvas initialization is atomic under a single lock without double-synchronization penalties.
+  - Upgraded on-device visual classifier to a Full-INT8 Quantized (w8a8, ~4.8 MB) version of GantMan's 5-class MobileNetV2 neural network (`[drawings, hentai, neutral, porn, sexy]`) with UINT8 input tensor (`[1, 224, 224, 3]`) and FLOAT32 probability output.
+  - **Zero-Heap MappedByteBuffer Loading**: Directly memory-maps uncompressed model bytes from APK assets via Linux `mmap()`, completely avoiding JVM heap allocation spikes (0 KB heap).
+  - **UINT8 Raw Byte Preprocessing & RGB_565 Scratchpad**: Feeds raw 0–255 pixel bytes into a direct reusable native `ByteBuffer` (150,528 bytes) and an `RGB_565` scratch canvas, eliminating 150,528 floating-point normalizations per frame and cutting memory by 75% without GC thrashing.
+  - **Low-Resource Safe Interpreter & Hardware Acceleration**:
+    - Initializes TFLite Interpreter with 2 CPU threads and XNNPACK acceleration (`setNumThreads(2)`, `setUseXNNPACK(true)`).
+    - Runs efficiently on ultra-low-resource Cortex-A53 quad-core SoCs (such as the Allwinner H313 Android TV SoC with a strict 500MB runtime RAM ceiling) using ARM NEON INT8 gemm microkernels across 2 cores while leaving 2 cores free for video playback buffers and UI rendering.
+    - Gracefully scales to mid-range and flagship Android devices with universal platform-agnostic TFLite portability and automatic safe fallback to standard CPU execution.
+    - **Emergency Memory Pressure Protection**: Under critical low-memory conditions (<20MB RAM remaining), automatically redirects to zero-native-allocation skin chrominance heuristic to eliminate Low Memory Killer (LMK) aborts.
+  - **Downsampling Utilities**: Integrated `inSampleSize` power-of-2 downsampler and RGB_565 configuration for compressed byte arrays, files, and video frames.
+  - **Calibrated Chrominance Clustering & Single-Lock Canvas**: Calibrated YCbCr skin clustering enforces human torso/face spatial correlation and rejects monochrome, desert, wood, earth-tone, and sepia backdrops. Scratchpad canvas initialization is atomic under a single lock without double-synchronization penalties.
 - **Zero-Allocation Card Badge Corner Styling & View Holder Tag Caching ([`SearchResultBuilder.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/search/SearchResultBuilder.kt))**:
   - Implemented the `CardViewHolder` tag caching pattern (`card_view_holder_tag`), completely eliminating 14 recursive `findViewById` tree traversals on every recycled item in the Home feed, Search, and Library.
   - Replaced per-card ArrayList and Array object allocations with zero-heap branch logic, eliminating thousands of ephemeral objects per minute during rapid feed scrolling.

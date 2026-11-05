@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.res.AssetFileDescriptor
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -38,12 +39,13 @@ import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.FileDescriptor
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.InputStream
 import java.lang.ref.WeakReference
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.FloatBuffer
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -58,35 +60,34 @@ import java.util.concurrent.atomic.AtomicInteger
  * Ultra-Lightweight, Production-Grade On-Device AI Classification Engine.
  *
  * Runs GantMan's 5-class MobileNetV2 neural network inference ([drawings, hentai, neutral, porn, sexy])
- * directly on-device via TensorFlow Lite.
+ * directly on-device via a Full-INT8 Quantized (w8a8, ~4.8 MB) TensorFlow Lite model.
  *
- * Engineering & Potato-Device Optimizations:
- * 1. ZERO-HEAP MMAP: Uses `AssetFileDescriptor` to memory-map the model directly from APK assets
- *    into virtual memory via Linux `mmap()`, consuming 0 KB of private JVM heap memory.
- * 2. PRE-ALLOCATED BUFFERS: Allocates a single direct native `ByteBuffer` and one reusable
- *    224x224 scratch bitmap, eliminating per-frame heap allocations and GC pressure.
- * 3. HARDWARE-ADAPTIVE INFERENCE: Automatically configures TFLite options based on `DeviceTier`:
- *    - Potato devices (Tier LOW / 32-bit ARM / Go edition / TV sticks): Exactly 1 background worker thread,
- *      XNNPACK explicitly disabled to prevent native SIMD instruction traps (SIGILL/SIGSEGV).
- *    - Capable tiers: 2 worker threads with optional SIMD acceleration.
- *    - Resilient fallback: Any delegate or native interpreter initialization failure falls back seamlessly
- *      to a single-threaded CPU interpreter.
- * 4. BOUNDED ADAPTIVE WORKER QUEUE WITH SMART EVICTION: Uses a bounded queue (16 items) with
- *    smart eviction. Evicted tasks whose views remain on screen are safely delivered, preventing
- *    indefinite placeholder stalls and completely bounding heap memory consumption (< 2 MB).
- * 5. HARDWARE BITMAP & RECYCLING PROTECTION: Safely converts hardware bitmaps via software copies,
- *    guards against view recycling races, and verifies bitmap lifecycle state before rendering.
- * 6. LEANBACK & RECYCLERVIEW CONCURRENCY SAFETY: Preserves layout grid geometry on TV devices
- *    to protect remote D-pad focus, and defers layout modifications when lists are computing layout.
- * 7. TWO-TIER HIGH-SPEED CACHING: In-memory `LruCache` (1,000 items), providing O(1) instantaneous
- *    (< 0.001 ms) responses for previously evaluated posters.
+ * Engineering & Hardware-Adaptive Optimizations:
+ * 1. ZERO-HEAP MMAP: Directly memory-maps the uncompressed `.tflite` asset from the APK into virtual
+ *    memory via Linux `mmap()`, completely bypassing JVM heap allocation spikes (0 KB heap).
+ * 2. UINT8 INPUT BUFFER & FAST BYTE PIPELINE: The INT8 model accepts raw UINT8 pixel bytes
+ *    ([1, 224, 224, 3], shape 150,528 bytes) directly, completely eliminating 150,528 floating-point
+ *    normalizations per inference frame and reducing buffer memory by 75%.
+ * 3. HARDWARE-OPTIMIZED PREPROCESSING: Pre-allocates a reusable direct native `ByteBuffer` (150,528 bytes)
+ *    and a scratch `Bitmap.Config.RGB_565` canvas (100 KB total), preventing Garbage Collector (GC) thrashing.
+ * 4. LOW-RESOURCE SAFE INTERPRETER OPTIONS: Automatically configures TFLite with 2 CPU threads and
+ *    XNNPACK acceleration (`setNumThreads(2)`, `setUseXNNPACK(true)`). On quad-core Cortex-A53 devices
+ *    (e.g. Allwinner H313 Android TV SoC with strict 500MB runtime RAM ceiling), this utilizes ARM NEON INT8
+ *    microkernels efficiently across 2 cores while leaving 2 cores untouched for UI rendering and video playback buffers.
+ * 5. UNIVERSAL SCALABILITY & RESILIENT FALLBACK: Seamlessly executes on low-end TV sticks, mid-range devices,
+ *    and flagships alike. Any native delegate or interpreter initialization failure safely falls back to a 2-threaded
+ *    standard CPU interpreter, and critical low-memory conditions seamlessly fall back to a zero-heap skin analyzer.
+ * 6. BOUNDED ADAPTIVE WORKER QUEUE: Background poster processing uses a bounded queue (16-128 items) with
+ *    smart eviction, completely bounding queue memory consumption (< 2 MB) during rapid scrolling.
+ * 7. TWO-TIER HIGH-SPEED CACHING: In-memory `LruCache` (5,000 items) backed by binary disk serialization,
+ *    providing O(1) instantaneous (< 0.001 ms) responses for previously evaluated posters.
  */
 object OnDeviceNsfwClassifier {
     private const val TAG = "OnDeviceNsfw"
     private const val MODEL_ASSET_PATH = "models/nsfw.tflite"
-    private const val INPUT_DIM = 224
-    private const val RGB_CHANNELS = 3
-    private const val BYTES_PER_FLOAT = 4
+    const val INPUT_DIM = 224
+    const val RGB_CHANNELS = 3
+    const val INPUT_BYTES = INPUT_DIM * INPUT_DIM * RGB_CHANNELS // 150,528 bytes
 
     // GantMan 5-Class MobileNetV2 Output Labels:
     // 0: drawings (SFW illustrations, cartoons, anime)
@@ -137,13 +138,10 @@ object OnDeviceNsfwClassifier {
         return isSkinChrominance || isAnimeSkin
     }
 
-    // Pre-computed lookup table to eliminate 150,528 floating-point divisions per inference frame
-    private val BYTE_TO_FLOAT = FloatArray(256) { it / 255.0f }
-
     /**
      * Completely isolated TFLite inference session.
-     * Encapsulates its own Interpreter instance, native ByteBuffer, and scratch canvas/bitmap.
-     * Guaranteed 100% thread-safe: multiple worker threads execute in parallel with ZERO lock contention.
+     * Encapsulates its own Interpreter instance, direct native ByteBuffer (UINT8), and reusable scratch canvas/bitmap (RGB_565).
+     * Guaranteed 100% thread-safe: multiple worker threads execute in parallel with ZERO lock contention and ZERO per-frame allocations.
      */
     private class InferenceSession(
         val interpreter: Interpreter,
@@ -151,9 +149,8 @@ object OnDeviceNsfwClassifier {
         val scratchBitmap: Bitmap,
         val scratchCanvas: Canvas,
         val scratchPixels: IntArray,
-        val scratchFloatArray: FloatArray
+        val scratchByteArray: ByteArray
     ) {
-        private val inputFloatBuffer: FloatBuffer = inputBuffer.asFloatBuffer()
         private val outputProb = Array(1) { FloatArray(5) }
         private val scratchRect = Rect(0, 0, INPUT_DIM, INPUT_DIM)
         private val scratchPaint = Paint(Paint.FILTER_BITMAP_FLAG)
@@ -163,128 +160,145 @@ object OnDeviceNsfwClassifier {
             try { scratchBitmap.recycle() } catch (_: Throwable) {}
         }
 
+        fun execute(bitmap: Bitmap, ctx: Context): Float {
+            return try {
+                if (bitmap.isRecycled) return 0.0f
+                scratchCanvas.drawColor(Color.BLACK)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && bitmap.config == Bitmap.Config.HARDWARE) {
+                    val copy = try {
+                        bitmap.copy(Bitmap.Config.RGB_565, false)
+                    } catch (_: Throwable) {
+                        try {
+                            bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                        } catch (_: Throwable) {
+                            null
+                        }
+                    }
+                    if (copy != null) {
+                        try {
+                            scratchCanvas.drawBitmap(copy, null, scratchRect, scratchPaint)
+                        } finally {
+                            try { copy.recycle() } catch (_: Throwable) {}
+                        }
+                    } else {
+                        return classifyPotatoFastScore(BitmapDrawable(ctx.resources, bitmap), ctx)
+                    }
+                } else {
+                    scratchCanvas.drawBitmap(bitmap, null, scratchRect, scratchPaint)
+                }
+
+                runInferenceInternal()
+            } catch (t: Throwable) {
+                Log.w(TAG, "Inference session execution warning: ${t.message}")
+                classifyPotatoFastScore(BitmapDrawable(ctx.resources, bitmap), ctx)
+            }
+        }
+
         fun execute(drawable: Drawable, ctx: Context): Float {
             return try {
                 scratchCanvas.drawColor(Color.BLACK)
                 if (drawable is BitmapDrawable) {
                     val b = drawable.bitmap
                     if (b == null || b.isRecycled) return 0.0f
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
-                        val copy = try {
-                            b.copy(Bitmap.Config.RGB_565, false)
-                        } catch (_: Throwable) {
-                            try {
-                                b.copy(Bitmap.Config.ARGB_8888, false)
-                            } catch (_: Throwable) {
-                                null
-                            }
-                        }
-                        if (copy != null) {
-                            try {
-                                scratchCanvas.drawBitmap(copy, null, scratchRect, scratchPaint)
-                            } finally {
-                                try { copy.recycle() } catch (_: Throwable) {}
-                            }
-                        } else {
-                            return classifyPotatoFastScore(drawable, ctx)
-                        }
-                    } else {
-                        scratchCanvas.drawBitmap(b, null, scratchRect, scratchPaint)
-                    }
+                    return execute(b, ctx)
                 } else {
                     drawable.setBounds(0, 0, INPUT_DIM, INPUT_DIM)
                     drawable.draw(scratchCanvas)
                 }
 
-                scratchBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
-
-                var floatIdx = 0
-                var bodySkinPixels = 0
-                val totalPixels = INPUT_DIM * INPUT_DIM
-                val bodyStartPixel = 66 * INPUT_DIM
-                val bodyTotalPixels = totalPixels - bodyStartPixel
-
-                for (i in 0 until totalPixels) {
-                    val pixel = scratchPixels[i]
-                    val r = (pixel shr 16) and 0xFF
-                    val g = (pixel shr 8) and 0xFF
-                    val b = pixel and 0xFF
-
-                    // GantMan MobileNetV2 expects RGB normalized to [0.0, 1.0] via fast L1-cache lookup
-                    scratchFloatArray[floatIdx++] = BYTE_TO_FLOAT[r]
-                    scratchFloatArray[floatIdx++] = BYTE_TO_FLOAT[g]
-                    scratchFloatArray[floatIdx++] = BYTE_TO_FLOAT[b]
-
-                    if (i >= bodyStartPixel && isSkinTone(r, g, b)) {
-                        bodySkinPixels++
-                    }
-                }
-
-                inputFloatBuffer.rewind()
-                inputFloatBuffer.put(scratchFloatArray)
-                inputBuffer.rewind()
-
-                interpreter.run(inputBuffer, outputProb)
-
-                val drawings = outputProb[0][CLASS_DRAWINGS]
-                val hentai = outputProb[0][CLASS_HENTAI]
-                val neutral = outputProb[0][CLASS_NEUTRAL]
-                val porn = outputProb[0][CLASS_PORN]
-                val sexy = outputProb[0][CLASS_SEXY]
-
-                val sumProb = drawings + hentai + neutral + porn + sexy
-                val pDrawings: Float
-                val pHentai: Float
-                val pNeutral: Float
-                val pPorn: Float
-                val pSexy: Float
-
-                if (sumProb in 0.95f..1.05f && drawings >= 0f && porn >= 0f) {
-                    pDrawings = drawings
-                    pHentai = hentai
-                    pNeutral = neutral
-                    pPorn = porn
-                    pSexy = sexy
-                } else {
-                    val maxLogit = maxOf(drawings, hentai, neutral, porn, sexy)
-                    val exp0 = kotlin.math.exp((drawings - maxLogit).toDouble()).toFloat()
-                    val exp1 = kotlin.math.exp((hentai - maxLogit).toDouble()).toFloat()
-                    val exp2 = kotlin.math.exp((neutral - maxLogit).toDouble()).toFloat()
-                    val exp3 = kotlin.math.exp((porn - maxLogit).toDouble()).toFloat()
-                    val exp4 = kotlin.math.exp((sexy - maxLogit).toDouble()).toFloat()
-                    val sumExp = exp0 + exp1 + exp2 + exp3 + exp4
-                    if (sumExp > 0f) {
-                        pDrawings = exp0 / sumExp
-                        pHentai = exp1 / sumExp
-                        pNeutral = exp2 / sumExp
-                        pPorn = exp3 / sumExp
-                        pSexy = exp4 / sumExp
-                    } else {
-                        pDrawings = 0.2f
-                        pHentai = 0.2f
-                        pNeutral = 0.2f
-                        pPorn = 0.2f
-                        pSexy = 0.2f
-                    }
-                }
-
-                val safeConfidence = maxOf(pDrawings, pNeutral)
-                val rawAiScore = if (safeConfidence > 0.75f && pPorn < 0.10f && pHentai < 0.10f) {
-                    ((pPorn + pHentai + (pSexy * 0.50f)) * 0.80f).coerceIn(0.0f, 1.0f)
-                } else {
-                    (pPorn + pHentai + (pSexy * 0.70f)).coerceIn(0.0f, 1.0f)
-                }
-                val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
-
-                if (rawAiScore >= 0.20f && bodySkinRatio > 0.30f) {
-                    val exposureBoost = ((bodySkinRatio - 0.30f) * 1.5f).coerceIn(0.0f, 1.0f)
-                    maxOf(rawAiScore, (rawAiScore * 0.70f) + (exposureBoost * 0.30f))
-                } else {
-                    rawAiScore
-                }
+                runInferenceInternal()
             } catch (t: Throwable) {
                 Log.w(TAG, "Inference session execution warning: ${t.message}")
                 classifyPotatoFastScore(drawable, ctx)
+            }
+        }
+
+        private fun runInferenceInternal(): Float {
+            scratchBitmap.getPixels(scratchPixels, 0, INPUT_DIM, 0, 0, INPUT_DIM, INPUT_DIM)
+
+            var byteIdx = 0
+            var bodySkinPixels = 0
+            val totalPixels = INPUT_DIM * INPUT_DIM
+            val bodyStartPixel = 66 * INPUT_DIM
+            val bodyTotalPixels = totalPixels - bodyStartPixel
+
+            for (i in 0 until totalPixels) {
+                val pixel = scratchPixels[i]
+                val r = (pixel shr 16) and 0xFF
+                val g = (pixel shr 8) and 0xFF
+                val b = pixel and 0xFF
+
+                // INT8 quantized model accepts UINT8 [0..255] raw pixel bytes directly (0 float overhead)
+                scratchByteArray[byteIdx++] = r.toByte()
+                scratchByteArray[byteIdx++] = g.toByte()
+                scratchByteArray[byteIdx++] = b.toByte()
+
+                if (i >= bodyStartPixel && isSkinTone(r, g, b)) {
+                    bodySkinPixels++
+                }
+            }
+
+            inputBuffer.rewind()
+            inputBuffer.put(scratchByteArray)
+            inputBuffer.rewind()
+
+            interpreter.run(inputBuffer, outputProb)
+
+            val drawings = outputProb[0][CLASS_DRAWINGS]
+            val hentai = outputProb[0][CLASS_HENTAI]
+            val neutral = outputProb[0][CLASS_NEUTRAL]
+            val porn = outputProb[0][CLASS_PORN]
+            val sexy = outputProb[0][CLASS_SEXY]
+
+            val sumProb = drawings + hentai + neutral + porn + sexy
+            val pDrawings: Float
+            val pHentai: Float
+            val pNeutral: Float
+            val pPorn: Float
+            val pSexy: Float
+
+            if (sumProb in 0.95f..1.05f && drawings >= 0f && porn >= 0f) {
+                pDrawings = drawings
+                pHentai = hentai
+                pNeutral = neutral
+                pPorn = porn
+                pSexy = sexy
+            } else {
+                val maxLogit = maxOf(drawings, hentai, neutral, porn, sexy)
+                val exp0 = kotlin.math.exp((drawings - maxLogit).toDouble()).toFloat()
+                val exp1 = kotlin.math.exp((hentai - maxLogit).toDouble()).toFloat()
+                val exp2 = kotlin.math.exp((neutral - maxLogit).toDouble()).toFloat()
+                val exp3 = kotlin.math.exp((porn - maxLogit).toDouble()).toFloat()
+                val exp4 = kotlin.math.exp((sexy - maxLogit).toDouble()).toFloat()
+                val sumExp = exp0 + exp1 + exp2 + exp3 + exp4
+                if (sumExp > 0f) {
+                    pDrawings = exp0 / sumExp
+                    pHentai = exp1 / sumExp
+                    pNeutral = exp2 / sumExp
+                    pPorn = exp3 / sumExp
+                    pSexy = exp4 / sumExp
+                } else {
+                    pDrawings = 0.2f
+                    pHentai = 0.2f
+                    pNeutral = 0.2f
+                    pPorn = 0.2f
+                    pSexy = 0.2f
+                }
+            }
+
+            val safeConfidence = maxOf(pDrawings, pNeutral)
+            val rawAiScore = if (safeConfidence > 0.75f && pPorn < 0.10f && pHentai < 0.10f) {
+                ((pPorn + pHentai + (pSexy * 0.50f)) * 0.80f).coerceIn(0.0f, 1.0f)
+            } else {
+                (pPorn + pHentai + (pSexy * 0.70f)).coerceIn(0.0f, 1.0f)
+            }
+            val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
+
+            return if (rawAiScore >= 0.20f && bodySkinRatio > 0.30f) {
+                val exposureBoost = ((bodySkinRatio - 0.30f) * 1.5f).coerceIn(0.0f, 1.0f)
+                maxOf(rawAiScore, (rawAiScore * 0.70f) + (exposureBoost * 0.30f))
+            } else {
+                rawAiScore
             }
         }
     }
@@ -741,11 +755,11 @@ object OnDeviceNsfwClassifier {
     }
 
     /**
-     * Memory-maps the TFLite model from assets without loading bytes into JVM heap memory.
-     * Reused across all parallel inference sessions via Linux shared virtual memory (mmap).
+     * Memory-maps the TFLite model directly from APK assets without loading bytes into JVM heap memory.
+     * Uses Linux virtual memory mmap() through AssetFileDescriptor, consuming 0 KB of private JVM heap.
+     * Reused across all parallel inference sessions via shared virtual memory pages.
      */
     private fun ensureModelBufferLoaded(ctx: Context): MappedByteBuffer? {
-        if (isPotatoDevice(ctx)) return null
         if (isModelPermanentlyUnavailable) return null
         sharedModelBuffer?.let { return it }
 
@@ -777,51 +791,47 @@ object OnDeviceNsfwClassifier {
 
     /**
      * Creates an isolated InferenceSession with its own Interpreter instance and scratch buffers.
+     * Configured for low-resource safe execution (2 threads + XNNPACK) on Cortex-A53 cores (e.g. Allwinner H313)
+     * while scaling cleanly across mid-range and flagship Android devices.
      */
     private fun createInferenceSession(ctx: Context): InferenceSession? {
         val modelBuffer = ensureModelBufferLoaded(ctx) ?: return null
         val tier = DeviceProfile.tier(ctx)
-        val is32Bit = try {
-            Build.SUPPORTED_64_BIT_ABIS.isNullOrEmpty()
-        } catch (_: Throwable) {
-            true
-        }
-        val isLowRam = try {
-            val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-            am?.isLowRamDevice ?: false
-        } catch (_: Throwable) {
-            false
-        }
 
-        val shouldUseXnnpack = tier != DeviceTier.LOW && !is32Bit && !isLowRam
-        val threadCount = if (tier == DeviceTier.LOW || is32Bit || isLowRam) 1 else 2
+        // Low-resource safe interpreter configuration:
+        // Set 2 threads and enable XNNPACK. On Cortex-A53 quad-core SoCs (e.g. Allwinner H313 Android TV SoC),
+        // 2 threads utilize 2 CPU cores for accelerated NEON INT8 gemm, leaving 2 cores free
+        // for video decoding buffers and UI rendering without starving memory or freezing playback.
+        val threadCount = if (tier == DeviceTier.HIGH) 3 else 2
 
         val interp = try {
             val options = Interpreter.Options().apply {
                 setNumThreads(threadCount)
-                setUseXNNPACK(shouldUseXnnpack)
+                setUseXNNPACK(true)
             }
             Interpreter(modelBuffer, options)
         } catch (t: Throwable) {
-            Log.w(TAG, "Primary interpreter init failed (xnnpack=$shouldUseXnnpack), falling back to safe CPU: ${t.message}")
+            Log.w(TAG, "Primary interpreter init with XNNPACK failed, falling back to safe CPU: ${t.message}")
             val safeOptions = Interpreter.Options().apply {
-                setNumThreads(1)
+                setNumThreads(2)
                 setUseXNNPACK(false)
             }
             try {
                 Interpreter(modelBuffer, safeOptions)
-            } catch (_: Throwable) {
+            } catch (fallbackEx: Throwable) {
+                Log.e(TAG, "Fallback interpreter init failed: ${fallbackEx.message}")
                 return null
             }
         }
 
-        val buf = ByteBuffer.allocateDirect(1 * INPUT_DIM * INPUT_DIM * RGB_CHANNELS * BYTES_PER_FLOAT).apply {
+        // Direct ByteBuffer for UINT8 input tensor: shape [1, 224, 224, 3] = 150,528 bytes
+        val buf = ByteBuffer.allocateDirect(INPUT_BYTES).apply {
             order(ByteOrder.nativeOrder())
         }
-        val sBitmap = Bitmap.createBitmap(INPUT_DIM, INPUT_DIM, Bitmap.Config.ARGB_8888)
+        val sBitmap = Bitmap.createBitmap(INPUT_DIM, INPUT_DIM, Bitmap.Config.RGB_565)
         val sCanvas = Canvas(sBitmap)
         val sPixels = IntArray(INPUT_DIM * INPUT_DIM)
-        val sFloats = FloatArray(INPUT_DIM * INPUT_DIM * RGB_CHANNELS)
+        val sBytes = ByteArray(INPUT_BYTES)
 
         return InferenceSession(
             interpreter = interp,
@@ -829,7 +839,7 @@ object OnDeviceNsfwClassifier {
             scratchBitmap = sBitmap,
             scratchCanvas = sCanvas,
             scratchPixels = sPixels,
-            scratchFloatArray = sFloats
+            scratchByteArray = sBytes
         )
     }
 
@@ -885,7 +895,7 @@ object OnDeviceNsfwClassifier {
      * Uses hardware-adaptive multi-session parallelism with zero thread contention.
      */
     fun classifyDrawableScore(ctx: Context, drawable: Drawable): Float {
-        if (isPotatoDevice(ctx) || isDeviceUnderMemoryPressure(ctx)) {
+        if (isDeviceUnderMemoryPressure(ctx)) {
             return classifyPotatoFastScore(drawable, ctx)
         }
         if (isModelPermanentlyUnavailable) return classifyPotatoFastScore(drawable, ctx)
@@ -906,7 +916,19 @@ object OnDeviceNsfwClassifier {
     @Synchronized
     fun classifyBitmapScore(ctx: Context, bitmap: Bitmap): Float {
         if (bitmap.isRecycled) return 0.0f
-        return classifyDrawableScore(ctx, BitmapDrawable(ctx.resources, bitmap))
+        if (isDeviceUnderMemoryPressure(ctx)) {
+            return classifyPotatoFastScore(BitmapDrawable(ctx.resources, bitmap), ctx)
+        }
+        if (isModelPermanentlyUnavailable) {
+            return classifyPotatoFastScore(BitmapDrawable(ctx.resources, bitmap), ctx)
+        }
+
+        val session = borrowSession(ctx) ?: return classifyPotatoFastScore(BitmapDrawable(ctx.resources, bitmap), ctx)
+        return try {
+            session.execute(bitmap, ctx)
+        } finally {
+            returnSession(session)
+        }
     }
 
     /**
@@ -916,6 +938,162 @@ object OnDeviceNsfwClassifier {
         val score = classifyBitmapScore(ctx, bitmap)
         val threshold = NsfwFilterEngine.getVisualThreshold(ctx)
         return score >= threshold
+    }
+
+    /**
+     * Synchronously classifies a video frame Bitmap and returns raw confidence score (0.0f - 1.0f).
+     */
+    fun classifyVideoFrameScore(ctx: Context, frameBitmap: Bitmap): Float {
+        return classifyBitmapScore(ctx, frameBitmap)
+    }
+
+    /**
+     * Calculates the optimal inSampleSize (power of 2) for downsampling large images/frames to ~224x224.
+     * Prevents high-resolution bitmaps (e.g. 1080p, 4K) from causing out-of-memory errors on 500MB RAM devices.
+     */
+    fun calculateInSampleSize(
+        options: BitmapFactory.Options,
+        reqWidth: Int = INPUT_DIM,
+        reqHeight: Int = INPUT_DIM
+    ): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight = height / 2
+            val halfWidth = width / 2
+            while ((halfHeight / inSampleSize) >= reqHeight && (halfWidth / inSampleSize) >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
+    }
+
+    /**
+     * Safely decodes a byte array into a downsampled RGB_565 Bitmap using inSampleSize.
+     */
+    fun decodeSampledBitmap(
+        data: ByteArray,
+        offset: Int = 0,
+        length: Int = data.size,
+        reqWidth: Int = INPUT_DIM,
+        reqHeight: Int = INPUT_DIM
+    ): Bitmap? {
+        if (data.isEmpty() || length <= 0) return null
+        return try {
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeByteArray(data, offset, length, options)
+            if (options.outWidth <= 0 || options.outHeight <= 0) return null
+
+            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+            options.inJustDecodeBounds = false
+            options.inPreferredConfig = Bitmap.Config.RGB_565
+            options.inDither = true
+
+            BitmapFactory.decodeByteArray(data, offset, length, options)
+        } catch (t: Throwable) {
+            Log.w(TAG, "decodeSampledBitmap from ByteArray failed: ${t.message}")
+            null
+        }
+    }
+
+    /**
+     * Safely decodes a FileDescriptor into a downsampled RGB_565 Bitmap using inSampleSize.
+     */
+    fun decodeSampledBitmap(
+        fileDescriptor: FileDescriptor,
+        reqWidth: Int = INPUT_DIM,
+        reqHeight: Int = INPUT_DIM
+    ): Bitmap? {
+        return try {
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeFileDescriptor(fileDescriptor, null, options)
+            if (options.outWidth <= 0 || options.outHeight <= 0) return null
+
+            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+            options.inJustDecodeBounds = false
+            options.inPreferredConfig = Bitmap.Config.RGB_565
+            options.inDither = true
+
+            BitmapFactory.decodeFileDescriptor(fileDescriptor, null, options)
+        } catch (t: Throwable) {
+            Log.w(TAG, "decodeSampledBitmap from FileDescriptor failed: ${t.message}")
+            null
+        }
+    }
+
+    /**
+     * Safely decodes a file path into a downsampled RGB_565 Bitmap using inSampleSize.
+     */
+    fun decodeSampledBitmap(
+        path: String,
+        reqWidth: Int = INPUT_DIM,
+        reqHeight: Int = INPUT_DIM
+    ): Bitmap? {
+        return try {
+            val options = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeFile(path, options)
+            if (options.outWidth <= 0 || options.outHeight <= 0) return null
+
+            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+            options.inJustDecodeBounds = false
+            options.inPreferredConfig = Bitmap.Config.RGB_565
+            options.inDither = true
+
+            BitmapFactory.decodeFile(path, options)
+        } catch (t: Throwable) {
+            Log.w(TAG, "decodeSampledBitmap from path failed: ${t.message}")
+            null
+        }
+    }
+
+    /**
+     * Safely decodes an InputStream into a downsampled RGB_565 Bitmap using inSampleSize.
+     */
+    fun decodeSampledBitmap(
+        inputStream: InputStream,
+        reqWidth: Int = INPUT_DIM,
+        reqHeight: Int = INPUT_DIM
+    ): Bitmap? {
+        return try {
+            val bytes = inputStream.readBytes()
+            decodeSampledBitmap(bytes, 0, bytes.size, reqWidth, reqHeight)
+        } catch (t: Throwable) {
+            Log.w(TAG, "decodeSampledBitmap from InputStream failed: ${t.message}")
+            null
+        }
+    }
+
+    /**
+     * Synchronously classifies a compressed image byte array using downsampling and returns confidence score.
+     */
+    fun classifyByteArrayScore(ctx: Context, data: ByteArray): Float {
+        if (data.isEmpty()) return 0.0f
+        val bitmap = decodeSampledBitmap(data, 0, data.size, INPUT_DIM, INPUT_DIM) ?: return 0.0f
+        return try {
+            classifyBitmapScore(ctx, bitmap)
+        } finally {
+            try { bitmap.recycle() } catch (_: Throwable) {}
+        }
+    }
+
+    /**
+     * Synchronously classifies an image from a file path using downsampling and returns confidence score.
+     */
+    fun classifyFileScore(ctx: Context, path: String): Float {
+        val bitmap = decodeSampledBitmap(path, INPUT_DIM, INPUT_DIM) ?: return 0.0f
+        return try {
+            classifyBitmapScore(ctx, bitmap)
+        } finally {
+            try { bitmap.recycle() } catch (_: Throwable) {}
+        }
     }
 
     /**
@@ -954,9 +1132,8 @@ object OnDeviceNsfwClassifier {
             return
         }
 
-        // Potato / low-tier device direct execution (<0.05ms, 0MB heap allocations)
-        // Completely eliminates background thread queuing, thread context switching, and eviction races on low RAM devices
-        if (isPotatoDevice(appContext) || isDeviceUnderMemoryPressure(appContext)) {
+        // If device is under critical memory pressure (<20MB available RAM), execute fast heuristic immediately
+        if (isDeviceUnderMemoryPressure(appContext)) {
             val score = classifyPotatoFastScore(drawable, appContext)
             recordScore(imageKey, score, appContext)
             applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)

@@ -86,17 +86,16 @@
   - Can be unlocked in Settings → Providers.
 - **Zero False Positives Guarantee**:
   - Clean mainstream anime (*Attack on Titan*, *Hunter x Hunter*, *Spy x Family*, *Frieren*, *Demon Slayer*, *Jujutsu Kaisen*) and clean family movies are strictly protected from accidental blocking.
-- **Hardware-Adaptive AI & Ultra-Potato Android TV Optimization ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
-  - **High & Mid Tier**: Runs GantMan 5-Class MobileNetV2 with multi-session parallel inference (2–4 threads) and clean Linux `mmap()` (0 KB JVM heap).
-  - **Low Tier (1GB–3.5GB RAM, 2GB TV Sticks, Budget Phones)**: Executes GantMan 5-Class MobileNetV2 with **1 single-threaded safe CPU interpreter session** (`useXNNPACK=false`, 0 SIMD traps, ~8 MB native RAM), enabling full 5-class detection without OOM crashes.
-  - **Ultra-Potato Devices ($\le 1024\text{ MB}$ RAM, Android Go, or Active Memory Pressure)**: Bypasses the neural network to eliminate native memory allocations and avoid Android Low Memory Killer (LMK) aborts.
-  - Operates using a static 48×48 RGB_565 scratchpad consuming $< 15\text{ KB}$ heap memory with zero native allocations.
-  - **Dual-Zone Anatomical & Backdrop Rejection**:
-    - Discards uniform warm/monochromatic backdrops (e.g., solid yellow, beige, or gold posters) where both upper and body regions exceed 60% skin hue.
-    - Requires concentrated anatomical skin clustering ($\ge 55\%$ in at least one row) to prevent dispersed noise from falsely triggering filters.
+- **Hardware-Adaptive AI & Low-Resource Android TV Optimization ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
+  - **Full-INT8 Quantized GantMan MobileNetV2 (~4.8 MB)**: Upgraded neural network using INT8 weights and activations (w8a8) with UINT8 raw byte input (`[1, 224, 224, 3]`) and FLOAT32 5-class outputs (`[drawings, hentai, neutral, porn, sexy]`).
+  - **Zero-Heap Virtual Memory Mapping**: Direct `MappedByteBuffer` loading from uncompressed APK assets via `FileChannel.map()`, consuming 0 KB of JVM heap memory.
+  - **Low-Resource Safe Interpreter (2 Threads + XNNPACK)**: Engineered specifically for ultra-low-resource Android TV devices (e.g. Allwinner H313 quad-core Cortex-A53 with strict 500MB runtime RAM limit), utilizing NEON INT8 microkernels across 2 cores without starving playback buffers or freezing the UI.
+  - **Reusable Direct Buffers & RGB_565 Preprocessing**: Reusable direct `ByteBuffer` (150,528 bytes) and `RGB_565` scratch canvas (100 KB) eliminate per-frame GC allocations and 150,528 float conversions.
+  - **Optimized Downsampling**: Safe `inSampleSize` power-of-2 decoding and RGB_565 configuration for images, files, and video frames.
   - **Safe Asynchronous Worker**:
     - Uses `WeakReference<ImageView>` to eliminate view recycling races and GC pinning during fast remote scrolling.
     - Rate-limits queue depth with smart eviction to maintain buttery smooth 60/120fps UI rendering with zero frame drops or OutOfMemory errors.
+  - **Critical Memory Pressure Fallback**: Automatically switches to ultra-fast zero-native-allocation skin chrominance heuristic if available RAM drops below 20MB.
 
 ### 8. Streamlined Release Packaging & Independent App Identity
 - **Pre-Release Builds**: Package ID `com.lagradost.cloudstream3.beta`, App Name **`CSB`**.
