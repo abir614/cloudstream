@@ -24,7 +24,9 @@ import com.lagradost.cloudstream3.ui.search.SearchResultBuilder
 import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
+import com.lagradost.cloudstream3.utils.UIHelper.applyTvCardFocusHover
 import com.lagradost.cloudstream3.utils.UIHelper.isBottomLayout
+import com.lagradost.cloudstream3.utils.UIHelper.resetTvCardHover
 import com.lagradost.cloudstream3.utils.UIHelper.toPx
 
 class HomeScrollViewHolderState(view: ViewBinding) : ViewHolderState<Boolean>(view) {
@@ -93,10 +95,10 @@ class ResumeItemAdapter(
                 isFocusableInTouchMode = true
                 isFocusable = true
                 if (!hasFocus()) {
-                    com.lagradost.cloudstream3.utils.UIHelper.resetTvCardHover(this)
+                    resetTvCardHover()
                 }
                 setOnFocusChangeListener { v, hasFocus ->
-                    com.lagradost.cloudstream3.utils.UIHelper.applyTvCardFocusHover(v, hasFocus)
+                    v.applyTvCardFocusHover(hasFocus)
                 }
             }
             nextFocusUp?.let {
