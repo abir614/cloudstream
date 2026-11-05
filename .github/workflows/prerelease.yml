@@ -142,11 +142,8 @@ jobs:
         fi
 
         # Generate scoped, readable changelog for in-app updates and release notes
-        cat << 'EOF' > release_body.md
-## ⚡ CloudStream Beta (CSB) Pre-release
-
-EOF
-
+        echo "## ⚡ CloudStream Beta (CSB) Pre-release" > release_body.md
+        echo "" >> release_body.md
         echo "### 🔄 Changes Since Immediate Previous Pre-release" >> release_body.md
         if [ -n "$PREV_PRE_SHA" ]; then
           PREV_SHORT=$(git rev-parse --short "$PREV_PRE_SHA" 2>/dev/null || echo "$PREV_PRE_SHA")
