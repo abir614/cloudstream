@@ -189,7 +189,15 @@ class NetworkCompressionInterceptor : Interceptor {
                         false
                     }
                     val inflater = Inflater(!isZlib)
-                    InflaterSource(rawSource, inflater).buffer()
+                    object : InflaterSource(rawSource, inflater) {
+                        override fun close() {
+                            try {
+                                super.close()
+                            } finally {
+                                inflater.end()
+                            }
+                        }
+                    }.buffer()
                 } catch (_: Throwable) {
                     return response
                 }

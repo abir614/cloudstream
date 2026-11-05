@@ -361,9 +361,9 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
 pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeDecryptBackup(
     mut env: JNIEnv,
     _class: JClass,
-    encrypted_input: jni::objects::JByteArray,
+    encrypted_input: JByteArray,
     passphrase_input: JString,
-) -> jni::sys::jbyteArray {
+) -> jbyteArray {
     if encrypted_input.is_null() || passphrase_input.is_null() {
         return std::ptr::null_mut();
     }
@@ -394,7 +394,7 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
 pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeIsEncryptedBackup(
     env: JNIEnv,
     _class: JClass,
-    data_input: jni::objects::JByteArray,
+    data_input: JByteArray,
 ) -> jboolean {
     if data_input.is_null() {
         return 0;
@@ -470,10 +470,10 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
 /// JNI bridge to compress raw bytes using DEFLATE
 #[no_mangle]
 pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeCompressDeflate(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
-    data_input: jni::objects::JByteArray,
-) -> jni::sys::jbyteArray {
+    data_input: JByteArray,
+) -> jbyteArray {
     if data_input.is_null() {
         return std::ptr::null_mut();
     }
@@ -498,10 +498,10 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
 /// JNI bridge to decompress raw DEFLATE bytes
 #[no_mangle]
 pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeDecompressDeflate(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
-    data_input: jni::objects::JByteArray,
-) -> jni::sys::jbyteArray {
+    data_input: JByteArray,
+) -> jbyteArray {
     if data_input.is_null() {
         return std::ptr::null_mut();
     }
@@ -526,10 +526,10 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
 /// JNI bridge to compress raw bytes using zlib-wrapped DEFLATE
 #[no_mangle]
 pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeCompressZlib(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
-    data_input: jni::objects::JByteArray,
-) -> jni::sys::jbyteArray {
+    data_input: JByteArray,
+) -> jbyteArray {
     if data_input.is_null() {
         return std::ptr::null_mut();
     }
@@ -554,10 +554,10 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
 /// JNI bridge to decompress zlib-wrapped DEFLATE bytes
 #[no_mangle]
 pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeDecompressZlib(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
-    data_input: jni::objects::JByteArray,
-) -> jni::sys::jbyteArray {
+    data_input: JByteArray,
+) -> jbyteArray {
     if data_input.is_null() {
         return std::ptr::null_mut();
     }

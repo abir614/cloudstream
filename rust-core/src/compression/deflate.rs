@@ -17,7 +17,7 @@ pub fn compress_deflate(input: &[u8]) -> Vec<u8> {
 
 /// Decompresses raw DEFLATE bytes into an uncompressed buffer.
 pub fn decompress_deflate(input: &[u8]) -> Result<Vec<u8>, CompressionError> {
-    decompress_to_vec(input).map_err(|e| CompressionError::Decompress(format!("{:?}", e)))
+    decompress_to_vec(input).map_err(|e| CompressionError::Decompress(format!("{e:?}")))
 }
 
 /// Compresses raw bytes using zlib-wrapped DEFLATE.
@@ -27,7 +27,7 @@ pub fn compress_zlib(input: &[u8]) -> Vec<u8> {
 
 /// Decompresses zlib-wrapped DEFLATE bytes.
 pub fn decompress_zlib(input: &[u8]) -> Result<Vec<u8>, CompressionError> {
-    decompress_to_vec_zlib(input).map_err(|e| CompressionError::Decompress(format!("{:?}", e)))
+    decompress_to_vec_zlib(input).map_err(|e| CompressionError::Decompress(format!("{e:?}")))
 }
 
 /// Compresses a UTF-8 string into raw DEFLATE bytes.

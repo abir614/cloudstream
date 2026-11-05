@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 pub mod cache;
 pub mod compression;
 pub mod crypto;

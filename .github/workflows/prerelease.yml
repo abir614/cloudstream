@@ -165,6 +165,7 @@ jobs:
         echo "- **Diff with Stable**: [Compare ${LATEST_STABLE_TAG}...this build](https://github.com/${{ github.repository }}/compare/${LATEST_STABLE_TAG}...${{ github.sha }})" >> release_body.md
         echo "" >> release_body.md
 
+        git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
         git tag -f pre-release ${{ github.sha }}
         git push origin -f pre-release || true
 
