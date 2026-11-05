@@ -130,8 +130,8 @@ jobs:
         git config user.email "github-actions[bot]@users.noreply.github.com"
 
         # Determine immediate previous pre-release SHA before moving the tag
-        PREV_PRE_SHA=$(git rev-parse origin/tags/pre-release 2>/dev/null || git ls-remote origin refs/tags/pre-release | awk '{print $1}')
-        if [ -z "$PREV_PRE_SHA" ] || [ "$PREV_PRE_SHA" = "${{ github.sha }}" ]; then
+        PREV_PRE_SHA=$(git rev-parse -q --verify "refs/tags/pre-release" 2>/dev/null || git ls-remote --tags origin pre-release 2>/dev/null | tail -n 1 | awk '{print $1}')
+        if [ -z "$PREV_PRE_SHA" ] || ! git cat-file -e "${PREV_PRE_SHA}^{commit}" 2>/dev/null || [ "$PREV_PRE_SHA" = "${{ github.sha }}" ]; then
           PREV_PRE_SHA=$(git rev-parse HEAD~1 2>/dev/null || echo "")
         fi
 
