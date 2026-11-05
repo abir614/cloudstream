@@ -155,4 +155,94 @@ object NativeCoreBridge {
     ): Boolean {
         return if (isLoaded) nativeIsNsfwText(title, url, tags, level) else false
     }
+
+    // --- Native DEFLATE / ZLIB High-Performance Compression Bridge ---
+    external fun nativeCompressDeflate(data: ByteArray): ByteArray?
+    external fun nativeDecompressDeflate(data: ByteArray): ByteArray?
+    external fun nativeCompressZlib(data: ByteArray): ByteArray?
+    external fun nativeDecompressZlib(data: ByteArray): ByteArray?
+
+    fun compressDeflate(data: ByteArray): ByteArray {
+        if (isLoaded) {
+            val res = nativeCompressDeflate(data)
+            if (res != null) return res
+        }
+        val deflater = java.util.zip.Deflater(java.util.zip.Deflater.DEFAULT_COMPRESSION, true)
+        return try {
+            deflater.setInput(data)
+            deflater.finish()
+            val bos = java.io.ByteArrayOutputStream(data.size / 2)
+            val buf = ByteArray(1024)
+            while (!deflater.finished()) {
+                val count = deflater.deflate(buf)
+                bos.write(buf, 0, count)
+            }
+            bos.toByteArray()
+        } finally {
+            deflater.end()
+        }
+    }
+
+    fun decompressDeflate(data: ByteArray): ByteArray {
+        if (isLoaded) {
+            val res = nativeDecompressDeflate(data)
+            if (res != null) return res
+        }
+        val inflater = java.util.zip.Inflater(true)
+        return try {
+            inflater.setInput(data)
+            val bos = java.io.ByteArrayOutputStream(data.size * 2)
+            val buf = ByteArray(1024)
+            while (!inflater.finished()) {
+                val count = inflater.inflate(buf)
+                if (count == 0 && inflater.needsInput()) break
+                bos.write(buf, 0, count)
+            }
+            bos.toByteArray()
+        } finally {
+            inflater.end()
+        }
+    }
+
+    fun compressZlib(data: ByteArray): ByteArray {
+        if (isLoaded) {
+            val res = nativeCompressZlib(data)
+            if (res != null) return res
+        }
+        val deflater = java.util.zip.Deflater()
+        return try {
+            deflater.setInput(data)
+            deflater.finish()
+            val bos = java.io.ByteArrayOutputStream(data.size / 2)
+            val buf = ByteArray(1024)
+            while (!deflater.finished()) {
+                val count = deflater.deflate(buf)
+                bos.write(buf, 0, count)
+            }
+            bos.toByteArray()
+        } finally {
+            deflater.end()
+        }
+    }
+
+    fun decompressZlib(data: ByteArray): ByteArray {
+        if (isLoaded) {
+            val res = nativeDecompressZlib(data)
+            if (res != null) return res
+        }
+        val inflater = java.util.zip.Inflater()
+        return try {
+            inflater.setInput(data)
+            val bos = java.io.ByteArrayOutputStream(data.size * 2)
+            val buf = ByteArray(1024)
+            while (!inflater.finished()) {
+                val count = inflater.inflate(buf)
+                if (count == 0 && inflater.needsInput()) break
+                bos.write(buf, 0, count)
+            }
+            bos.toByteArray()
+        } finally {
+            inflater.end()
+        }
+    }
 }

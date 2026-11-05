@@ -13,12 +13,21 @@ import okhttp3.Dispatcher
 import okhttp3.Dns
 import okhttp3.Headers
 import okhttp3.Headers.Companion.toHeaders
+import okhttp3.Interceptor
+import okhttp3.MediaType
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody
+import okio.BufferedSource
+import okio.GzipSource
+import okio.InflaterSource
+import okio.buffer
 import org.conscrypt.Conscrypt
 import java.io.File
 import java.security.Security
 import java.util.concurrent.TimeUnit
+import java.util.zip.Inflater
 
 // Backwards compatible constructor, mark as deprecated later
 fun Requests.initClient(context: Context) {
@@ -76,6 +85,7 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
         .protocols(listOf(Protocol.HTTP_2, Protocol.HTTP_1_1))
         .followRedirects(true)
         .followSslRedirects(true)
+        .addInterceptor(NetworkCompressionInterceptor())
         .apply {
             if (ignoreSSL) {
                 ignoreAllSSLErrors()
@@ -127,4 +137,88 @@ fun getHeaders(
             }) else mapOf()
     val tempHeaders = (DEFAULT_HEADERS + headers + cookieMap)
     return tempHeaders.toHeaders()
+}
+
+/**
+ * High-performance, zero-allocation network compression interceptor.
+ * Automatically negotiates and transparently decompresses gzip and deflate content-encodings for
+ * scraper manifests, repository indexes, JSON APIs, and subtitle payloads.
+ * Strictly avoids touching media streams (.ts, .m4s, .mp4, images) and range requests to conserve CPU.
+ */
+class NetworkCompressionInterceptor : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val request = chain.request()
+        val path = request.url.encodedPath.lowercase()
+        val isMediaStream = isMediaBitstream(path) || request.header("Range") != null
+
+        val outgoingRequest = if (!isMediaStream && request.header("Accept-Encoding") == null) {
+            request.newBuilder()
+                .header("Accept-Encoding", "gzip, deflate")
+                .build()
+        } else {
+            request
+        }
+
+        val response = chain.proceed(outgoingRequest)
+        val body = response.body ?: return response
+
+        if (isMediaStream || response.code == 204 || response.code == 304 || request.method.equals("HEAD", ignoreCase = true)) {
+            return response
+        }
+
+        val contentEncoding = response.header("Content-Encoding")?.lowercase()?.trim() ?: return response
+
+        val decompressedSource: BufferedSource = when {
+            contentEncoding.equals("gzip", ignoreCase = true) -> {
+                try {
+                    GzipSource(body.source()).buffer()
+                } catch (_: Throwable) {
+                    return response
+                }
+            }
+            contentEncoding.equals("deflate", ignoreCase = true) -> {
+                try {
+                    val rawSource = body.source()
+                    val isZlib = try {
+                        if (rawSource.request(2)) {
+                            val b0 = rawSource.buffer[0].toInt() and 0xFF
+                            val b1 = rawSource.buffer[1].toInt() and 0xFF
+                            (b0 and 0x0F == 8) && ((b0 * 256 + b1) % 31 == 0)
+                        } else false
+                    } catch (_: Throwable) {
+                        false
+                    }
+                    val inflater = Inflater(!isZlib)
+                    InflaterSource(rawSource, inflater).buffer()
+                } catch (_: Throwable) {
+                    return response
+                }
+            }
+            else -> return response
+        }
+
+        val strippedHeaders = response.headers.newBuilder()
+            .removeAll("Content-Encoding")
+            .removeAll("Content-Length")
+            .build()
+
+        val uncompressedBody = object : ResponseBody() {
+            override fun contentType(): MediaType? = body.contentType()
+            override fun contentLength(): Long = -1L
+            override fun source(): BufferedSource = decompressedSource
+        }
+
+        return response.newBuilder()
+            .headers(strippedHeaders)
+            .body(uncompressedBody)
+            .build()
+    }
+
+    private fun isMediaBitstream(path: String): Boolean {
+        return path.endsWith(".ts") || path.endsWith(".m4s") ||
+                path.endsWith(".mp4") || path.endsWith(".mkv") ||
+                path.endsWith(".webm") || path.endsWith(".avi") ||
+                path.endsWith(".jpg") || path.endsWith(".jpeg") ||
+                path.endsWith(".png") || path.endsWith(".webp")
+    }
 }

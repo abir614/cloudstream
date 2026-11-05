@@ -1,5 +1,5 @@
 use jni::objects::{JByteArray, JClass, JString};
-use jni::sys::{jboolean, jstring};
+use jni::sys::{jboolean, jbyteArray, jstring};
 use jni::JNIEnv;
 
 use crate::security::ssrf::validate_url_safety;
@@ -466,3 +466,116 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         _ => 0,
     }
 }
+
+/// JNI bridge to compress raw bytes using DEFLATE
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeCompressDeflate(
+    env: JNIEnv,
+    _class: JClass,
+    data_input: jni::objects::JByteArray,
+) -> jni::sys::jbyteArray {
+    if data_input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let data = match env.convert_byte_array(&data_input) {
+        Ok(b) => b,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::compression::compress_deflate(&data)
+    });
+
+    match safe_res {
+        Ok(compressed) => match env.byte_array_from_slice(&compressed) {
+            Ok(arr) => arr.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        _ => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to decompress raw DEFLATE bytes
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeDecompressDeflate(
+    env: JNIEnv,
+    _class: JClass,
+    data_input: jni::objects::JByteArray,
+) -> jni::sys::jbyteArray {
+    if data_input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let data = match env.convert_byte_array(&data_input) {
+        Ok(b) => b,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::compression::decompress_deflate(&data)
+    });
+
+    match safe_res {
+        Ok(Ok(decompressed)) => match env.byte_array_from_slice(&decompressed) {
+            Ok(arr) => arr.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        _ => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to compress raw bytes using zlib-wrapped DEFLATE
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeCompressZlib(
+    env: JNIEnv,
+    _class: JClass,
+    data_input: jni::objects::JByteArray,
+) -> jni::sys::jbyteArray {
+    if data_input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let data = match env.convert_byte_array(&data_input) {
+        Ok(b) => b,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::compression::compress_zlib(&data)
+    });
+
+    match safe_res {
+        Ok(compressed) => match env.byte_array_from_slice(&compressed) {
+            Ok(arr) => arr.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        _ => std::ptr::null_mut(),
+    }
+}
+
+/// JNI bridge to decompress zlib-wrapped DEFLATE bytes
+#[no_mangle]
+pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_nativeDecompressZlib(
+    env: JNIEnv,
+    _class: JClass,
+    data_input: jni::objects::JByteArray,
+) -> jni::sys::jbyteArray {
+    if data_input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let data = match env.convert_byte_array(&data_input) {
+        Ok(b) => b,
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::compression::decompress_zlib(&data)
+    });
+
+    match safe_res {
+        Ok(Ok(decompressed)) => match env.byte_array_from_slice(&decompressed) {
+            Ok(arr) => arr.into_raw(),
+            Err(_) => std::ptr::null_mut(),
+        },
+        _ => std::ptr::null_mut(),
+    }
+}
+
