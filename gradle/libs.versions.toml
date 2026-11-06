@@ -19,7 +19,7 @@ dokkaGradlePlugin = "2.2.0"
 espressoCore = "3.7.0"
 fragmentKtx = "1.9.1"
 guava = "33.7.2-android"
-instancioCore = "5.6.0"
+instancioCore = "6.2.1"
 jacksonModuleKotlin = { strictly = "2.13.5" } # Last 2.13.x patch supporting minSdk <26 (Android TV & FireSticks)
 json = "20260522"
 jsoup = "1.23.2"
