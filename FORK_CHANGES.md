@@ -388,3 +388,9 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 - **Suppressed Transient Route Drops**: In `ArchComponentExt.kt`, filtered out expected network connection dropouts (`SocketTimeoutException`, `ConnectException`, `UnknownHostException`, `NoRouteToHostException`, `SSLHandshakeException`, `EHOSTUNREACH`, `ECONNREFUSED`, `ETIMEDOUT`) from generating remote `ApiError` alerts, keeping telemetry focused on critical application issues.
 - **Resolved Cast MiniController Attribute Warning**: Removed redundant `android:tint="?attr/white"` from `go_forward_30.xml` and `go_back_30.xml`, resolving unresolved theme attribute runtime warnings during Cast controller inflation.
 
+### 16.7 Dependabot Dependency Synchronization & Compatibility Pinning
+- **`androidx.annotation:annotation`**: Bumped from `1.10.0` to `1.11.0` (Dependabot PR #37).
+- **`org.json:json`**: Bumped from `20260522` to `20260814` (Dependabot PR #38).
+- **`instancioCore`**: Bumped from `5.6.0` to `6.2.1` (Dependabot PR #39).
+
+
