@@ -97,26 +97,19 @@ private fun rescale(image: Bitmap, params: ImageParams): Bitmap {
 
 /** rescale to not take up as much memory */
 private fun MediaMetadataRetriever.image(timeUs: Long, params: ImageParams): Bitmap? {
-    /*if (timeUs <= 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        try {
-            val primary = this.primaryImage
-            if (primary != null) {
-                return rescale(primary, params)
-            }
-        } catch (t: Throwable) {
-            logError(t)
+    return try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            this.getScaledFrameAtTime(
+                timeUs,
+                MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                params.width,
+                params.height
+            )
+        } else {
+            rescale(this.getFrameAtTime(timeUs) ?: return null, params)
         }
-    }*/
-
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-        this.getScaledFrameAtTime(
-            timeUs,
-            MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-            params.width,
-            params.height
-        )
-    } else {
-        return rescale(this.getFrameAtTime(timeUs) ?: return null, params)
+    } catch (_: Throwable) {
+        null
     }
 }
 
@@ -153,7 +146,7 @@ class PreviewGenerator : IPreviewGenerator {
         return try {
             currentGenerator.getPreviewImage(fraction) ?: backupGenerator.getPreviewImage(fraction)
         } catch (t: Throwable) {
-            logError(t)
+            if (BuildConfig.DEBUG) Log.d("PreviewGenerator", "Failed to get preview image", t)
             null
         }
     }
@@ -318,8 +311,7 @@ private class M3u8PreviewGenerator(override var params: ImageParams) : IPreviewG
         currentJob?.cancel()
         currentJob = ioSafe {
             withContext(Dispatchers.IO) {
-                Log.i(TAG, "Loading with url = $url headers = $headers")
-                val retriever = MediaMetadataRetriever()
+                if (BuildConfig.DEBUG) Log.d(TAG, "Loading with url = $url headers = $headers")
                 val hsl = M3u8Helper2.hslLazy(
                     M3u8Helper.M3u8Stream(
                         streamUrl = url,
@@ -331,7 +323,7 @@ private class M3u8PreviewGenerator(override var params: ImageParams) : IPreviewG
 
                 // no support for encryption atm
                 if (hsl.isEncrypted) {
-                    Log.i(TAG, "m3u8 is encrypted")
+                    if (BuildConfig.DEBUG) Log.d(TAG, "m3u8 is encrypted")
                     totalImages = 0
                     return@withContext
                 }
@@ -364,6 +356,7 @@ private class M3u8PreviewGenerator(override var params: ImageParams) : IPreviewG
 
                 val maxLod = ceil(log2(duration)).toInt().coerceIn(MIN_LOD, MAX_LOD)
                 val count = hsl.allTsLinks.size
+                var consecutiveFailures = 0
                 for (l in 1..maxLod) {
                     val items = (1 shl (l - 1))
                     for (i in 0 until items) {
@@ -371,26 +364,42 @@ private class M3u8PreviewGenerator(override var params: ImageParams) : IPreviewG
                         if (synchronized(images) { images[index] } != null) {
                             continue
                         }
-                        Log.i(TAG, "Generating preview for $index")
+                        if (consecutiveFailures >= 3) {
+                            if (BuildConfig.DEBUG) Log.d(TAG, "Too many consecutive preview extraction failures ($consecutiveFailures), aborting")
+                            return@withContext
+                        }
+                        if (BuildConfig.DEBUG) Log.d(TAG, "Generating preview for $index")
 
                         val ts = hsl.allTsLinks[index]
+                        var segRetriever: MediaMetadataRetriever? = null
                         try {
-                            retriever.setDataSource(ts.url, hsl.headers)
+                            segRetriever = MediaMetadataRetriever()
+                            segRetriever.setDataSource(ts.url, hsl.headers)
                             if (!isActive) {
                                 return@withContext
                             }
-                            val img = retriever.image(0, params)
+                            val img = segRetriever.image(0, params)
                             if (!isActive) {
                                 return@withContext
                             }
-                            if (img == null || img.width <= 1 || img.height <= 1) continue
+                            if (img == null || img.width <= 1 || img.height <= 1) {
+                                consecutiveFailures++
+                                continue
+                            }
+                            consecutiveFailures = 0
                             synchronized(images) {
                                 images[index] = img
                                 loadedImages += 1
                             }
                         } catch (t: Throwable) {
-                            logError(t)
+                            consecutiveFailures++
+                            if (BuildConfig.DEBUG) Log.d(TAG, "Failed to extract segment preview: ${t.message}")
                             continue
+                        } finally {
+                            try {
+                                segRetriever?.release()
+                            } catch (_: Throwable) {
+                            }
                         }
                     }
                 }
@@ -456,7 +465,7 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
     }
 
     // also check out https://github.com/wseemann/FFmpegMediaMetadataRetriever
-    private val retriever: MediaMetadataRetriever = MediaMetadataRetriever()
+    private var retriever: MediaMetadataRetriever? = null
 
     private fun clear(keepCache: Boolean) {
         if (keepCache) return
@@ -473,8 +482,14 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
         currentJob = ioSafe {
             if (BuildConfig.DEBUG) Log.d(TAG, "Loading with url = $url headers = $headers")
             clear(true)
-            retriever.setDataSource(url, headers)
-            start(this)
+            val r = MediaMetadataRetriever()
+            retriever = r
+            try {
+                r.setDataSource(url, headers)
+                start(this, r)
+            } catch (t: Throwable) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "Failed to load mp4 preview: ${t.message}")
+            }
         }
     }
 
@@ -483,25 +498,36 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
         currentJob = ioSafe {
             if (BuildConfig.DEBUG) Log.d(TAG, "Loading with uri = $uri")
             clear(keepCache)
-            retriever.setDataSource(context, uri)
-            start(this)
+            val r = MediaMetadataRetriever()
+            retriever = r
+            try {
+                r.setDataSource(context, uri)
+                start(this, r)
+            } catch (t: Throwable) {
+                if (BuildConfig.DEBUG) Log.d(TAG, "Failed to load mp4 preview: ${t.message}")
+            }
         }
     }
 
     override fun release() {
         currentJob?.cancel()
         clear(false)
+        try {
+            retriever?.release()
+        } catch (_: Throwable) {
+        }
+        retriever = null
     }
 
     override var durationMs: Long = 0L
 
     @Throws
     @WorkerThread
-    private fun start(scope: CoroutineScope) {
+    private fun start(scope: CoroutineScope, r: MediaMetadataRetriever) {
         if (BuildConfig.DEBUG) Log.d(TAG, "Started loading preview")
 
         val durationMs =
-            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong()
+            r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong()
                 ?: throw IllegalArgumentException("Bad video duration")
         this.durationMs = durationMs
         val durationUs = (durationMs * 1000L).toFloat()
@@ -517,7 +543,7 @@ private class Mp4PreviewGenerator(override var params: ImageParams) : IPreviewGe
                 val fraction = (1.0f.div((1 shl l).toFloat()) + i * 1.0f.div(items.toFloat()))
                 if (BuildConfig.DEBUG) Log.d(TAG, "Generating preview for ${fraction * 100}%")
                 val frame = durationUs * fraction
-                val img = retriever.image(frame.toLong(), params)
+                val img = r.image(frame.toLong(), params)
                 if (!scope.isActive) return
                 if (img == null || img.width <= 1 || img.height <= 1) continue
                 synchronized(images) {

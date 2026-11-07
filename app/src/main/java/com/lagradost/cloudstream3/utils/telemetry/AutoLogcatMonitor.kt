@@ -46,7 +46,25 @@ object AutoLogcatMonitor {
         "MIUI",
         "SemWifiManager",
         "WindowManager",
-        "RenderThread"
+        "RenderThread",
+        "InputEventSender",
+        "PesReader",
+        "System.err",
+        "SingleLiceFactory",
+        "perfctl",
+        "MediaHTTPConnection",
+        "MediaMetadataRetriever",
+        "RecyclerView",
+        "TranScrollOptimizer",
+        "WindowOnBackDispatcher",
+        "AxMediaRouter",
+        "Resources",
+        "BLASTBufferQueue",
+        "DynamiteModule",
+        "CastContext",
+        "GooglePlayServicesUtil",
+        "GoogleApiManager",
+        "VideoCapabilities"
     )
 
     fun start(context: Context? = null) {
@@ -128,6 +146,13 @@ object AutoLogcatMonitor {
                             // Filter out common benign spam messages
                             if (message.contains("Skipped") && message.contains("frames!")) continue
                             if (message.contains("onAnimationCancel")) continue
+                            if (message.contains("Unexpected start code prefix", ignoreCase = true)) continue
+                            if (message.contains("Received 'finished' signal", ignoreCase = true)) continue
+                            if (message.contains("No adapter attached; skipping layout", ignoreCase = true)) continue
+                            if (message.contains("sendCancelIfRunning", ignoreCase = true)) continue
+                            if (message.contains("acquireNextBufferLocked", ignoreCase = true)) continue
+                            if (message.contains("ClassLoaderContext type mismatch", ignoreCase = true)) continue
+                            if (message.contains("unresolved theme attributes", ignoreCase = true)) continue
 
                             val level = when (levelChar) {
                                 "E" -> TelemetryService.Level.ERROR

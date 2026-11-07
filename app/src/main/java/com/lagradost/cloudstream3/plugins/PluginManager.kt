@@ -513,21 +513,14 @@ object PluginManager {
 
         val dir = File(LOCAL_PLUGINS_PATH)
 
-        if (!dir.exists()) {
+        // Only attempt to create legacy shared storage directory on Android < 11 (API < 30)
+        // On Android 11+, apps without MANAGE_EXTERNAL_STORAGE cannot create root folders.
+        if (!dir.exists() && Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             val res = dir.mkdirs()
             if (!res) {
-                Log.w(TAG, "Failed to create local directories")
-                // We have tried to load local plugins, but exit early.
-                // This needs to be true to prevent the downloader waiting for plugins.
-                loadedLocalPlugins = true
-                return
+                Log.d(TAG, "Legacy shared local plugins directory could not be created")
             }
         }
-
-        val sortedPlugins = dir.listFiles()
-        // Always sort plugins alphabetically for reproducible results
-
-        Log.d(TAG, "Files in '${LOCAL_PLUGINS_PATH}' folder: ${sortedPlugins?.size}")
 
         // Use app-specific external files directory and copy the file there.
         // We have to do this because on Android 14+, it otherwise gives SecurityException
@@ -537,10 +530,13 @@ object PluginManager {
             pluginDirectory.mkdirs() // Ensure the plugins directory exists
         }
 
+        val legacyPlugins = if (dir.exists()) dir.listFiles() else null
+        Log.d(TAG, "Files in '${LOCAL_PLUGINS_PATH}' folder: ${legacyPlugins?.size ?: 0}")
+
         // Make sure all local plugins are fully refreshed.
         removeKey(PLUGINS_KEY_LOCAL)
 
-        sortedPlugins?.sortedBy { it.name }?.amap { file ->
+        legacyPlugins?.sortedBy { it.name }?.amap { file ->
             try {
                 val destinationFile = File(pluginDirectory, file.name)
 
@@ -559,11 +555,17 @@ object PluginManager {
                     // can check the modification time and not make redundant writes.
                     destinationFile.setLastModified(file.lastModified())
                 }
-
-                // Load the plugin after it has been copied
-                maybeLoadPlugin(context, destinationFile)
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to copy the file")
+                logError(t)
+            }
+        }
+
+        pluginDirectory.listFiles()?.sortedBy { it.name }?.amap { destinationFile ->
+            try {
+                maybeLoadPlugin(context, destinationFile)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to load local plugin: ${destinationFile.name}")
                 logError(t)
             }
         }

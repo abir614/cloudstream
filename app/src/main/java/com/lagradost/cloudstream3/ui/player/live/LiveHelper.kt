@@ -39,11 +39,14 @@ object LiveHelper {
                 reason: Int
             ) {
                 super.onPositionDiscontinuity(oldPosition, newPosition, reason)
-                val timeAheadOfLive = liveManager.getTimeAheadOfLive(newPosition.positionMs)
-
-                // Seek back to the optimal live spot
-                if (timeAheadOfLive > 100) {
-                    player.seekTo(newPosition.positionMs - timeAheadOfLive)
+                // Avoid recursive seeks and fighting against ExoPlayer's DefaultLivePlaybackSpeedControl.
+                // DefaultLivePlaybackSpeedControl smoothly handles live edge drift (0.97x - 1.03x) without decoder flushes.
+                // Only seek back if playback has severely desynced past the live window (> 15 seconds) and not already seeking.
+                if (reason != Player.DISCONTINUITY_REASON_SEEK && reason != Player.DISCONTINUITY_REASON_SEEK_ADJUSTMENT) {
+                    val timeAheadOfLive = liveManager.getTimeAheadOfLive(newPosition.positionMs)
+                    if (timeAheadOfLive > 15_000L) {
+                        player.seekTo(newPosition.positionMs - timeAheadOfLive)
+                    }
                 }
             }
         }

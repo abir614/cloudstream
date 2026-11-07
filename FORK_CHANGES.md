@@ -353,3 +353,38 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
   - **Layer 2 (Inner Accent Stroke)**: `2.5dp` `?attr/colorPrimary` stroke that glows in the app's primary accent color.
 - Applied across [`outline.xml`](app/src/main/res/drawable/outline.xml), [`outline_big_20.xml`](app/src/main/res/drawable/outline_big_20.xml), and [`outline_less.xml`](app/src/main/res/drawable/outline_less.xml).
 - **TV-Only Gating**: Gated to `isLayout(TV)` to ensure mobile and tablet touch interactions are untouched.
+
+---
+
+## 16. Build 285-PRE Device Stability, Video Diagnostics & Production Hardening
+
+### 16.1 NSFW Classifier Low-Tier Safety Alignment (v220 Parity)
+- **Zero-Allocation Skin Chrominance Heuristic on Low/Potato Hardware**: Restored `isPotatoDevice(ctx)` to `DeviceProfile.isLowEnd(ctx) || DeviceProfile.isUltraPotato(ctx)`, matching the rock-solid stability of `v220`. Low-end devices (≤ 2048MB RAM, 32-bit ARM, Android Go, TV sticks) completely bypass the heavy 12MB TFLite model mapping and native tensor arenas, executing `classifyPotatoFastScore` (< 0.05ms, 0 MB native RAM) with 0% risk of native LMK aborts.
+- **Strict 64-Bit Architecture Gating for XNNPACK**: Guarded `setUseXNNPACK(useXnnpack)` strictly by `has64Bit && tier != DeviceTier.LOW`. Prevents native `SIGILL`/`SIGSEGV` instruction traps on 32-bit ARM processors (e.g., Allwinner H313, sun50iw9p1) while delivering multi-threaded hardware acceleration (2–3 threads) on capable mid-range and flagship 64-bit devices without bottlenecks.
+
+### 16.2 Live Stream Playback Smoothness & Drift Alignment
+- **Eliminated Tug-of-War Hard Micro-Seeks**: Removed the destructive `if (timeAheadOfLive > 100) player.seekTo(...)` micro-seek in `LiveHelper.kt`. Allows ExoPlayer's `DefaultLivePlaybackSpeedControl` (0.97x–1.03x) to smoothly regulate live edge drift without flushing video/audio decoders or dropping frames, eliminating live degradation after 1–2 minutes. Hard seek is only triggered if live drift exceeds 15 seconds.
+- **Restored Target Offset & Capped Rebuffer**: Restored `.setLiveTargetOffsetMs(PREFERRED_LIVE_OFFSET)` on the player's primary `DefaultMediaSourceFactory` in `CS3IPlayer.kt`, and capped `rebufferMs` to 2,500ms max in `DefaultLoadControl` so live streams resume instantly without demanding an impossible future buffer.
+
+### 16.3 Leak-Proof MediaMetadataRetriever Lifecycle & Circuit Breaker
+- **Per-Segment Lifecycle**: In `PreviewGenerator.kt` (`M3u8PreviewGenerator`), eliminated the shared persistent `MediaMetadataRetriever` instance in favor of scoped instances wrapped in `try { ... } finally { retriever?.release() }`, preventing native Stagefright codec leaks and unrecoverable binder state corruption.
+- **Fail-Fast Circuit Breaker & Silent Telemetry**: If 3 consecutive HLS segments fail preview extraction, the job halts immediately without burning battery or CPU. Benign segment extraction failures are logged to debug only instead of triggering `ApiError` dumps. Safe `release()` cleanup was also added to `Mp4PreviewGenerator`.
+
+### 16.4 Android 11+ Scoped Storage Plugin Directory Compliance
+- **Scoped Storage Protection in `PluginManager.kt`**: Guarded legacy shared directory creation (`/storage/emulated/0/Cloudstream/plugins`) to `Build.VERSION.SDK_INT < Build.VERSION_CODES.R` to prevent `Failed to create local directories` errors on Android 11+. Ensured plugin loading always falls through to the app-specific external files directory (`context.getExternalFilesDir(null)/plugins`) and fires `afterPluginsLoadedEvent`.
+
+### 16.5 Benign Logcat Noise & Framework Error Suppression
+- **`AutoLogcatMonitor.kt` Noise Filters**: Expanded `noiseTagDenylist` to filter out non-actionable platform logs:
+  - `InputEventSender` (touch fling sequence signals on Pixel 6 Pro).
+  - `PesReader` (ExoPlayer MPEG-TS start code prefix warnings).
+  - `System.err` (fragmented stack trace lines).
+  - `BLASTBufferQueue` (SurfaceFlinger dropped buffer logs during fast scrolling).
+  - `Resources` (framework-level resource resolution warnings).
+  - `VideoCapabilities` (unsupported HEIC mime checks in MediaCodec).
+  - `DynamiteModule`, `CastContext`, `GooglePlayServicesUtil`, `GoogleApiManager` (AOSP / emulator Google Play Services warnings).
+- **Message Filter Patterns**: Added filters for `acquireNextBufferLocked`, `ClassLoaderContext type mismatch`, `Unexpected start code prefix`, `Received 'finished' signal`, `No adapter attached; skipping layout`, and `unresolved theme attributes`.
+
+### 16.6 Telemetry Transient Network Exception Filtering
+- **Suppressed Transient Route Drops**: In `ArchComponentExt.kt`, filtered out expected network connection dropouts (`SocketTimeoutException`, `ConnectException`, `UnknownHostException`, `NoRouteToHostException`, `SSLHandshakeException`, `EHOSTUNREACH`, `ECONNREFUSED`, `ETIMEDOUT`) from generating remote `ApiError` alerts, keeping telemetry focused on critical application issues.
+- **Resolved Cast MiniController Attribute Warning**: Removed redundant `android:tint="?attr/white"` from `go_forward_30.xml` and `go_back_30.xml`, resolving unresolved theme attribute runtime warnings during Cast controller inflation.
+

@@ -1144,8 +1144,10 @@ class CS3IPlayer : IPlayer {
         }
         // Ensure ExoPlayer's DefaultLoadControl invariants:
         // bufferForPlaybackMs <= bufferForPlaybackAfterRebufferMs <= minBufferMs <= maxBufferMs
+        // Cap rebufferMs to 2,500ms so live streams and transient network recoveries resume smoothly
+        // without demanding an unachievable buffer ahead of the live edge.
         val playbackMs = playerConfig.bufferForPlaybackMs
-        val rebufferMs = maxOf(playbackMs, playerConfig.bufferForPlaybackAfterRebufferMs)
+        val rebufferMs = maxOf(playbackMs, minOf(playerConfig.bufferForPlaybackAfterRebufferMs, 2_500))
         val minBufferMs = maxOf(rebufferMs, rawMinBufferMs)
         val maxBufferMs = maxOf(minBufferMs, rawMaxBufferMs)
 
@@ -1365,11 +1367,11 @@ class CS3IPlayer : IPlayer {
             }
         }
 
-        val defaultMediaSourceFactory = if (dataSourceFactory != null) {
+        val defaultMediaSourceFactory = (if (dataSourceFactory != null) {
             DefaultMediaSourceFactory(dataSourceFactory, extractorFactor)
         } else {
             DefaultMediaSourceFactory(context, extractorFactor)
-        }
+        }).setLiveTargetOffsetMs(PREFERRED_LIVE_OFFSET)
 
         // If there is only one item then treat it as normal, if multiple: concatenate the items.
         val videoMediaSource = if (mediaItemSlices.size == 1) {

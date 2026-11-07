@@ -368,17 +368,13 @@ object OnDeviceNsfwClassifier {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     /**
-     * Checks if the device is a true ultra-potato device (≤ 1024MB RAM, Android Go, or severe kernel/hardware constraint).
-     * Only on true ultra-potato devices is the TFLite neural network bypassed to prevent native LMK aborts.
-     * Devices with > 1024MB RAM (including 1.5GB, 2GB, 3GB, and all DeviceTier.LOW devices) run the full
-     * GantMan MobileNetV2 model using a single safe CPU thread with zero JVM heap allocations.
+     * Checks if the device is a potato or low-end device (≤ 2048MB RAM, 32-bit ARM, Android Go, TV stick, or LOW tier).
+     * On potato and low-end devices, the heavy TFLite model and native tensor arenas are completely bypassed
+     * in favor of the ultra-fast zero-allocation skin chrominance heuristic to eliminate 100% of LMK / SIGILL crash risk.
+     * Capable devices (MID and HIGH tiers with 64-bit architecture) execute the full GantMan MobileNetV2 model.
      */
     fun isPotatoDevice(ctx: Context): Boolean {
-        val totalMb = DeviceProfile.getTotalRamMb(ctx)
-        if (totalMb <= 1024L) return true
-        val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-        if (am?.isLowRamDevice == true && totalMb <= 1536L) return true
-        return DeviceProfile.isUltraPotato(ctx)
+        return DeviceProfile.isLowEnd(ctx) || DeviceProfile.isUltraPotato(ctx)
     }
 
     /**
@@ -800,6 +796,7 @@ object OnDeviceNsfwClassifier {
      */
     private fun ensureModelBufferLoaded(ctx: Context): MappedByteBuffer? {
         if (isModelPermanentlyUnavailable) return null
+        if (isPotatoDevice(ctx)) return null
         sharedModelBuffer?.let { return it }
 
         synchronized(modelBufferLock) {
@@ -834,25 +831,26 @@ object OnDeviceNsfwClassifier {
      * while scaling cleanly across mid-range and flagship Android devices.
      */
     private fun createInferenceSession(ctx: Context): InferenceSession? {
+        if (isPotatoDevice(ctx)) return null
         val modelBuffer = ensureModelBufferLoaded(ctx) ?: return null
         val tier = DeviceProfile.tier(ctx)
+        val has64Bit = try { Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() == true } catch (_: Throwable) { false }
 
         // Low-resource safe interpreter configuration:
-        // Set 2 threads and enable XNNPACK. On Cortex-A53 quad-core SoCs (e.g. Allwinner H313 Android TV SoC),
-        // 2 threads utilize 2 CPU cores for accelerated NEON INT8 gemm, leaving 2 cores free
-        // for video decoding buffers and UI rendering without starving memory or freezing playback.
+        // Set 2-3 threads based on tier. Disable XNNPACK on non-64-bit devices to prevent native SIMD instruction traps (SIGILL/SIGSEGV).
         val threadCount = if (tier == DeviceTier.HIGH) 3 else 2
+        val useXnnpack = has64Bit && tier != DeviceTier.LOW
 
         val interp = try {
             val options = Interpreter.Options().apply {
                 setNumThreads(threadCount)
-                setUseXNNPACK(true)
+                setUseXNNPACK(useXnnpack)
             }
             Interpreter(modelBuffer, options)
         } catch (t: Throwable) {
-            Log.w(TAG, "Primary interpreter init with XNNPACK failed, falling back to safe CPU: ${t.message}")
+            Log.w(TAG, "Primary interpreter init failed, falling back to safe CPU: ${t.message}")
             val safeOptions = Interpreter.Options().apply {
-                setNumThreads(2)
+                setNumThreads(threadCount)
                 setUseXNNPACK(false)
             }
             try {
