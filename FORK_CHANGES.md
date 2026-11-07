@@ -297,6 +297,31 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 - **Self-Draining Queued Dispatcher**: Replaced lossy synchronous drop throttling with a bounded FIFO `diagnosticQueue` in `RemoteCrashReporter.kt` that paces dispatches by 2 seconds, ensuring burst errors are not dropped while protecting edge rate limits.
 - **In-App Verification**: Added a dedicated **"Test Telemetry Alert"** action preference in **Settings -> Updates** ([`SettingsUpdatesScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsUpdatesScreen.kt)) with immediate feedback toasts.
 
+### 12.5 Public Forensic Log Stream & Log Taxonomy ([`t.me/cloudstreamdata`](https://t.me/cloudstreamdata))
+For full transparency, developers and users can inspect live, real-time diagnostic telemetry, warning batches, and crash dispatches published by test and pre-release builds at [**https://t.me/cloudstreamdata**](https://t.me/cloudstreamdata).
+
+#### Log Categories & Format Breakdown:
+1. **Fatal Crashes (`🚨 CLOUDSTREAM CRASH REPORT`)**:
+   - Dispatched immediately upon uncaught exceptions in UI/background threads or native SIGSEGV/SIGILL signals.
+   - Contains complete exception class name, localized message, root causes, and full un-truncated stack traces (dispatched as an attached `.txt` file if exceeding 1,200 characters).
+2. **Critical Errors (`🛑 CLOUDSTREAM BATCH DIAGNOSTIC REPORT` • Level: `ERROR`)**:
+   - Ingests recoverable yet severe failures, including MediaCodec hardware video decoding failures, Stagefright native binder drops, cryptographic attestation/verification rejections, and extension sandbox IPC timeout failures.
+3. **Diagnostic Warnings (`⚠️ CLOUDSTREAM BATCH DIAGNOSTIC REPORT` • Level: `WARN`)**:
+   - Captures degraded operational events, such as transient network retries, video track parsing fallbacks, display refresh rate mismatch notices, and memory pressure triggers.
+4. **Device Forensic Fingerprint Included with Every Report**:
+   - **Device & Model**: Device marketing name, manufacturer, and hardware board (e.g. `INFINIX Infinix X6858`, `Xiaomi Poco F5`, `Chromecast with Google TV`).
+   - **SoC & Processor**: Silicon chipset model (e.g. `MT6789`, `SM8475`), CPU core count, and instruction set architecture (`32-bit ARMv7` vs `64-bit ARMv8`).
+   - **Memory & Swap**: Physical RAM capacity (in MB), active zRAM compressed swap allocation, and low-RAM / Android Go indicator.
+   - **Device Performance Tier**: Runtime tier assigned by [`DeviceProfile.tier`](app/src/main/java/com/lagradost/cloudstream3/utils/DeviceProfile.kt) (`LOW`, `MID`, `HIGH`).
+   - **OS & Kernel Environment**: Android version, SDK API level, and Linux kernel version release string.
+   - **Application Context**: App build flavor (`285-PRE`, `286-PRE`, etc.), build number, and currently active provider/plugin ID.
+
+#### Privacy, Scrubbing & Anonymization Guarantees:
+- **IP Address Anonymization**: All IPv4 and IPv6 addresses occurring in log lines, stack traces, and socket connection dumps are scrubbed and replaced with `[REDACTED_IP]`.
+- **Credential Stripping**: URL queries, authorization headers, and bearer tokens are automatically purged before dispatch.
+- **Zero Personally Identifiable Information (PII)**: No user viewing history, search queries, personal media lists, or account credentials are ever logged or transmitted.
+- **User Opt-Out**: Log ingestion and remote transmission can be fully turned off at any time under **Settings $\rightarrow$ Updates $\rightarrow$ Anonymous Crash Reporting** ([`SettingsUpdatesScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsUpdatesScreen.kt)).
+
 ---
 
 ## 13. Independent Application Identity & Side-by-Side Co-existence (`CSB`)

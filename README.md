@@ -102,6 +102,13 @@
   - **Critical Memory Pressure Fallback**: Automatically switches to ultra-fast zero-native-allocation skin chrominance heuristic if available RAM drops below 20MB.
 
 ### 8. Enterprise Automated Telemetry & Z+ Zero-Trust Crash Reporting
+- **Public Diagnostic Log Transparency**: Real-time forensic telemetry, diagnostic warning batches, and crash dispatches are publicly observable for complete transparency at [**t.me/cloudstreamdata**](https://t.me/cloudstreamdata).
+  - **Collected Telemetry Scope**:
+    - **Fatal Crashes (`🚨 CLOUDSTREAM CRASH REPORT`)**: Uncaught exceptions, native signal aborts (SIGSEGV/SIGILL), and full stack traces.
+    - **Critical Errors (`🛑 CLOUDSTREAM BATCH DIAGNOSTIC REPORT`)**: MediaCodec video decoder crashes, native playback initialization failures, binder connection drops, and plugin runtime exceptions.
+    - **Diagnostic Warnings (`⚠️ CLOUDSTREAM BATCH DIAGNOSTIC REPORT`)**: Coroutine cancellations, non-fatal fallback events, resource thrashing warnings, and stream format fallback notices.
+    - **Hardware Forensic Fingerprint**: Device model, SoC chipset (e.g. MediaTek MT6789, Allwinner H313, Qualcomm Snapdragon), RAM capacity, zRAM swap, CPU core count & architecture (32-bit ARMv7 vs 64-bit ARMv8), Device Performance Tier (`LOW`, `MID`, `HIGH`), Android OS version & API level, Linux Kernel version, App Build flavor & version code, and Active Plugin ID.
+  - **Zero PII & Data Privacy**: All telemetry undergoes automatic IP redaction (`[REDACTED_IP]`), query-parameter cleaning, and credential sanitization before transmission. Zero user account credentials, browsing history, or personal data are ever collected. Users can disable telemetry at any time via **Settings $\rightarrow$ Updates $\rightarrow$ Anonymous Crash Reporting**.
 - **Zero Static Secrets in APK**: The APK contains ZERO symmetric keys, Telegram Bot Tokens, or Chat IDs; all destination secrets reside exclusively in the serverless Cloudflare Worker proxy at the edge.
 - **Z+ Zero-Trust Anti-MITM Verification**: Handshakes are digitally signed by the edge worker using an ECDSA P-256 private key and verified on-device against a pinned SPKI public key before any shared secrets are derived, mathematically aborting any MITM interception attempt.
 - **Ephemeral Key Exchange (NIST P-256) & Forward Secrecy**: Handshake generates single-use ECDH keypairs and derives 256-bit AES-GCM session keys via HKDF-SHA256 with epoch salts.
