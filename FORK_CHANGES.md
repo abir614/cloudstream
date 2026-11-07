@@ -422,7 +422,8 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Mullvad DoH Retirement**: Decommissioned discontinued Mullvad DNS (`dns.mullvad.net` / `194.242.2.2`) across all configurations.
 - **Mozilla Cloudflare DoH Integration**: Replaced Mullvad with privacy-focused Mozilla Cloudflare DoH (`https://mozilla.cloudflare-dns.com/dns-query`) with bootstrap addresses `1.1.1.1` and `1.0.0.1`.
 - **Quad9 Resolver Modernization**: Upgraded Quad9 DoH to unfiltered profile `https://dns10.quad9.net/dns-query` (bootstrap IPs `9.9.9.10`, `149.112.112.10`, IPv6 `2620:fe::10`, `2620:fe::fe:10`), delivering improved throughput and eliminating false-positive scraper domain blocks.
-- **Settings UI & Security Config**: Updated DNS selection preferences in `array.xml` (`Cloudflare (Mozilla)` and `Resilient Multi-Tier (Mozilla+Quad9 -> CF+Google)`) and purged `mullvad.net` from `network_security_config.xml`.
+- **AdGuard Unfiltered Profile Transition**: Upgraded AdGuard DoH to `https://unfiltered.adguard-dns.com/dns-query` (bootstrap IPv4 `94.140.14.140`, `94.140.14.141`, IPv6 `2a10:50c0::1:ff`, `2a10:50c0::2:ff`), preventing scraper indexers and video hosts from being inadvertently blocked by ad-filter heuristics.
+- **Settings UI & Security Config**: Updated DNS selection preferences in `array.xml` (`Cloudflare (Mozilla)`, `AdGuard (Unfiltered)`, and `Resilient Multi-Tier (Mozilla+Quad9 -> CF+Google)`) and purged `mullvad.net` from `network_security_config.xml`.
 
 
 
