@@ -77,12 +77,21 @@ fun logError(throwable: Throwable) {
     }
     // Suppress expected transient network drops, connect timeouts, and DNS failures from flooding remote telemetry
     val className = throwable::class.simpleName ?: ""
-    if (className in setOf("SocketTimeoutException", "ConnectException", "UnknownHostException", "NoRouteToHostException", "SSLHandshakeException", "SSLException", "PortUnreachableException")) {
+    if (className in setOf("SocketTimeoutException", "ConnectException", "UnknownHostException", "NoRouteToHostException", "SSLHandshakeException", "SSLException", "PortUnreachableException", "StreamResetException", "ConnectionShutdownException")) {
         Log.d("ApiError", "Network connection exception ($className): ${throwable.message}")
         return
     }
-    if (msg != null && (msg.contains("Failed to connect", ignoreCase = true) || msg.contains("EHOSTUNREACH", ignoreCase = true) || msg.contains("ECONNREFUSED", ignoreCase = true) || msg.contains("ETIMEDOUT", ignoreCase = true))) {
-        Log.d("ApiError", "Transient route error: $msg")
+    if (msg != null && (
+        msg.contains("Failed to connect", ignoreCase = true) ||
+        msg.contains("EHOSTUNREACH", ignoreCase = true) ||
+        msg.contains("ECONNREFUSED", ignoreCase = true) ||
+        msg.contains("ETIMEDOUT", ignoreCase = true) ||
+        msg.contains("Required SETTINGS preface not received", ignoreCase = true) ||
+        msg.contains("PROTOCOL_ERROR", ignoreCase = true) ||
+        msg.contains("REFUSED_STREAM", ignoreCase = true) ||
+        msg.contains("STREAM_CLOSED", ignoreCase = true)
+    )) {
+        Log.d("ApiError", "Transient network/protocol error: $msg")
         return
     }
     Log.d("ApiError", "-------------------------------------------------------------------")

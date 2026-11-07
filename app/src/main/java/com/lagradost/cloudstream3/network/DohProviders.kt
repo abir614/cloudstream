@@ -128,6 +128,24 @@ fun queryUdpDns(hostname: String, dnsServerIp: String, timeoutMs: Int = 1500): L
     }
 }
 
+private val IP_REGEX = Regex("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$")
+
+/**
+ * Checks and parses raw IPv4 or IPv6 numeric literals, returning them immediately
+ * without executing unnecessary DNS roundtrips.
+ */
+private fun parseNumericAddress(hostname: String): List<InetAddress>? {
+    val clean = hostname.removePrefix("[").removeSuffix("]")
+    if (clean.contains(':') || clean.matches(IP_REGEX)) {
+        return try {
+            listOf(InetAddress.getByName(clean))
+        } catch (_: Throwable) {
+            null
+        }
+    }
+    return null
+}
+
 /**
  * Multi-Tier Resilient DNS Resolver with cascading fallbacks:
  * 1. Primary DoH: Mozilla Cloudflare DoH -> Quad9 DoH (dns10)
@@ -187,9 +205,7 @@ class ResilientFallbackDns(
     private val secondaryPlainIps = listOf("8.8.8.8", "8.8.4.4", "94.140.14.140", "94.140.14.141")
 
     override fun lookup(hostname: String): List<InetAddress> {
-        if (hostname.matches(IP_REGEX)) {
-            return listOf(InetAddress.getByName(hostname))
-        }
+        parseNumericAddress(hostname)?.let { return it }
 
         val deadline = System.currentTimeMillis() + 2000L
 
@@ -232,11 +248,6 @@ class ResilientFallbackDns(
         // 5. Final Fallback to Android System DNS
         return Dns.SYSTEM.lookup(hostname)
     }
-
-
-    companion object {
-        private val IP_REGEX = Regex("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$")
-    }
 }
 
 /**
@@ -258,9 +269,7 @@ class CachedDns(
     private val cache = ConcurrentHashMap<String, CacheEntry>()
 
     override fun lookup(hostname: String): List<InetAddress> {
-        if (hostname.matches(IP_REGEX)) {
-            return listOf(InetAddress.getByName(hostname))
-        }
+        parseNumericAddress(hostname)?.let { return it }
 
         val now = System.currentTimeMillis()
         val entry = cache[hostname]
@@ -280,10 +289,6 @@ class CachedDns(
         }
         return addresses
     }
-
-    companion object {
-        private val IP_REGEX = Regex("^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}$")
-    }
 }
 
 fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>) = dns(
@@ -300,14 +305,16 @@ fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>) = dns(
                 }
 
                 override fun lookup(hostname: String): List<InetAddress> {
+                    parseNumericAddress(hostname)?.let { return it }
+
                     val deadline = System.currentTimeMillis() + 2000L
                     try {
                         return doh.lookup(hostname)
                     } catch (_: Throwable) {}
 
                     if (System.currentTimeMillis() < deadline) {
-                        // Plain DNS fallback using the provider's bootstrap IPs
-                        for (ip in ips) {
+                        // Plain DNS fallback using the provider's bootstrap IPs (IPv4 only for UDP port 53 A-record queries)
+                        for (ip in ips.filterNot { it.contains(':') }) {
                             val res = queryUdpDns(hostname, ip)
                             if (!res.isNullOrEmpty()) return res
                             if (System.currentTimeMillis() >= deadline) break

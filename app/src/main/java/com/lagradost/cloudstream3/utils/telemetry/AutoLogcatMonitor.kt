@@ -64,8 +64,20 @@ object AutoLogcatMonitor {
         "CastContext",
         "GooglePlayServicesUtil",
         "GoogleApiManager",
-        "VideoCapabilities"
+        "VideoCapabilities",
+        "InteractionJankMonitor",
+        "FinalizerDaemon"
     )
+
+    private fun isNoiseTag(tag: String): Boolean {
+        if (tag in noiseTagDenylist) return true
+        for (entry in noiseTagDenylist) {
+            if (tag.contains(entry, ignoreCase = true)) {
+                return true
+            }
+        }
+        return false
+    }
 
     fun start(context: Context? = null) {
         if (!isRunning.compareAndSet(false, true)) return
@@ -129,7 +141,7 @@ object AutoLogcatMonitor {
                                 continue
                             }
 
-                            if (tag in noiseTagDenylist || tag == TAG || tag == "RemoteCrashReporter") {
+                            if (isNoiseTag(tag) || tag == TAG || tag == "RemoteCrashReporter") {
                                 continue
                             }
 
@@ -153,6 +165,16 @@ object AutoLogcatMonitor {
                             if (message.contains("acquireNextBufferLocked", ignoreCase = true)) continue
                             if (message.contains("ClassLoaderContext type mismatch", ignoreCase = true)) continue
                             if (message.contains("unresolved theme attributes", ignoreCase = true)) continue
+                            if (message.contains("perfctl", ignoreCase = true)) continue
+                            if (message.contains("FPSGO", ignoreCase = true)) continue
+                            if (message.contains("legacy_receive_flag", ignoreCase = true)) continue
+                            if (message.contains("Cleared Reference was only reachable from finalizer", ignoreCase = true)) continue
+                            if (message.contains("Monitor::Inflate", ignoreCase = true)) continue
+                            if (message.contains("SingleLiceFactory", ignoreCase = true)) continue
+                            if (message.contains("TripleFinger", ignoreCase = true)) continue
+                            if (message.contains("ThreeFinger", ignoreCase = true)) continue
+                            if (message.contains("avc:  denied") || message.contains("avc: denied")) continue
+                            if (message.contains("READ_DEVICE_CONFIG", ignoreCase = true)) continue
 
                             val level = when (levelChar) {
                                 "E" -> TelemetryService.Level.ERROR

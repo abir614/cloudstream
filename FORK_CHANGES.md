@@ -399,18 +399,22 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Scoped Storage Protection in `PluginManager.kt`**: Guarded legacy shared directory creation (`/storage/emulated/0/Cloudstream/plugins`) to `Build.VERSION.SDK_INT < Build.VERSION_CODES.R` to prevent `Failed to create local directories` errors on Android 11+. Ensured plugin loading always falls through to the app-specific external files directory (`context.getExternalFilesDir(null)/plugins`) and fires `afterPluginsLoadedEvent`.
 
 ### 16.5 Benign Logcat Noise & Framework Error Suppression
-- **`AutoLogcatMonitor.kt` Noise Filters**: Expanded `noiseTagDenylist` to filter out non-actionable platform logs:
+- **`AutoLogcatMonitor.kt` Noise Filters**: Expanded `noiseTagDenylist` and substring matcher (`isNoiseTag`) to filter out non-actionable platform logs:
   - `InputEventSender` (touch fling sequence signals on Pixel 6 Pro).
   - `PesReader` (ExoPlayer MPEG-TS start code prefix warnings).
   - `System.err` (fragmented stack trace lines).
+  - `SingleLiceFactory` / `os.SingleLiceFactory` (Transsion / Infinix gesture listeners).
+  - `InteractionJankMonitor` (AOSP UI jank monitor missing permission warnings).
+  - `FinalizerDaemon` (Zygote USAP pool SELinux audit denials).
   - `BLASTBufferQueue` (SurfaceFlinger dropped buffer logs during fast scrolling).
   - `Resources` (framework-level resource resolution warnings).
   - `VideoCapabilities` (unsupported HEIC mime checks in MediaCodec).
   - `DynamiteModule`, `CastContext`, `GooglePlayServicesUtil`, `GoogleApiManager` (AOSP / emulator Google Play Services warnings).
-- **Message Filter Patterns**: Added filters for `acquireNextBufferLocked`, `ClassLoaderContext type mismatch`, `Unexpected start code prefix`, `Received 'finished' signal`, `No adapter attached; skipping layout`, and `unresolved theme attributes`.
+- **Message Filter Patterns**: Added filters for `acquireNextBufferLocked`, `ClassLoaderContext type mismatch`, `Unexpected start code prefix`, `Received 'finished' signal`, `No adapter attached; skipping layout`, `unresolved theme attributes`, `perfctl`, `FPSGO`, `legacy_receive_flag`, `Cleared Reference was only reachable from finalizer`, `Monitor::Inflate`, `TripleFinger`, `ThreeFinger`, `avc: denied`, and `READ_DEVICE_CONFIG`.
+- **Dual-Shield Edge Worker Suppression (`worker.js`)**: Added `isNoiseTelemetry(tag, message, stackTrace)` to the Cloudflare Worker proxy at the edge, dropping non-actionable vendor framework logs and transient HTTP/2 preface errors before dispatch to Telegram, providing an extra defense-in-depth shield that guarantees zero channel spam even from older APK builds during update transitions.
 
 ### 16.6 Telemetry Transient Network Exception Filtering
-- **Suppressed Transient Route Drops**: In `ArchComponentExt.kt`, filtered out expected network connection dropouts (`SocketTimeoutException`, `ConnectException`, `UnknownHostException`, `NoRouteToHostException`, `SSLHandshakeException`, `EHOSTUNREACH`, `ECONNREFUSED`, `ETIMEDOUT`) from generating remote `ApiError` alerts, keeping telemetry focused on critical application issues.
+- **Suppressed Transient Route Drops**: In `ArchComponentExt.kt`, filtered out expected network connection dropouts (`SocketTimeoutException`, `ConnectException`, `UnknownHostException`, `NoRouteToHostException`, `SSLHandshakeException`, `EHOSTUNREACH`, `ECONNREFUSED`, `ETIMEDOUT`, `StreamResetException`, `ConnectionShutdownException`, `Required SETTINGS preface not received`, `PROTOCOL_ERROR`, `REFUSED_STREAM`) from generating remote `ApiError` alerts, keeping telemetry focused on critical application issues.
 - **Resolved Cast MiniController Attribute Warning**: Removed redundant `android:tint="?attr/white"` from `go_forward_30.xml` and `go_back_30.xml`, resolving unresolved theme attribute runtime warnings during Cast controller inflation.
 
 ### 16.7 Dependabot Dependency Synchronization & Compatibility Pinning
@@ -424,6 +428,7 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Quad9 Resolver Modernization**: Upgraded Quad9 DoH to unfiltered profile `https://dns10.quad9.net/dns-query` (bootstrap IPs `9.9.9.10`, `149.112.112.10`, IPv6 `2620:fe::10`, `2620:fe::fe:10`), delivering improved throughput and eliminating false-positive scraper domain blocks.
 - **AdGuard Unfiltered Profile Transition**: Upgraded AdGuard DoH to `https://unfiltered.adguard-dns.com/dns-query` (bootstrap IPv4 `94.140.14.140`, `94.140.14.141`, IPv6 `2a10:50c0::1:ff`, `2a10:50c0::2:ff`), preventing scraper indexers and video hosts from being inadvertently blocked by ad-filter heuristics.
 - **Settings UI & Security Config**: Updated DNS selection preferences in `array.xml` (`Cloudflare (Mozilla)`, `AdGuard (Unfiltered)`, and `Resilient Multi-Tier (Mozilla+Quad9 -> CF+Google)`) and purged `mullvad.net` from `network_security_config.xml`.
+- **Zero-Roundtrip Numeric IP Literal Handling**: Implemented centralized `parseNumericAddress` in `DohProviders.kt` for IPv4 and IPv6 direct numeric strings, eliminating duplicate regex instances, preventing bogus DNS lookups for direct IP segment streams, and filtering out IPv6 addresses during UDP port 53 fallback queries.
 
 
 
