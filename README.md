@@ -61,10 +61,10 @@
   - Blocks loopback (`127.0.0.0/8`, `::1`), RFC-1918 private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Carrier-Grade NAT (`100.64.0.0/10`), link-local / cloud metadata (`169.254.169.254`), and IPv6 ULA (`fc00::/7`).
   - Opt-in LAN toggle available for local media servers (Jellyfin, Kodi, local NAS).
 - **Privacy-First Multi-Tier DNS Fallback ([`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt))**:
-  - **Tier 1 (Privacy DoH)**: Queries zero-logging encrypted resolvers **Mullvad DoH** $\rightarrow$ **Quad9 DoH** first.
+  - **Tier 1 (Privacy DoH)**: Queries zero-logging encrypted resolvers **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) $\rightarrow$ **Quad9 DoH** (`https://dns10.quad9.net/dns-query`) first.
   - **Tier 2 (High-Speed Edge DoH)**: Queries **Cloudflare DoH** $\rightarrow$ **Google DoH** if Tier 1 times out or is blocked.
-  - **Tier 3 (Privacy Plain DNS)**: Direct UDP 53 Anycast to Mullvad & Quad9 if DoH is blocked by hostile network firewalls.
-  - **Tier 4 (Edge Plain DNS)**: Direct UDP 53 Anycast to Cloudflare & Google.
+  - **Tier 3 (Primary Plain DNS)**: Direct UDP 53 Anycast to Quad9 (`9.9.9.10`, `149.112.112.10`) & Cloudflare (`1.1.1.1`, `1.0.0.1`) if DoH is blocked by hostile network firewalls.
+  - **Tier 4 (Edge Plain DNS)**: Direct UDP 53 Anycast to Google & AdGuard.
   - **Tier 5 (System Fallback)**: Transparent Android `Dns.SYSTEM` fallback.
   - Bounded by a hard 2000ms deadline per hostname to eliminate latency cascades.
   - **ExoPlayer / Media3 DNS Alignment**: When DoH is enabled (`dns != 0`), Cronet is automatically bypassed in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt) to ensure video segment fetching always uses the encrypted resolver, preventing ISP DNS surveillance leaks.

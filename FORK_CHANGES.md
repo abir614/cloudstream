@@ -38,10 +38,10 @@ This document catalogues all intentional architectural deviations, security hard
 
 ### 2.4 Privacy-First Resilient Multi-Tier DNS with Hard Budget
 - **Privacy-First Fallback Chain in [`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt)**:
-  1. **Tier 1 (Privacy DoH)**: Queries zero-logging **Mullvad DoH** $\rightarrow$ **Quad9 DoH** first.
+  1. **Tier 1 (Privacy DoH)**: Queries zero-logging **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) $\rightarrow$ **Quad9 DoH** (`https://dns10.quad9.net/dns-query`) first.
   2. **Tier 2 (High-Speed Edge DoH)**: Queries **Cloudflare DoH** $\rightarrow$ **Google DoH** within remaining budget.
-  3. **Tier 3 (Privacy Plain DNS)**: Direct UDP 53 Anycast to Mullvad (`194.242.2.2`, `193.19.108.2`) and Quad9 (`9.9.9.9`, `149.112.112.112`).
-  4. **Tier 4 (Edge Plain DNS)**: Direct UDP 53 Anycast to Cloudflare (`1.1.1.1`, `1.0.0.1`) and Google (`8.8.8.8`, `8.8.4.4`).
+  3. **Tier 3 (Primary Plain DNS)**: Direct UDP 53 Anycast to Quad9 (`9.9.9.10`, `149.112.112.10`) and Cloudflare (`1.1.1.1`, `1.0.0.1`).
+  4. **Tier 4 (Edge Plain DNS)**: Direct UDP 53 Anycast to Google (`8.8.8.8`, `8.8.4.4`) and AdGuard (`94.140.14.140`, `94.140.14.141`).
   5. **Tier 5 (System Fallback)**: Transparent Android `Dns.SYSTEM` fallback.
 - **Bounded Total Budget**: Enforces a 2000ms hard deadline per lookup to prevent sequential fallbacks from stacking latency on slow connections.
 - **ExoPlayer / Media3 DNS Alignment**: When DoH is enabled (`dns != 0`), Cronet is automatically bypassed in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt) so video chunks are retrieved via OkHttp `app.baseClient`, guaranteeing video segment downloads never leak to unencrypted ISP DNS.
@@ -417,5 +417,12 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **`androidx.annotation:annotation`**: Bumped from `1.10.0` to `1.11.0` (Dependabot PR #37).
 - **`org.json:json`**: Bumped from `20260522` to `20260814` (Dependabot PR #38).
 - **`instancioCore`**: Bumped from `5.6.0` to `6.2.1` (Dependabot PR #39).
+
+### 16.8 Discontinued DNS Service Decommission & Resolver Modernization
+- **Mullvad DoH Retirement**: Decommissioned discontinued Mullvad DNS (`dns.mullvad.net` / `194.242.2.2`) across all configurations.
+- **Mozilla Cloudflare DoH Integration**: Replaced Mullvad with privacy-focused Mozilla Cloudflare DoH (`https://mozilla.cloudflare-dns.com/dns-query`) with bootstrap addresses `1.1.1.1` and `1.0.0.1`.
+- **Quad9 Resolver Modernization**: Upgraded Quad9 DoH to unfiltered profile `https://dns10.quad9.net/dns-query` (bootstrap IPs `9.9.9.10`, `149.112.112.10`, IPv6 `2620:fe::10`, `2620:fe::fe:10`), delivering improved throughput and eliminating false-positive scraper domain blocks.
+- **Settings UI & Security Config**: Updated DNS selection preferences in `array.xml` (`Cloudflare (Mozilla)` and `Resilient Multi-Tier (Mozilla+Quad9 -> CF+Google)`) and purged `mullvad.net` from `network_security_config.xml`.
+
 
 

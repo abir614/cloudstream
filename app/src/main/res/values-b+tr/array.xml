@@ -24,8 +24,8 @@
         <item>Quad9</item>
         <item>DNS.SB</item>
         <item>Canadian Shield</item>
-        <item>Mullvad</item>
-        <item>Resilient Multi-Tier (Mullvad+Quad9 -> CF+Google)</item>
+        <item>Cloudflare (Mozilla)</item>
+        <item>Resilient Multi-Tier (Mozilla+Quad9 -> CF+Google)</item>
     </array>
     <array name="dns_pref_values">
         <item>0</item>

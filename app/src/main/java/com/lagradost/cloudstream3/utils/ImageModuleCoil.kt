@@ -46,7 +46,7 @@ import com.lagradost.cloudstream3.network.addCloudFlareDns
 import com.lagradost.cloudstream3.network.addDNSWatchDns
 import com.lagradost.cloudstream3.network.addDnsSbDns
 import com.lagradost.cloudstream3.network.addGoogleDns
-import com.lagradost.cloudstream3.network.addMullvadDns
+import com.lagradost.cloudstream3.network.addMozillaCloudflareDns
 import com.lagradost.cloudstream3.network.addQuad9Dns
 import com.lagradost.cloudstream3.network.addResilientMultiTierDns
 import okhttp3.ConnectionPool
@@ -166,7 +166,7 @@ object ImageLoader {
                     6 -> addQuad9Dns()
                     7 -> addDnsSbDns()
                     8 -> addCanadianShieldDns()
-                    9 -> addMullvadDns()
+                    9 -> addMozillaCloudflareDns()
                     10 -> addResilientMultiTierDns()
                     else -> dns(SafeDns(Dns.SYSTEM))
                 }

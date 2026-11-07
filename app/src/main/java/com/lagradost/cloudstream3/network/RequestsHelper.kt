@@ -110,7 +110,7 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
                 6 -> addQuad9Dns()
                 7 -> addDnsSbDns()
                 8 -> addCanadianShieldDns()
-                9 -> addMullvadDns()
+                9 -> addMozillaCloudflareDns()
                 10 -> addResilientMultiTierDns()
                 else -> dns(SafeDns(Dns.SYSTEM))
             }

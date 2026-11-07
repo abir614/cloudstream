@@ -130,22 +130,22 @@ fun queryUdpDns(hostname: String, dnsServerIp: String, timeoutMs: Int = 1500): L
 
 /**
  * Multi-Tier Resilient DNS Resolver with cascading fallbacks:
- * 1. Primary DoH: Mullvad DoH -> Quad9 DoH
+ * 1. Primary DoH: Mozilla Cloudflare DoH -> Quad9 DoH (dns10)
  * 2. Secondary DoH: Cloudflare DoH -> Google DoH
- * 3. Primary Plain DNS (UDP 53): Mullvad -> Quad9
- * 4. Secondary Plain DNS (UDP 53): Cloudflare -> Google
+ * 3. Primary Plain DNS (UDP 53): Quad9 (dns10) -> Cloudflare
+ * 4. Secondary Plain DNS (UDP 53): Google -> AdGuard
  * 5. Final Fallback: Android System DNS (Dns.SYSTEM)
  */
 class ResilientFallbackDns(
     bootstrapClient: OkHttpClient
 ) : Dns {
-    private val mullvadDoh by lazy {
+    private val mozillaCloudflareDoh by lazy {
         DnsOverHttps.Builder()
             .client(bootstrapClient)
-            .url("https://dns.mullvad.net/dns-query".toHttpUrl())
+            .url("https://mozilla.cloudflare-dns.com/dns-query".toHttpUrl())
             .bootstrapDnsHosts(listOf(
-                InetAddress.getByName("194.242.2.2"),
-                InetAddress.getByName("193.19.108.2")
+                InetAddress.getByName("1.1.1.1"),
+                InetAddress.getByName("1.0.0.1")
             ))
             .build()
     }
@@ -153,10 +153,10 @@ class ResilientFallbackDns(
     private val quad9Doh by lazy {
         DnsOverHttps.Builder()
             .client(bootstrapClient)
-            .url("https://dns.quad9.net/dns-query".toHttpUrl())
+            .url("https://dns10.quad9.net/dns-query".toHttpUrl())
             .bootstrapDnsHosts(listOf(
-                InetAddress.getByName("9.9.9.9"),
-                InetAddress.getByName("149.112.112.112")
+                InetAddress.getByName("9.9.9.10"),
+                InetAddress.getByName("149.112.112.10")
             ))
             .build()
     }
@@ -183,8 +183,8 @@ class ResilientFallbackDns(
             .build()
     }
 
-    private val primaryPlainIps = listOf("194.242.2.2", "193.19.108.2", "9.9.9.9", "149.112.112.112")
-    private val secondaryPlainIps = listOf("1.1.1.1", "1.0.0.1", "8.8.8.8", "8.8.4.4")
+    private val primaryPlainIps = listOf("9.9.9.10", "149.112.112.10", "1.1.1.1", "1.0.0.1")
+    private val secondaryPlainIps = listOf("8.8.8.8", "8.8.4.4", "94.140.14.140", "94.140.14.141")
 
     override fun lookup(hostname: String): List<InetAddress> {
         if (hostname.matches(IP_REGEX)) {
@@ -193,9 +193,9 @@ class ResilientFallbackDns(
 
         val deadline = System.currentTimeMillis() + 2000L
 
-        // 1. Primary Privacy DoH: Mullvad -> Quad9 (Zero-logging, strictly confidential)
+        // 1. Primary Privacy DoH: Mozilla Cloudflare -> Quad9 (Zero-logging, strictly confidential)
         try {
-            return mullvadDoh.lookup(hostname)
+            return mozillaCloudflareDoh.lookup(hostname)
         } catch (_: Throwable) {}
         try {
             return quad9Doh.lookup(hostname)
@@ -212,7 +212,7 @@ class ResilientFallbackDns(
         }
 
         if (System.currentTimeMillis() < deadline) {
-            // 3. Primary Plain DNS (UDP 53): Mullvad -> Quad9
+            // 3. Primary Plain DNS (UDP 53): Quad9 -> Cloudflare
             for (ip in primaryPlainIps) {
                 val res = queryUdpDns(hostname, ip)
                 if (!res.isNullOrEmpty()) return res
@@ -221,7 +221,7 @@ class ResilientFallbackDns(
         }
 
         if (System.currentTimeMillis() < deadline) {
-            // 4. Secondary Plain DNS (UDP 53): Cloudflare -> Google
+            // 4. Secondary Plain DNS (UDP 53): Google -> AdGuard
             for (ip in secondaryPlainIps) {
                 val res = queryUdpDns(hostname, ip)
                 if (!res.isNullOrEmpty()) return res
@@ -327,14 +327,19 @@ fun OkHttpClient.Builder.addResilientMultiTierDns() = dns(
 )
 
 
-fun OkHttpClient.Builder.addMullvadDns() = (
+fun OkHttpClient.Builder.addMozillaCloudflareDns() = (
     addGenericDns(
-        "https://dns.mullvad.net/dns-query",
+        "https://mozilla.cloudflare-dns.com/dns-query",
         listOf(
-            "194.242.2.2",
-            "193.19.108.2"
+            "1.1.1.1",
+            "1.0.0.1",
+            "2606:4700:4700::1111",
+            "2606:4700:4700::1001"
         )
     ))
+
+@Deprecated("Mullvad DNS is discontinued. Redirected to Mozilla Cloudflare DNS.", ReplaceWith("addMozillaCloudflareDns()"))
+fun OkHttpClient.Builder.addMullvadDns() = addMozillaCloudflareDns()
 
 fun OkHttpClient.Builder.addGoogleDns() = (
     addGenericDns(
@@ -376,10 +381,12 @@ fun OkHttpClient.Builder.addDNSWatchDns() = (
 
 fun OkHttpClient.Builder.addQuad9Dns() = (
     addGenericDns(
-        "https://dns.quad9.net/dns-query",
+        "https://dns10.quad9.net/dns-query",
         listOf(
-            "9.9.9.9",
-            "149.112.112.112"
+            "9.9.9.10",
+            "149.112.112.10",
+            "2620:fe::10",
+            "2620:fe::fe:10"
         )
     ))
 
