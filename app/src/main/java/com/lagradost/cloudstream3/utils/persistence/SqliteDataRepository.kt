@@ -33,6 +33,14 @@ class SqliteDataRepository(
     private class DatabaseHelper(context: Context, name: String) :
         SQLiteOpenHelper(context, name, null, DATABASE_VERSION) {
 
+        override fun onConfigure(db: SQLiteDatabase) {
+            super.onConfigure(db)
+            try {
+                db.enableWriteAheadLogging()
+            } catch (_: Throwable) {
+            }
+        }
+
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL(
                 """

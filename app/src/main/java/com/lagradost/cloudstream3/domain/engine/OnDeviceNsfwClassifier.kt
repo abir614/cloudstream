@@ -374,7 +374,16 @@ object OnDeviceNsfwClassifier {
      * Capable devices (MID and HIGH tiers with 64-bit architecture) execute the full GantMan MobileNetV2 model.
      */
     fun isPotatoDevice(ctx: Context): Boolean {
-        return DeviceProfile.isLowEnd(ctx) || DeviceProfile.isUltraPotato(ctx)
+        if (DeviceProfile.isLowEnd(ctx) || DeviceProfile.isUltraPotato(ctx)) return true
+        // Dynamic critical memory pressure guard: if remaining runtime heap is critically low (<20MB),
+        // fallback to the zero-native-allocation skin heuristic to prevent OutOfMemoryError or LMK aborts
+        return try {
+            val rt = Runtime.getRuntime()
+            val remainingHeapMb = (rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())) / (1024 * 1024)
+            remainingHeapMb < 20
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     /**

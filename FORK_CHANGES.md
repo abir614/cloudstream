@@ -430,5 +430,12 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Settings UI & Security Config**: Updated DNS selection preferences in `array.xml` (`Cloudflare (Mozilla)`, `AdGuard (Unfiltered)`, and `Resilient Multi-Tier (Mozilla+Quad9 -> CF+Google)`) and purged `mullvad.net` from `network_security_config.xml`.
 - **Zero-Roundtrip Numeric IP Literal Handling**: Implemented centralized `parseNumericAddress` in `DohProviders.kt` for IPv4 and IPv6 direct numeric strings, eliminating duplicate regex instances, preventing bogus DNS lookups for direct IP segment streams, and filtering out IPv6 addresses during UDP port 53 fallback queries.
 
+### 16.9 Codebase Hygiene & Import Cleanup
+- **Dead Code & Commented Import Elimination**: Removed residual commented-out imports in `CS3IPlayer.kt` and `Uqload.kt`, keeping the codebase pristine and warning-free.
+
+### 16.10 SQLite WAL Mode & Dynamic Memory Pressure Failsafe
+- **SQLite Write-Ahead Logging (WAL)**: Enabled WAL mode (`enableWriteAheadLogging()`) on `DatabaseHelper` in `SqliteDataRepository.kt`, eliminating database file read/write lock contention between background sync/playback writers and UI readers, while reducing flash wear on low-end eMMC/TV stick storage.
+- **Dynamic Heap Memory Guard**: Added real-time available JVM heap checking in `OnDeviceNsfwClassifier.isPotatoDevice()`, automatically falling back to the zero-native-allocation skin heuristic if available heap drops below 20MB, completely preventing OutOfMemory errors and LMK native aborts even during intense multitasking on mid/high-tier devices.
+
 
 
