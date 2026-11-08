@@ -75,9 +75,9 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.request.bitmapConfig
-import coil3.request.diskCacheKey
-import coil3.request.memoryCacheKey
 import com.lagradost.cloudstream3.USER_AGENT
+import com.lagradost.cloudstream3.utils.DeviceProfile
+import com.lagradost.cloudstream3.utils.DeviceTier
 import java.util.EnumSet
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap
