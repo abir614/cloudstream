@@ -174,7 +174,7 @@ open class HomeChildItemAdapter(
         // The vast majority of the lag comes from creating the view
         // This simply shares the views between all HomeChildItemAdapter
         val sharedPool =
-            newSharedPool { setMaxRecycledViews(CONTENT, 20) }
+            newSharedPool { setMaxRecycledViews(CONTENT, 32) }
 
         var minPosterSize: Int = 114.toPx
         var maxPosterSize: Int = 180.toPx

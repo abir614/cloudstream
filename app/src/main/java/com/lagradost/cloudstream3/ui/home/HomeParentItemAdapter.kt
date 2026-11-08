@@ -97,6 +97,14 @@ open class ParentItemAdapter(
         if (binding !is HomepageParentBinding) return
         val info = item.list
         binding.apply {
+            if (homeChildRecyclerview.layoutManager == null) {
+                homeChildRecyclerview.setLinearListLayout(
+                    isHorizontal = true,
+                    nextLeft = startFocus,
+                    nextRight = endFocus,
+                )
+            }
+
             val currentAdapter = homeChildRecyclerview.adapter as? HomeChildItemAdapter
             if (currentAdapter == null) {
                 homeChildRecyclerview.setRecycledViewPool(HomeChildItemAdapter.sharedPool)
@@ -123,13 +131,6 @@ open class ParentItemAdapter(
                 }
             }
 
-            if (homeChildRecyclerview.layoutManager == null) {
-                homeChildRecyclerview.setLinearListLayout(
-                    isHorizontal = true,
-                    nextLeft = startFocus,
-                    nextRight = endFocus,
-                )
-            }
             homeChildMoreInfo.text = info.name
 
             homeChildRecyclerview.clearOnScrollListeners()

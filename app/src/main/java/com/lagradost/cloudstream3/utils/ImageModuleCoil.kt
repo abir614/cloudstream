@@ -225,10 +225,7 @@ object ImageLoader {
             eventListener(object : EventListener() {
                 override fun onError(request: ImageRequest, result: ErrorResult) {
                     super.onError(request, result)
-                    Log.e(TAG, "Image load error: ${result.throwable.message ?: result.throwable}")
-                    Log.e(TAG, "  URL: ${request.data}")
-                    Log.e(TAG, "  allowHardware: ${request.allowHardware}")
-                    Log.e(TAG, "  hardware: ${Build.HARDWARE}, board: ${Build.BOARD}")
+                    Log.w(TAG, "Image load error: ${result.throwable.message ?: result.throwable}")
                 }
             })
         }
@@ -340,10 +337,10 @@ object ImageLoader {
             }.build())
             builder() // if passed
             if (needsInspection) {
-                // CRITICAL HARDWARE BITMAP FIX:
-                // Disable hardware bitmaps so Coil decodes directly into a software Bitmap (ARGB_8888 / RGB_565).
-                // Software bitmaps can be inspected, sampled, scaled, and classified by TFLite & Canvas without native SIGSEGV or software rendering exceptions!
-                this.allowHardware(false)
+                val tier = DeviceProfile.tier(context)
+                val isPotato = DeviceProfile.isUltraPotato(context)
+                val allowHw = tier != DeviceTier.LOW && !isPotato && !hasPotentialBrokenHardware()
+                this.allowHardware(allowHw)
                 target(
                     onStart = { placeholder ->
                         val defaultPlaceholder = placeholder?.asDrawable(context.resources)

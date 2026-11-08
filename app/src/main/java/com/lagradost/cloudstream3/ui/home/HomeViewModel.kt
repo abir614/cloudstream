@@ -69,13 +69,25 @@ import kotlinx.coroutines.sync.withPermit
 import android.graphics.Bitmap
 import coil3.SingletonImageLoader
 import coil3.asDrawable
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.request.bitmapConfig
+import coil3.request.diskCacheKey
+import coil3.request.memoryCacheKey
+import com.lagradost.cloudstream3.USER_AGENT
 import java.util.EnumSet
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap
+
+private data class PosterPreloadTarget(
+    val name: String,
+    val url: String,
+    val posterUrl: String,
+    val posterHeaders: Map<String, String>?
+)
 
 class HomeViewModel : ViewModel() {
     companion object {
@@ -410,18 +422,69 @@ class HomeViewModel : ViewModel() {
                 }
             }
 
-            // Phase 2: Pre-validate & Preload initial visible posters with hardware-adaptive pacing
+            val items = homeData.mapNotNull { it?.items }.flatten()
+
+            previewResponses.clear()
+            previewResponsesAdded.clear()
+
+            var randomItems: List<SearchResponse> = emptyList()
+            var initialPreviews: List<LoadResponse> = emptyList()
+
+            if (items.isNotEmpty()) {
+                val currentList =
+                    items.shuffled().filter { it.list.isNotEmpty() }
+                        .flatMap { it.list }
+                        .distinctBy { it.url }.toList()
+
+                val nsfwFilteredCurrentList = NsfwFilterEngine.filterSearchResults(currentList, nsfwEnabled)
+                if (nsfwFilteredCurrentList.isNotEmpty()) {
+                    randomItems =
+                        context?.filterSearchResultByFilmQuality(nsfwFilteredCurrentList.shuffled())
+                            ?: nsfwFilteredCurrentList.shuffled()
+
+                    _randomItems.postValue(randomItems)
+                    currentShuffledList = randomItems
+
+                    val targetApi = repo?.api ?: noneApi
+                    initialPreviews = randomItems.take(3).map { item ->
+                        val providerApi = getApiFromNameNull(item.apiName) ?: targetApi
+                        providerApi.newMovieLoadResponse(
+                            name = item.name,
+                            url = item.url,
+                            type = item.type ?: com.lagradost.cloudstream3.TvType.Movie,
+                            dataUrl = item.url
+                        ) {
+                            this.posterUrl = item.posterUrl
+                            this.backgroundPosterUrl = item.posterUrl
+                            this.posterHeaders = item.posterHeaders
+                        }
+                    }
+                }
+            }
+
+            // Phase 2: Pre-validate & Preload initial visible posters (rails + banner) with hardware-adaptive pacing
             val preloaderContext = context ?: com.lagradost.cloudstream3.CloudStreamApp.context
-            if (preloaderContext != null && expandable.isNotEmpty()) {
-                val initialItems = expandable.values
-                    .take(3)
-                    .flatMap { it.list.list.take(6) }
+            if (preloaderContext != null && (expandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
+                val railItems = expandable.values
+                    .take(4)
+                    .flatMap { it.list.list.take(8) }
                     .filter { !it.posterUrl.isNullOrBlank() }
+                    .map { PosterPreloadTarget(it.name, it.url, it.posterUrl!!, it.posterHeaders) }
+
+                val bannerItems = initialPreviews
+                    .filter { !it.posterUrl.isNullOrBlank() || !it.backgroundPosterUrl.isNullOrBlank() }
+                    .map { preview ->
+                        val pUrl = preview.backgroundPosterUrl ?: preview.posterUrl!!
+                        PosterPreloadTarget(preview.name, preview.url, pUrl, preview.posterHeaders)
+                    }
+
+                val initialItems = (bannerItems + railItems).distinctBy { it.posterUrl }
 
                 if (initialItems.isNotEmpty()) {
                     val totalPosters = initialItems.size
                     val posterMsg = preloaderContext.getString(R.string.loading_posters)
-                    val semaphore = Semaphore(if (isPotato) 2 else 4)
+                    val tier = DeviceProfile.tier(preloaderContext)
+                    val semaphore = Semaphore(if (isPotato) 2 else if (tier == DeviceTier.HIGH) 8 else 4)
                     val imageLoader = SingletonImageLoader.get(preloaderContext)
                     val nsfwUrlsToRemove = ConcurrentHashMap.newKeySet<String>()
 
@@ -434,6 +497,14 @@ class HomeViewModel : ViewModel() {
                                         withTimeoutOrNull(2500L) {
                                             val request = ImageRequest.Builder(preloaderContext)
                                                 .data(item.posterUrl)
+                                                .memoryCacheKey(item.posterUrl)
+                                                .diskCacheKey(item.posterUrl)
+                                                .httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
+                                                    headerBuilder["User-Agent"] = USER_AGENT
+                                                    item.posterHeaders?.forEach { (key, value) ->
+                                                        headerBuilder[key] = value
+                                                    }
+                                                }.build())
                                                 .allowHardware(!isPotato)
                                                 .bitmapConfig(if (isPotato) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888)
                                                 .build()
@@ -447,6 +518,8 @@ class HomeViewModel : ViewModel() {
                                                     if (score >= threshold) {
                                                         nsfwUrlsToRemove.add(item.url)
                                                     }
+                                                } else {
+                                                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl!!, 0.0f, preloaderContext)
                                                 }
                                             }
                                         }
@@ -492,62 +565,25 @@ class HomeViewModel : ViewModel() {
                 )
             )
 
-            // Render home sections with posters already loaded and verified
+            // Render home sections with posters already loaded, safe, and cached
             _page.postValue(Resource.Success(expandable))
 
-            val items = homeData.mapNotNull { it?.items }.flatten()
+            if (initialPreviews.isNotEmpty()) {
+                previewResponses.clear()
+                previewResponses.addAll(initialPreviews)
+                _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
 
-            previewResponses.clear()
-            previewResponsesAdded.clear()
-
-            if (items.isNotEmpty()) {
-                val currentList =
-                    items.shuffled().filter { it.list.isNotEmpty() }
-                        .flatMap { it.list }
-                        .distinctBy { it.url }.toList()
-
-                val nsfwFilteredCurrentList = NsfwFilterEngine.filterSearchResults(currentList, nsfwEnabled)
-                if (nsfwFilteredCurrentList.isNotEmpty()) {
-                    val randomItems =
-                        context?.filterSearchResultByFilmQuality(nsfwFilteredCurrentList.shuffled())
-                            ?: nsfwFilteredCurrentList.shuffled()
-
-                    _randomItems.postValue(randomItems)
-                    currentShuffledList = randomItems
-
-                    val targetApi = repo?.api ?: noneApi
-                    val initialPreviews = randomItems.take(3).map { item ->
-                        val providerApi = getApiFromNameNull(item.apiName) ?: targetApi
-                        providerApi.newMovieLoadResponse(
-                            name = item.name,
-                            url = item.url,
-                            type = item.type ?: com.lagradost.cloudstream3.TvType.Movie,
-                            dataUrl = item.url
-                        ) {
-                            this.posterUrl = item.posterUrl
-                            this.backgroundPosterUrl = item.posterUrl
-                            this.posterHeaders = item.posterHeaders
-                        }
-                    }
-
-                    if (initialPreviews.isNotEmpty()) {
-                        previewResponses.clear()
-                        previewResponses.addAll(initialPreviews)
+                // Asynchronously enrich with full metadata in background without stalling home screen
+                addJob?.cancel()
+                addJob = ioSafe {
+                    updatePreviewResponses(
+                        previewResponses,
+                        previewResponsesAdded,
+                        randomItems,
+                        3
+                    )
+                    if (previewResponses.isNotEmpty()) {
                         _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
-                    }
-
-                    // Asynchronously enrich with full metadata in background without stalling home screen
-                    addJob?.cancel()
-                    addJob = ioSafe {
-                        updatePreviewResponses(
-                            previewResponses,
-                            previewResponsesAdded,
-                            randomItems,
-                            3
-                        )
-                        if (previewResponses.isNotEmpty()) {
-                            _preview.postValue(Resource.Success((previewResponsesAdded.size < currentShuffledList.size) to previewResponses))
-                        }
                     }
                 }
             }

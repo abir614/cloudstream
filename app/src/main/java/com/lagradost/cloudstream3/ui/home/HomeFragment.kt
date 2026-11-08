@@ -841,12 +841,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                                 list = it.list.copy(list = it.list.list.toMutableList())
                             )
                         }) {
-                            // Only dismiss loading shimmer when views are committed and ready to render
-                            homeLoading.isVisible = false
-                            homeLoadingError.isVisible = false
-                            homeMasterRecycler.isVisible = true
-                            homeLoadingShimmer.stopShimmer()
-                            homeViewModel.clearFilterProgress()
+                            // Wait until RecyclerView layout pass is complete and child ViewHolders are drawn before dismissing loading screen
+                            homeMasterRecycler.post {
+                                homeLoading.isVisible = false
+                                homeLoadingError.isVisible = false
+                                homeMasterRecycler.isVisible = true
+                                homeLoadingShimmer.stopShimmer()
+                                homeViewModel.clearFilterProgress()
+                            }
                         }
 
                         if (d.isEmpty()) {

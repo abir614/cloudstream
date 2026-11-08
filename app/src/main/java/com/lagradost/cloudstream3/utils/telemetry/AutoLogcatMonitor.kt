@@ -71,7 +71,11 @@ object AutoLogcatMonitor {
         "RemoteInputConnectionImpl",
         "GraphicsTracker",
         "FrameEvents",
-        "InputEventReceiver"
+        "InputEventReceiver",
+        "CoilImgLoader",
+        "ImeBackDispatcher",
+        "NavInflater",
+        "NavController"
     )
 
     private fun isNoiseTag(tag: String): Boolean {
@@ -187,6 +191,13 @@ object AutoLogcatMonitor {
                             if (message.contains("Media Quality Service not found", ignoreCase = true)) continue
                             if (message.contains("Failed to query component interface", ignoreCase = true)) continue
                             if (message.contains("input event receiver has already been disposed", ignoreCase = true)) continue
+                            if (message.contains("Missing inline cache", ignoreCase = true)) continue
+                            if (message.contains("Suspending all threads took", ignoreCase = true)) continue
+                            if (message.contains("Ime callback not found", ignoreCase = true)) continue
+                            if (message.contains("Explicit concurrent copying GC", ignoreCase = true)) continue
+                            if (message.contains("Background concurrent copying GC", ignoreCase = true)) continue
+                            if (message.contains("Image load error", ignoreCase = true)) continue
+                            if (message.contains("allowHardware", ignoreCase = true)) continue
 
                             val level = when (levelChar) {
                                 "E" -> TelemetryService.Level.ERROR

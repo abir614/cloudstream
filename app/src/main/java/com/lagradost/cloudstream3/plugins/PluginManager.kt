@@ -731,7 +731,10 @@ object PluginManager {
     fun unloadPlugin(absolutePath: String) {
         Log.i(TAG, "Unloading plugin: $absolutePath")
         val canonical = normalizePluginPath(absolutePath)
-        val plugin = plugins[absolutePath] ?: plugins[canonical]
+        val plugin = plugins[absolutePath]
+            ?: plugins[canonical]
+            ?: plugins.values.firstOrNull { it.filename == absolutePath || normalizePluginPath(it.filename) == canonical }
+            ?: urlPlugins[absolutePath]
         if (plugin == null) {
             Log.w(TAG, "Couldn't find plugin $absolutePath")
             return
