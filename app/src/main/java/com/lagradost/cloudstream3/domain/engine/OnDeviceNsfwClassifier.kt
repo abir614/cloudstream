@@ -704,7 +704,7 @@ object OnDeviceNsfwClassifier {
         }
     }
 
-    private fun recordScore(imageKey: String, score: Float, ctx: Context) {
+    internal fun recordScore(imageKey: String, score: Float, ctx: Context) {
         scoreCache.put(imageKey, score)
         isScoresDirty = true
         scheduleFlush(ctx)

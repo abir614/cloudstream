@@ -200,8 +200,8 @@ object PluginManager {
     val urlPlugins: MutableMap<String, BasePlugin> =
         LinkedHashMap<String, BasePlugin>()
 
-    private val classLoaders: MutableMap<PathClassLoader, BasePlugin> =
-        HashMap<PathClassLoader, BasePlugin>()
+    private val classLoaders: MutableMap<ClassLoader, BasePlugin> =
+        HashMap<ClassLoader, BasePlugin>()
 
     var loadedLocalPlugins = false
         private set

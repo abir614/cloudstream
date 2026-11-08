@@ -65,7 +65,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import android.graphics.Bitmap
 import coil3.SingletonImageLoader
 import coil3.asDrawable
@@ -429,7 +429,7 @@ class HomeViewModel : ViewModel() {
                     coroutineScope {
                         initialItems.map { item ->
                             async(Dispatchers.IO) {
-                                semaphore.withLock {
+                                semaphore.withPermit {
                                     try {
                                         withTimeoutOrNull(2500L) {
                                             val request = ImageRequest.Builder(preloaderContext)
