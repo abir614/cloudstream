@@ -66,7 +66,12 @@ object AutoLogcatMonitor {
         "GoogleApiManager",
         "VideoCapabilities",
         "InteractionJankMonitor",
-        "FinalizerDaemon"
+        "FinalizerDaemon",
+        "PanelsChildGestureRegionObserver",
+        "RemoteInputConnectionImpl",
+        "GraphicsTracker",
+        "FrameEvents",
+        "InputEventReceiver"
     )
 
     private fun isNoiseTag(tag: String): Boolean {
@@ -175,6 +180,13 @@ object AutoLogcatMonitor {
                             if (message.contains("ThreeFinger", ignoreCase = true)) continue
                             if (message.contains("avc:  denied") || message.contains("avc: denied")) continue
                             if (message.contains("READ_DEVICE_CONFIG", ignoreCase = true)) continue
+                            if (message.contains("resources.arsc in APK", ignoreCase = true)) continue
+                            if (message.contains("Accessing hidden method Landroid/view/WindowInsets", ignoreCase = true)) continue
+                            if (message.contains("AIBinder_linkToDeath", ignoreCase = true)) continue
+                            if (message.contains("Unknown bits set in runtime_flags", ignoreCase = true)) continue
+                            if (message.contains("Media Quality Service not found", ignoreCase = true)) continue
+                            if (message.contains("Failed to query component interface", ignoreCase = true)) continue
+                            if (message.contains("input event receiver has already been disposed", ignoreCase = true)) continue
 
                             val level = when (levelChar) {
                                 "E" -> TelemetryService.Level.ERROR

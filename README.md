@@ -6,35 +6,47 @@
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 > [!NOTE]
-> **Fork Information**: This project is a production-hardened edition of [recloudstream/cloudstream](https://github.com/recloudstream/cloudstream) focused on Z+ zero-trust security, hardware-adaptive performance for any device tier (from low-end ARMv7/ARMv8 TV sticks with 500MB RAM to high-end MediaTek Helio G100 Ultimate, Dimensity, and Snapdragon devices), and native Rust acceleration.
+> **Fork Information**: This project is a production-hardened edition of [recloudstream/cloudstream](https://github.com/recloudstream/cloudstream) focused on defense-in-depth security, hardware-adaptive performance for any device tier (from low-end ARMv7/ARMv8 TV sticks with 500MB RAM to high-end flagship devices), guarded in-process extension sandboxing, and native Rust acceleration.
 
 ---
 
 ## Architectural Highlights & Hardening
 
-### 1. Z+ Zero-Trust Update Security Gate & Ephemeral Nonces
+### 1. Guarded In-Process Extension Sandboxing & TOFU Integrity
+- **Reflection Firewall ([`ShieldedClassLoader.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/ShieldedClassLoader.kt))**:
+  - Dynamically shields the host application from untrusted third-party `.cs3` plugins.
+  - Explicitly permits core extension APIs (`MainAPI`, `ExtractorApi`, `NiceHttp`, `com.mega.*`, `RepositoryManager`, `RepositoryData`), guaranteeing 100% backward compatibility for legacy extensions and multi-repository shortcodes (e.g. `megarepo` / `3737`).
+  - Blocks reflection lookups targeting internal singletons, user authentication credentials (MAL, AniList, SIMKL), database helpers, and encryption key stores.
+- **Storage & Database Jail ([`SandboxedContextWrapper.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapper.kt))**:
+  - Confines plugin file storage, temporary caches, and SharedPreferences to isolated per-plugin directories (`filesDir/plugin_sandboxes/<pluginName>/`).
+  - Throws an immediate `SecurityException` if an extension attempts to inspect, read, or delete CloudStream core SQLite database files (`cloudstream_kv.db`).
+- **Trust-On-First-Use (TOFU) Cryptographic Fingerprinting ([`PluginFingerprintStore.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/PluginFingerprintStore.kt))**:
+  - Persists SHA-256 digests of installed plugins in SQLite.
+  - Automatically grandfathers existing installed extensions without user friction.
+  - Verifies local binary integrity at boot and detects rogue repository substitution or disk tampering attacks before bytecode is executed.
+
+### 2. Z+ Update Security Gate & Ephemeral Nonces
 - **Isolated Cryptographic Gate ([`UpdateSecurityGate.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/UpdateSecurityGate.kt))**:
   - The package installation pipeline remains locked by default.
   - Generates single-use ephemeral challenge nonces for update requests.
   - Enforces end-to-end cryptographic identity verification between the installed app and the staged APK before unlocking.
   - Unauthorized or malformed binaries are immediately purged from disk.
 - **Offline Ed25519 & SHA256SUMS Attestation**:
-  - Validates releases against signed `SHA256SUMS` manifests using offline Ed25519 signatures.
+  - Validates releases against signed `SHA256SUMS` manifests using offline Ed25519 signatures when signature assets are attached.
   - Native Rust verifier enforces strict anti-rollback protection (`apkVersionCode >= installedVersionCode`).
 - **Interactive User Confirmation Dialog ([`InAppUpdater.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/InAppUpdater.kt))**:
   - Displays an explicit update confirmation dialog upon download completion.
   - The single-use authorization token is consumed only when the user confirms the update.
 
-### 2. Universal Hardware-Adaptive Profile Engine
-- **Chipset & SoC Profiling ([`DeviceProfile.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/DeviceProfile.kt))**:
-  - Dedicated architecture mapping for **MediaTek Helio G100 Ultimate**, Helio G99/G96/G85/G80, Dimensity (9400 to 6020), Qualcomm Snapdragon (8 Elite down to 4 Gen series), Google Tensor (G1–G5), Samsung Exynos, Unisoc T-series, and universal chipsets.
-  - Dynamic profiling based on total system RAM, CPU cores, 64-bit ABI support, and Android Go status.
+### 3. Universal Hardware-Adaptive Profile Engine
+- **Hardware & Memory Profiling ([`DeviceProfile.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/DeviceProfile.kt))**:
+  - Dynamic profiling based on total system RAM, CPU cores, 64-bit ABI support, Android Go low-RAM status, and SoC platform identifiers (MediaTek, Qualcomm Snapdragon, Google Tensor, Samsung Exynos, Unisoc, Allwinner, Rockchip, Amlogic).
 - **Battery-Adaptive Performance Scaling**:
   - **Unrestricted Battery Mode ("Disable Battery Optimization" enabled)**: Automatically boosts capable devices to the **HIGH / Boosted** tier (96 concurrent HTTP connections, 128 MB player buffer, hardware bitmap decoding).
   - **Standard Battery Mode**: Operates in **Balanced (MID)** tier to preserve battery life while maintaining smooth playback.
   - **Settings Override**: User can manually select between **Auto**, **Balanced (Standard)**, and **Boosted (High Performance)** in Settings.
 
-### 3. Playback & Video Streaming
+### 4. Playback & Video Streaming
 - **Resume Video Playback by Default**:
   - Videos automatically resume from the last saved position out of the box.
   - Periodic and lifecycle-safe playback position flushing (`onPause`, `onStop`).
@@ -43,7 +55,7 @@
 - **Hardware-Adaptive Buffering (ExoPlayer / Media3)**:
   - Tiers buffers dynamically: Low-end (10s min / 25s max / 12 MB target), Mid-range (20s / 45s / 48 MB), and High-end (30s / 60s / 128 MB).
 
-### 4. Resilient Local & Sync Library
+### 5. Resilient Local & Sync Library
 - **Bottom Navigation "Library" Menu ([`LibraryFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/library/LibraryFragment.kt))**:
   - Full local library lists: **Watching**, **Plan to Watch**, **Completed**, **On Hold**, **Dropped**, **Favorites**, and **Subscriptions**.
   - Null-safe initialization in [`LocalList.kt`](app/src/main/java/com/lagradost/cloudstream3/syncproviders/providers/LocalList.kt) ensures all category tabs render properly even before any items are bookmarked.
@@ -52,7 +64,7 @@
   - Integrated support for MyAnimeList (MAL), AniList, Kitsu, Simkl, and LocalList.
   - Subtitle integration with OpenSubtitles, SubDL, Addic7ed, SubSource, and AnimeSkip.
 
-### 5. Privacy-First Resilient DNS & Network Security
+### 6. Privacy-First Resilient DNS & Network Security
 - **Strict Control Plane vs. Data Plane ([`network_security_config.xml`](app/src/main/res/xml/network_security_config.xml))**:
   - Control-plane domains (`github.com`, `githubusercontent.com`) strictly enforce HTTPS and system-only CAs.
   - User-installed CAs are excluded in release builds to eliminate unauthorized MitM interception.
@@ -61,7 +73,7 @@
   - Blocks loopback (`127.0.0.0/8`, `::1`), RFC-1918 private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Carrier-Grade NAT (`100.64.0.0/10`), link-local / cloud metadata (`169.254.169.254`), and IPv6 ULA (`fc00::/7`).
   - Opt-in LAN toggle available for local media servers (Jellyfin, Kodi, local NAS).
 - **Privacy-First Multi-Tier DNS Fallback ([`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt))**:
-  - **Tier 1 (Privacy DoH)**: Queries zero-logging encrypted resolvers **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) $\rightarrow$ **Quad9 DoH** (`https://dns10.quad9.net/dns-query`) first.
+  - **Tier 1 (Privacy DoH)**: Queries zero-logging encrypted resolvers **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) $\rightarrow$ **Quad9 DoH** (`https://dns10.quad9.net/dns-query`) first. Bootstrap client is uncoupled from disk cache to eliminate lock contention on slow eMMC storage.
   - **Tier 2 (High-Speed Edge DoH)**: Queries **Cloudflare DoH** $\rightarrow$ **Google DoH** if Tier 1 times out or is blocked.
   - **Tier 3 (Primary Plain DNS)**: Direct UDP 53 Anycast to Quad9 (`9.9.9.10`, `149.112.112.10`) & Cloudflare (`1.1.1.1`, `1.0.0.1`) if DoH is blocked by hostile network firewalls.
   - **Tier 4 (Edge Plain DNS)**: Direct UDP 53 Anycast to Google & AdGuard.
@@ -73,9 +85,9 @@
   - Media bitstream preservation: Video segments (`.ts`, `.m4s`, `.mp4`, images) and HTTP Range requests strictly bypass compression negotiation, eliminating CPU/battery waste on low-power devices.
   - Native Rust `miniz_oxide` compression bridge ([`NativeCoreBridge.kt`](app/src/main/java/com/lagradost/cloudstream3/services/NativeCoreBridge.kt)) provides hardware-accelerated in-memory DEFLATE/ZLIB buffer compression with pure-JVM fallback.
 
-### 6. Native Rust Acceleration & Safety (`rust-core`)
+### 7. Native Rust Acceleration & Safety (`rust-core`)
 - **Accelerated Components**:
-  - Zero-allocation IPTV M3U/M3U8 master playlist and cue parser.
+  - Native Rust-accelerated IPTV M3U/M3U8 master playlist and cue parser.
   - Native Levenshtein fuzzy search scoring and string compression (DEFLATE).
   - High-performance adult & hentai classification engine.
   - Authenticated encrypted backups using Argon2id + ChaCha20-Poly1305 (`CSENC1` format).
@@ -83,33 +95,31 @@
   - All JNI entry points are null-checked and wrapped with `std::panic::catch_unwind` to prevent Rust panics from unwinding across the FFI boundary.
   - Built with `panic = "unwind"`, `opt-level = "z"`, and fat LTO.
 
-### 7. Content Safety: Zero-False-Positive Adult & Hentai Protection
-- **Hybrid Content Classifier ([`NsfwFilterEngine.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/NsfwFilterEngine.kt))**:
+### 8. Content Safety & Certified Clean Anime Whitelist
+- **Multi-Vector Content Classifier ([`NsfwFilterEngine.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/NsfwFilterEngine.kt))**:
   - Filters adult and hentai content by default across Feed, Carousel, Search, and Extension discovery for family-safe viewing on shared living room Android TVs and mobile devices.
   - Detects disguised adult content tagged under `TvType.Anime` or `TvType.OVA` via studio fingerprints, title tokens, and metadata.
   - Can be unlocked in Settings → Providers.
-- **Zero False Positives Guarantee**:
-  - Clean mainstream anime (*Attack on Titan*, *Hunter x Hunter*, *Spy x Family*, *Frieren*, *Demon Slayer*, *Jujutsu Kaisen*) and clean family movies are strictly protected from accidental blocking.
+- **Certified Clean Anime Whitelist**:
+  - Clean mainstream anime (*Attack on Titan*, *Hunter x Hunter*, *Spy x Family*, *Frieren*, *Demon Slayer*, *Jujutsu Kaisen*, *One Piece*, *Naruto*, *Bleach*, *Vinland Saga*, *Chainsaw Man*, *Mob Psycho 100*, Studio Ghibli films, Makoto Shinkai films) are explicitly protected by an engine-level allowlist, preventing accidental false positives on summer/beach episodes or high-exposure character art.
+- **Full-Screen Pacing & Filtering Overlay**:
+  - Dedicated progress indicator and UI isolation screen during content filtering on home page and search views.
+  - Protects low-end and potato devices (Allwinner, Rockchip, Android Go with $\le 1024$MB RAM) from UI thread locks, memory spikes, or ANRs.
 - **Hardware-Adaptive AI & Low-Resource Android TV Optimization ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
   - **Full-INT8 Quantized GantMan MobileNetV2 (~4.8 MB)**: Upgraded neural network using INT8 weights and activations (w8a8) with UINT8 raw byte input (`[1, 224, 224, 3]`) and FLOAT32 5-class outputs (`[drawings, hentai, neutral, porn, sexy]`).
   - **Zero-Heap Virtual Memory Mapping**: Direct `MappedByteBuffer` loading from uncompressed APK assets via `FileChannel.map()`, consuming 0 KB of JVM heap memory.
-  - **Tier-Adaptive Execution & Ultra-Potato Fallback (v220 Parity)**: Low-end and potato devices (≤ 2048MB RAM, 32-bit ARM, Android Go, TV sticks) completely bypass the heavy TFLite model mapping and tensor arenas, executing the ultra-fast zero-allocation skin chrominance heuristic (< 0.05ms, 0 MB native RAM) with 0% risk of native LMK aborts or 32-bit SIGILL crashes. Capable mid-range and flagship 64-bit devices execute the full GantMan MobileNetV2 model with 2–3 threads and hardware-accelerated XNNPACK.
-  - **Reusable Direct Buffers & RGB_565 Preprocessing**: Reusable direct `ByteBuffer` (150,528 bytes) and `RGB_565` scratch canvas (100 KB) eliminate per-frame GC allocations and 150,528 float conversions.
-  - **Optimized Downsampling**: Safe `inSampleSize` power-of-2 decoding and RGB_565 configuration for images, files, and video frames.
-  - **Safe Asynchronous Worker**:
-    - Uses `WeakReference<ImageView>` to eliminate view recycling races and GC pinning during fast remote scrolling.
-    - Rate-limits queue depth with smart eviction to maintain buttery smooth 60/120fps UI rendering with zero frame drops or OutOfMemory errors.
+  - **Tier-Adaptive Execution & Ultra-Potato Fallback**: Low-end and potato devices (≤ 2048MB RAM, 32-bit ARM, Android Go, TV sticks) completely bypass the heavy TFLite model mapping, executing the ultra-fast skin chrominance heuristic (< 0.05ms, 0 MB native RAM). Capable mid-range and flagship 64-bit devices execute the full GantMan MobileNetV2 model with 2–3 threads and hardware-accelerated XNNPACK.
   - **Critical Memory Pressure Fallback**: Automatically switches to ultra-fast zero-native-allocation skin chrominance heuristic if available RAM drops below 20MB.
 
-### 8. Enterprise Automated Telemetry & Z+ Zero-Trust Crash Reporting
+### 9. Enterprise Automated Telemetry & Privacy-First Crash Reporting
 - **Public Diagnostic Log Transparency**: Real-time forensic telemetry, diagnostic warning batches, and crash dispatches are publicly observable for complete transparency at [**t.me/cloudstreamdata**](https://t.me/cloudstreamdata).
   - **Collected Telemetry Scope**:
     - **Fatal Crashes (`🚨 CLOUDSTREAM CRASH REPORT`)**: Uncaught exceptions, native signal aborts (SIGSEGV/SIGILL), and full stack traces.
     - **Critical Errors (`🛑 CLOUDSTREAM BATCH DIAGNOSTIC REPORT`)**: MediaCodec video decoder crashes, native playback initialization failures, binder connection drops, and plugin runtime exceptions.
     - **Diagnostic Warnings (`⚠️ CLOUDSTREAM BATCH DIAGNOSTIC REPORT`)**: Coroutine cancellations, non-fatal fallback events, resource thrashing warnings, and stream format fallback notices.
-    - **Hardware Forensic Fingerprint**: Device model, SoC chipset (e.g. MediaTek MT6789, Allwinner H313, Qualcomm Snapdragon), RAM capacity, zRAM swap, CPU core count & architecture (32-bit ARMv7 vs 64-bit ARMv8), Device Performance Tier (`LOW`, `MID`, `HIGH`), Android OS version & API level, Linux Kernel version, App Build flavor & version code, and Active Plugin ID.
+    - **Hardware Forensic Fingerprint**: Device model, SoC platform ID, RAM capacity, zRAM swap, CPU core count & architecture (32-bit ARMv7 vs 64-bit ARMv8), Device Performance Tier (`LOW`, `MID`, `HIGH`), Android OS version & API level, Linux Kernel version, App Build flavor & version code, and Active Plugin ID.
   - **Zero PII & Data Privacy**: All telemetry undergoes automatic IP redaction (`[REDACTED_IP]`), query-parameter cleaning, and credential sanitization before transmission. Zero user account credentials, browsing history, or personal data are ever collected. Users can disable telemetry at any time via **Settings $\rightarrow$ Updates $\rightarrow$ Anonymous Crash Reporting**.
-- **Zero Static Secrets in APK**: The APK contains ZERO symmetric keys, Telegram Bot Tokens, or Chat IDs; all destination secrets reside exclusively in the serverless Cloudflare Worker proxy at the edge.
+- **Zero Static Ingestion Secrets in APK**: The APK contains ZERO symmetric keys, Telegram Bot Tokens, or Chat IDs for telemetry dispatch; all forensic destination credentials reside exclusively in the serverless Cloudflare Worker proxy at the edge.
 - **Z+ Zero-Trust Anti-MITM Verification**: Handshakes are digitally signed by the edge worker using an ECDSA P-256 private key and verified on-device against a pinned SPKI public key before any shared secrets are derived, mathematically aborting any MITM interception attempt.
 - **Ephemeral Key Exchange (NIST P-256) & Forward Secrecy**: Handshake generates single-use ECDH keypairs and derives 256-bit AES-GCM session keys via HKDF-SHA256 with epoch salts.
 - **CPU-Bound Proof-of-Work (PoW) Anti-Spam Barrier**: Dynamically solves difficulty 3 challenges in ~15ms via an allocation-free streaming SHA-256 loop, neutralizing automated bot spam and edge flooding.
@@ -118,7 +128,7 @@
 - **App-Wide Error & Warning Ingestion**: Real-time logcat streaming ([`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt)) on standard/high-end devices, with automatic subprocess deactivation on ultra-potato devices to save CPU/RAM.
 - **High-Ratio Transparent Payload Compression (85–92% Bandwidth Savings)**: Automatically compresses telemetry reports exceeding 256 bytes with Gzip prior to AES-256-GCM encryption, slashing batch dump sizes from ~80 KB to ~6 KB before edge dispatch, where the Cloudflare Worker decompresses it via native `DecompressionStream("gzip")`.
 
-### 9. Modern Android TV UI & Visual Focus Experience
+### 10. Modern Android TV UI & Visual Focus Experience
 - **D-Pad 3D Hover-Up Animation ([`UIHelper.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/UIHelper.kt))**:
   - Remote focus lifts content cards forward with **`1.08x` scale** and **`translationZ = 16f` elevation**, casting a dynamic 3D drop shadow over adjacent items.
   - Powered by a 180ms fluid deceleration curve (`DecelerateInterpolator(1.5f)`).
@@ -129,13 +139,13 @@
   - Layer 2: Inner radiant accent stroke (`2.5dp`, `?attr/colorPrimary`) highlighting the active card in the current theme color.
   - TV-Only Gating: Gated strictly to `isLayout(TV)` to ensure zero unwanted scaling during touch interactions on phones and tablets.
 
-### 10. Streamlined Release Packaging & Independent App Identity
+### 11. Streamlined Release Packaging & Independent App Identity
 - **Pre-Release Builds**: Package ID `com.lagradost.cloudstream3.beta`, App Name **`CSB`**.
 - **Stable Builds**: Package ID `com.lagradost.cloudstream3.stable`, App Name **`CloudStream`**.
 - *Side-by-Side Coexistence*: Both flavors can be installed simultaneously alongside official upstream releases without signature collisions.
 
 Each CI release generates exactly 6 organized artifacts with zero duplicate files:
-* `CSB-prerelease-v<BUILD>-arm64-v8a.apk`: Optimized for modern 64-bit ARM devices (Helio G100, Snapdragon, Dimensity).
+* `CSB-prerelease-v<BUILD>-arm64-v8a.apk`: Optimized for modern 64-bit ARM devices.
 * `CSB-prerelease-v<BUILD>-armeabi-v7a.apk`: For older 32-bit devices and budget Android TV sticks.
 * `CSB-prerelease-v<BUILD>-universal.apk`: All-in-one universal binary.
 * `SHA256SUMS`: Cryptographic integrity manifest for offline attestation.

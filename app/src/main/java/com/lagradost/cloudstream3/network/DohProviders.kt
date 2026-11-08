@@ -298,7 +298,7 @@ fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>) = dns(
                 private val doh by lazy {
                     DnsOverHttps
                         .Builder()
-                        .client(build())
+                        .client(newBuilder().cache(null).build())
                         .url(url.toHttpUrl())
                         .bootstrapDnsHosts(ips.map { InetAddress.getByName(it) })
                         .build()
@@ -330,7 +330,7 @@ fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>) = dns(
 )
 
 fun OkHttpClient.Builder.addResilientMultiTierDns() = dns(
-    SafeDns(CachedDns(ResilientFallbackDns(build())))
+    SafeDns(CachedDns(ResilientFallbackDns(newBuilder().cache(null).build())))
 )
 
 

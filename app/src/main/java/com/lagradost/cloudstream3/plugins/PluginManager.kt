@@ -55,6 +55,10 @@ import com.lagradost.cloudstream3.utils.downloader.DownloadFileManagement.saniti
 import com.lagradost.cloudstream3.utils.extractorApis
 import com.lagradost.cloudstream3.utils.txt
 import dalvik.system.PathClassLoader
+import com.lagradost.cloudstream3.plugins.ShieldedClassLoader
+import com.lagradost.cloudstream3.plugins.SandboxedContextWrapper
+import com.lagradost.cloudstream3.plugins.PluginFingerprintStore
+import com.lagradost.cloudstream3.domain.engine.PluginArchiveIntegrityEngine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -594,16 +598,45 @@ object PluginManager {
         } ?: false
     }
 
+    private fun normalizePluginPath(path: String): String {
+        return try {
+            File(path).canonicalPath
+        } catch (_: Throwable) {
+            try {
+                File(path).absolutePath
+            } catch (_: Throwable) {
+                path
+            }
+        }
+    }
+
     /**
      * @return True if successful, false if not
      * */
     private suspend fun loadPlugin(context: Context, file: File, data: PluginData): Boolean {
         val fileName = file.nameWithoutExtension
         val filePath = file.absolutePath
+        val canonicalPath = normalizePluginPath(filePath)
         currentlyLoading = fileName
         Log.i(TAG, "Loading plugin: $data")
 
         return try {
+            // TOFU (Trust-On-First-Use) Cryptographic Integrity Verification & Grandfathering
+            when (val tofuResult = PluginFingerprintStore.verifyAndGrandfather(file, data.internalName, data.url)) {
+                is PluginFingerprintStore.IntegrityResult.Valid -> {
+                    // Fingerprint verified or grandfathered
+                }
+                is PluginFingerprintStore.IntegrityResult.Tampered -> {
+                    Log.e(TAG, "TOFU Tamper Detection for plugin '${data.internalName}': Expected ${tofuResult.expectedSha256}, got ${tofuResult.actualSha256}")
+                    showToast(
+                        "Plugin '${data.internalName}' failed security integrity check",
+                        Toast.LENGTH_LONG
+                    )
+                    currentlyLoading = null
+                    return false
+                }
+            }
+
             // In case of Android 14+ then
             try {
                 // Set the file as read-only and log if it fails
@@ -615,7 +648,7 @@ object PluginManager {
                 logError(t)
             }
 
-            val loader = PathClassLoader(filePath, context.classLoader)
+            val loader = ShieldedClassLoader(filePath, context.classLoader)
             var manifest: BasePlugin.Manifest
             loader.getResourceAsStream("manifest.json").use { stream ->
                 if (stream == null) {
@@ -643,7 +676,7 @@ object PluginManager {
             // Sets with the proper version
             setPluginData(data.copy(version = version))
 
-            if (plugins.containsKey(filePath)) {
+            if (plugins.containsKey(filePath) || plugins.containsKey(canonicalPath)) {
                 Log.i(TAG, "Plugin with name $name already exists")
                 return true
             }
@@ -666,19 +699,22 @@ object PluginManager {
             }
             synchronized(plugins) {
                 plugins[filePath] = pluginInstance
+                plugins[canonicalPath] = pluginInstance
             }
             synchronized(classLoaders) {
                 classLoaders[loader] = pluginInstance
+                classLoaders[loader.dexLoader] = pluginInstance
             }
             synchronized(urlPlugins) {
                 urlPlugins[data.url ?: filePath] = pluginInstance
             }
+            val sandboxedContext = SandboxedContextWrapper(context, name)
             if (pluginInstance is Plugin) {
-                pluginInstance.load(context)
+                pluginInstance.load(sandboxedContext)
             } else {
                 pluginInstance.load()
             }
-            Log.i(TAG, "Loaded plugin ${data.internalName} successfully")
+            Log.i(TAG, "Loaded plugin ${data.internalName} successfully (guarded in-process)")
             currentlyLoading = null
             true
         } catch (e: Throwable) {
@@ -694,7 +730,8 @@ object PluginManager {
 
     fun unloadPlugin(absolutePath: String) {
         Log.i(TAG, "Unloading plugin: $absolutePath")
-        val plugin = plugins[absolutePath]
+        val canonical = normalizePluginPath(absolutePath)
+        val plugin = plugins[absolutePath] ?: plugins[canonical]
         if (plugin == null) {
             Log.w(TAG, "Couldn't find plugin $absolutePath")
             return
@@ -784,6 +821,14 @@ object PluginManager {
             Log.d(TAG, "Downloading plugin: $pluginUrl to ${file.absolutePath}")
             // The plugin file needs to be salted with the repository url hash as to allow multiple repositories with the same internal plugin names
             val newFile = downloadPluginToFile(activity, pluginUrl, file, pluginHash) ?: return false
+
+            // Pin updated cryptographic fingerprint upon verified download
+            try {
+                val actualSha = PluginArchiveIntegrityEngine().computeFileSha256(newFile)
+                PluginFingerprintStore.pinFingerprint(internalName, actualSha, pluginUrl)
+            } catch (t: Throwable) {
+                Log.w(TAG, "Failed to pin fingerprint for $internalName: ${t.message}")
+            }
 
             val data = PluginData(
                 internalName,

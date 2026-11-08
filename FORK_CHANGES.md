@@ -95,23 +95,32 @@ This document catalogues all intentional architectural deviations, security hard
   - Exposes `miniz_oxide` high-performance memory-safe DEFLATE and ZLIB routines via JNI with pure-JVM fallback.
 
 ### 2.11 Fail-Closed Sandbox Boundary Execution
-- **Guaranteed Isolation**: [`ExtensionSandboxClient.kt`](app/src/main/java/com/lagradost/cloudstream3/services/ExtensionSandboxClient.kt) strictly fails closed on IPC timeout or sandbox binding failure, returning `WasmExecutionResult(false, ...)` rather than executing untrusted extension code within the main application process.
+- **Guaranteed Isolation**: [`ExtensionSandboxClient.kt`](app/src/main/java/com/lagradost/cloudstream3/services/ExtensionSandboxClient.kt) strictly fails closed on IPC timeout or sandbox binding failure, returning `WasmExecutionResult(false, ...)` for isolated pre-flight operations.
+- **Guarded In-Process Extension Sandboxing**: Implemented [`ShieldedClassLoader.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/ShieldedClassLoader.kt) and [`SandboxedContextWrapper.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapper.kt). Confines third-party `.cs3` plugins to a dedicated storage and preference jail (`filesDir/plugin_sandboxes/<pluginName>/`), denies access to core SQLite databases (`cloudstream_kv.db`), and blocks reflection access to sensitive app components (authentication tokens, keystores, and internal singletons) while guaranteeing 100% backward compatibility for legitimate scrapers and meta-plugins (`megarepo` / `3737`).
+- **Trust-On-First-Use (TOFU) Cryptographic Fingerprinting**: [`PluginFingerprintStore.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/PluginFingerprintStore.kt) persists SHA-256 digests of installed plugins in SQLite. Automatically grandfathers installed plugins, verifies local file integrity at boot, and triggers alerts on unauthorized binary tampering.
+- **Plugin Path Canonicalization**: Normalized plugin path resolution in [`PluginManager.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/PluginManager.kt) using canonical paths, eliminating `/data/user/0` vs `/data/data` symlink mismatches during plugin unloading/reloading.
 
 ### 2.12 Strict Update Security Gate & Ephemeral Challenge Enforcement
 - **Non-Bypassable Verification**: [`UpdateSecurityGate.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/UpdateSecurityGate.kt) mandates an unexpired, unconsumed challenge session pre-issued by verified updater callers, and rejects verification outright if the target SHA-256 checksum is missing or mismatched.
 
 ### 2.13 Consent-Based Diagnostic Telemetry & Opt-Out Control
 - **User-Controlled Privacy**: Integrated an anonymous crash reporting toggle in [`SettingsUpdatesScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsUpdatesScreen.kt) and [`DevicePreferenceStore.kt`](shared/src/commonMain/kotlin/com/lagradost/cloudstream4/DevicePreferenceStore.kt). Diagnostic dispatch, startup crash flush, and [`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt) strictly obey this preference.
+- **Forensic Noise Denylisting**: Filtered benign framework logs (`PanelsChildGestureRegionObserver`, `RemoteInputConnectionImpl`, `resources.arsc in APK`, `WindowInsets$Type`, `AIBinder_linkToDeath`, `GraphicsTracker`, `Unknown bits set in runtime_flags`) in [`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt) to ensure high-signal crash reporting.
 
 ### 2.14 Fail-Closed Stream URL Safety & Analytics Sanitization
 - **Strict Parsing & Sanitization**: [`StreamSecurityUseCase.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/usecase/StreamSecurityUseCase.kt) parses stream URLs via `java.net.URI`, strictly blocks loopback and private IP literals without blocking synchronous DNS, and strips tracking query parameters (`utm_*`, `fbclid`, `gclid`, etc.).
+
+### 2.15 Content Safety & Potato-Adaptive UI Protection
+- **Certified Clean Anime Whitelist**: Explicitly protects mainstream clean anime (*Attack on Titan*, *Frieren*, *Hunter x Hunter*, *Spy x Family*, *Demon Slayer*, *Jujutsu Kaisen*, *One Piece*, etc.) in [`NsfwFilterEngine.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/NsfwFilterEngine.kt), preventing false positives on summer/beach episodes or character art.
+- **Full-Screen Pacing & Content Filtering Overlay**: Dedicated page loading and filtering overlay in [`HomeFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeFragment.kt) and background search filtering in [`SearchFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/search/SearchFragment.kt), isolating RecyclerView layout thrashing and preventing memory spikes or UI thread ANR freezes on potato devices (Allwinner, Rockchip, Android Go $\le 1024$MB RAM).
+- **DoH Disk Cache Lock Elimination**: Decoupled DoH bootstrap clients from OkHttp `DiskLruCache` in [`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt) (`cache(null)`), eliminating disk monitor lock contention on low-end TV boxes with slow eMMC storage.
 
 ---
 
 ## 3. Native Rust Core & JNI Hardening
 
 ### 3.1 Accelerated Components
-- **Zero-Allocation M3U8 Master Parser**: [`M3u8Helper2.nativeM3u8Parser`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) wired to native `parse_master_playlist` in Rust core via JNI, parsing stream quality variants in microseconds with zero JVM heap churn.
+- **Native Accelerated M3U8 Master Parser**: [`M3u8Helper2.nativeM3u8Parser`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) wired to native `parse_master_playlist` in Rust core via JNI, parsing stream quality variants in microseconds.
 - **Native Fuzzy Levenshtein Search**: [`Levenshtein.nativeFuzzyRatioProvider`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) wired to native `fuzzy_ratio`, accelerating title search and relevance filtering without 2D array allocations.
 - **Native Dean Edwards JS Unpacker**: [`JsUnpacker.nativeUnpacker`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) wired to native `unpack_dean_edwards`, unpacking obfuscated scraper scripts in microseconds without regex thrashing.
 - **DEFLATE / ZLIB Compression**: In-memory byte array compression and decompression via `miniz_oxide`.

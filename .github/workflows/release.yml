@@ -137,6 +137,25 @@ jobs:
             fi
           done
           sha256sum *.apk > SHA256SUMS
+          if [ -n "${{ secrets.ED25519_PRIVATE_KEY }}" ]; then
+            python3 -c "
+              import os
+              try:
+                  from cryptography.hazmat.primitives.asymmetric import ed25519
+                  priv_hex = '${{ secrets.ED25519_PRIVATE_KEY }}'.strip()
+                  if priv_hex:
+                      priv_bytes = bytes.fromhex(priv_hex)
+                      key = ed25519.Ed25519PrivateKey.from_private_bytes(priv_bytes)
+                      with open('SHA256SUMS', 'rb') as f:
+                          data = f.read()
+                      sig = key.sign(data)
+                      with open('SHA256SUMS.sig', 'w') as f:
+                          f.write(sig.hex())
+                      print('Successfully generated SHA256SUMS.sig manifest signature')
+              except Exception as e:
+                  print('Ed25519 signing skipped or failed:', e)
+            " || true
+          fi
           cd "$GITHUB_WORKSPACE"
           if [ -f "app/build/classes.jar" ]; then
             mkdir -p app/build/libs

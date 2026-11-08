@@ -811,6 +811,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                     homeLoading.isVisible = true
                     homeLoadingIndicator.isVisible = true
                     homeLoadingProgress.isGone = true
+                    homeMasterRecycler.isGone = true
                     homeFilteringProgressBar.isVisible = true
                     homeFilteringProgressBar.max = progress.total.coerceAtLeast(1)
                     homeFilteringProgressBar.progress = progress.current
@@ -845,6 +846,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                             homeLoadingError.isVisible = false
                             homeMasterRecycler.isVisible = true
                             homeLoadingShimmer.stopShimmer()
+                            homeViewModel.clearFilterProgress()
                         }
 
                         if (d.isEmpty()) {
@@ -852,6 +854,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                             homeLoadingError.isVisible = false
                             homeMasterRecycler.isVisible = true
                             homeLoadingShimmer.stopShimmer()
+                            homeViewModel.clearFilterProgress()
                         }
 
                         saveHomepageToTV(d)

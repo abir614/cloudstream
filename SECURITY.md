@@ -4,15 +4,17 @@
 
 | Version | Supported          | Description                                  |
 | ------- | ------------------ | -------------------------------------------- |
-| 4.8.x   | :white_check_mark: | Hardened Edition (with WASM & Process Isolation) |
+| 4.8.x   | :white_check_mark: | Hardened Edition (Guarded In-Process Sandboxing & SSRF Gate) |
 | < 4.8.0 | :x:                | Legacy CloudStream releases                  |
 
-## Zero-Trust Architecture & Threat Model
+## Defense-in-Depth Architecture & Threat Model
 
-This fork implements multi-layer zero-trust isolation:
-1. **Kernel-Level Isolation**: Extension operations execute in an Android service with `android:isolatedProcess="true"`. The OS assigns an isolated UID with zero Android permissions.
-2. **WASM Runtime Sandboxing**: Extensions execute within linear memory boundaries using the embedded `wasmi` engine with strict instruction/fuel consumption quotas.
-3. **Anti-SSRF Network Gate**: Blocks private RFC-1918 subnets, loopbacks (`127.0.0.1`), and cloud metadata (`169.254.169.254`).
+This fork implements multi-layer defense-in-depth isolation:
+1. **Guarded In-Process Extension Sandboxing**: Third-party `.cs3` plugins are loaded through `ShieldedClassLoader` (intercepting and blocking reflection access to app authentication tokens, keystores, and internal singletons) and executed inside `SandboxedContextWrapper` (isolating storage, caches, and preferences under dedicated directories, and strictly preventing access to core app databases).
+2. **Trust-On-First-Use (TOFU) Cryptographic Fingerprinting**: Computes and pins SHA-256 digests of installed plugins in SQLite. Automatically grandfathers existing extensions, verifies local disk integrity at startup, and alerts the user if a plugin binary is tampered with or substituted by a rogue repository.
+3. **Anti-SSRF Network Gate**: Enforces address validation at the DNS resolution layer for all network calls and HTTP redirect hops via `SafeDns`, blocking loopbacks (`127.0.0.0/8`, `::1`), RFC-1918 private subnets, Carrier-Grade NAT (`100.64.0.0/10`), link-local / cloud metadata (`169.254.169.254`), and IPv6 ULA.
+4. **Isolated Process Gate**: Runs `ExtensionSandboxService` in `android:isolatedProcess="true"` with a dedicated throwaway Linux UID with zero Android OS permissions for pre-flight URL and redirect safety validation.
+5. **Experimental WASM Sandboxing**: Embedded `wasmi` WebAssembly engine in native Rust core with instruction/fuel consumption quotas for next-generation scraper modules.
 
 ## Reporting a Vulnerability
 

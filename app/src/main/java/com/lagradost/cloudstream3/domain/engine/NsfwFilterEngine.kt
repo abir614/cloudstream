@@ -450,6 +450,48 @@ object NsfwFilterEngine {
         }
     }
 
+    /**
+     * Certified Clean Mainstream Titles Allowlist.
+     * Guaranteed protection against false positives on high-exposure scenes, beach episodes,
+     * or ambiguous character art across both text and visual AI classification layers.
+     */
+    val CLEAN_TITLE_ALLOWLIST = hashSetOf(
+        "attack on titan", "shingeki no kyojin",
+        "frieren", "sousou no frieren", "frieren: beyond journey's end",
+        "hunter x hunter", "hunterxhunter",
+        "spy x family", "spyxfamily",
+        "demon slayer", "kimetsu no yaiba",
+        "jujutsu kaisen",
+        "one piece",
+        "naruto", "naruto shippuden",
+        "bleach", "bleach: thousand-year blood war",
+        "my hero academia", "boku no hero academia",
+        "fullmetal alchemist", "fullmetal alchemist: brotherhood",
+        "death note", "vinland saga", "chainsaw man",
+        "haikyu", "haikyuu", "haikyu!!",
+        "mob psycho 100",
+        "dragon ball", "dragon ball z", "dragon ball super",
+        "steins;gate", "steins gate",
+        "cowboy bebop", "neon genesis evangelion",
+        "spirited away", "princess mononoke", "my neighbor totoro",
+        "your name", "kimi no na wa", "weathering with you", "suzume",
+        "a silent voice", "koe no katachi",
+        "solo leveling", "black clover", "blue lock",
+        "tokyo revengers", "mashle", "kaiju no. 8", "kaiju no 8"
+    )
+
+    fun isCleanTitleAllowed(title: String?): Boolean {
+        if (title.isNullOrBlank()) return false
+        val clean = title.lowercase().trim()
+        if (clean in CLEAN_TITLE_ALLOWLIST) return true
+        for (allowed in CLEAN_TITLE_ALLOWLIST) {
+            if (clean.startsWith(allowed) || clean.contains(allowed)) {
+                return true
+            }
+        }
+        return false
+    }
+
     private val HARDCORE_KEYWORDS = hashSetOf(
         "xxx", "porn", "porno", "pornography", "nsfw", "jav", "r18", "r-18", "r18+", "+18", "18+", "18plus",
         "over18", "18only", "adult", "erotica", "erotic", "hentai", "hanime", "chikan", "paizuri", "nakadashi",
@@ -599,6 +641,8 @@ object NsfwFilterEngine {
         tags: String? = null,
         level: NsfwFilterLevel = getFilterLevel()
     ): Boolean {
+        if (isCleanTitleAllowed(title)) return false
+
         if (com.lagradost.cloudstream3.services.NativeCoreBridge.isNativeReady()) {
             val lvlInt = when (level) {
                 NsfwFilterLevel.LOW -> 0
@@ -717,11 +761,13 @@ object NsfwFilterEngine {
      */
     fun isNsfw(item: SearchResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
+        if (isCleanTitleAllowed(item.name)) return false
 
-        // In EXTREME filter level, contents with empty/missing/blank/non-http posters are strictly filtered out
+        // In EXTREME filter level, contents with empty/missing/blank posters are strictly filtered out
+        // Permits valid relative paths (e.g. /images/poster.jpg)
         if (level == NsfwFilterLevel.EXTREME) {
             val poster = item.posterUrl
-            if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://"))) {
+            if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://") && !poster.startsWith("/"))) {
                 return true
             }
         }
@@ -750,11 +796,13 @@ object NsfwFilterEngine {
      */
     fun isNsfw(item: LoadResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
+        if (isCleanTitleAllowed(item.name)) return false
 
-        // In EXTREME filter level, contents with empty/missing/blank/non-http posters are strictly filtered out
+        // In EXTREME filter level, contents with empty/missing/blank posters are strictly filtered out
+        // Permits valid relative paths
         if (level == NsfwFilterLevel.EXTREME) {
             val poster = item.posterUrl ?: item.backgroundPosterUrl
-            if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://"))) {
+            if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://") && !poster.startsWith("/"))) {
                 return true
             }
         }

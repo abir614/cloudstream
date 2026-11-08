@@ -406,6 +406,7 @@
     <string name="enable_nsfw_on_providers">Show Adult (18+) / NSFW Content</string>
     <string name="enable_nsfw_summary">Allow adult content in searches, categories, and filters (disabled by default for family safety)</string>
     <string name="content_filtering_in_progress">Content Filtering in Progress</string>
+    <string name="loading_posters">Loading Posters</string>
     <string name="nsfw_filter_level_title">Filter Sensitivity &amp; Visual Thresholds</string>
     <string name="nsfw_filter_level_summary">Configure adult content detection sensitivity and visual thresholds</string>
     <string-array name="nsfw_filter_level_entries">

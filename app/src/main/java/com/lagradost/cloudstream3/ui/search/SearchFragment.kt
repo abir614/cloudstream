@@ -18,6 +18,11 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isVisible
+import androidx.core.view.isGone
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.fragment.app.activityViewModels
 import androidx.preference.PreferenceManager
 import androidx.recyclerview.widget.GridLayoutManager
@@ -233,34 +238,43 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
 
 
     private fun reapplySearchResultFilters() {
-        val currentResource = searchViewModel.searchResponse.value
-        if (currentResource is Resource.Success) {
-            val fullList = currentResource.value.list
-            val filtered = filterSearchResults(fullList)
-            (binding?.searchAutofitResults?.adapter as? SearchAdapter)?.submitList(filtered)
-        }
+        val b = binding ?: return
+        viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
+            val currentResource = searchViewModel.searchResponse.value
+            val filteredSingle = if (currentResource is Resource.Success) {
+                filterSearchResults(currentResource.value.list)
+            } else null
 
-        val currentGrouped = searchViewModel.currentSearch.value
-        if (!currentGrouped.isNullOrEmpty()) {
-            val pinnedOrder = DataStoreHelper.pinnedProviders.reversedArray()
-            val sortedList = currentGrouped.toList().sortedWith(compareBy { (providerName, _) ->
-                val index = pinnedOrder.indexOf(providerName)
-                if (index == -1) Int.MAX_VALUE else index
-            })
-            val newItems = sortedList.mapNotNull { (providerName, providerData) ->
-                val dataList = providerData.list
-                val dataListFiltered = filterSearchResults(
-                    context?.filterSearchResultByFilmQuality(dataList) ?: dataList
-                )
-                if (dataListFiltered.isEmpty()) return@mapNotNull null
-                val homePageList = HomePageList(providerName, dataListFiltered)
-                HomeViewModel.ExpandableHomepageList(
-                    homePageList,
-                    providerData.currentPage,
-                    providerData.hasNext
-                )
+            val currentGrouped = searchViewModel.currentSearch.value
+            val newGroupedItems = if (!currentGrouped.isNullOrEmpty()) {
+                val pinnedOrder = DataStoreHelper.pinnedProviders.reversedArray()
+                val sortedList = currentGrouped.toList().sortedWith(compareBy { (providerName, _) ->
+                    val index = pinnedOrder.indexOf(providerName)
+                    if (index == -1) Int.MAX_VALUE else index
+                })
+                sortedList.mapNotNull { (providerName, providerData) ->
+                    val dataList = providerData.list
+                    val dataListFiltered = filterSearchResults(
+                        context?.filterSearchResultByFilmQuality(dataList) ?: dataList
+                    )
+                    if (dataListFiltered.isEmpty()) return@mapNotNull null
+                    val homePageList = HomePageList(providerName, dataListFiltered)
+                    HomeViewModel.ExpandableHomepageList(
+                        homePageList,
+                        providerData.currentPage,
+                        providerData.hasNext
+                    )
+                }
+            } else null
+
+            withContext(Dispatchers.Main) {
+                if (filteredSingle != null) {
+                    (b.searchAutofitResults.adapter as? SearchAdapter)?.submitList(filteredSingle)
+                }
+                if (newGroupedItems != null) {
+                    (b.searchMasterRecycler.adapter as? ParentItemAdapter)?.submitList(newGroupedItems)
+                }
             }
-            (binding?.searchMasterRecycler?.adapter as? ParentItemAdapter)?.submitList(newItems)
         }
     }
 
@@ -551,23 +565,19 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             }
         })
 
-        observe(searchViewModel.searchResponse) {
-            when (it) {
+        observe(searchViewModel.searchResponse) { res ->
+            when (res) {
                 is Resource.Success -> {
-                    it.value.let { data ->
-                        val list = filterSearchResults(data.list)
-                        if (list.isNotEmpty()) {
+                    viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
+                        val list = filterSearchResults(res.value.list)
+                        withContext(Dispatchers.Main) {
                             (binding.searchAutofitResults.adapter as? SearchAdapter)?.submitList(
-                                list
+                                if (list.isNotEmpty()) list else emptyList()
                             )
-                        } else {
-                            (binding.searchAutofitResults.adapter as? SearchAdapter)?.submitList(
-                                emptyList()
-                            )
+                            searchExitIcon?.alpha = 1f
+                            binding.searchLoadingBar.alpha = 0f
                         }
                     }
-                    searchExitIcon?.alpha = 1f
-                    binding.searchLoadingBar.alpha = 0f
                 }
 
                 is Resource.Failure -> {
@@ -584,18 +594,17 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
 
         val listLock = ReentrantLock()
         observe(searchViewModel.currentSearch) { list ->
-            try {
-                // https://stackoverflow.com/questions/6866238/concurrent-modification-exception-adding-to-an-arraylist
-                listLock.lock()
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
+                try {
+                    listLock.lock()
 
-                val pinnedOrder = DataStoreHelper.pinnedProviders.reversedArray()
+                    val pinnedOrder = DataStoreHelper.pinnedProviders.reversedArray()
 
-                val sortedList = list.toList().sortedWith(compareBy { (providerName, _) ->
-                    val index = pinnedOrder.indexOf(providerName)
-                    if (index == -1) Int.MAX_VALUE else index
-                })
+                    val sortedList = list.toList().sortedWith(compareBy { (providerName, _) ->
+                        val index = pinnedOrder.indexOf(providerName)
+                        if (index == -1) Int.MAX_VALUE else index
+                    })
 
-                (binding.searchMasterRecycler.adapter as? ParentItemAdapter)?.apply {
                     val newItems = sortedList.mapNotNull { (providerName, providerData) ->
                         val dataList = providerData.list
                         val dataListFiltered = filterSearchResults(
@@ -615,12 +624,14 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                         )
                     }
 
-                    submitList(newItems)
+                    withContext(Dispatchers.Main) {
+                        (binding.searchMasterRecycler.adapter as? ParentItemAdapter)?.submitList(newItems)
+                    }
+                } catch (e: Exception) {
+                    logError(e)
+                } finally {
+                    try { listLock.unlock() } catch (_: Throwable) {}
                 }
-            } catch (e: Exception) {
-                logError(e)
-            } finally {
-                listLock.unlock()
             }
         }
 
