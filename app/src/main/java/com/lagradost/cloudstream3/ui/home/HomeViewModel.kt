@@ -494,7 +494,8 @@ class HomeViewModel : ViewModel() {
                             async(Dispatchers.IO) {
                                 semaphore.withPermit {
                                     try {
-                                        withTimeoutOrNull(2500L) {
+                                        val timeoutMs = if (isPotato) 3500L else 4000L
+                                        withTimeoutOrNull(timeoutMs) {
                                             val request = ImageRequest.Builder(preloaderContext)
                                                 .data(item.posterUrl)
                                                 .memoryCacheKey(item.posterUrl)
@@ -513,9 +514,9 @@ class HomeViewModel : ViewModel() {
                                                 val drawable = result.image.asDrawable(preloaderContext.resources)
                                                 if (shouldFilter && !NsfwFilterEngine.isCleanTitleAllowed(item.name)) {
                                                     val threshold = NsfwFilterEngine.getVisualThreshold(preloaderContext)
-                                                    val score = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.classifyPotatoFastScore(drawable, preloaderContext)
+                                                    val score = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.classifyDrawableScore(preloaderContext, drawable)
                                                     com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl!!, score, preloaderContext)
-                                                    if (score >= threshold) {
+                                                    if (!nsfwEnabled && score >= threshold) {
                                                         nsfwUrlsToRemove.add(item.url)
                                                     }
                                                 } else {

@@ -243,6 +243,7 @@ object ImageLoader {
         }
         val key = targetUrl ?: "censored_poster"
         imageView.setTag(R.id.coil_image_url_tag, key)
+        imageView.setTag(R.id.coil_image_loaded_tag, key)
         val d = getCensoredDrawable(imageView.context)
         try {
             imageView.scaleType = ImageView.ScaleType.CENTER_CROP
@@ -265,6 +266,7 @@ object ImageLoader {
             try { this.dispose() } catch (_: Throwable) {}
             this.setImageDrawable(null)
             this.setTag(R.id.coil_image_url_tag, null)
+            this.setTag(R.id.coil_image_loaded_tag, null)
             return
         }
         // setImageResource is better than coil3 on resources due to attr
@@ -272,6 +274,7 @@ object ImageLoader {
             try { this.dispose() } catch (_: Throwable) {}
             this.setImageResource(imageData)
             this.setTag(R.id.coil_image_url_tag, null)
+            this.setTag(R.id.coil_image_loaded_tag, null)
             return
         }
 
@@ -279,12 +282,10 @@ object ImageLoader {
         val isAdultAllowed = context.isNsfwEnabled()
         val shouldCensor = isAdultAllowed && shouldCensorPosters(context)
 
-        // 1. Strict pre-load inspection: if content is already known NSFW via text or AI cache, censor or hide immediately
+        // 1. Strict pre-load inspection: if content is already known NSFW via AI cache, censor or hide immediately
         if (shouldCensor) {
             val level = NsfwFilterEngine.getFilterLevel(context)
-            if ((imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) ||
-                OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)
-            ) {
+            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)) {
                 applyCensoredPoster(this, imageKey)
                 return
             }
@@ -295,27 +296,28 @@ object ImageLoader {
                     try { this.dispose() } catch (_: Throwable) {}
                     this.setImageDrawable(null)
                     this.setTag(R.id.coil_image_url_tag, imageKey)
+                    this.setTag(R.id.coil_image_loaded_tag, null)
                     OnDeviceNsfwClassifier.hideParentItem(this)
                     return
                 }
             }
-            if ((imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) ||
-                OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)
-            ) {
+            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)) {
                 try { this.dispose() } catch (_: Throwable) {}
                 this.setImageDrawable(null)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
+                this.setTag(R.id.coil_image_loaded_tag, null)
                 OnDeviceNsfwClassifier.hideParentItem(this)
                 return
             }
         }
 
-        val currentTag = this.getTag(R.id.coil_image_url_tag)
-        if (currentTag == imageKey && this.drawable != null) {
+        val loadedKey = this.getTag(R.id.coil_image_loaded_tag)
+        if (loadedKey == imageKey && this.drawable != null) {
             return
         }
 
         this.setTag(R.id.coil_image_url_tag, imageKey)
+        this.setTag(R.id.coil_image_loaded_tag, null)
 
         val isAlreadyCachedSafe = OnDeviceNsfwClassifier.isCachedSafe(imageKey, context)
         val needsInspection = (!isAdultAllowed || shouldCensor) && !isAlreadyCachedSafe
@@ -325,10 +327,15 @@ object ImageLoader {
             this.setImageDrawable(defaultCover)
         }
 
+        val tier = DeviceProfile.tier(context)
+        val isPotato = DeviceProfile.isUltraPotato(context)
+        val allowHw = tier != DeviceTier.LOW && !isPotato && !hasPotentialBrokenHardware()
+
         // headers can be overridden by extensions.
         this.load(imageData, SingletonImageLoader.get(context)) {
             this.diskCacheKey(imageKey)
             this.memoryCacheKey(imageKey)
+            this.allowHardware(allowHw)
             this.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
                 headerBuilder["User-Agent"] = USER_AGENT
                 headers?.forEach { (key, value) ->
@@ -337,10 +344,6 @@ object ImageLoader {
             }.build())
             builder() // if passed
             if (needsInspection) {
-                val tier = DeviceProfile.tier(context)
-                val isPotato = DeviceProfile.isUltraPotato(context)
-                val allowHw = tier != DeviceTier.LOW && !isPotato && !hasPotentialBrokenHardware()
-                this.allowHardware(allowHw)
                 target(
                     onStart = { placeholder ->
                         val defaultPlaceholder = placeholder?.asDrawable(context.resources)
@@ -360,11 +363,14 @@ object ImageLoader {
                     onSuccess = { result ->
                         try {
                             val drawable = result.asDrawable(context.resources)
-                            OnDeviceNsfwClassifier.classifyAndApplyAsync(
-                                imageView = this@loadImageInternal,
-                                imageKey = imageKey,
-                                drawable = drawable
-                            )
+                            val currentActiveTag = this@loadImageInternal.getTag(R.id.coil_image_url_tag)
+                            if (currentActiveTag == imageKey) {
+                                OnDeviceNsfwClassifier.classifyAndApplyAsync(
+                                    imageView = this@loadImageInternal,
+                                    imageKey = imageKey,
+                                    drawable = drawable
+                                )
+                            }
                         } catch (_: Throwable) {
                             if (!isAdultAllowed) {
                                 this@loadImageInternal.setImageDrawable(null)
@@ -379,11 +385,18 @@ object ImageLoader {
                             } else {
                                 try {
                                     this@loadImageInternal.setImageDrawable(result.asDrawable(context.resources))
+                                    this@loadImageInternal.setTag(R.id.coil_image_loaded_tag, imageKey)
                                 } catch (_: Throwable) {
                                     this@loadImageInternal.setImageResource(R.drawable.default_cover)
                                 }
                             }
                         }
+                    }
+                )
+            } else {
+                listener(
+                    onSuccess = { _, _ ->
+                        this@loadImageInternal.setTag(R.id.coil_image_loaded_tag, imageKey)
                     }
                 )
             }

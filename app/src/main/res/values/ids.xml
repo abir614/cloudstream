@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="coil_image_url_tag" type="id" />
+    <item name="coil_image_loaded_tag" type="id" />
     <item name="parent_view_tag" type="id" />
     <item name="card_view_holder_tag" type="id" />
 </resources>

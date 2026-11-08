@@ -182,6 +182,7 @@ object SearchResultBuilder {
 
         fun hideCardItem() {
             cardView.setImageDrawable(null)
+            cardView.setTag(R.id.coil_image_loaded_tag, null)
             bg.isVisible = false
             cardText?.isVisible = false
             shadow?.isVisible = false

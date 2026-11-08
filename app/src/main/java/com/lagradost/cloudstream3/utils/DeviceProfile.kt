@@ -447,7 +447,11 @@ object DeviceProfile {
 
     fun getInitialPrefetchItemCount(ctx: Context?): Int {
         if (ctx == null) return 4
-        return if (isUltraPotato(ctx)) 2 else 4
+        return when {
+            isUltraPotato(ctx) -> 2
+            tier(ctx) == DeviceTier.HIGH -> 6
+            else -> 4
+        }
     }
 
     fun getKernelVersion(): String {

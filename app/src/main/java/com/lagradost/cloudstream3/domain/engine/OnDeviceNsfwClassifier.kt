@@ -483,17 +483,17 @@ object OnDeviceNsfwClassifier {
                 // False-positive rejection:
                 // 1. Uniform colored / sepia / gold / desert backdrop across both upper and body zones
                 // 2. Absence of upper torso/head/face (landscape, desert sand, dirt road, wooden table, brown floor)
-                if (upperSkinRatio > 0.60f && bodySkinRatio > 0.60f) {
+                if (upperSkinRatio > 0.50f && bodySkinRatio > 0.50f) {
                     0.0f
-                } else if (bodySkinRatio >= 0.65f && maxRowSkinRatio >= 0.60f && upperSkinRatio in 0.05f..0.60f) {
-                    // Near-total nudity -> 0.75f (Blocks in Low >= 0.55, Moderate >= 0.30, Extreme >= 0.15)
+                } else if (bodySkinRatio >= 0.75f && maxRowSkinRatio >= 0.70f && upperSkinRatio in 0.08f..0.50f) {
+                    // True near-total nudity -> 0.75f (Blocks in Low >= 0.55, Moderate >= 0.30, Extreme >= 0.15)
                     0.75f
-                } else if (bodySkinRatio >= 0.42f && maxRowSkinRatio >= 0.40f && upperSkinRatio in 0.08f..0.60f) {
-                    // Sexy / lingerie / bikini / high exposure -> 0.42f (Blocks in Moderate >= 0.30 & Extreme >= 0.15; Allowed in Low < 0.55)
-                    0.42f
-                } else if (bodySkinRatio >= 0.28f && maxRowSkinRatio >= 0.25f && upperSkinRatio in 0.10f..0.60f) {
-                    // Mild beach / summer / cleavage -> 0.22f (Blocks in Extreme >= 0.15; Allowed in Moderate < 0.30 & Low < 0.55)
-                    0.22f
+                } else if (bodySkinRatio >= 0.60f && maxRowSkinRatio >= 0.55f && upperSkinRatio in 0.10f..0.45f) {
+                    // Extreme exposure / bikini / lingerie -> 0.35f (Blocks in Moderate >= 0.30 & Extreme >= 0.15; Allowed in Low < 0.55)
+                    0.35f
+                } else if (bodySkinRatio >= 0.45f && maxRowSkinRatio >= 0.40f && upperSkinRatio in 0.12f..0.40f) {
+                    // Mild beach / summer / cleavage -> 0.20f (Blocks in Extreme >= 0.15; Allowed in Moderate < 0.30 & Low < 0.55)
+                    0.20f
                 } else {
                     0.0f
                 }
@@ -590,10 +590,11 @@ object OnDeviceNsfwClassifier {
                     if (checkTag == imageKey) {
                         if (!appContext.isNsfwEnabled()) {
                             activeView.setImageResource(R.drawable.default_cover)
+                            activeView.setTag(R.id.coil_image_loaded_tag, null)
                         } else if (shouldCensorPosters(appContext)) {
                             ImageLoader.applyCensoredPoster(activeView, imageKey)
                         } else {
-                            setSmoothPosterDrawable(activeView, targetDrawable, false)
+                            setSmoothPosterDrawable(activeView, imageKey, targetDrawable, false)
                         }
                     }
                 }
@@ -1222,18 +1223,19 @@ object OnDeviceNsfwClassifier {
         if (score >= threshold) {
             if (!appContext.isNsfwEnabled()) {
                 view.setImageDrawable(null)
+                view.setTag(R.id.coil_image_loaded_tag, null)
                 hideParentItem(view)
             } else if (shouldCensorPosters(appContext)) {
                 ImageLoader.applyCensoredPoster(view, imageKey)
             } else {
-                setSmoothPosterDrawable(view, drawable, animate)
+                setSmoothPosterDrawable(view, imageKey, drawable, animate)
             }
         } else {
-            setSmoothPosterDrawable(view, drawable, animate)
+            setSmoothPosterDrawable(view, imageKey, drawable, animate)
         }
     }
 
-    private fun setSmoothPosterDrawable(view: ImageView, newDrawable: Drawable, animate: Boolean) {
+    private fun setSmoothPosterDrawable(view: ImageView, imageKey: String, newDrawable: Drawable, animate: Boolean) {
         if (newDrawable is BitmapDrawable) {
             val b = newDrawable.bitmap
             if (b == null || b.isRecycled) {
@@ -1252,6 +1254,7 @@ object OnDeviceNsfwClassifier {
             val b = actualOld.bitmap
             if (b != null && b.isRecycled) {
                 view.setImageDrawable(newDrawable)
+                view.setTag(R.id.coil_image_loaded_tag, imageKey)
                 return
             }
         }
@@ -1262,12 +1265,15 @@ object OnDeviceNsfwClassifier {
                     isCrossFadeEnabled = true
                 }
                 view.setImageDrawable(transition)
+                view.setTag(R.id.coil_image_loaded_tag, imageKey)
                 transition.startTransition(150)
             } catch (_: Throwable) {
                 view.setImageDrawable(newDrawable)
+                view.setTag(R.id.coil_image_loaded_tag, imageKey)
             }
         } else {
             view.setImageDrawable(newDrawable)
+            view.setTag(R.id.coil_image_loaded_tag, imageKey)
         }
     }
 

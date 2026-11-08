@@ -477,7 +477,13 @@ object NsfwFilterEngine {
         "your name", "kimi no na wa", "weathering with you", "suzume",
         "a silent voice", "koe no katachi",
         "solo leveling", "black clover", "blue lock",
-        "tokyo revengers", "mashle", "kaiju no. 8", "kaiju no 8"
+        "tokyo revengers", "mashle", "kaiju no. 8", "kaiju no 8",
+        "dragon maid", "miss kobayashi's dragon maid",
+        "maid-sama", "maid sama", "kaichou wa maid-sama",
+        "summer wars", "summer time rendering",
+        "deadpool", "deadpool 2", "deadpool & wolverine",
+        "free!", "free! - iwatobi swim club",
+        "the beach", "500 days of summer"
     )
 
     fun isCleanTitleAllowed(title: String?): Boolean {
@@ -783,8 +789,8 @@ object NsfwFilterEngine {
             if (OnDeviceNsfwClassifier.isCachedNsfw(url, null, level)) return true
         }
 
-        // Multi-vector text check on title, item URL, and poster URL
-        if (isNsfwText(item.name, item.url, item.posterUrl, level)) {
+        // Multi-vector text check on title, item URL, and (in EXTREME filter level) poster URL
+        if (isNsfwText(item.name, item.url, if (level == NsfwFilterLevel.EXTREME) item.posterUrl else null, level)) {
             return true
         }
 
@@ -835,8 +841,11 @@ object NsfwFilterEngine {
         if (isNsfwText(item.name, item.url, tagsStr, level)) {
             return true
         }
-        item.posterUrl?.let { if (isNsfwUrl(it, level)) return true }
-        item.backgroundPosterUrl?.let { if (isNsfwUrl(it, level)) return true }
+
+        if (level == NsfwFilterLevel.EXTREME) {
+            item.posterUrl?.let { if (isNsfwUrl(it, level)) return true }
+            item.backgroundPosterUrl?.let { if (isNsfwUrl(it, level)) return true }
+        }
 
         // In MODERATE and EXTREME, inspect synopsis/plot
         if (level >= NsfwFilterLevel.MODERATE) {
