@@ -68,11 +68,13 @@ object GithubReleases {
         userName: String,
         repository: String,
         tag: String,
-    ): String {
-        return app.get(
+    ): String? {
+        val res = app.get(
             url = "https://api.github.com/repos/$userName/$repository/git/ref/tags/$tag",
             headers = defaultHeaders
-        ).parsed<GithubTag>().githubObject.sha
+        )
+        if (!res.isSuccessful) return null
+        return res.parsedSafe<GithubTag>()?.githubObject?.sha
     }
 
     @Throws
@@ -94,10 +96,21 @@ object GithubReleases {
             "https://api.github.com/repos/$userName/$repository/releases/latest"
         }
 
-        val latestRelease = app.get(
+        val response = app.get(
             url = latestReleaseUrl,
             headers = defaultHeaders
-        ).parsed<GithubRelease>()
+        )
+
+        if (response.code == 403 || response.code == 429) {
+            android.util.Log.w("GithubReleases", "GitHub API rate limit exceeded (HTTP ${response.code}). Skipping update check.")
+            return null
+        }
+        if (!response.isSuccessful) {
+            android.util.Log.w("GithubReleases", "GitHub API request failed with HTTP ${response.code}")
+            return null
+        }
+
+        val latestRelease = response.parsedSafe<GithubRelease>() ?: return null
 
         val apkAssets = latestRelease.assets.filter { asset ->
             asset.contentType == contentType || asset.name.endsWith(".apk")

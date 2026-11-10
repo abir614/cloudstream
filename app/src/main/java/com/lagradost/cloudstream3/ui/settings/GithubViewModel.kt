@@ -318,5 +318,5 @@ class GithubViewModel(
             tag = tag,
             userName = remoteUserName,
             repository = remoteRepository,
-        )
+        ) ?: ""
 }
