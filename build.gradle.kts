@@ -13,8 +13,13 @@ plugins {
 
 allprojects {
     configurations.all {
+        resolutionStrategy.force("org.json:json:20260814")
         resolutionStrategy.eachDependency {
             when {
+                requested.group == "org.json" && requested.name == "json" -> {
+                    useVersion("20260814")
+                    because("Patches CVE-2026-59171 / GHSA-ghc9-756g-vrcv unbounded numeric string DoS in NiceHttp dependency")
+                }
                 requested.group == "io.netty" -> {
                     useVersion("4.1.137.Final")
                     because("Patches Netty HTTP/2, TLS, and DoS vulnerabilities")

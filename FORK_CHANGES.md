@@ -217,6 +217,7 @@ All primary third-party sync and subtitle accounts are wired and hardened with c
 ---
 
 ## 8. Security Advisories & Dependency Upgrades
+- **org.json / JSON-Java (CVE-2026-59171 / GHSA-ghc9-756g-vrcv)**: Excluded vulnerable transitive `org.json:json:20251224` from `com.github.Blatzar:NiceHttp:0.4.18`, enforced `org.json:json:20260814` across all Gradle configurations via `resolutionStrategy.force` and `resolutionStrategy.eachDependency`, and added dependency constraints across `:app` and `:library` to eliminate unbounded numeric string resource-exhaustion DoS vulnerabilities (Dependabot Alert #77).
 - **Google Guava (CVE-2026-102554 / GHSA-xxph-c9ww-hj94)**: Enforced `com.google.guava:guava:33.7.2-android` via Gradle `resolutionStrategy` to eliminate uncontrolled deserialization memory allocation DoS vulnerabilities.
 - **Jackson Databind (CVE-2026-59889 / GHSA-5gvw-p9qm-jgwh)**: Validated zero usage of `@JsonView` annotations across the entire codebase. Strictly pinned Jackson `2.13.5` to maintain `minSdk 23` backwards compatibility for Android TV and Fire TV sticks without risk.
 - **Rust Core `ctutils` (RUSTSEC-2026-0385)**: Upgraded `ctutils` to `0.4.4` to fix non-constant-time mask generation and `u128` comparisons, and replaced yanked `inout 0.2.3` with `0.2.5`.

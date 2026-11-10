@@ -334,6 +334,13 @@ android {
 }
 
 dependencies {
+    constraints {
+        implementation(libs.json) {
+            because("Patches CVE-2026-59171 / GHSA-ghc9-756g-vrcv unbounded numeric string DoS in NiceHttp")
+        }
+    }
+    implementation(libs.json)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.json)

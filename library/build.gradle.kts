@@ -83,7 +83,10 @@ kotlin {
             implementation(libs.kotlinx.serialization.json) // JSON Parser
             implementation(libs.ksoup) // HTML Parser
             implementation(libs.ktor.http)
-            implementation(libs.nicehttp) // HTTP Library
+            implementation(libs.nicehttp) {
+                exclude(group = "org.json", module = "json")
+            }
+            implementation(libs.json)
             implementation(libs.rhino) // Run JavaScript
             implementation(libs.bundles.cryptography) // Cryptography
         }
