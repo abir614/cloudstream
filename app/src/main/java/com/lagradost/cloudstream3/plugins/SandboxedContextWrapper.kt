@@ -25,22 +25,24 @@ import java.io.File
  *    audio, display) remain completely functional.
  */
 class SandboxedContextWrapper(
-    base: Context,
+    private val hostContext: Context,
     val pluginName: String
-) : ContextWrapper(base) {
+) : ContextWrapper(hostContext) {
 
     private val sanitizedName: String = pluginName
         .replace(Regex("[^a-zA-Z0-9._-]"), "_")
         .take(64)
 
     private val sandboxDir: File by lazy {
-        File(baseContext.filesDir, "plugin_sandboxes/$sanitizedName").apply {
+        val baseFiles = hostContext.filesDir ?: File("/tmp")
+        File(baseFiles, "plugin_sandboxes/$sanitizedName").apply {
             if (!exists()) mkdirs()
         }
     }
 
     private val sandboxCacheDir: File by lazy {
-        File(baseContext.cacheDir, "plugin_sandboxes/$sanitizedName").apply {
+        val baseCache = hostContext.cacheDir ?: File("/tmp")
+        File(baseCache, "plugin_sandboxes/$sanitizedName").apply {
             if (!exists()) mkdirs()
         }
     }
@@ -91,14 +93,14 @@ class SandboxedContextWrapper(
     }
 
     override fun getExternalFilesDir(type: String?): File? {
-        val baseExt = super.getExternalFilesDir(type) ?: return getFilesDir()
+        val baseExt = hostContext.getExternalFilesDir(type) ?: return getFilesDir()
         val dir = File(baseExt, "plugin_sandboxes/$sanitizedName")
         if (!dir.exists()) dir.mkdirs()
         return dir
     }
 
     override fun getExternalCacheDir(): File? {
-        val baseExt = super.getExternalCacheDir() ?: return getCacheDir()
+        val baseExt = hostContext.getExternalCacheDir() ?: return getCacheDir()
         val dir = File(baseExt, "plugin_sandboxes/$sanitizedName")
         if (!dir.exists()) dir.mkdirs()
         return dir
@@ -106,7 +108,7 @@ class SandboxedContextWrapper(
 
     override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
         // Namespace SharedPreferences so plugins cannot overwrite host or other plugin settings
-        return super.getSharedPreferences("cs_plugin_${sanitizedName}_$name", mode)
+        return hostContext.getSharedPreferences("cs_plugin_${sanitizedName}_$name", mode)
     }
 
     private fun assertSafeDatabaseName(name: String) {
