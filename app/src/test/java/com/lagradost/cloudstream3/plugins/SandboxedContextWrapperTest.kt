@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.plugins
 
 import android.content.Context
+import android.content.ContextWrapper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
@@ -10,8 +11,6 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.`when`
 import java.io.File
 
 class SandboxedContextWrapperTest {
@@ -19,21 +18,28 @@ class SandboxedContextWrapperTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
-    private lateinit var mockBaseContext: Context
+    private class FakeContext(
+        private val files: File,
+        private val cache: File
+    ) : ContextWrapper(null) {
+        override fun getFilesDir(): File = files
+        override fun getCacheDir(): File = cache
+        override fun getApplicationContext(): Context = this
+        override fun getBaseContext(): Context = this
+    }
+
+    private lateinit var fakeBaseContext: Context
     private lateinit var baseFilesDir: File
     private lateinit var baseCacheDir: File
     private lateinit var sandboxedContext: SandboxedContextWrapper
 
     @Before
     fun setUp() {
-        mockBaseContext = mock(Context::class.java)
         baseFilesDir = tempFolder.newFolder("files")
         baseCacheDir = tempFolder.newFolder("cache")
+        fakeBaseContext = FakeContext(baseFilesDir, baseCacheDir)
 
-        `when`(mockBaseContext.filesDir).thenReturn(baseFilesDir)
-        `when`(mockBaseContext.cacheDir).thenReturn(baseCacheDir)
-
-        sandboxedContext = SandboxedContextWrapper(mockBaseContext, "test_plugin")
+        sandboxedContext = SandboxedContextWrapper(fakeBaseContext, "test_plugin")
     }
 
     @Test
