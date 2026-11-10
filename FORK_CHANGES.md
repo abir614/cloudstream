@@ -72,7 +72,7 @@ This document catalogues all intentional architectural deviations, security hard
 
 ### 2.7 Data at Rest & Strict Anti-Rollback Gating
 - **No Unencrypted OS Backups**: `android:allowBackup="false"` enforced in `AndroidManifest.xml`, along with explicit deny rules in `data_extraction_rules.xml` and `backup_descriptor.xml` preventing unencrypted ADB or cloud extraction of credentials/keys.
-- **Strict Anti-Rollback (§2.3)**: Both [`UpdateSecurityGate`](app/src/main/java/com/lagradost/cloudstream3/utils/UpdateSecurityGate.kt) and native Rust verifier strictly enforce `apkVersionCode > installedVersionCode` (rejecting both downgrades and non-upgrading reinstallations).
+- **Strict Anti-Rollback (§2.3)**: Both [`UpdateSecurityGate`](app/src/main/java/com/lagradost/cloudstream3/utils/UpdateSecurityGate.kt) and native Rust verifier strictly enforce `apkVersionCode > installedVersionCode` (rejecting both downgrades and non-upgrading reinstallations for stable; prerelease allows matching versionCode to test git commits).
 
 ### 2.8 Offline Ed25519 Update Manifest Attestation (§2.3)
 - **Air-Gapped Trust**: Update authenticity verification using offline Ed25519 signature checks on `SHA256SUMS` manifests, verified via `ed25519-dalek` in the native Rust core (`NativeCoreBridge.verifyEd25519`).
@@ -185,7 +185,7 @@ This document catalogues all intentional architectural deviations, security hard
     - Initializes TFLite Interpreter with 2 CPU threads and XNNPACK acceleration (`setNumThreads(2)`, `setUseXNNPACK(true)`).
     - Runs efficiently on ultra-low-resource Cortex-A53 quad-core SoCs (such as the Allwinner H313 Android TV SoC with a strict 500MB runtime RAM ceiling) using ARM NEON INT8 gemm microkernels across 2 cores while leaving 2 cores free for video playback buffers and UI rendering.
     - Gracefully scales to mid-range and flagship Android devices with universal platform-agnostic TFLite portability and automatic safe fallback to standard CPU execution.
-    - **Emergency Memory Pressure Protection**: Under critical low-memory conditions (<20MB RAM remaining), automatically redirects to zero-native-allocation skin chrominance heuristic to eliminate Low Memory Killer (LMK) aborts.
+    - **Emergency Memory Pressure Protection**: Under critical low-memory conditions (< 25MB runtime heap remaining), automatically redirects to zero-native-allocation skin chrominance heuristic to eliminate Low Memory Killer (LMK) aborts.
   - **Downsampling Utilities**: Integrated `inSampleSize` power-of-2 downsampler and RGB_565 configuration for compressed byte arrays, files, and video frames.
   - **Calibrated Chrominance Clustering & Single-Lock Canvas**: Calibrated YCbCr skin clustering enforces human torso/face spatial correlation and rejects monochrome, desert, wood, earth-tone, and sepia backdrops. Scratchpad canvas initialization is atomic under a single lock without double-synchronization penalties.
 - **Zero-Allocation Card Badge Corner Styling & View Holder Tag Caching ([`SearchResultBuilder.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/search/SearchResultBuilder.kt))**:
@@ -420,7 +420,10 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - `Resources` (framework-level resource resolution warnings).
   - `VideoCapabilities` (unsupported HEIC mime checks in MediaCodec).
   - `DynamiteModule`, `CastContext`, `GooglePlayServicesUtil`, `GoogleApiManager` (AOSP / emulator Google Play Services warnings).
-- **Message Filter Patterns**: Added filters for `acquireNextBufferLocked`, `ClassLoaderContext type mismatch`, `Unexpected start code prefix`, `Received 'finished' signal`, `No adapter attached; skipping layout`, `unresolved theme attributes`, `perfctl`, `FPSGO`, `legacy_receive_flag`, `Cleared Reference was only reachable from finalizer`, `Monitor::Inflate`, `TripleFinger`, `ThreeFinger`, `avc: denied`, and `READ_DEVICE_CONFIG`.
+  - `IInputConnectionWrapper` (Android soft keyboard IME inactive connection transitions).
+  - `NotificationManager` (Android system service notification posting rate limits).
+  - `ActivityThread` (Android framework binder token window visibility notices).
+- **Message Filter Patterns**: Added filters for `acquireNextBufferLocked`, `ClassLoaderContext type mismatch`, `Unexpected start code prefix`, `Received 'finished' signal`, `No adapter attached; skipping layout`, `unresolved theme attributes`, `perfctl`, `FPSGO`, `legacy_receive_flag`, `Cleared Reference was only reachable from finalizer`, `Monitor::Inflate`, `TripleFinger`, `ThreeFinger`, `avc: denied`, `READ_DEVICE_CONFIG`, `Not starting debugger since process cannot load the jdwp agent`, `PostNotification rate is`, `inactive InputConnection`, and `handleWindowVisibility`.
 - **Dual-Shield Edge Worker Suppression (`worker.js`)**: Added `isNoiseTelemetry(tag, message, stackTrace)` to the Cloudflare Worker proxy at the edge, dropping non-actionable vendor framework logs and transient HTTP/2 preface errors before dispatch to Telegram, providing an extra defense-in-depth shield that guarantees zero channel spam even from older APK builds during update transitions.
 
 ### 16.6 Telemetry Transient Network Exception Filtering
@@ -445,7 +448,7 @@ For full transparency, developers and users can inspect live, real-time diagnost
 
 ### 16.10 SQLite WAL Mode & Dynamic Memory Pressure Failsafe
 - **SQLite Write-Ahead Logging (WAL)**: Enabled WAL mode (`enableWriteAheadLogging()`) on `DatabaseHelper` in `SqliteDataRepository.kt`, eliminating database file read/write lock contention between background sync/playback writers and UI readers, while reducing flash wear on low-end eMMC/TV stick storage.
-- **Dynamic Heap Memory Guard**: Added real-time available JVM heap checking in `OnDeviceNsfwClassifier.isPotatoDevice()`, automatically falling back to the zero-native-allocation skin heuristic if available heap drops below 20MB, completely preventing OutOfMemory errors and LMK native aborts even during intense multitasking on mid/high-tier devices.
+- **Dynamic Heap Memory Guard**: Added real-time available JVM heap checking in `OnDeviceNsfwClassifier.isPotatoDevice()`, automatically falling back to the zero-native-allocation skin heuristic if available heap drops below 25MB, completely preventing OutOfMemory errors and LMK native aborts even during intense multitasking on mid/high-tier devices.
 
 ### 16.11 Poster Loading Reliability, NSFW Accuracy & Flagship 120Hz Profiling
 - **Stuck Poster Placeholder Fix (`coil_image_loaded_tag`)**: Replaced premature tag checks in [`ImageModuleCoil.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/ImageModuleCoil.kt) with a dedicated `coil_image_loaded_tag` (`ids.xml`). Prevents RecyclerView viewholder re-binding or layout passes from treating transient placeholder drawables (`default_cover`) as completed loads, eliminating permanently stuck placeholders across all lists and grids.

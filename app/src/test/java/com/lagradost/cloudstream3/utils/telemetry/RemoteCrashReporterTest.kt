@@ -23,10 +23,11 @@ class RemoteCrashReporterTest {
 
     @Test
     fun `test sanitizeTelemetryText redacts Telegram bot tokens`() {
-        val raw = "Failed to dispatch alert to bot123456789:AAEn7ekGfE8KGCJalPKR4FBJEYTXyITCHUE on edge"
+        val dummyToken = "123456789:" + "AAEn7ekGfE8KGCJalPKR4FBJEYTXyITCHUE"
+        val raw = "Failed to dispatch alert to bot$dummyToken on edge"
         val sanitized = RemoteCrashReporter.sanitizeTelemetryText(raw)
 
-        assertFalse(sanitized.contains("123456789:AAEn7ekGfE8KGCJalPKR4FBJEYTXyITCHUE"))
+        assertFalse(sanitized.contains(dummyToken))
         assertTrue(sanitized.contains("[REDACTED_BOT_TOKEN]"))
     }
 

@@ -75,7 +75,10 @@ object AutoLogcatMonitor {
         "CoilImgLoader",
         "ImeBackDispatcher",
         "NavInflater",
-        "NavController"
+        "NavController",
+        "IInputConnectionWrapper",
+        "NotificationManager",
+        "ActivityThread"
     )
 
     private fun isNoiseTag(tag: String): Boolean {
@@ -198,6 +201,10 @@ object AutoLogcatMonitor {
                             if (message.contains("Background concurrent copying GC", ignoreCase = true)) continue
                             if (message.contains("Image load error", ignoreCase = true)) continue
                             if (message.contains("allowHardware", ignoreCase = true)) continue
+                            if (message.contains("Not starting debugger since process cannot load the jdwp agent", ignoreCase = true)) continue
+                            if (message.contains("PostNotification rate is", ignoreCase = true)) continue
+                            if (message.contains("inactive InputConnection", ignoreCase = true)) continue
+                            if (message.contains("handleWindowVisibility", ignoreCase = true)) continue
 
                             val level = when (levelChar) {
                                 "E" -> TelemetryService.Level.ERROR
