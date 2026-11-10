@@ -226,5 +226,38 @@ class NsfwFilterEngineTest {
         assertTrue(NsfwFilterEngine.isNsfw(lingerieItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(lingerieItem, NsfwFilterLevel.EXTREME))
     }
+
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `test clean title allowlist never bypasses hardcore adult parodies`() {
+        // Adult titles mentioning allowed anime/movies must NEVER be exempted
+        val adultNaruto = AnimeSearchResponse("Naruto Shippuden Hentai", "https://site.to/naruto-hentai", "Provider", TvType.Anime)
+        assertTrue(NsfwFilterEngine.isNsfw(adultNaruto, NsfwFilterLevel.LOW))
+        assertTrue(NsfwFilterEngine.isNsfw(adultNaruto, NsfwFilterLevel.MODERATE))
+        assertFalse(NsfwFilterEngine.isCleanTitleAllowed(adultNaruto.name))
+
+        val adultOnePiece = AnimeSearchResponse("One Piece XXX Porn", "https://site.to/op-xxx", "Provider", TvType.Anime)
+        assertTrue(NsfwFilterEngine.isNsfw(adultOnePiece, NsfwFilterLevel.LOW))
+        assertFalse(NsfwFilterEngine.isCleanTitleAllowed(adultOnePiece.name))
+
+        val adultDeadpool = MovieSearchResponse("Deadpool Porn Parody", "https://site.to/deadpool-porn", "Provider", TvType.Movie)
+        assertTrue(NsfwFilterEngine.isNsfw(adultDeadpool, NsfwFilterLevel.LOW))
+        assertFalse(NsfwFilterEngine.isCleanTitleAllowed(adultDeadpool.name))
+
+        // Legitimate clean show and sequel forms must remain clean
+        assertTrue(NsfwFilterEngine.isCleanTitleAllowed("Attack on Titan"))
+        assertTrue(NsfwFilterEngine.isCleanTitleAllowed("Attack on Titan Season 4"))
+        assertTrue(NsfwFilterEngine.isCleanTitleAllowed("Spy x Family Part 2"))
+        assertTrue(NsfwFilterEngine.isCleanTitleAllowed("Summer Time Rendering"))
+    }
+
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `test poster url adult tokens trigger filtering across all levels`() {
+        val adultPosterItem = AnimeSearchResponse("Normal Looking Title", "https://site.to/episode1", "Provider", TvType.Anime, posterUrl = "https://cdn.com/hentai/poster123.jpg")
+        assertTrue(NsfwFilterEngine.isNsfw(adultPosterItem, NsfwFilterLevel.LOW))
+        assertTrue(NsfwFilterEngine.isNsfw(adultPosterItem, NsfwFilterLevel.MODERATE))
+        assertTrue(NsfwFilterEngine.isNsfw(adultPosterItem, NsfwFilterLevel.EXTREME))
+    }
 }
 

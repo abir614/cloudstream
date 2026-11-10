@@ -16,9 +16,11 @@
 - **Reflection Firewall ([`ShieldedClassLoader.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/ShieldedClassLoader.kt))**:
   - Dynamically shields the host application from untrusted third-party `.cs3` plugins.
   - Explicitly permits core extension APIs (`MainAPI`, `ExtractorApi`, `NiceHttp`, `com.mega.*`, `RepositoryManager`, `RepositoryData`), guaranteeing 100% backward compatibility for legacy extensions and multi-repository shortcodes (e.g. `megarepo` / `3737`).
-  - Blocks reflection lookups targeting internal singletons, user authentication credentials (MAL, AniList, SIMKL), database helpers, and encryption key stores.
+  - Blocks reflection lookups targeting internal singletons, application instances (`CloudStreamApp`), secure key-value stores (`DataStore`, `DataStoreHelper`), user credentials (MAL, AniList, SIMKL), database helpers, and encryption keystores.
 - **Storage & Database Jail ([`SandboxedContextWrapper.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapper.kt))**:
   - Confines plugin file storage, temporary caches, and SharedPreferences to isolated per-plugin directories (`filesDir/plugin_sandboxes/<pluginName>/`).
+  - Overrides `getApplicationContext()` and `getBaseContext()` returning the sandboxed context, preventing context unwrap escapes to the host `Application` instance.
+  - Enforces canonical boundary and path traversal validation on `getDatabasePath` and `getDir`, rejecting attempts to escape via directory traversal (`../`).
   - Throws an immediate `SecurityException` if an extension attempts to inspect, read, or delete CloudStream core SQLite database files (`cloudstream_kv.db`).
 - **Trust-On-First-Use (TOFU) Cryptographic Fingerprinting ([`PluginFingerprintStore.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/PluginFingerprintStore.kt))**:
   - Persists SHA-256 digests of installed plugins in SQLite.
@@ -100,8 +102,9 @@
   - Filters adult and hentai content by default across Feed, Carousel, Search, and Extension discovery for family-safe viewing on shared living room Android TVs and mobile devices.
   - Detects disguised adult content tagged under `TvType.Anime` or `TvType.OVA` via studio fingerprints, title tokens, and metadata.
   - Can be unlocked in Settings → Providers.
-- **Certified Clean Anime Whitelist**:
+- **Certified Clean Anime Whitelist & Anti-Exploit Security Gate**:
   - Clean mainstream anime (*Attack on Titan*, *Hunter x Hunter*, *Spy x Family*, *Frieren*, *Demon Slayer*, *Jujutsu Kaisen*, *One Piece*, *Naruto*, *Bleach*, *Vinland Saga*, *Chainsaw Man*, *Mob Psycho 100*, Studio Ghibli films, Makoto Shinkai films) are explicitly protected by an engine-level allowlist, preventing accidental false positives on summer/beach episodes or high-exposure character art.
+  - Strict Anti-Exploit Defense: Titles containing any adult, hentai, or hardcore tokens immediately fail allowlist matching, preventing adult parodies from bypassing content safety filters. Exact and canonical title suffixing (`Season`, `Part`) strictly replaces loose substring matching.
 - **Full-Screen Pacing & Filtering Overlay**:
   - Dedicated progress indicator and UI isolation screen during content filtering on home page and search views.
   - Protects low-end and potato devices (Allwinner, Rockchip, Android Go with $\le 1024$MB RAM) from UI thread locks, memory spikes, or ANRs.

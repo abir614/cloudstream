@@ -464,7 +464,14 @@ class HomeViewModel : ViewModel() {
 
             // Phase 2: Pre-validate & Preload initial visible posters (rails + banner) with hardware-adaptive pacing
             val preloaderContext = context ?: com.lagradost.cloudstream3.CloudStreamApp.context
-            if (preloaderContext != null && (expandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
+            val isLowEndOrPotato = isPotato || (preloaderContext != null && DeviceProfile.isLowEnd(preloaderContext))
+
+            if (isLowEndOrPotato) {
+                // v220 Parity: Low-end / potato devices render home sections immediately without
+                // blocking the UI thread or device network on synchronous poster preloading & classifier passes.
+                _contentFilterProgress.postValue(null)
+                _page.postValue(Resource.Success(expandable))
+            } else if (preloaderContext != null && (expandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
                 val railItems = expandable.values
                     .take(4)
                     .flatMap { it.list.list.take(8) }
@@ -557,17 +564,19 @@ class HomeViewModel : ViewModel() {
                 }
             }
 
-            _contentFilterProgress.postValue(
-                ContentFilterProgress(
-                    isFiltering = true,
-                    current = 100,
-                    total = 100,
-                    message = context?.getString(R.string.loading) ?: "Loading"
+            if (!isLowEndOrPotato) {
+                _contentFilterProgress.postValue(
+                    ContentFilterProgress(
+                        isFiltering = true,
+                        current = 100,
+                        total = 100,
+                        message = context?.getString(R.string.loading) ?: "Loading"
+                    )
                 )
-            )
 
-            // Render home sections with posters already loaded, safe, and cached
-            _page.postValue(Resource.Success(expandable))
+                // Render home sections with posters already loaded, safe, and cached
+                _page.postValue(Resource.Success(expandable))
+            }
 
             if (initialPreviews.isNotEmpty()) {
                 previewResponses.clear()

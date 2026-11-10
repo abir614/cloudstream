@@ -489,9 +489,16 @@ object NsfwFilterEngine {
     fun isCleanTitleAllowed(title: String?): Boolean {
         if (title.isNullOrBlank()) return false
         val clean = title.lowercase().trim()
+
+        // Strict security barrier: If the title contains ANY adult/hardcore/hentai/xxx tokens,
+        // it must NEVER be exempted by the allowlist (prevents "Naruto Hentai", "Deadpool Porn", etc.)
+        if (isTextNsfwSingle(clean, NsfwFilterLevel.LOW)) return false
+
         if (clean in CLEAN_TITLE_ALLOWLIST) return true
         for (allowed in CLEAN_TITLE_ALLOWLIST) {
-            if (clean.startsWith(allowed) || clean.contains(allowed)) {
+            if (clean == allowed) return true
+            // Support title suffixes for seasons, parts, movies (e.g. "Attack on Titan Season 4", "Spy x Family Part 2")
+            if (clean.startsWith("$allowed ") || clean.startsWith("$allowed:") || clean.startsWith("$allowed -")) {
                 return true
             }
         }
@@ -789,8 +796,8 @@ object NsfwFilterEngine {
             if (OnDeviceNsfwClassifier.isCachedNsfw(url, null, level)) return true
         }
 
-        // Multi-vector text check on title, item URL, and (in EXTREME filter level) poster URL
-        if (isNsfwText(item.name, item.url, if (level == NsfwFilterLevel.EXTREME) item.posterUrl else null, level)) {
+        // Multi-vector text check on title, item URL, and poster URL across all levels
+        if (isNsfwText(item.name, item.url, item.posterUrl, level)) {
             return true
         }
 
@@ -842,10 +849,8 @@ object NsfwFilterEngine {
             return true
         }
 
-        if (level == NsfwFilterLevel.EXTREME) {
-            item.posterUrl?.let { if (isNsfwUrl(it, level)) return true }
-            item.backgroundPosterUrl?.let { if (isNsfwUrl(it, level)) return true }
-        }
+        item.posterUrl?.let { if (isNsfwUrl(it, level)) return true }
+        item.backgroundPosterUrl?.let { if (isNsfwUrl(it, level)) return true }
 
         // In MODERATE and EXTREME, inspect synopsis/plot
         if (level >= NsfwFilterLevel.MODERATE) {

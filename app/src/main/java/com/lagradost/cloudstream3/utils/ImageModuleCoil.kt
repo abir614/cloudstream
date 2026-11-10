@@ -282,17 +282,19 @@ object ImageLoader {
         val isAdultAllowed = context.isNsfwEnabled()
         val shouldCensor = isAdultAllowed && shouldCensorPosters(context)
 
-        // 1. Strict pre-load inspection: if content is already known NSFW via AI cache, censor or hide immediately
+        // 1. Strict pre-load inspection: if content is already known NSFW via text or AI cache, censor or hide immediately
         if (shouldCensor) {
             val level = NsfwFilterEngine.getFilterLevel(context)
-            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)) {
+            if ((imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) ||
+                OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)
+            ) {
                 applyCensoredPoster(this, imageKey)
                 return
             }
         } else if (!isAdultAllowed) {
             val level = NsfwFilterEngine.getFilterLevel(context)
             if (level == NsfwFilterLevel.EXTREME && (imageData is String)) {
-                if (imageData.isBlank() || imageData == "null" || (!imageData.startsWith("http://") && !imageData.startsWith("https://"))) {
+                if (imageData.isBlank() || imageData == "null" || (!imageData.startsWith("http://") && !imageData.startsWith("https://") && !imageData.startsWith("/"))) {
                     try { this.dispose() } catch (_: Throwable) {}
                     this.setImageDrawable(null)
                     this.setTag(R.id.coil_image_url_tag, imageKey)
@@ -301,7 +303,9 @@ object ImageLoader {
                     return
                 }
             }
-            if (OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)) {
+            if ((imageData is String && NsfwFilterEngine.isNsfwText("", imageData, null, level)) ||
+                OnDeviceNsfwClassifier.isCachedNsfw(imageKey, context, level)
+            ) {
                 try { this.dispose() } catch (_: Throwable) {}
                 this.setImageDrawable(null)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
@@ -335,7 +339,12 @@ object ImageLoader {
         this.load(imageData, SingletonImageLoader.get(context)) {
             this.diskCacheKey(imageKey)
             this.memoryCacheKey(imageKey)
-            this.allowHardware(allowHw)
+            if (needsInspection) {
+                // Software bitmap required for zero-copy CPU pixel inspection by TFLite & Canvas
+                this.allowHardware(false)
+            } else {
+                this.allowHardware(allowHw)
+            }
             this.httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
                 headerBuilder["User-Agent"] = USER_AGENT
                 headers?.forEach { (key, value) ->
@@ -358,6 +367,8 @@ object ImageLoader {
                             if (level == NsfwFilterLevel.EXTREME) {
                                 OnDeviceNsfwClassifier.hideParentItem(this@loadImageInternal)
                             }
+                        } else if (shouldCensor) {
+                            applyCensoredPoster(this@loadImageInternal, imageKey)
                         }
                     },
                     onSuccess = { result ->
@@ -374,6 +385,7 @@ object ImageLoader {
                         } catch (_: Throwable) {
                             if (!isAdultAllowed) {
                                 this@loadImageInternal.setImageDrawable(null)
+                                this@loadImageInternal.setTag(R.id.coil_image_loaded_tag, null)
                                 val level = NsfwFilterEngine.getFilterLevel(context)
                                 if (level == NsfwFilterLevel.EXTREME) {
                                     OnDeviceNsfwClassifier.hideParentItem(this@loadImageInternal)
@@ -383,12 +395,7 @@ object ImageLoader {
                             } else if (shouldCensor) {
                                 applyCensoredPoster(this@loadImageInternal, imageKey)
                             } else {
-                                try {
-                                    this@loadImageInternal.setImageDrawable(result.asDrawable(context.resources))
-                                    this@loadImageInternal.setTag(R.id.coil_image_loaded_tag, imageKey)
-                                } catch (_: Throwable) {
-                                    this@loadImageInternal.setImageResource(R.drawable.default_cover)
-                                }
+                                this@loadImageInternal.setImageResource(R.drawable.default_cover)
                             }
                         }
                     }

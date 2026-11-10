@@ -45,6 +45,31 @@ class SandboxedContextWrapper(
         }
     }
 
+    override fun getApplicationContext(): Context {
+        // Prevent extension sandbox escapes via applicationContext
+        return this
+    }
+
+    override fun getBaseContext(): Context {
+        // Prevent extension sandbox escapes via baseContext
+        return this
+    }
+
+    private fun sanitizePathSegment(segment: String): String {
+        if (segment.contains("..") || segment.contains("/") || segment.contains("\\") || segment.contains("\u0000")) {
+            throw SecurityException("Path traversal attempt detected in segment: '$segment'")
+        }
+        return segment
+    }
+
+    private fun assertInsideSandbox(target: File, boundary: File) {
+        val canonicalTarget = try { target.canonicalPath } catch (_: Throwable) { target.absolutePath }
+        val canonicalBoundary = try { boundary.canonicalPath } catch (_: Throwable) { boundary.absolutePath }
+        if (!canonicalTarget.startsWith(canonicalBoundary)) {
+            throw SecurityException("Sandbox boundary violation: '$canonicalTarget' escapes '$canonicalBoundary'")
+        }
+    }
+
     override fun getFilesDir(): File {
         val dir = File(sandboxDir, "files")
         if (!dir.exists()) dir.mkdirs()
@@ -58,7 +83,9 @@ class SandboxedContextWrapper(
     }
 
     override fun getDir(name: String, mode: Int): File {
+        sanitizePathSegment(name)
         val dir = File(sandboxDir, name)
+        assertInsideSandbox(dir, sandboxDir)
         if (!dir.exists()) dir.mkdirs()
         return dir
     }
@@ -83,6 +110,7 @@ class SandboxedContextWrapper(
     }
 
     private fun assertSafeDatabaseName(name: String) {
+        sanitizePathSegment(name)
         val lower = name.lowercase()
         if (lower.contains("cloudstream") ||
             lower.contains("kv_store") ||
@@ -98,7 +126,9 @@ class SandboxedContextWrapper(
         assertSafeDatabaseName(name)
         val dbDir = File(sandboxDir, "databases")
         if (!dbDir.exists()) dbDir.mkdirs()
-        return File(dbDir, name)
+        val dbPath = File(dbDir, name)
+        assertInsideSandbox(dbPath, sandboxDir)
+        return dbPath
     }
 
     override fun deleteDatabase(name: String): Boolean {

@@ -48,7 +48,7 @@ class StreamSecurityUseCase(
             val isIp = host.matches(Regex("^[0-9.]+$")) || host.contains(":")
             if (isIp) {
                 val inet = java.net.InetAddress.getByName(host)
-                !inet.isLoopbackAddress && !inet.isLinkLocalAddress && !inet.isSiteLocalAddress && !inet.isAnyLocalAddress
+                !com.lagradost.cloudstream3.network.SafeDns.Companion.run { inet.isBlocked() }
             } else {
                 true
             }

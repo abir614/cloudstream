@@ -132,11 +132,13 @@ object OnDeviceNsfwClassifier {
         val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
 
         // Robust YCbCr human skin chrominance cluster (light, medium, and dark skin tones)
-        val isSkinChrominance = y in 50..240 && cb in 80..130 && cr in 133..175 && (cr - cb) in 12..65 && r > g && (r - b) >= 12
+        val isSkinChrominance = y in 50..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8
         // Stylized anime/illustrated peach tones
-        val isAnimeSkin = r in 210..255 && g in 180..245 && b in 155..235 && r > g && g > b && (r - b) in 10..60 && (r - g) in 6..35
+        val isAnimeSkin = r in 205..255 && g in 175..245 && b in 150..235 && r > g && g > b && (r - b) in 8..70 && (r - g) in 4..40
+        // Darker human skin tones
+        val isDarkerSkin = r in 70..190 && g in 45..150 && b in 25..110 && r > g && g > b && (r - b) >= 12 && (r - g) >= 8
 
-        return isSkinChrominance || isAnimeSkin
+        return isSkinChrominance || isAnimeSkin || isDarkerSkin
     }
 
     /**
@@ -374,13 +376,20 @@ object OnDeviceNsfwClassifier {
      * Capable devices (MID and HIGH tiers with 64-bit architecture) execute the full GantMan MobileNetV2 model.
      */
     fun isPotatoDevice(ctx: Context): Boolean {
+        if (DeviceProfile.tier(ctx) == DeviceTier.LOW) return true
+        val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        if (am?.isLowRamDevice == true) return true
+        val mi = ActivityManager.MemoryInfo()
+        am?.getMemoryInfo(mi)
+        val totalMb = if (mi.totalMem > 0) mi.totalMem / (1024 * 1024) else 1024L
+        if (totalMb <= 2200L) return true
         if (DeviceProfile.isLowEnd(ctx) || DeviceProfile.isUltraPotato(ctx)) return true
-        // Dynamic critical memory pressure guard: if remaining runtime heap is critically low (<20MB),
+        // Dynamic critical memory pressure guard: if remaining runtime heap is critically low (<25MB),
         // fallback to the zero-native-allocation skin heuristic to prevent OutOfMemoryError or LMK aborts
         return try {
             val rt = Runtime.getRuntime()
             val remainingHeapMb = (rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())) / (1024 * 1024)
-            remainingHeapMb < 20
+            remainingHeapMb < 25
         } catch (_: Throwable) {
             false
         }
@@ -480,26 +489,22 @@ object OnDeviceNsfwClassifier {
                 val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
                 val maxRowSkinRatio = maxRowSkinCount.toFloat() / POTATO_DIM.toFloat()
 
-                // False-positive rejection:
-                // 1. Uniform colored / sepia / gold / desert backdrop across both upper and body zones
-                // 2. Absence of upper torso/head/face (landscape, desert sand, dirt road, wooden table, brown floor)
-                if (upperSkinRatio > 0.50f && bodySkinRatio > 0.50f) {
+                // False-positive rejection: uniform colored backdrop (e.g. solid yellow, beige, or gold poster)
+                if (upperSkinRatio > 0.70f && bodySkinRatio > 0.70f) {
                     0.0f
-                } else if (bodySkinRatio >= 0.75f && maxRowSkinRatio >= 0.70f && upperSkinRatio in 0.08f..0.50f) {
-                    // True near-total nudity -> 0.75f (Blocks in Low >= 0.55, Moderate >= 0.30, Extreme >= 0.15)
-                    0.75f
-                } else if (bodySkinRatio >= 0.60f && maxRowSkinRatio >= 0.55f && upperSkinRatio in 0.10f..0.45f) {
-                    // Extreme exposure / bikini / lingerie -> 0.35f (Blocks in Moderate >= 0.30 & Extreme >= 0.15; Allowed in Low < 0.55)
+                } else if (bodySkinRatio > 0.50f && maxRowSkinRatio >= 0.45f) {
+                    ((bodySkinRatio - 0.50f) * 2.0f + 0.50f).coerceIn(0.0f, 1.0f)
+                } else if (bodySkinRatio > 0.40f && maxRowSkinRatio >= 0.40f && upperSkinRatio < 0.20f) {
+                    0.45f
+                } else if (bodySkinRatio > 0.35f && maxRowSkinRatio >= 0.35f) {
                     0.35f
-                } else if (bodySkinRatio >= 0.45f && maxRowSkinRatio >= 0.40f && upperSkinRatio in 0.12f..0.40f) {
-                    // Mild beach / summer / cleavage -> 0.20f (Blocks in Extreme >= 0.15; Allowed in Moderate < 0.30 & Low < 0.55)
-                    0.20f
                 } else {
                     0.0f
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Potato fast visual scoring error: ${t.message}")
-                0.0f
+                val appCtx = ctx ?: CloudStreamApp.context
+                if (appCtx?.let { shouldCensorPosters(it) || !it.isNsfwEnabled() } == true) 1.0f else 0.0f
             }
         }
     }
@@ -812,21 +817,18 @@ object OnDeviceNsfwClassifier {
         synchronized(modelBufferLock) {
             sharedModelBuffer?.let { return it }
             return try {
-                ctx.assets.openFd(MODEL_ASSET_PATH).use { assetFd ->
-                    FileInputStream(assetFd.fileDescriptor).use { inputStream ->
-                        inputStream.channel.use { fileChannel ->
-                            val startOffset = assetFd.startOffset
-                            val declaredLength = assetFd.declaredLength
-                            val buffer = fileChannel.map(
-                                FileChannel.MapMode.READ_ONLY,
-                                startOffset,
-                                declaredLength
-                            )
-                            sharedModelBuffer = buffer
-                            buffer
-                        }
-                    }
-                }
+                val assetFd: AssetFileDescriptor = ctx.assets.openFd(MODEL_ASSET_PATH)
+                val inputStream = FileInputStream(assetFd.fileDescriptor)
+                val fileChannel = inputStream.channel
+                val startOffset = assetFd.startOffset
+                val declaredLength = assetFd.declaredLength
+                val buffer = fileChannel.map(
+                    FileChannel.MapMode.READ_ONLY,
+                    startOffset,
+                    declaredLength
+                )
+                sharedModelBuffer = buffer
+                buffer
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to memory map TFLite model: ${t.message}")
                 isModelPermanentlyUnavailable = true

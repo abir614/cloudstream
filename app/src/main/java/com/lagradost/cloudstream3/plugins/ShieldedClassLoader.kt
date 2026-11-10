@@ -36,7 +36,10 @@ class ShieldedClassLoader(
             "com.lagradost.cloudstream3.utils.BackupUtils",
             "com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter",
             "com.lagradost.cloudstream3.utils.telemetry.CrashHandler",
-            "com.lagradost.cloudstream3.utils.persistence.SqliteDataRepository\$DatabaseHelper"
+            "com.lagradost.cloudstream3.utils.persistence.SqliteDataRepository\$DatabaseHelper",
+            "com.lagradost.cloudstream3.CloudStreamApp",
+            "com.lagradost.cloudstream3.utils.DataStore",
+            "com.lagradost.cloudstream3.utils.DataStoreHelper"
         )
 
         /**

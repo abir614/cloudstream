@@ -48,6 +48,9 @@ class StreamSecurityUseCaseTest {
         assertFalse(useCase.isSafeFallback("http://192.168.1.1/video.mp4"))
         assertFalse(useCase.isSafeFallback("http://10.0.0.5:8080/stream"))
         assertFalse(useCase.isSafeFallback("http://172.16.0.10:3000/media"))
+        assertFalse(useCase.isSafeFallback("http://100.64.0.1:8080/stream.m3u8"))
+        assertFalse(useCase.isSafeFallback("http://240.0.0.1/video.mp4"))
+        assertFalse(useCase.isSafeFallback("http://[fc00::1]:8080/feed"))
 
         // Public URLs are safe under fallback
         assertTrue(useCase.isSafeFallback("https://edge.mediaserver.com/live/stream.m3u8"))

@@ -96,13 +96,13 @@ object AutoLogcatMonitor {
             return
         }
 
-        // Potato-tier optimization: On devices with <= 1024MB RAM, do not spawn an external Unix process.
+        // Potato-tier & low-end device optimization: On devices with <= 2048MB RAM or potato devices, do not spawn an external Unix process.
         // In-memory errorReporter in ArchComponentExt already captures 100% of caught exceptions with zero overhead.
-        if (context != null && DeviceProfile.isUltraPotato(context)) {
+        if (context != null && (DeviceProfile.isUltraPotato(context) || DeviceProfile.isLowEnd(context))) {
             try {
                 ServiceLocator.telemetry.recordBreadcrumb(
                     tag = TAG,
-                    message = "Subprocess disabled on ultra-potato device to conserve RAM/CPU; in-memory exception hook active",
+                    message = "Subprocess disabled on potato/low-end device to conserve RAM/CPU; in-memory exception hook active",
                     level = TelemetryService.Level.INFO
                 )
             } catch (_: Throwable) {
