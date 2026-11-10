@@ -448,7 +448,7 @@ For full transparency, developers and users can inspect live, real-time diagnost
 
 ### 16.11 Poster Loading Reliability, NSFW Accuracy & Flagship 120Hz Profiling
 - **Stuck Poster Placeholder Fix (`coil_image_loaded_tag`)**: Replaced premature tag checks in [`ImageModuleCoil.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/ImageModuleCoil.kt) with a dedicated `coil_image_loaded_tag` (`ids.xml`). Prevents RecyclerView viewholder re-binding or layout passes from treating transient placeholder drawables (`default_cover`) as completed loads, eliminating permanently stuck placeholders across all lists and grids.
-- **Poster CDN URL Text Filtering Decoupling**: Removed image CDN URLs from text keyword stem matching in `ImageModuleCoil.kt` and restricted poster URL inspection in [`NsfwFilterEngine.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/NsfwFilterEngine.kt) exclusively to `EXTREME` filter level. Eliminates false-positive censorship caused by random CDN hashes containing sub-stems on clean family content.
+- **Initial Poster CDN URL Stem Filtering (Refined in §16.13)**: Decoupled raw random CDN hash sub-stems in `ImageModuleCoil.kt`; subsequently hardened in §16.13 with multi-vector token parsing across all levels while protecting clean titles via the engine allowlist.
 - **Potato Visual Heuristic Calibration**: Calibrated `classifyPotatoFastScore` in [`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt) with higher body skin density thresholds (>= 75% for near-total nudity, >= 60% for extreme exposure) and uniform warm-tone backdrop rejection (> 50% upper and body skin ratio). Normal portrait photography, clothed actors, and warm/sepia poster art are never falsely flagged.
 - **Full TFLite Model Wiring in `HomeViewModel`**: Replaced crude potato fast score calls in [`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt) preloader with [`classifyDrawableScore`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt), utilizing the accurate MobileNet neural network on MID and HIGH tier devices. Ensured items are never removed from expandable home rows when NSFW is explicitly enabled (`isNsfwEnabled == true`).
 - **Clean Title Allowlist Expansion**: Expanded `CLEAN_TITLE_ALLOWLIST` in `NsfwFilterEngine.kt` to include popular clean titles containing common English words (*Dragon Maid*, *Maid-sama*, *Summer Wars*, *Summer Time Rendering*, *Deadpool*, *Free! - Iwatobi Swim Club*, *The Beach*, *500 Days of Summer*).
@@ -481,6 +481,12 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Restored complete TFLite bypass across all low-end devices (`DeviceTier.LOW`, `totalMb <= 2200MB`, Android Go `isLowRamDevice`, or available runtime heap < 25MB), routing directly to zero-allocation skin chrominance heuristic (< 0.05ms, 0 MB native RAM).
   - Fixed TFLite native `SIGSEGV` crash in `ensureModelBufferLoaded` caused by premature `AssetFileDescriptor` closure during active memory mapping.
   - Calibrated skin tone chrominance and spatial torso exposure scoring, restoring high-accuracy explicit exposure detection and backdrop rejection.
+
+### 16.14 Non-Recursive Sandbox Delegation & Telemetry Suite Verification
+- **Non-Recursive Context Delegation ([`SandboxedContextWrapper.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapper.kt))**:
+  - Bound internal filesystem getters (`filesDir`, `cacheDir`, `getExternalFilesDir`, `getExternalCacheDir`, `getSharedPreferences`) explicitly to constructor `hostContext` rather than calling `baseContext` / `getBaseContext()`, eliminating `StackOverflowError` when plugins or unit test frameworks inspect wrapped context properties.
+- **Enterprise Telemetry Unit Verification ([`RemoteCrashReporterTest.kt`](app/src/test/java/com/lagradost/cloudstream3/utils/telemetry/RemoteCrashReporterTest.kt))**:
+  - Added full test coverage for remote crash report payload serialization, batched diagnostic events, PII / token sanitization, and edge worker endpoint contracts.
 
 
 
