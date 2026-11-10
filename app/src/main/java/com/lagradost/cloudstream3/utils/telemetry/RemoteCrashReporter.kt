@@ -464,7 +464,7 @@ object RemoteCrashReporter {
     }
 
     // --- Zero-Trust Sanitization ---
-    private val TOKEN_REGEX = Regex("""(?i)(token|key|secret|password|auth|bearer|access_token|refresh_token|session|signature)=([^&\\s"']+)""")
+    private val TOKEN_REGEX = Regex("""(?i)(token|key|secret|password|auth|bearer|access_token|refresh_token|session|signature)=([^&\s"']+)""")
     private val IPV4_REGEX = Regex("""\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b""")
     private val EMAIL_REGEX = Regex("""[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}""")
     private val BOT_TOKEN_REGEX = Regex("""\d{8,10}:[a-zA-Z0-9_-]{35}""")
@@ -562,8 +562,10 @@ object RemoteCrashReporter {
             payload.put("kernel", DeviceProfile.getKernelVersion())
 
             // 6. Application Version & Environment
-            payload.put("version", "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})")
-            payload.put("plugin", PluginManager.currentlyLoading ?: "None")
+            val appVersion = try { "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})" } catch (_: Throwable) { "CloudStream" }
+            payload.put("version", appVersion)
+            val currentPlugin = try { PluginManager.currentlyLoading ?: "None" } catch (_: Throwable) { "None" }
+            payload.put("plugin", currentPlugin)
 
             // 7. Exception & Thread Diagnostics
             val threadName = thread?.name ?: Thread.currentThread().name
@@ -657,8 +659,10 @@ object RemoteCrashReporter {
             val osSdk = Build.VERSION.SDK_INT
             payload.put("os", "Android $osRelease (API $osSdk)")
             payload.put("kernel", DeviceProfile.getKernelVersion())
-            payload.put("version", "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})")
-            payload.put("plugin", PluginManager.currentlyLoading ?: "None")
+            val appVersion = try { "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})" } catch (_: Throwable) { "CloudStream" }
+            payload.put("version", appVersion)
+            val currentPlugin = try { PluginManager.currentlyLoading ?: "None" } catch (_: Throwable) { "None" }
+            payload.put("plugin", currentPlugin)
 
             val eventsArray = org.json.JSONArray()
             for (ev in events) {
