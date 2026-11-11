@@ -78,7 +78,12 @@ object AutoLogcatMonitor {
         "NavController",
         "IInputConnectionWrapper",
         "NotificationManager",
-        "ActivityThread"
+        "ActivityThread",
+        "androidtc",
+        "VelocityTracker",
+        "ColorUtils",
+        "ExoPlayerImplInternal",
+        "SandboxClient"
     )
 
     private fun isNoiseTag(tag: String): Boolean {
@@ -205,6 +210,11 @@ object AutoLogcatMonitor {
                             if (message.contains("PostNotification rate is", ignoreCase = true)) continue
                             if (message.contains("inactive InputConnection", ignoreCase = true)) continue
                             if (message.contains("handleWindowVisibility", ignoreCase = true)) continue
+                            if (message.contains("Ignoring messages sent after release", ignoreCase = true)) continue
+                            if (message.contains("Disconnected from ExtensionSandboxService", ignoreCase = true)) continue
+                            if (message.contains("expected specified color aspects", ignoreCase = true)) continue
+                            if (message.contains("No movement data for pointerId", ignoreCase = true)) continue
+                            if (message.contains("TextClassifier called on main thread", ignoreCase = true)) continue
 
                             val level = when (levelChar) {
                                 "E" -> TelemetryService.Level.ERROR

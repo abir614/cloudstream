@@ -168,31 +168,58 @@ object InAppUpdater {
     private suspend fun Activity.getReleaseUpdate(): Update {
         val url = "https://api.github.com/repos/$GITHUB_USER_NAME/$GITHUB_REPO/releases"
         val headers = mapOf("Accept" to "application/vnd.github.v3+json")
-        val releaseHttp = app.get(url, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+        var found: GithubRelease? = null
 
-        if (releaseHttp.code == 403 || releaseHttp.code == 429) {
-            Log.w(LOG_TAG, "GitHub API rate limit exceeded (HTTP ${releaseHttp.code}). Skipping release update check.")
-            return Update(false, null, null, null, null)
-        }
-        if (!releaseHttp.isSuccessful) {
-            Log.w(LOG_TAG, "GitHub API releases request failed with HTTP ${releaseHttp.code}")
-            return Update(false, null, null, null, null)
+        val releaseHttp = try {
+            app.get(url, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+        } catch (_: Throwable) {
+            null
         }
 
-        val response = parseJson<Array<GithubRelease>>(releaseHttp.text).toList()
-
-        val foundList = response.filter { rel ->
-            !rel.prerelease
-        }.sortedWith(compareBy { release ->
-            val tagScore = parseVersionScore(release.tagName)
-            if (tagScore > 0L) tagScore else {
-                release.assets.firstOrNull { it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk") }?.name?.let { fileName ->
-                    parseVersionScore(extractVersionFromFileName(fileName))
-                } ?: 0L
+        if (releaseHttp != null && releaseHttp.isSuccessful) {
+            val response = try {
+                parseJson<Array<GithubRelease>>(releaseHttp.text).toList()
+            } catch (_: Throwable) {
+                emptyList()
             }
-        }).toList()
 
-        val found = foundList.lastOrNull() ?: return Update(false, null, null, null, null)
+            val foundList = response.filter { rel ->
+                !rel.prerelease
+            }.sortedWith(compareBy { release ->
+                val tagScore = parseVersionScore(release.tagName)
+                if (tagScore > 0L) tagScore else {
+                    release.assets.firstOrNull { it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk") }?.name?.let { fileName ->
+                        parseVersionScore(extractVersionFromFileName(fileName))
+                    } ?: 0L
+                }
+            }).toList()
+
+            found = foundList.lastOrNull()
+        }
+
+        // Rate-limit proof CDN fallback: Fetches release.json directly with 0 rate limits
+        if (found == null) {
+            val cdnUrls = listOf(
+                "https://github.com/$GITHUB_USER_NAME/$GITHUB_REPO/releases/download/latest/release.json",
+                "https://raw.githubusercontent.com/$GITHUB_USER_NAME/$GITHUB_REPO/master/release.json"
+            )
+            for (cdnUrl in cdnUrls) {
+                try {
+                    val cdnResponse = app.get(cdnUrl)
+                    if (cdnResponse.isSuccessful) {
+                        val parsed = try { parseJson<GithubRelease>(cdnResponse.text) } catch (_: Throwable) { null }
+                        if (parsed != null && parsed.assets.isNotEmpty()) {
+                            found = parsed
+                            break
+                        }
+                    }
+                } catch (_: Throwable) {
+                }
+            }
+        }
+
+        if (found == null) return Update(false, null, null, null, null)
+
         val apkAssets = found.assets.filter {
             it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk")
         }.sortedByDescending { asset ->
@@ -247,22 +274,48 @@ object InAppUpdater {
             "https://api.github.com/repos/$GITHUB_USER_NAME/$GITHUB_REPO/git/ref/tags/pre-release"
         val releaseUrl = "https://api.github.com/repos/$GITHUB_USER_NAME/$GITHUB_REPO/releases"
         val headers = mapOf("Accept" to "application/vnd.github.v3+json")
-        val releaseHttp = app.get(releaseUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+        var found: GithubRelease? = null
 
-        if (releaseHttp.code == 403 || releaseHttp.code == 429) {
-            Log.w(LOG_TAG, "GitHub API rate limit exceeded (HTTP ${releaseHttp.code}). Skipping pre-release update check.")
-            return Update(false, null, null, null, null)
-        }
-        if (!releaseHttp.isSuccessful) {
-            Log.w(LOG_TAG, "GitHub API pre-release request failed with HTTP ${releaseHttp.code}")
-            return Update(false, null, null, null, null)
+        val releaseHttp = try {
+            app.get(releaseUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+        } catch (_: Throwable) {
+            null
         }
 
-        val response = parseJson<Array<GithubRelease>>(releaseHttp.text).toList()
+        if (releaseHttp != null && releaseHttp.isSuccessful) {
+            val response = try {
+                parseJson<Array<GithubRelease>>(releaseHttp.text).toList()
+            } catch (_: Throwable) {
+                emptyList()
+            }
 
-        val found = response.lastOrNull { rel ->
-            rel.prerelease || rel.tagName == "pre-release"
-        } ?: return Update(false, null, null, null, null)
+            found = response.lastOrNull { rel ->
+                rel.prerelease || rel.tagName == "pre-release"
+            }
+        }
+
+        // Rate-limit proof CDN fallback: Fetches release.json directly with 0 rate limits
+        if (found == null) {
+            val cdnUrls = listOf(
+                "https://github.com/$GITHUB_USER_NAME/$GITHUB_REPO/releases/download/pre-release/release.json",
+                "https://raw.githubusercontent.com/$GITHUB_USER_NAME/$GITHUB_REPO/master/release.json"
+            )
+            for (cdnUrl in cdnUrls) {
+                try {
+                    val cdnResponse = app.get(cdnUrl)
+                    if (cdnResponse.isSuccessful) {
+                        val parsed = try { parseJson<GithubRelease>(cdnResponse.text) } catch (_: Throwable) { null }
+                        if (parsed != null && parsed.assets.isNotEmpty()) {
+                            found = parsed
+                            break
+                        }
+                    }
+                } catch (_: Throwable) {
+                }
+            }
+        }
+
+        if (found == null) return Update(false, null, null, null, null)
 
         val apkAssets = found.assets.filter {
             it.contentType == "application/vnd.android.package-archive" || it.name.endsWith(".apk")
@@ -289,8 +342,12 @@ object InAppUpdater {
             found.targetCommitish.trim().take(7)
         } else null
 
-        val tagHttp = app.get(tagUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
-        val tagCommitSha = if (tagHttp.isSuccessful) {
+        val tagHttp = try {
+            app.get(tagUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+        } catch (_: Throwable) {
+            null
+        }
+        val tagCommitSha = if (tagHttp != null && tagHttp.isSuccessful) {
             try {
                 val tagResponse = parseJson<GithubTag>(tagHttp.text)
                 tagResponse.githubObject.sha.trim().take(7)
@@ -298,7 +355,6 @@ object InAppUpdater {
                 null
             }
         } else {
-            Log.w(LOG_TAG, "GitHub pre-release tag request returned HTTP ${tagHttp.code}")
             null
         }
 
