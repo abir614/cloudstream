@@ -144,12 +144,10 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Ok(res) => res,
         Err(_) => crate::security::apk_verifier::ApkVerificationResult {
             is_valid: false,
+            package_name: String::new(),
+            file_sha256: String::new(),
+            attestation_token: String::new(),
             error_message: Some("Panic trapped in native APK identity verifier".to_string()),
-            actual_sha256: None,
-            extracted_package_name: None,
-            extracted_version_code: None,
-            extracted_cert_sha256: None,
-            attestation_token: None,
         },
     };
 
