@@ -371,7 +371,10 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    private suspend fun populateHomeFromData(homeData: List<HomePageResponse?>) {
+    private suspend fun populateHomeFromData(
+        homeData: List<HomePageResponse?>,
+        isBackgroundUpdate: Boolean = false
+    ) {
         try {
             expandable.clear()
             val nsfwEnabled = context?.isNsfwEnabled() ?: true
@@ -383,7 +386,7 @@ class HomeViewModel : ViewModel() {
             val shouldFilter = !nsfwEnabled || (context?.shouldCensorPosters() == true)
             val filterMsg = context?.getString(R.string.content_filtering_in_progress) ?: "Content Filtering in Progress"
 
-            if (shouldFilter && totalTextItems > 0) {
+            if (!isBackgroundUpdate && shouldFilter && totalTextItems > 0) {
                 _contentFilterProgress.postValue(ContentFilterProgress(isFiltering = true, current = 0, total = 100, message = filterMsg))
             }
 
@@ -392,7 +395,7 @@ class HomeViewModel : ViewModel() {
                 home?.items?.forEach { list ->
                     val nsfwFiltered = NsfwFilterEngine.filterHomePageList(list, nsfwEnabled)
                     processedCount += list.list.size
-                    if (shouldFilter && totalTextItems > 0) {
+                    if (!isBackgroundUpdate && shouldFilter && totalTextItems > 0) {
                         val phase1Percent = (processedCount * 50 / totalTextItems).coerceIn(0, 50)
                         _contentFilterProgress.postValue(
                             ContentFilterProgress(
@@ -422,42 +425,37 @@ class HomeViewModel : ViewModel() {
                 }
             }
 
-            val items = homeData.mapNotNull { it?.items }.flatten()
-
             previewResponses.clear()
             previewResponsesAdded.clear()
 
             var randomItems: List<SearchResponse> = emptyList()
             var initialPreviews: List<LoadResponse> = emptyList()
 
-            if (items.isNotEmpty()) {
-                val currentList =
-                    items.shuffled().filter { it.list.isNotEmpty() }
-                        .flatMap { it.list }
-                        .distinctBy { it.url }.toList()
+            // Reuse already-filtered items from expandable to eliminate duplicate second-pass filterSearchResults
+            val filteredHomeItems = expandable.values
+                .flatMap { it.list.list }
+                .distinctBy { it.url }
 
-                val nsfwFilteredCurrentList = NsfwFilterEngine.filterSearchResults(currentList, nsfwEnabled)
-                if (nsfwFilteredCurrentList.isNotEmpty()) {
-                    randomItems =
-                        context?.filterSearchResultByFilmQuality(nsfwFilteredCurrentList.shuffled())
-                            ?: nsfwFilteredCurrentList.shuffled()
+            if (filteredHomeItems.isNotEmpty()) {
+                randomItems =
+                    context?.filterSearchResultByFilmQuality(filteredHomeItems.shuffled())
+                        ?: filteredHomeItems.shuffled()
 
-                    _randomItems.postValue(randomItems)
-                    currentShuffledList = randomItems
+                _randomItems.postValue(randomItems)
+                currentShuffledList = randomItems
 
-                    val targetApi = repo?.api ?: noneApi
-                    initialPreviews = randomItems.take(3).map { item ->
-                        val providerApi = getApiFromNameNull(item.apiName) ?: targetApi
-                        providerApi.newMovieLoadResponse(
-                            name = item.name,
-                            url = item.url,
-                            type = item.type ?: com.lagradost.cloudstream3.TvType.Movie,
-                            dataUrl = item.url
-                        ) {
-                            this.posterUrl = item.posterUrl
-                            this.backgroundPosterUrl = item.posterUrl
-                            this.posterHeaders = item.posterHeaders
-                        }
+                val targetApi = repo?.api ?: noneApi
+                initialPreviews = randomItems.take(3).map { item ->
+                    val providerApi = getApiFromNameNull(item.apiName) ?: targetApi
+                    providerApi.newMovieLoadResponse(
+                        name = item.name,
+                        url = item.url,
+                        type = item.type ?: com.lagradost.cloudstream3.TvType.Movie,
+                        dataUrl = item.url
+                    ) {
+                        this.posterUrl = item.posterUrl
+                        this.backgroundPosterUrl = item.posterUrl
+                        this.posterHeaders = item.posterHeaders
                     }
                 }
             }
@@ -536,15 +534,17 @@ class HomeViewModel : ViewModel() {
                                     synchronized(initialItems) {
                                         postersProcessed++
                                     }
-                                    val posterPercent = (50 + (postersProcessed * 50 / totalPosters)).coerceIn(50, 100)
-                                    _contentFilterProgress.postValue(
-                                        ContentFilterProgress(
-                                            isFiltering = true,
-                                            current = posterPercent,
-                                            total = 100,
-                                            message = posterMsg
+                                    if (!isBackgroundUpdate) {
+                                        val posterPercent = (50 + (postersProcessed * 50 / totalPosters)).coerceIn(50, 100)
+                                        _contentFilterProgress.postValue(
+                                            ContentFilterProgress(
+                                                isFiltering = true,
+                                                current = posterPercent,
+                                                total = 100,
+                                                message = posterMsg
+                                            )
                                         )
-                                    )
+                                    }
                                     if (isPotato) {
                                         kotlinx.coroutines.delay(10L)
                                     }
@@ -565,14 +565,16 @@ class HomeViewModel : ViewModel() {
             }
 
             if (!isLowEndOrPotato) {
-                _contentFilterProgress.postValue(
-                    ContentFilterProgress(
-                        isFiltering = true,
-                        current = 100,
-                        total = 100,
-                        message = context?.getString(R.string.loading) ?: "Loading"
+                if (!isBackgroundUpdate) {
+                    _contentFilterProgress.postValue(
+                        ContentFilterProgress(
+                            isFiltering = true,
+                            current = 100,
+                            total = 100,
+                            message = context?.getString(R.string.loading) ?: "Loading"
+                        )
                     )
-                )
+                }
 
                 // Render home sections with posters already loaded, safe, and cached
                 _page.postValue(Resource.Success(expandable))
@@ -612,6 +614,35 @@ class HomeViewModel : ViewModel() {
         }
     }
 
+    private fun isHomeDataEqual(
+        oldData: List<HomePageResponse?>?,
+        newData: List<HomePageResponse?>?
+    ): Boolean {
+        if (oldData === newData) return true
+        if (oldData == null || newData == null) return false
+        if (oldData.size != newData.size) return false
+        for (i in oldData.indices) {
+            val oldItem = oldData[i]
+            val newItem = newData[i]
+            if (oldItem === newItem) continue
+            if (oldItem == null || newItem == null) return false
+            if (oldItem.hasNext != newItem.hasNext) return false
+            if (oldItem.items.size != newItem.items.size) return false
+            for (j in oldItem.items.indices) {
+                val oldRow = oldItem.items[j]
+                val newRow = newItem.items[j]
+                if (oldRow.name != newRow.name || oldRow.isHorizontalImages != newRow.isHorizontalImages) return false
+                if (oldRow.list.size != newRow.list.size) return false
+                for (k in oldRow.list.indices) {
+                    val oldSearch = oldRow.list[k]
+                    val newSearch = newRow.list[k]
+                    if (oldSearch.url != newSearch.url || oldSearch.name != newSearch.name || oldSearch.posterUrl != newSearch.posterUrl || oldSearch.type != newSearch.type) return false
+                }
+            }
+        }
+        return true
+    }
+
     private fun load(api: MainAPI, forceReload: Boolean = false): Job = ioSafe {
         repo = APIRepository(api)
 
@@ -629,9 +660,10 @@ class HomeViewModel : ViewModel() {
             APIRepository.getCachedMainPage(api.name, 1)
         } else null
 
-        if (cachedData != null && cachedData.any { it != null }) {
+        val hasCached = cachedData != null && cachedData.any { it != null }
+        if (hasCached) {
             rawHomeData = cachedData
-            populateHomeFromData(cachedData)
+            populateHomeFromData(cachedData!!)
         } else {
             _page.postValue(Resource.Loading())
             _preview.postValue(Resource.Loading())
@@ -641,12 +673,15 @@ class HomeViewModel : ViewModel() {
 
         when (val data = repo?.getMainPage(1, null, forceReload)) {
             is Resource.Success -> {
+                val isDataIdentical = hasCached && isHomeDataEqual(cachedData, data.value)
                 rawHomeData = data.value
-                populateHomeFromData(data.value)
+                if (!isDataIdentical) {
+                    populateHomeFromData(data.value, isBackgroundUpdate = hasCached)
+                }
             }
 
             is Resource.Failure -> {
-                if (cachedData == null) {
+                if (!hasCached) {
                     @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")
                     _page.postValue(data!!)
                     @Suppress("UNNECESSARY_NOT_NULL_ASSERTION")

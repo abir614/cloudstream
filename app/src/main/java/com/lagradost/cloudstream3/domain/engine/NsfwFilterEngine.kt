@@ -915,10 +915,7 @@ object NsfwFilterEngine {
 
         // 2. If row items exclusively contain adult content (100% NSFW), eliminate the entire row
         if (items.isNotEmpty()) {
-            val nsfwCount = items.count { isNsfw(it, level) }
-            if (nsfwCount == items.size) {
-                return true
-            }
+            return items.all { isNsfw(it, level) }
         }
         return false
     }
@@ -936,12 +933,15 @@ object NsfwFilterEngine {
     /**
      * Filters a home page row, removing adult items or eliminating the row entirely if empty or adult.
      * When disabled (default), all adult categories and items are completely removed.
+     * Implements single-pass evaluation: evaluates each item at most once to prevent duplicate scanning.
      */
     fun filterHomePageList(data: HomePageList, isNsfwEnabled: Boolean): HomePageList? {
         if (isNsfwEnabled) return data
         val level = getFilterLevel()
-        if (isNsfwFeedRow(data.name, data.list, level)) return null
+        // Fast-path: if the row category title is adult, drop the entire row immediately without inspecting items
+        if (isNsfwText(data.name, "", null, level)) return null
 
+        // Single-pass: filter items directly
         val filteredItems = data.list.filterNot { isNsfw(it, level) }
         if (filteredItems.isEmpty()) return null
 
