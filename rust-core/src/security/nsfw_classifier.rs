@@ -695,8 +695,66 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
     false
 }
 
+/// Scunthorpe problem allowlist: benign mainstream media, literary titles, and geographic entities
+/// that happen to contain benign substrings overlapping with adult stems.
+const SCUNTHORPE_ALLOWLIST: &[&str] = &[
+    "step brothers",
+    "step-brothers",
+    "stepbrothers",
+    "moby dick",
+    "charles dickens",
+    "scunthorpe",
+    "middlesbrough",
+    "sussex",
+    "essex",
+    "assassin",
+    "assassins",
+    "assassins creed",
+    "classics",
+    "classic",
+    "cocktail",
+    "cockpit",
+    "spancock",
+    "penistone",
+    "lightshippond",
+];
+
+/// Explicit hardcore pornography tokens that, if present, cancel any allowlist protection.
+const STRICT_EXPLICIT_TOKENS: &[&str] = &[
+    "porn", "porno", "xxx", "hentai", "jav", "r18", "bukkake", "blowjob", "creampie", "masturbation",
+];
+
+pub fn is_benign_scunthorpe_allowed(title: &str) -> bool {
+    if title.is_empty() {
+        return false;
+    }
+    let lower = title.to_lowercase();
+    let trimmed = lower.trim();
+
+    let matches_allow = SCUNTHORPE_ALLOWLIST.iter().any(|&item| {
+        trimmed == item
+            || trimmed.starts_with(&format!("{} ", item))
+            || trimmed.starts_with(&format!("{}:", item))
+            || trimmed.starts_with(&format!("{} -", item))
+    });
+
+    if !matches_allow {
+        return false;
+    }
+
+    for &token in STRICT_EXPLICIT_TOKENS {
+        if trimmed.contains(token) {
+            return false;
+        }
+    }
+    true
+}
+
 /// Classifies title, url, and optional tags with a specific sensitivity level.
 pub fn is_nsfw_text_with_level(title: &str, url: &str, tags: Option<&str>, level: u8) -> bool {
+    if is_benign_scunthorpe_allowed(title) {
+        return false;
+    }
     if is_text_nsfw_single(title, level) {
         return true;
     }
@@ -983,5 +1041,18 @@ mod tests {
             "https://sony.com/spiderman",
             None
         ));
+    }
+
+    #[test]
+    fn test_scunthorpe_allowlist_benign_titles() {
+        assert!(!is_nsfw_text("Step Brothers", "https://movies.com/sb", None));
+        assert!(!is_nsfw_text("Moby Dick", "https://classic.com/md", None));
+        assert!(!is_nsfw_text("Charles Dickens", "https://literature.org/cd", None));
+        assert!(!is_nsfw_text("Scunthorpe United", "https://sports.com/su", None));
+        assert!(!is_nsfw_text("The Assassin", "https://movies.com/assassin", None));
+        assert!(!is_nsfw_text("Sussex Wildlife", "https://nature.org/sussex", None));
+
+        // Parody with explicit pornography token must still be caught
+        assert!(is_nsfw_text("Step Brothers Porn Parody", "https://xxx.com/sb", None));
     }
 }

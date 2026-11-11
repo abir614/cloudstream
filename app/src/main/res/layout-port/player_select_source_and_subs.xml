@@ -58,7 +58,7 @@
                 android:layout_height="0dp"
                 android:layout_weight="1"
                 android:background="?attr/primaryBlackBackground"
-                android:listSelector="@drawable/outline_drawable_forced"
+                android:listSelector="@drawable/outline_drawable"
                 android:requiresFadingEdge="vertical"
                 tools:listitem="@layout/sort_bottom_single_choice" />
         </LinearLayout>
@@ -111,7 +111,7 @@
                     android:layout_width="44dp"
                     android:layout_height="44dp"
                     android:contentDescription="@string/subtitles_settings"
-                    android:foreground="@drawable/outline_drawable_forced"
+                    android:foreground="@drawable/outline_drawable"
                     android:padding="10dp"
                     android:src="@drawable/ic_outline_settings_24" />
             </LinearLayout>
@@ -129,7 +129,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="?attr/primaryBlackBackground"
-                    android:listSelector="@drawable/outline_drawable_forced"
+                    android:listSelector="@drawable/outline_drawable"
                     android:requiresFadingEdge="vertical"
                     tools:listitem="@layout/sort_bottom_single_choice" />
 
@@ -139,7 +139,7 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="?attr/primaryBlackBackground"
-                    android:listSelector="@drawable/outline_drawable_forced"
+                    android:listSelector="@drawable/outline_drawable"
                     android:requiresFadingEdge="vertical"
                     tools:listitem="@layout/sort_bottom_single_choice" />
             </LinearLayout>

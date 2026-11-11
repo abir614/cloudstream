@@ -486,9 +486,40 @@ object NsfwFilterEngine {
         "the beach", "500 days of summer"
     )
 
+    /**
+     * Scunthorpe Problem Allowlist.
+     * Prevents benign English/literary/geographic titles from triggering false positives
+     * due to substring stem overlaps.
+     */
+    val SCUNTHORPE_ALLOWLIST = hashSetOf(
+        "step brothers", "step-brothers", "stepbrothers",
+        "moby dick", "charles dickens",
+        "scunthorpe", "middlesbrough",
+        "sussex", "essex",
+        "assassin", "assassins", "assassins creed",
+        "classics", "classic",
+        "cocktail", "cockpit", "spancock", "penistone", "lightshippond"
+    )
+
+    private val STRICT_EXPLICIT_VIOLATIONS = arrayOf(
+        "porn", "porno", "xxx", "hentai", "jav", "r18", "bukkake", "blowjob", "creampie", "masturbation"
+    )
+
     fun isCleanTitleAllowed(title: String?): Boolean {
         if (title.isNullOrBlank()) return false
         val clean = title.lowercase().trim()
+
+        // Scunthorpe problem protection: resolve benign matches unless explicit hardcore tokens appear
+        val isScunthorpeCandidate = SCUNTHORPE_ALLOWLIST.any { allowed ->
+            clean == allowed || clean.startsWith("$allowed ") || clean.startsWith("$allowed:") ||
+            clean.startsWith("$allowed -") || clean.startsWith("the $allowed")
+        }
+        if (isScunthorpeCandidate) {
+            val hasExplicitHardcore = STRICT_EXPLICIT_VIOLATIONS.any { clean.contains(it) }
+            if (!hasExplicitHardcore) {
+                return true
+            }
+        }
 
         // Strict security barrier: If the title contains ANY adult/hardcore/hentai/xxx tokens,
         // it must NEVER be exempted by the allowlist (prevents "Naruto Hentai", "Deadpool Porn", etc.)

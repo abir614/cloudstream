@@ -1,4 +1,4 @@
-#![allow(unused_mut, unused_variables, dead_code, clippy::all)]
+#![allow(unused_variables, dead_code)]
 
 use jni::objects::{JByteArray, JClass, JString};
 use jni::sys::{jboolean, jbyteArray, jint, jstring};
@@ -55,12 +55,15 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
 /// JNI bridge to generate a cryptographically secure 256-bit ephemeral session nonce
 #[no_mangle]
 pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge_generateSessionNonce(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
-    let nonce = match crate::security::apk_verifier::generate_session_nonce() {
-        Ok(n) => n,
-        Err(_) => return std::ptr::null_mut(),
+    let safe_res = std::panic::catch_unwind(|| {
+        crate::security::apk_verifier::generate_session_nonce()
+    });
+    let nonce = match safe_res {
+        Ok(Ok(n)) => n,
+        _ => return std::ptr::null_mut(),
     };
     match env.new_string(nonce) {
         Ok(js) => js.into_raw(),
@@ -123,17 +126,32 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         None
     };
 
-    let result = crate::security::apk_verifier::verify_apk_identity(
-        &apk_path,
-        &session_nonce,
-        &expected_pkg,
-        &actual_pkg,
-        &expected_cert,
-        &actual_cert,
-        installed_version_code,
-        apk_version_code,
-        repo_header_hex.as_deref(),
-    );
+    let safe_res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::security::apk_verifier::verify_apk_identity(
+            &apk_path,
+            &session_nonce,
+            &expected_pkg,
+            &actual_pkg,
+            &expected_cert,
+            &actual_cert,
+            installed_version_code,
+            apk_version_code,
+            repo_header_hex.as_deref(),
+        )
+    }));
+
+    let result = match safe_res {
+        Ok(res) => res,
+        Err(_) => crate::security::apk_verifier::ApkVerificationResult {
+            is_valid: false,
+            error_message: Some("Panic trapped in native APK identity verifier".to_string()),
+            actual_sha256: None,
+            extracted_package_name: None,
+            extracted_version_code: None,
+            extracted_cert_sha256: None,
+            attestation_token: None,
+        },
+    };
 
     let json_output = serde_json::to_string(&result).unwrap_or_else(|_| {
         "{\"is_valid\":false,\"error_message\":\"Serialization error\"}".to_string()
@@ -177,17 +195,20 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Err(_) => return 0,
     };
 
-    if crate::security::apk_verifier::verify_attestation_token(
-        &session_nonce,
-        &token,
-        &file_hash,
-        &pkg_name,
-        &cert_fingerprint,
-        version_code,
-    ) {
-        1
-    } else {
-        0
+    let safe_res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::security::apk_verifier::verify_attestation_token(
+            &session_nonce,
+            &token,
+            &file_hash,
+            &pkg_name,
+            &cert_fingerprint,
+            version_code,
+        )
+    }));
+
+    match safe_res {
+        Ok(true) => 1,
+        _ => 0,
     }
 }
 
@@ -406,10 +427,13 @@ pub extern "system" fn Java_com_lagradost_cloudstream3_services_NativeCoreBridge
         Err(_) => return 0,
     };
 
-    if crate::crypto::backup_cipher::is_encrypted_backup(&data) {
-        1
-    } else {
-        0
+    let safe_res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::crypto::backup_cipher::is_encrypted_backup(&data)
+    }));
+
+    match safe_res {
+        Ok(true) => 1,
+        _ => 0,
     }
 }
 

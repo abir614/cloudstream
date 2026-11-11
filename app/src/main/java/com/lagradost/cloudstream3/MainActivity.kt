@@ -804,8 +804,8 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         val builder = NavOptions.Builder().setLaunchSingleTop(true).setRestoreState(true)
             .setEnterAnim(R.anim.enter_anim)
             .setExitAnim(R.anim.exit_anim)
-            .setPopEnterAnim(R.anim.pop_enter)
-            .setPopExitAnim(R.anim.pop_exit)
+            .setPopEnterAnim(R.anim.enter_anim)
+            .setPopExitAnim(R.anim.exit_anim)
         if (item.order and Menu.CATEGORY_SECONDARY == 0) {
             builder.setPopUpTo(
                 navController.graph.findStartDestination().id,

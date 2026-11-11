@@ -81,7 +81,7 @@
 
     <style name="ListViewStyle" parent="Widget.AppCompat.ListView">
         <item name="android:divider">@null</item>
-        <item name="android:listSelector">@drawable/outline_drawable_forced</item>
+        <item name="android:listSelector">@drawable/outline_drawable</item>
         <item name="android:drawSelectorOnTop">false</item>
     </style>
 

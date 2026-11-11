@@ -12,6 +12,65 @@ enum class DeviceTier {
     HIGH
 }
 
+data class RamCapability(
+    val totalMemMb: Long,
+    val availMemMb: Long,
+    val isLowRamDevice: Boolean,
+    val memoryClass: Int,
+    val largeMemoryClass: Int,
+    val swapMb: Long
+)
+
+data class CpuCapability(
+    val supportedAbis: List<String>,
+    val primaryAbi: String,
+    val coreCount: Int,
+    val is64Bit: Boolean,
+    val chipIdentifier: String
+)
+
+data class DisplayCapability(
+    val isTv: Boolean,
+    val isTablet: Boolean,
+    val widthPx: Int,
+    val heightPx: Int,
+    val densityDpi: Int,
+    val refreshRateHz: Float
+)
+
+data class CodecCapabilities(
+    val hasHardwareAvc: Boolean,
+    val hasHardwareHevc: Boolean,
+    val maxHevcHeight: Int,
+    val hasHardwareVp9: Boolean,
+    val hasHardwareAv1: Boolean,
+    val hardwareDecoders: List<String>,
+    val softwareDecoders: List<String>
+)
+
+data class StorageCapability(
+    val freeSpaceMb: Long,
+    val totalSpaceMb: Long
+)
+
+data class OsCapability(
+    val sdkInt: Int,
+    val manufacturer: String,
+    val model: String,
+    val kernelVersion: String
+)
+
+data class DeviceCapabilities(
+    val tier: DeviceTier,
+    val isUltraPotato: Boolean,
+    val ram: RamCapability,
+    val cpu: CpuCapability,
+    val display: DisplayCapability,
+    val codecs: CodecCapabilities,
+    val storage: StorageCapability,
+    val os: OsCapability
+)
+
 data class NetworkTierConfig(
     val maxRequests: Int,
     val maxRequestsPerHost: Int,
@@ -60,6 +119,8 @@ object DeviceProfile {
     private var cachedKernelVersion: String? = null
     @Volatile
     private var cachedZramSwapMb: Long? = null
+    @Volatile
+    private var cachedCapabilities: DeviceCapabilities? = null
 
     fun tier(ctx: Context): DeviceTier {
         val override = try {
@@ -348,6 +409,197 @@ object DeviceProfile {
             cachedTier = null
             cachedOverride = null
             cachedBatteryRestricted = null
+            cachedCapabilities = null
+        }
+    }
+
+    /**
+     * Probes dynamic hardware decoding capabilities querying MediaCodecList.
+     * Wrapped in a failsafe boundary to guarantee zero crashes on non-standard Android TV firmware.
+     */
+    fun probeCodecs(): CodecCapabilities {
+        return try {
+            val codecList = if (Build.VERSION.SDK_INT >= 21) {
+                android.media.MediaCodecList(android.media.MediaCodecList.REGULAR_CODECS)
+            } else null
+
+            var hasAvc = false
+            var hasHevc = false
+            var maxHevcH = 1080
+            var hasVp9 = false
+            var hasAv1 = false
+            val hwList = mutableListOf<String>()
+            val swList = mutableListOf<String>()
+
+            codecList?.codecInfos?.forEach { info ->
+                if (!info.isEncoder) {
+                    val isHw = if (Build.VERSION.SDK_INT >= 29) {
+                        info.isHardwareAccelerated
+                    } else {
+                        val name = info.name.lowercase()
+                        !name.startsWith("omx.google.") && !name.startsWith("c2.android.") && !name.startsWith("omx.ffmpeg.")
+                    }
+                    if (isHw) {
+                        hwList.add(info.name)
+                    } else {
+                        swList.add(info.name)
+                    }
+
+                    val types = try { info.supportedTypes } catch (_: Throwable) { emptyArray() }
+                    for (type in types) {
+                        when (type.lowercase()) {
+                            "video/avc" -> if (isHw) hasAvc = true
+                            "video/hevc" -> {
+                                if (isHw) {
+                                    hasHevc = true
+                                    try {
+                                        val caps = info.getCapabilitiesForType(type)?.videoCapabilities
+                                        if (caps != null) {
+                                            val maxH = caps.supportedHeights.upper
+                                            if (maxH > maxHevcH) {
+                                                maxHevcH = maxH
+                                            }
+                                        }
+                                    } catch (_: Throwable) {}
+                                }
+                            }
+                            "video/x-vnd.on2.vp9" -> if (isHw) hasVp9 = true
+                            "video/av01" -> if (isHw) hasAv1 = true
+                        }
+                    }
+                }
+            }
+
+            CodecCapabilities(
+                hasHardwareAvc = hasAvc,
+                hasHardwareHevc = hasHevc,
+                maxHevcHeight = maxHevcH,
+                hasHardwareVp9 = hasVp9,
+                hasHardwareAv1 = hasAv1,
+                hardwareDecoders = hwList.distinct().take(15),
+                softwareDecoders = swList.distinct().take(15)
+            )
+        } catch (_: Throwable) {
+            CodecCapabilities(
+                hasHardwareAvc = true,
+                hasHardwareHevc = false,
+                maxHevcHeight = 1080,
+                hasHardwareVp9 = false,
+                hasHardwareAv1 = false,
+                hardwareDecoders = emptyList(),
+                softwareDecoders = emptyList()
+            )
+        }
+    }
+
+    /**
+     * Computes the complete single source-of-truth hardware profile asynchronously or cached.
+     */
+    fun getDeviceCapabilities(ctx: Context): DeviceCapabilities {
+        cachedCapabilities?.let { return it }
+        val appContext = ctx.applicationContext ?: ctx
+
+        val tier = tier(appContext)
+        val potato = isUltraPotato(appContext)
+
+        val ram = try {
+            val am = appContext.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            val mi = ActivityManager.MemoryInfo()
+            am?.getMemoryInfo(mi)
+            RamCapability(
+                totalMemMb = (mi.totalMem / (1024 * 1024)),
+                availMemMb = (mi.availMem / (1024 * 1024)),
+                isLowRamDevice = am?.isLowRamDevice ?: false,
+                memoryClass = am?.memoryClass ?: 128,
+                largeMemoryClass = am?.largeMemoryClass ?: 256,
+                swapMb = getZramSwapMb()
+            )
+        } catch (_: Throwable) {
+            RamCapability(1024, 512, false, 128, 256, 0)
+        }
+
+        val cpu = try {
+            val abis = Build.SUPPORTED_ABIS?.toList() ?: listOf(Build.CPU_ABI ?: "armeabi-v7a")
+            val primary = abis.firstOrNull() ?: "armeabi-v7a"
+            val cores = Runtime.getRuntime().availableProcessors()
+            val is64 = Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() ?: false
+            CpuCapability(
+                supportedAbis = abis,
+                primaryAbi = primary,
+                coreCount = cores,
+                is64Bit = is64,
+                chipIdentifier = getCpuInfoString()
+            )
+        } catch (_: Throwable) {
+            CpuCapability(listOf("armeabi-v7a"), "armeabi-v7a", 4, false, "")
+        }
+
+        val display = try {
+            val dm = appContext.resources.displayMetrics
+            val isTv = try {
+                val uiMode = appContext.resources.configuration.uiMode
+                (uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+            } catch (_: Throwable) { false }
+            val isTablet = try {
+                appContext.resources.configuration.smallestScreenWidthDp >= 600
+            } catch (_: Throwable) { false }
+            DisplayCapability(
+                isTv = isTv,
+                isTablet = isTablet,
+                widthPx = dm.widthPixels,
+                heightPx = dm.heightPixels,
+                densityDpi = dm.densityDpi,
+                refreshRateHz = 60.0f
+            )
+        } catch (_: Throwable) {
+            DisplayCapability(false, false, 1280, 720, 160, 60.0f)
+        }
+
+        val codecs = probeCodecs()
+
+        val storage = try {
+            val stat = android.os.StatFs(appContext.filesDir.absolutePath)
+            val free = stat.availableBytes / (1024 * 1024)
+            val total = stat.totalBytes / (1024 * 1024)
+            StorageCapability(free, total)
+        } catch (_: Throwable) {
+            StorageCapability(512, 4096)
+        }
+
+        val os = OsCapability(
+            sdkInt = Build.VERSION.SDK_INT,
+            manufacturer = Build.MANUFACTURER ?: "Unknown",
+            model = Build.MODEL ?: "Unknown",
+            kernelVersion = getKernelVersion()
+        )
+
+        val caps = DeviceCapabilities(
+            tier = tier,
+            isUltraPotato = potato,
+            ram = ram,
+            cpu = cpu,
+            display = display,
+            codecs = codecs,
+            storage = storage,
+            os = os
+        )
+        cachedCapabilities = caps
+        return caps
+    }
+
+    /**
+     * Determines maximum safe video playback resolution for the current hardware.
+     * Prevents low-memory SoCs (e.g. Allwinner H313) from crash-looping on 4K streams.
+     */
+    fun getMaxSupportedVideoHeight(ctx: Context): Int {
+        return try {
+            if (isUltraPotato(ctx) || getDeviceCapabilities(ctx).codecs.maxHevcHeight <= 1080) {
+                1080
+            } else {
+                2160
+            }
+        } catch (_: Throwable) {
+            1080
         }
     }
 

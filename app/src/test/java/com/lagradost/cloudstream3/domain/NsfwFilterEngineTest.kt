@@ -259,5 +259,103 @@ class NsfwFilterEngineTest {
         assertTrue(NsfwFilterEngine.isNsfw(adultPosterItem, NsfwFilterLevel.MODERATE))
         assertTrue(NsfwFilterEngine.isNsfw(adultPosterItem, NsfwFilterLevel.EXTREME))
     }
+
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `test scunthorpe problem allowlist protects benign titles`() {
+        // Benign titles that contain substrings matching adult stems must NOT be filtered
+        val stepBrothers = MovieSearchResponse("Step Brothers", "https://stream.to/sb", "Provider", TvType.Movie)
+        assertFalse(NsfwFilterEngine.isNsfw(stepBrothers, NsfwFilterLevel.LOW))
+        assertFalse(NsfwFilterEngine.isNsfw(stepBrothers, NsfwFilterLevel.MODERATE))
+
+        val mobyDick = MovieSearchResponse("Moby Dick", "https://stream.to/md", "Provider", TvType.Movie)
+        assertFalse(NsfwFilterEngine.isNsfw(mobyDick, NsfwFilterLevel.LOW))
+        assertFalse(NsfwFilterEngine.isNsfw(mobyDick, NsfwFilterLevel.MODERATE))
+
+        val charlesDickens = MovieSearchResponse("Charles Dickens: A Christmas Carol", "https://stream.to/cd", "Provider", TvType.Movie)
+        assertFalse(NsfwFilterEngine.isNsfw(charlesDickens, NsfwFilterLevel.LOW))
+
+        val scunthorpe = MovieSearchResponse("Scunthorpe United Highlights", "https://stream.to/su", "Provider", TvType.Movie)
+        assertFalse(NsfwFilterEngine.isNsfw(scunthorpe, NsfwFilterLevel.LOW))
+
+        val assassin = MovieSearchResponse("The Assassin", "https://stream.to/assassin", "Provider", TvType.Movie)
+        assertFalse(NsfwFilterEngine.isNsfw(assassin, NsfwFilterLevel.LOW))
+
+        val sussex = MovieSearchResponse("Sussex Coast Wildlife", "https://stream.to/sussex", "Provider", TvType.Movie)
+        assertFalse(NsfwFilterEngine.isNsfw(sussex, NsfwFilterLevel.LOW))
+
+        val classics = MovieSearchResponse("Classics of Cinema", "https://stream.to/classics", "Provider", TvType.Movie)
+        assertFalse(NsfwFilterEngine.isNsfw(classics, NsfwFilterLevel.LOW))
+
+        // But explicit pornography variant must still be caught as NSFW
+        val dirtyStepBrothers = MovieSearchResponse("Step Brothers Porn Parody", "https://stream.to/sb-porn", "Provider", TvType.Movie)
+        assertTrue(NsfwFilterEngine.isNsfw(dirtyStepBrothers, NsfwFilterLevel.LOW))
+    }
+
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `test labeled benchmark suite measures precision and recall`() {
+        data class LabeledItem(val title: String, val url: String, val isAdult: Boolean)
+
+        val dataset = listOf(
+            // 15 Ground Truth Adult (Positive)
+            LabeledItem("Explicit Adult Video", "https://site.to/a1", true),
+            LabeledItem("Hentai Haven Ep 1", "https://site.to/h1", true),
+            LabeledItem("Boku no Pico OVA", "https://site.to/bnp", true),
+            LabeledItem("Adult JAV Vol 1", "https://site.to/jav1", true),
+            LabeledItem("Creampie Gangbang XXX", "https://site.to/cg", true),
+            LabeledItem("R18+ Uncensored Anime", "https://site.to/r18", true),
+            LabeledItem("School Chikan Subway", "https://site.to/chk", true),
+            LabeledItem("Paizuri Queen", "https://site.to/pz", true),
+            LabeledItem("Deepthroat Challenge", "https://site.to/dt", true),
+            LabeledItem("Incest Taboo Confessions", "https://site.to/it", true),
+            LabeledItem("Swinger Party Uncut", "https://site.to/sw", true),
+            LabeledItem("Onlyfans Premium Leaks", "https://site.to/of", true),
+            LabeledItem("Playboy Mansion Special", "https://site.to/pb", true),
+            LabeledItem("Bukkake Fantasy Vol 2", "https://site.to/bk", true),
+            LabeledItem("Striptease Night Live", "https://site.to/st", true),
+
+            // 15 Ground Truth Clean / Mainstream / Tricky Negatives (Negative)
+            LabeledItem("Attack on Titan", "https://site.to/aot", false),
+            LabeledItem("Frieren: Beyond Journey's End", "https://site.to/frieren", false),
+            LabeledItem("Demon Slayer", "https://site.to/ds", false),
+            LabeledItem("Spy x Family", "https://site.to/sxf", false),
+            LabeledItem("Step Brothers", "https://site.to/sb", false),
+            LabeledItem("Moby Dick", "https://site.to/md", false),
+            LabeledItem("Charles Dickens: Oliver Twist", "https://site.to/cd", false),
+            LabeledItem("Scunthorpe United", "https://site.to/su", false),
+            LabeledItem("The Assassin", "https://site.to/assassin", false),
+            LabeledItem("Sussex Wildlife Journey", "https://site.to/sussex", false),
+            LabeledItem("Classics of Cinema", "https://site.to/classics", false),
+            LabeledItem("Inception", "https://site.to/inception", false),
+            LabeledItem("Interstellar", "https://site.to/interstellar", false),
+            LabeledItem("Spider-Man: No Way Home", "https://site.to/spiderman", false),
+            LabeledItem("Summer Time Rendering", "https://site.to/str", false)
+        )
+
+        var tp = 0
+        var fp = 0
+        var tn = 0
+        var fn = 0
+
+        for (item in dataset) {
+            val response = MovieSearchResponse(item.title, item.url, "TestProvider", TvType.Movie)
+            val predictedNsfw = NsfwFilterEngine.isNsfw(response, NsfwFilterLevel.LOW)
+            if (predictedNsfw && item.isAdult) tp++
+            else if (predictedNsfw && !item.isAdult) fp++
+            else if (!predictedNsfw && !item.isAdult) tn++
+            else if (!predictedNsfw && item.isAdult) fn++
+        }
+
+        val precision = if (tp + fp > 0) tp.toDouble() / (tp + fp) else 1.0
+        val recall = if (tp + fn > 0) tp.toDouble() / (tp + fn) else 1.0
+
+        println("NSFW Filter Benchmark -> TP: $tp, FP: $fp, TN: $tn, FN: $fn | Precision: ${"%.4f".format(precision)}, Recall: ${"%.4f".format(recall)}")
+
+        assertEquals("False positives must be 0 on clean benchmark set", 0, fp)
+        assertEquals("False negatives must be 0 on adult benchmark set", 0, fn)
+        assertEquals("Precision must be 100%", 1.0, precision, 0.001)
+        assertEquals("Recall must be 100%", 1.0, recall, 0.001)
+    }
 }
 

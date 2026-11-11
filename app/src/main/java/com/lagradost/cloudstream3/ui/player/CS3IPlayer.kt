@@ -1484,10 +1484,12 @@ class CS3IPlayer : IPlayer {
     ) {
         Log.i(TAG, "loadExo")
         val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
-        val maxVideoHeight = settingsManager.getInt(
+        val userMaxVideoHeight = settingsManager.getInt(
             context.getString(if (context.isUsingMobileData()) R.string.quality_pref_mobile_data_key else R.string.quality_pref_key),
             Int.MAX_VALUE
         )
+        val hwMaxVideoHeight = DeviceProfile.getMaxSupportedVideoHeight(context)
+        val maxVideoHeight = minOf(userMaxVideoHeight, hwMaxVideoHeight)
         val settings = AppSettings(context)
 
         try {

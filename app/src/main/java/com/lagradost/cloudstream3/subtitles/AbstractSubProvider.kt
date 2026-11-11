@@ -31,18 +31,55 @@ class SubtitleResource {
 
     private fun unzip(file: File): List<Pair<String, File>> {
         val entries = mutableListOf<Pair<String, File>>()
+        val maxTotalBytes = 50L * 1024 * 1024 // 50 MB total uncompressed budget
+        val maxEntryBytes = 20L * 1024 * 1024 // 20 MB max per subtitle entry
+        val maxEntriesCount = 50
+        var totalBytesRead = 0L
 
-        ZipInputStream(file.inputStream()).use { zipInputStream ->
+        ZipInputStream(file.inputStream().buffered()).use { zipInputStream ->
             var zipEntry = zipInputStream.nextEntry
+            var count = 0
 
             while (zipEntry != null) {
+                count++
+                if (count > maxEntriesCount) {
+                    break
+                }
+                if (zipEntry.isDirectory) {
+                    zipEntry = zipInputStream.nextEntry
+                    continue
+                }
+
+                val entryName = zipEntry.name
+                // Zip-Slip path traversal defense: reject entries with '..' or root escapes
+                if (entryName.contains("..") || entryName.startsWith("/") || entryName.startsWith("\\") || entryName.contains("\u0000")) {
+                    zipEntry = zipInputStream.nextEntry
+                    continue
+                }
+
                 val tempFile = File.createTempFile("unzipped-subtitle", ".tmp").apply {
                     deleteFileOnExit(this)
                 }
-                entries.add(zipEntry.name to tempFile)
 
-                tempFile.sink().buffer().use { buffer ->
-                    buffer.writeAll(zipInputStream.source())
+                try {
+                    val buffer = ByteArray(8192)
+                    var bytesForEntry = 0L
+                    tempFile.outputStream().use { os ->
+                        while (true) {
+                            val read = zipInputStream.read(buffer)
+                            if (read == -1) break
+                            bytesForEntry += read
+                            totalBytesRead += read
+                            if (bytesForEntry > maxEntryBytes || totalBytesRead > maxTotalBytes) {
+                                throw SecurityException("Zip extraction exceeded security threshold (Zip Bomb defense)")
+                            }
+                            os.write(buffer, 0, read)
+                        }
+                    }
+                    entries.add(entryName to tempFile)
+                } catch (t: Throwable) {
+                    tempFile.delete()
+                    if (t is SecurityException) throw t
                 }
 
                 zipEntry = zipInputStream.nextEntry

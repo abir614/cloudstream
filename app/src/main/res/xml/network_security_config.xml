@@ -17,6 +17,7 @@
         <domain includeSubdomains="true">adguard-dns.com</domain>
         <domain includeSubdomains="true">dns.sb</domain>
         <domain includeSubdomains="true">cira.ca</domain>
+        <domain includeSubdomains="true">workers.dev</domain>
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

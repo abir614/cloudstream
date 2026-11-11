@@ -169,6 +169,13 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         }
 
         try {
+            thread(start = true, isDaemon = true, name = "StartupHardwareProfile") {
+                com.lagradost.cloudstream3.utils.DeviceProfile.getDeviceCapabilities(this)
+            }
+        } catch (_: Throwable) {
+        }
+
+        try {
             thread(start = true, isDaemon = true, name = "StartupScoreCacheWarmup") {
                 com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.ensureScoresLoaded(this)
             }
