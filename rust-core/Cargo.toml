@@ -47,7 +47,7 @@ quickcheck_macros = "1.0.3"
 tempfile = "3.16.0"
 
 [features]
-default = ["wasm-sandbox"]
+default = []
 wasm-sandbox = ["dep:wasmi"]
 
 [profile.release]
@@ -55,5 +55,5 @@ opt-level = "z"
 lto = "fat"
 codegen-units = 1
 panic = "unwind"
-strip = "symbols"
+strip = true
 

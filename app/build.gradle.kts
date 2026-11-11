@@ -316,7 +316,15 @@ android {
                 "META-INF/NOTICE",
                 "META-INF/NOTICE.txt",
                 "META-INF/notice.txt",
-                "META-INF/INDEX.LIST"
+                "META-INF/INDEX.LIST",
+                "META-INF/**/*.version",
+                "META-INF/*.version",
+                "META-INF/**/LICENSE*",
+                "META-INF/**/license*",
+                "META-INF/**/NOTICE*",
+                "META-INF/**/notice*",
+                "META-INF/*.kotlin_module",
+                "META-INF/version-control-info.textproto"
             )
         }
     }

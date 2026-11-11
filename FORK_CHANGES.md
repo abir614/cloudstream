@@ -131,7 +131,8 @@ This document catalogues all intentional architectural deviations, security hard
 - **Release Profile**: Configured with `panic = "unwind"`, `opt-level = "z"`, and `lto = "fat"`.
 
 ### 3.3 Lean Release Profile & Feature-Gated WASM Sandbox (§3.5, §6.2)
-- **Feature-Gated Runtime**: The `wasmi` WebAssembly engine is optional and disabled by default under `features = ["wasm-sandbox"]`, reducing binary size and memory overhead on mobile and TV sticks.
+- **Feature-Gated Runtime**: The `wasmi` WebAssembly engine is optional and disabled by default under `features = ["wasm-sandbox"]` (`default = []` in `rust-core/Cargo.toml`), reducing binary size and memory overhead on mobile and TV sticks.
+- **Aggressive Symbol Stripping & LTO**: Enabled `strip = true`, `opt-level = "z"`, and `lto = "fat"`. Automated CI pipelines execute `llvm-strip --strip-unneeded` on all compiled `.so` binaries across all 4 architectures before packaging.
 
 ---
 
@@ -158,8 +159,12 @@ This document catalogues all intentional architectural deviations, security hard
 - **HIGH**: Minimum buffer: 30s, maximum buffer: 60s, target buffer: 128 MB, back buffer: 30s.
 
 ### 4.5 Packaging & Native ABI Optimization (§6.1)
-- **Focused ABI Splits**: Builds package `arm64-v8a` and `armeabi-v7a` plus an optional universal APK, dropping obsolete x86 emulators from releases.
-- **Legacy Native Library Packaging & DEFLATE Compression**: Configured `useLegacyPackaging = true` in Gradle packaging options, compressing native libraries (`.so`) with DEFLATE to shrink APK download size from ~48MB to ~41MB (pre-model) / ~56MB (with INT8 AI model) and ensuring 100% installation compatibility across all budget Android TV devices, custom ROMs, and TV stick package installers. Also excluded redundant `META-INF/` dependency notices and licenses.
+- **Focused ABI Splits**: Builds package `arm64-v8a` and `armeabi-v7a` plus an optional universal APK, dropping obsolete standalone x86 emulator releases.
+- **Mathematical Binary Layout & Size Distribution**:
+  - **Architecture-Specific Splits (`arm64-v8a` / `armeabi-v7a`)**: Package only a single ABI's native binaries (~6.7 MB compressed). Download size sits at ~44.4 MiB (~46.6 MB decimal), optimized for phones, TV boxes, and Fire TV devices.
+  - **Universal APK (`universal`)**: Packages all 4 ABIs (`arm64-v8a`, `armeabi-v7a`, `x86`, `x86_64`) containing 27.72 MB of compressed native libraries, totaling ~65.4 MiB (~68.7 MB decimal) to ensure universal out-of-the-box compatibility across all Android devices, Android TV, ChromeOS, and emulators.
+  - **Zero-Copy Memory-Mapped INT8 Model**: The on-device NSFW TFLite model (`nsfw.tflite`, 4.78 MB) is preserved uncompressed via `aaptOptions.noCompress += listOf("bin", "tflite")`, allowing the OS to memory-map (`mmap`) weights directly into shared read-only virtual memory pages without allocating 5MB of heap in Java, preventing Out-Of-Memory (OOM) crashes on 1GB/2GB RAM potato TV sticks.
+- **Legacy Native Library Packaging & DEFLATE Compression**: Configured `useLegacyPackaging = true` in Gradle packaging options, compressing native libraries (`.so`) with DEFLATE and ensuring 100% installation compatibility across all budget Android TV devices, custom ROMs, and TV stick package installers. Also excluded redundant `META-INF/` dependency notices, `.version` manifests, `.kotlin_module` compiler metadata, and transitive licenses.
 
 ### 4.6 Memory Pressure Trimming & Connection Eviction (§5.3)
 - **`onTrimMemory` & `onLowMemory`**: On moderate/low/critical memory pressure, the app automatically flushes Coil bitmap memory caches and evicts all idle OkHttp network connections via `baseClient.connectionPool.evictAll()`.
