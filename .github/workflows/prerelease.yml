@@ -117,6 +117,41 @@ jobs:
           fi
         done
         sha256sum *.apk > SHA256SUMS
+        python3 -c "
+          import glob, json, os, datetime
+          tag = 'pre-release'
+          build_tag = '${TAG}'
+          commit_sha = '${{ github.sha }}'
+          repo = '${{ github.repository }}'
+          assets = []
+          for apk in sorted(glob.glob('*.apk')):
+              assets.append({
+                  'name': apk,
+                  'size': os.path.getsize(apk),
+                  'browser_download_url': f'https://github.com/{repo}/releases/download/{tag}/{apk}',
+                  'content_type': 'application/vnd.android.package-archive',
+              })
+          for extra in sorted(glob.glob('SHA256SUMS*')):
+              assets.append({
+                  'name': extra,
+                  'size': os.path.getsize(extra),
+                  'browser_download_url': f'https://github.com/{repo}/releases/download/{tag}/{extra}',
+                  'content_type': 'text/plain',
+              })
+          manifest = {
+              'tag_name': build_tag,
+              'name': f'Pre-release Build #${{ steps.build_count.outputs.count }}',
+              'body': f'Automated pre-release build for commit {commit_sha[:7]}',
+              'target_commitish': commit_sha,
+              'prerelease': True,
+              'node_id': f'release_{build_tag}_{commit_sha[:7]}',
+              'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'assets': assets
+          }
+          with open('release.json', 'w') as f:
+              json.dump(manifest, f, indent=2)
+          print('Successfully generated rate-limit-free release.json manifest with', len(assets), 'assets')
+        "
         if [ -n "${{ secrets.ED25519_PRIVATE_KEY }}" ]; then
           python3 -c "
             import os
@@ -221,5 +256,6 @@ jobs:
         files: |
           app/build/outputs/apk/prerelease/release/*.apk
           app/build/outputs/apk/prerelease/release/SHA256SUMS*
+          app/build/outputs/apk/prerelease/release/release.json
           app/build/libs/classes.jar
           app/build/libs/app-sources.jar

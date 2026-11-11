@@ -69,12 +69,30 @@ object GithubReleases {
         repository: String,
         tag: String,
     ): String? {
-        val res = app.get(
-            url = "https://api.github.com/repos/$userName/$repository/git/ref/tags/$tag",
-            headers = defaultHeaders
-        )
-        if (!res.isSuccessful) return null
-        return res.parsedSafe<GithubTag>()?.githubObject?.sha
+        try {
+            val res = app.get(
+                url = "https://api.github.com/repos/$userName/$repository/git/ref/tags/$tag",
+                headers = defaultHeaders
+            )
+            if (res.isSuccessful) {
+                val sha = res.parsedSafe<GithubTag>()?.githubObject?.sha
+                if (!sha.isNullOrBlank()) return sha
+            }
+        } catch (_: Throwable) {}
+
+        // Fallback: If api.github.com is rate-limited, read commit SHA from CDN release.json
+        try {
+            val cdnRes = app.get("https://github.com/$userName/$repository/releases/download/$tag/release.json")
+            if (cdnRes.isSuccessful) {
+                val cdnRelease = cdnRes.parsedSafe<GithubRelease>()
+                val targetSha = cdnRelease?.targetCommitish?.trim()
+                if (!targetSha.isNullOrBlank() && targetSha.matches(Regex("^[0-9a-fA-F]{7,40}$"))) {
+                    return targetSha
+                }
+            }
+        } catch (_: Throwable) {}
+
+        return null
     }
 
     @Throws
@@ -96,21 +114,52 @@ object GithubReleases {
             "https://api.github.com/repos/$userName/$repository/releases/latest"
         }
 
-        val response = app.get(
-            url = latestReleaseUrl,
-            headers = defaultHeaders
-        )
+        var latestRelease: GithubRelease? = null
 
-        if (response.code == 403 || response.code == 429) {
-            android.util.Log.w("GithubReleases", "GitHub API rate limit exceeded (HTTP ${response.code}). Skipping update check.")
+        try {
+            val response = app.get(
+                url = latestReleaseUrl,
+                headers = defaultHeaders
+            )
+
+            if (response.isSuccessful) {
+                latestRelease = response.parsedSafe<GithubRelease>()
+            } else if (response.code == 403 || response.code == 429) {
+                android.util.Log.w("GithubReleases", "GitHub REST API rate limit exceeded (HTTP ${response.code}). Falling back to rate-limit-free CDN release manifest.")
+            } else {
+                android.util.Log.w("GithubReleases", "GitHub REST API returned HTTP ${response.code}. Attempting CDN fallback.")
+            }
+        } catch (t: Throwable) {
+            android.util.Log.w("GithubReleases", "Primary GitHub API check error: ${t.message}. Attempting CDN fallback.")
+        }
+
+        // Rate-limit proof CDN fallback: Fetches release.json directly from GitHub Release CDN (Fastly/Azure) with 0 rate limits
+        if (latestRelease == null) {
+            val targetTag = if (prerelease) prereleaseTag else "latest"
+            val cdnUrls = listOf(
+                "https://github.com/$userName/$repository/releases/download/$targetTag/release.json",
+                "https://raw.githubusercontent.com/$userName/$repository/master/release.json"
+            )
+            for (cdnUrl in cdnUrls) {
+                try {
+                    val cdnResponse = app.get(cdnUrl)
+                    if (cdnResponse.isSuccessful) {
+                        val parsed = cdnResponse.parsedSafe<GithubRelease>()
+                        if (parsed != null && parsed.assets.isNotEmpty()) {
+                            android.util.Log.i("GithubReleases", "Successfully resolved release update via rate-limit-free CDN manifest: $cdnUrl")
+                            latestRelease = parsed
+                            break
+                        }
+                    }
+                } catch (t: Throwable) {
+                    android.util.Log.w("GithubReleases", "CDN fallback fetch failed for $cdnUrl: ${t.message}")
+                }
+            }
+        }
+
+        if (latestRelease == null) {
             return null
         }
-        if (!response.isSuccessful) {
-            android.util.Log.w("GithubReleases", "GitHub API request failed with HTTP ${response.code}")
-            return null
-        }
-
-        val latestRelease = response.parsedSafe<GithubRelease>() ?: return null
 
         val apkAssets = latestRelease.assets.filter { asset ->
             asset.contentType == contentType || asset.name.endsWith(".apk")
