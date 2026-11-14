@@ -180,7 +180,7 @@ object SecureAuthStore {
      * Reads accounts for a given sync provider prefix, performing seamless migration from
      * legacy plaintext DataStore if necessary.
      */
-    fun getAccounts(context: Context, prefix: String, currentAccount: Int = DataStoreHelper.currentAccount): Array<AuthData> {
+    fun getAccounts(context: Context, prefix: String, currentAccount: String = DataStoreHelper.currentAccount): Array<AuthData> {
         val key = "${prefix}/$currentAccount"
         val prefs = getSecurePrefs(context)
         val encrypted = prefs.getString(key, null)
@@ -221,7 +221,7 @@ object SecureAuthStore {
         context: Context,
         prefix: String,
         accounts: Array<AuthData>,
-        currentAccount: Int = DataStoreHelper.currentAccount
+        currentAccount: String = DataStoreHelper.currentAccount
     ) {
         val key = "${prefix}/$currentAccount"
         val json = accounts.toJson()
@@ -236,7 +236,7 @@ object SecureAuthStore {
         context: Context,
         prefix: String,
         defaultId: Int = AccountManager.NONE_ID,
-        currentAccount: Int = DataStoreHelper.currentAccount
+        currentAccount: String = DataStoreHelper.currentAccount
     ): Int {
         val key = "id_${prefix}/$currentAccount"
         val prefs = getSecurePrefs(context)
@@ -264,7 +264,7 @@ object SecureAuthStore {
         context: Context,
         prefix: String,
         id: Int,
-        currentAccount: Int = DataStoreHelper.currentAccount
+        currentAccount: String = DataStoreHelper.currentAccount
     ) {
         val key = "id_${prefix}/$currentAccount"
         val enc = encrypt(id.toString())
@@ -274,7 +274,7 @@ object SecureAuthStore {
     /**
      * Purges all credentials for a given sync provider.
      */
-    fun removeAccounts(context: Context, prefix: String, currentAccount: Int = DataStoreHelper.currentAccount) {
+    fun removeAccounts(context: Context, prefix: String, currentAccount: String = DataStoreHelper.currentAccount) {
         val key = "${prefix}/$currentAccount"
         val idKey = "id_${prefix}/$currentAccount"
         getSecurePrefs(context).edit().remove(key).remove(idKey).apply()
@@ -285,7 +285,7 @@ object SecureAuthStore {
     /**
      * Checks whether accounts exist in the secure vault for a given provider.
      */
-    fun hasSavedAccounts(context: Context, prefix: String, currentAccount: Int = DataStoreHelper.currentAccount): Boolean {
+    fun hasSavedAccounts(context: Context, prefix: String, currentAccount: String = DataStoreHelper.currentAccount): Boolean {
         val key = "${prefix}/$currentAccount"
         return getSecurePrefs(context).contains(key)
     }
