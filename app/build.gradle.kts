@@ -228,8 +228,10 @@ android {
     buildTypes {
         release {
             isDebuggable = false
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Keep minification disabled so runtime plugins have full access to Kotlin stdlib,
+            // coroutines, and framework dependencies without R8 class-stripping/NoClassDefFoundError.
+            isMinifyEnabled = false
+            isShrinkResources = false
             if (signingConfigs.names.contains("prerelease")) {
                 signingConfig = signingConfigs.getByName("prerelease").takeIf { it.storeFile != null }
             }

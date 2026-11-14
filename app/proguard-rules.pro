@@ -32,10 +32,15 @@
 # 3. CloudStream Core Plugin API & Data Models (Keep entire tree for runtime plugins)
 # -----------------------------------------------------------------------------
 -dontobfuscate
+-keep class kotlin.** { *; }
+-keep class kotlinx.** { *; }
 -keep class com.lagradost.cloudstream3.** { *; }
 -keep class com.lagradost.nicehttp.** { *; }
 -keep class com.lagradost.api.** { *; }
 -keep class com.mega.** { *; }
+-keep class org.jsoup.** { *; }
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
 -keep class com.lagradost.cloudstream3.syncproviders.SecureAuthStore { *; }
 -keep class com.lagradost.cloudstream3.network.UpdateNetworkClient { *; }
 -keep class com.lagradost.cloudstream3.ui.coordinators.WindowSizeCoordinator { *; }

@@ -26,11 +26,7 @@ class ShieldedClassLoaderTest {
             "com.lagradost.cloudstream3.services.ExtensionSandboxClient",
             "com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter",
             "com.lagradost.cloudstream3.utils.telemetry.CrashHandler",
-            "com.lagradost.cloudstream3.utils.persistence.SqliteDataRepository\$DatabaseHelper",
-            "com.lagradost.cloudstream3.CloudStreamApp",
-            "com.lagradost.cloudstream3.CloudStreamApp\$Companion",
-            "com.lagradost.cloudstream3.utils.DataStore",
-            "com.lagradost.cloudstream3.utils.DataStoreHelper"
+            "com.lagradost.cloudstream3.utils.persistence.SqliteDataRepository\$DatabaseHelper"
         )
 
         for (className in blockedClasses) {
@@ -54,6 +50,11 @@ class ShieldedClassLoaderTest {
             "com.lagradost.cloudstream3.LoadResponse",
             "com.lagradost.cloudstream3.Episode",
             "com.lagradost.cloudstream3.SubtitleFile",
+            "com.lagradost.cloudstream3.CloudStreamApp",
+            "com.lagradost.cloudstream3.utils.DataStore",
+            "com.lagradost.cloudstream3.utils.DataStoreHelper",
+            "kotlin.coroutines.intrinsics.IntrinsicsKt",
+            "kotlin.jvm.internal.Intrinsics",
             "com.mega.MegaPlugin",
             "com.mega.MegaProvider",
             "org.jsoup.Jsoup",
