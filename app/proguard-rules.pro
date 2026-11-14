@@ -97,3 +97,17 @@
 -keep class com.lagradost.cloudstream3.utils.persistence.** { *; }
 -keep class com.lagradost.cloudstream3.utils.telemetry.** { *; }
 -keep class com.lagradost.cloudstream3.ui.coordinators.** { *; }
+
+# -----------------------------------------------------------------------------
+# 8. Scripting & JS Engines (Rhino & JavaBeans compatibility)
+# -----------------------------------------------------------------------------
+-dontwarn java.beans.**
+-dontwarn org.mozilla.javascript.**
+-keep class org.mozilla.javascript.** { *; }
+
+# -----------------------------------------------------------------------------
+# 9. Third-Party Libraries (Jsoup, Ktor, JSpecify)
+# -----------------------------------------------------------------------------
+-dontwarn org.jsoup.**
+-dontwarn io.ktor.**
+-dontwarn org.jspecify.**
