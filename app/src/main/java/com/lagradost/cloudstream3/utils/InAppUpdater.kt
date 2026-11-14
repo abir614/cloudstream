@@ -28,6 +28,7 @@ import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.network.UpdateNetworkClient
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.mvvm.safe
 import com.lagradost.cloudstream3.services.PackageInstallerService
@@ -96,6 +97,9 @@ object InAppUpdater {
         @JsonProperty("expectedSha256") @SerialName("expectedSha256") val expectedSha256: String? = null,
     )
 
+    // Dedicated certificate-pinned and SSRF-safe client for all update metadata and APK downloads
+    private val githubClient get() = UpdateNetworkClient.requests
+
     private suspend fun extractExpectedSha256(
         assets: List<GithubAsset>,
         targetAssetFileName: String
@@ -104,7 +108,7 @@ object InAppUpdater {
             it.name.equals("SHA256SUMS", ignoreCase = true) || it.name.equals("SHA256SUMS.txt", ignoreCase = true)
         } ?: return null
         return try {
-            val sumsText = app.get(sumsAsset.browserDownloadUrl, cacheTime = 15, cacheUnit = TimeUnit.MINUTES).text
+            val sumsText = githubClient.get(sumsAsset.browserDownloadUrl, cacheTime = 15, cacheUnit = TimeUnit.MINUTES).text
             if (sumsText.isBlank()) return null
 
             val sigAsset = assets.firstOrNull {
@@ -112,7 +116,7 @@ object InAppUpdater {
                 it.name.equals("SHA256SUMS.minisig", ignoreCase = true)
             }
             if (sigAsset != null) {
-                val sigText = app.get(sigAsset.browserDownloadUrl, cacheTime = 15, cacheUnit = TimeUnit.MINUTES).text.trim()
+                val sigText = githubClient.get(sigAsset.browserDownloadUrl, cacheTime = 15, cacheUnit = TimeUnit.MINUTES).text.trim()
                 val isValid = UpdateSecurityGate.verifyUpdateManifestSignature(sumsText, sigText)
                 if (!isValid) {
                     Log.e(LOG_TAG, "Ed25519 signature verification failed for SHA256SUMS manifest!")
@@ -171,7 +175,7 @@ object InAppUpdater {
         var found: GithubRelease? = null
 
         val releaseHttp = try {
-            app.get(url, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+            githubClient.get(url, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
         } catch (_: Throwable) {
             null
         }
@@ -205,7 +209,7 @@ object InAppUpdater {
             )
             for (cdnUrl in cdnUrls) {
                 try {
-                    val cdnResponse = app.get(cdnUrl)
+                    val cdnResponse = githubClient.get(cdnUrl)
                     if (cdnResponse.isSuccessful) {
                         val parsed = try { parseJson<GithubRelease>(cdnResponse.text) } catch (_: Throwable) { null }
                         if (parsed != null && parsed.assets.isNotEmpty()) {
@@ -277,7 +281,7 @@ object InAppUpdater {
         var found: GithubRelease? = null
 
         val releaseHttp = try {
-            app.get(releaseUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+            githubClient.get(releaseUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
         } catch (_: Throwable) {
             null
         }
@@ -302,7 +306,7 @@ object InAppUpdater {
             )
             for (cdnUrl in cdnUrls) {
                 try {
-                    val cdnResponse = app.get(cdnUrl)
+                    val cdnResponse = githubClient.get(cdnUrl)
                     if (cdnResponse.isSuccessful) {
                         val parsed = try { parseJson<GithubRelease>(cdnResponse.text) } catch (_: Throwable) { null }
                         if (parsed != null && parsed.assets.isNotEmpty()) {
@@ -343,7 +347,7 @@ object InAppUpdater {
         } else null
 
         val tagHttp = try {
-            app.get(tagUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
+            githubClient.get(tagUrl, headers = headers, cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
         } catch (_: Throwable) {
             null
         }
@@ -655,7 +659,7 @@ object InAppUpdater {
             UpdateSecurityGate.requestUpdateChallenge()
 
             val isInstalled = updateLock.withLock {
-                val response = app.get(url)
+                val response = githubClient.get(url)
                 val body = response.body
                 val totalBytes = body.contentLength()
                 var downloadedBytes = 0L

@@ -206,14 +206,13 @@ object UIHelper {
         listView.requestLayout()
     }
 
-    fun Context.getSpanCount(isHorizontal:Boolean=false): Int {
-        val spanCountLandscape = if (isHorizontal) 3 else 6
-        val spanCountPortrait = if (isHorizontal) 2 else 3
-        val orientation = resources.configuration.orientation
-
-        return if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            spanCountLandscape
-        } else spanCountPortrait
+    fun Context.getSpanCount(isHorizontal: Boolean = false): Int {
+        val isTv = com.lagradost.cloudstream3.ui.settings.Globals.isLayout(com.lagradost.cloudstream3.ui.settings.Globals.TV)
+        return com.lagradost.cloudstream3.ui.coordinators.WindowSizeCoordinator.calculateGridSpanCount(
+            this,
+            isHorizontalItem = isHorizontal,
+            isTv = isTv
+        )
     }
 
     fun Fragment.hideKeyboard() {

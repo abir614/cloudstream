@@ -39,15 +39,25 @@ abstract class AccountManager {
 
         fun accounts(prefix: String): Array<AuthData> {
             require(prefix != "NONE")
-            return getKey<Array<AuthData>>(
-                ACCOUNT_TOKEN,
-                "${prefix}/${DataStoreHelper.currentAccount}"
-            ) ?: arrayOf()
+            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
+            return if (ctx != null) {
+                SecureAuthStore.getAccounts(ctx, prefix, DataStoreHelper.currentAccount)
+            } else {
+                getKey<Array<AuthData>>(
+                    ACCOUNT_TOKEN,
+                    "${prefix}/${DataStoreHelper.currentAccount}"
+                ) ?: arrayOf()
+            }
         }
 
         fun updateAccounts(prefix: String, array: Array<AuthData>) {
             require(prefix != "NONE")
-            setKey(ACCOUNT_TOKEN, "${prefix}/${DataStoreHelper.currentAccount}", array)
+            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
+            if (ctx != null) {
+                SecureAuthStore.saveAccounts(ctx, prefix, array, DataStoreHelper.currentAccount)
+            } else {
+                setKey(ACCOUNT_TOKEN, "${prefix}/${DataStoreHelper.currentAccount}", array)
+            }
             synchronized(cachedAccounts) {
                 cachedAccounts[prefix] = array
             }
@@ -55,7 +65,12 @@ abstract class AccountManager {
 
         fun updateAccountsId(prefix: String, id: Int) {
             require(prefix != "NONE")
-            setKey(ACCOUNT_IDS, "${prefix}/${DataStoreHelper.currentAccount}", id)
+            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
+            if (ctx != null) {
+                SecureAuthStore.saveAccountId(ctx, prefix, id, DataStoreHelper.currentAccount)
+            } else {
+                setKey(ACCOUNT_IDS, "${prefix}/${DataStoreHelper.currentAccount}", id)
+            }
             synchronized(cachedAccountIds) {
                 cachedAccountIds[prefix] = id
             }
@@ -76,15 +91,18 @@ abstract class AccountManager {
 
         fun updateAccountIds() {
             val ids = mutableMapOf<String, Int>()
+            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
             for (api in allApis) {
-                ids.put(
-                    api.idPrefix,
+                val id = if (ctx != null) {
+                    SecureAuthStore.getAccountId(ctx, api.idPrefix, NONE_ID, DataStoreHelper.currentAccount)
+                } else {
                     getKey<Int>(
                         ACCOUNT_IDS,
                         "${api.idPrefix}/${DataStoreHelper.currentAccount}",
                         NONE_ID
                     ) ?: NONE_ID
-                )
+                }
+                ids.put(api.idPrefix, id)
             }
             synchronized(cachedAccountIds) {
                 cachedAccountIds = ids
@@ -94,16 +112,19 @@ abstract class AccountManager {
         init {
             val data = mutableMapOf<String, Array<AuthData>>()
             val ids = mutableMapOf<String, Int>()
+            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
             for (api in allApis) {
                 data.put(api.idPrefix, accounts(api.idPrefix))
-                ids.put(
-                    api.idPrefix,
+                val id = if (ctx != null) {
+                    SecureAuthStore.getAccountId(ctx, api.idPrefix, NONE_ID, DataStoreHelper.currentAccount)
+                } else {
                     getKey<Int>(
                         ACCOUNT_IDS,
                         "${api.idPrefix}/${DataStoreHelper.currentAccount}",
                         NONE_ID
                     ) ?: NONE_ID
-                )
+                }
+                ids.put(api.idPrefix, id)
             }
             cachedAccounts = data
             cachedAccountIds = ids

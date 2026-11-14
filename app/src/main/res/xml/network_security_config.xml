@@ -18,6 +18,21 @@
         <domain includeSubdomains="true">dns.sb</domain>
         <domain includeSubdomains="true">cira.ca</domain>
         <domain includeSubdomains="true">workers.dev</domain>
+
+        <!-- User Authentication & Sync Infrastructure: strictly forbid cleartext HTTP -->
+        <domain includeSubdomains="true">myanimelist.net</domain>
+        <domain includeSubdomains="true">anilist.co</domain>
+        <domain includeSubdomains="true">kitsu.io</domain>
+        <domain includeSubdomains="true">simkl.com</domain>
+        <domain includeSubdomains="true">trakt.tv</domain>
+        <domain includeSubdomains="true">opensubtitles.com</domain>
+        <domain includeSubdomains="true">opensubtitles.org</domain>
+        <domain includeSubdomains="true">subdl.com</domain>
+        <domain includeSubdomains="true">addic7ed.com</domain>
+        <domain includeSubdomains="true">subsource.net</domain>
+        <domain includeSubdomains="true">animeskip.com</domain>
+        <domain includeSubdomains="true">themoviedb.org</domain>
+        <domain includeSubdomains="true">tmdb.org</domain>
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>

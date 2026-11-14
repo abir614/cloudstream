@@ -44,10 +44,10 @@ misc.xml
 deploymentTargetDropDown.xml
 render.experimental.xml
 
-# Keystore files
+# Keystore files — never commit signing keys to version control
+# Use CI secrets (RELEASE_KEYSTORE_BASE64 + RELEASE_KEYSTORE_PASSWORD) instead.
 *.jks
 *.keystore
-!keystore/release.keystore
 
 
 # Google Services (e.g. APIs or Firebase)

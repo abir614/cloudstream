@@ -2,7 +2,7 @@ package com.lagradost.cloudstream3.ui.settings
 
 import androidx.compose.runtime.Immutable
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.network.UpdateNetworkClient
 import com.lagradost.cloudstream3.utils.InAppUpdater
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -63,6 +63,10 @@ object GithubReleases {
 
     private val defaultHeaders = mapOf("Accept" to "application/vnd.github.v3+json")
 
+    // All GitHub network calls use the certificate-pinned + SSRF-safe client instead of
+    // the shared 'app' client, so a compromised system CA cannot spoof update manifests.
+    private val github get() = UpdateNetworkClient.requests
+
     @Throws
     suspend fun getShaFromTag(
         userName: String,
@@ -70,7 +74,7 @@ object GithubReleases {
         tag: String,
     ): String? {
         try {
-            val res = app.get(
+            val res = github.get(
                 url = "https://api.github.com/repos/$userName/$repository/git/ref/tags/$tag",
                 headers = defaultHeaders
             )
@@ -82,7 +86,7 @@ object GithubReleases {
 
         // Fallback: If api.github.com is rate-limited, read commit SHA from CDN release.json
         try {
-            val cdnRes = app.get("https://github.com/$userName/$repository/releases/download/$tag/release.json")
+            val cdnRes = github.get("https://github.com/$userName/$repository/releases/download/$tag/release.json")
             if (cdnRes.isSuccessful) {
                 val cdnRelease = cdnRes.parsedSafe<GithubRelease>()
                 val targetSha = cdnRelease?.targetCommitish?.trim()
@@ -117,7 +121,7 @@ object GithubReleases {
         var latestRelease: GithubRelease? = null
 
         try {
-            val response = app.get(
+            val response = github.get(
                 url = latestReleaseUrl,
                 headers = defaultHeaders
             )
@@ -142,7 +146,7 @@ object GithubReleases {
             )
             for (cdnUrl in cdnUrls) {
                 try {
-                    val cdnResponse = app.get(cdnUrl)
+                    val cdnResponse = github.get(cdnUrl)
                     if (cdnResponse.isSuccessful) {
                         val parsed = cdnResponse.parsedSafe<GithubRelease>()
                         if (parsed != null && parsed.assets.isNotEmpty()) {
@@ -191,7 +195,7 @@ object GithubReleases {
         }
         val digest = sumsAsset?.let { asset ->
             try {
-                val sumsText = app.get(asset.browserDownloadUrl).text
+                val sumsText = github.get(asset.browserDownloadUrl).text
                 val hash = sumsText.lines().firstOrNull { line ->
                     line.contains(foundAsset.name)
                 }?.split("""\s+""".toRegex())?.firstOrNull()?.trim()?.lowercase()

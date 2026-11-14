@@ -7,6 +7,8 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteDatabase.CursorFactory
 import android.database.DatabaseErrorHandler
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 
 /**
  * Sandboxed Context Wrapper for third-party extensions (.cs3 plugins).
@@ -57,6 +59,20 @@ class SandboxedContextWrapper(
         return this
     }
 
+    override fun getSystemService(name: String): Any? {
+        // Prevent plugins from obtaining sensitive system services to probe OS tasks or accounts
+        when (name) {
+            Context.ACTIVITY_SERVICE,
+            Context.ACCOUNT_SERVICE,
+            Context.DEVICE_POLICY_SERVICE,
+            Context.KEYGUARD_SERVICE,
+            Context.DROPBOX_SERVICE -> {
+                throw SecurityException("Access to system service '$name' is restricted for sandboxed plugins")
+            }
+        }
+        return super.getSystemService(name)
+    }
+
     private fun sanitizePathSegment(segment: String): String {
         if (segment.contains("..") || segment.contains("/") || segment.contains("\\") || segment.contains("\u0000")) {
             throw SecurityException("Path traversal attempt detected in segment: '$segment'")
@@ -76,6 +92,37 @@ class SandboxedContextWrapper(
         val dir = File(sandboxDir, "files")
         if (!dir.exists()) dir.mkdirs()
         return dir
+    }
+
+    override fun openFileInput(name: String): FileInputStream {
+        sanitizePathSegment(name)
+        val file = File(getFilesDir(), name)
+        assertInsideSandbox(file, sandboxDir)
+        return FileInputStream(file)
+    }
+
+    override fun openFileOutput(name: String, mode: Int): FileOutputStream {
+        sanitizePathSegment(name)
+        val file = File(getFilesDir(), name)
+        assertInsideSandbox(file, sandboxDir)
+        val append = (mode and Context.MODE_APPEND) != 0
+        return FileOutputStream(file, append)
+    }
+
+    override fun deleteFile(name: String): Boolean {
+        sanitizePathSegment(name)
+        val file = File(getFilesDir(), name)
+        assertInsideSandbox(file, sandboxDir)
+        return if (file.exists()) file.delete() else false
+    }
+
+    override fun fileList(): Array<String> {
+        return getFilesDir().list() ?: emptyArray()
+    }
+
+    override fun databaseList(): Array<String> {
+        val dbDir = File(sandboxDir, "databases")
+        return dbDir.list() ?: emptyArray()
     }
 
     override fun getCacheDir(): File {
@@ -107,6 +154,15 @@ class SandboxedContextWrapper(
     }
 
     override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
+        sanitizePathSegment(name)
+        val lower = name.lowercase()
+        if (lower.contains("cs_secure") ||
+            lower.contains("secure_auth") ||
+            lower.contains("rebuild_preference") ||
+            lower.contains("auth_token")
+        ) {
+            throw SecurityException("Access to protected host preferences '$name' denied for plugin '$pluginName'")
+        }
         // Namespace SharedPreferences so plugins cannot overwrite host or other plugin settings
         return hostContext.getSharedPreferences("cs_plugin_${sanitizedName}_$name", mode)
     }
@@ -117,6 +173,9 @@ class SandboxedContextWrapper(
         if (lower.contains("cloudstream") ||
             lower.contains("kv_store") ||
             lower.contains("user_data") ||
+            lower.contains("secure_auth") ||
+            lower.contains("auth_token") ||
+            lower.contains("credential") ||
             lower == "cloudstream_kv.db" ||
             lower == "database.db"
         ) {

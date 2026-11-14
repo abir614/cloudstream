@@ -32,8 +32,17 @@ class ShieldedClassLoader(
         private val BLOCKED_CLASS_PREFIXES = listOf(
             "com.lagradost.cloudstream3.syncproviders.AccountManager",
             "com.lagradost.cloudstream3.syncproviders.AuthStore",
+            "com.lagradost.cloudstream3.syncproviders.SecureAuthStore",
             "com.lagradost.cloudstream3.utils.UpdateSecurityGate",
             "com.lagradost.cloudstream3.utils.BackupUtils",
+            "com.lagradost.cloudstream3.utils.SystemMemoryOptimizer",
+            "com.lagradost.cloudstream3.network.UpdateNetworkClient",
+            "com.lagradost.cloudstream3.network.DohProviders",
+            "com.lagradost.cloudstream3.network.SafeDns",
+            "com.lagradost.cloudstream3.ui.settings.GithubReleases",
+            "com.lagradost.cloudstream3.services.NativeCoreBridge",
+            "com.lagradost.cloudstream3.services.ExtensionSandboxService",
+            "com.lagradost.cloudstream3.services.ExtensionSandboxClient",
             "com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter",
             "com.lagradost.cloudstream3.utils.telemetry.CrashHandler",
             "com.lagradost.cloudstream3.utils.persistence.SqliteDataRepository\$DatabaseHelper",
@@ -46,8 +55,9 @@ class ShieldedClassLoader(
          * Checks whether a class lookup targets a blocked internal app component.
          */
         fun isBlocked(className: String): Boolean {
+            val normalized = className.replace('/', '.').trim()
             for (prefix in BLOCKED_CLASS_PREFIXES) {
-                if (className == prefix || className.startsWith("$prefix$") || className.startsWith("$prefix.")) {
+                if (normalized == prefix || normalized.startsWith("$prefix$") || normalized.startsWith("$prefix.")) {
                     return true
                 }
             }

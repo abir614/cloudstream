@@ -111,4 +111,50 @@ class SafeDnsTest {
         assertEquals(1, resolved.size)
         assertEquals(InetAddress.getByName("192.168.1.50"), resolved[0])
     }
+
+    @Test
+    fun `test mazeSubnetRotate preserves elements on single or empty list`() {
+        val empty = emptyList<InetAddress>()
+        assertEquals(empty, SafeDns.mazeSubnetRotate(empty))
+
+        val single = listOf(InetAddress.getByName("8.8.8.8"))
+        assertEquals(single, SafeDns.mazeSubnetRotate(single))
+    }
+
+    @Test
+    fun `test mazeSubnetRotate preserves all elements across multiple subnets`() {
+        val addresses = listOf(
+            InetAddress.getByName("1.1.1.1"),
+            InetAddress.getByName("1.1.1.2"),
+            InetAddress.getByName("8.8.8.8"),
+            InetAddress.getByName("8.8.4.4"),
+            InetAddress.getByName("9.9.9.9"),
+            InetAddress.getByName("2606:4700:4700::1111"),
+            InetAddress.getByName("2606:4700:4700::1001")
+        )
+
+        val rotated = SafeDns.mazeSubnetRotate(addresses)
+        assertEquals(addresses.size, rotated.size)
+        assertEquals(addresses.toSet(), rotated.toSet())
+    }
+
+    @Test
+    fun `test mazeSubnetRotate interleaves disparate subnets`() {
+        val subnetA = listOf(
+            InetAddress.getByName("1.1.1.1"),
+            InetAddress.getByName("1.1.1.2")
+        )
+        val subnetB = listOf(
+            InetAddress.getByName("8.8.8.1"),
+            InetAddress.getByName("8.8.8.2")
+        )
+        val combined = subnetA + subnetB
+        val rotated = SafeDns.mazeSubnetRotate(combined)
+
+        assertEquals(4, rotated.size)
+        assertEquals(combined.toSet(), rotated.toSet())
+        val firstSubnet = listOf(rotated[0].address[0], rotated[0].address[1], rotated[0].address[2])
+        val secondSubnet = listOf(rotated[1].address[0], rotated[1].address[1], rotated[1].address[2])
+        assertFalse(firstSubnet == secondSubnet)
+    }
 }
