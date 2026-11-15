@@ -357,5 +357,35 @@ class NsfwFilterEngineTest {
         assertEquals("Precision must be 100%", 1.0, precision, 0.001)
         assertEquals("Recall must be 100%", 1.0, recall, 0.001)
     }
+
+    @Test
+    fun `test computeDHash64 perceptual difference hash consistency and invariance`() {
+        // Uniform color array
+        val uniform = IntArray(48 * 48) { 0xFFFFFF }
+        val uniformHash = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.computeDHash64(uniform)
+        assertEquals(0L, uniformHash)
+
+        // Gradient from dark to light
+        val darkToLight = IntArray(48 * 48) { idx ->
+            val col = idx % 48
+            val lum = (col * 255) / 48
+            (0xFF shl 24) or (lum shl 16) or (lum shl 8) or lum
+        }
+        val gradHash1 = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.computeDHash64(darkToLight)
+
+        // Same gradient content should produce the exact same dHash (idempotence)
+        val gradCopy = darkToLight.clone()
+        val gradHash2 = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.computeDHash64(gradCopy)
+        assertEquals(gradHash1, gradHash2)
+
+        // Inverted gradient (light to dark) must produce distinct hash
+        val lightToDark = IntArray(48 * 48) { idx ->
+            val col = idx % 48
+            val lum = 255 - ((col * 255) / 48)
+            (0xFF shl 24) or (lum shl 16) or (lum shl 8) or lum
+        }
+        val invHash = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.computeDHash64(lightToDark)
+        assertTrue(gradHash1 != invHash)
+    }
 }
 
