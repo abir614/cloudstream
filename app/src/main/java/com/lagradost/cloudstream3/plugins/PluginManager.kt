@@ -708,11 +708,17 @@ object PluginManager {
             synchronized(urlPlugins) {
                 urlPlugins[data.url ?: filePath] = pluginInstance
             }
-            val sandboxedContext = SandboxedContextWrapper(context, name)
-            if (pluginInstance is Plugin) {
-                pluginInstance.load(sandboxedContext)
-            } else {
-                pluginInstance.load()
+            val originalClassLoader = Thread.currentThread().contextClassLoader
+            try {
+                Thread.currentThread().contextClassLoader = loader
+                val sandboxedContext = SandboxedContextWrapper(context, name)
+                if (pluginInstance is Plugin) {
+                    pluginInstance.load(sandboxedContext)
+                } else {
+                    pluginInstance.load()
+                }
+            } finally {
+                Thread.currentThread().contextClassLoader = originalClassLoader
             }
             Log.i(TAG, "Loaded plugin ${data.internalName} successfully (guarded in-process)")
             currentlyLoading = null

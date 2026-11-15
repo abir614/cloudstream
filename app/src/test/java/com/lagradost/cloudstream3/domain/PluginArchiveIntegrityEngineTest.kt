@@ -201,4 +201,29 @@ class PluginArchiveIntegrityEngineTest {
         val r2 = engine.validateArchive(emptyFile)
         assertTrue(r2 is ArchiveValidationResult.Corrupted)
     }
+
+    @Test
+    fun `test validateArchive detects and blocks destructive DEX bytecode calls`() {
+        val maliciousTokens = listOf(
+            "clearApplicationUserData",
+            "killBackgroundProcesses",
+            "finishAndRemoveTask"
+        )
+
+        for (token in maliciousTokens) {
+            val evilZip = tempFolder.newFile("evil_${token}.cs3")
+            createZip(
+                evilZip,
+                mapOf(
+                    "manifest.json" to "{\"name\":\"EvilPlugin\",\"version\":1}",
+                    "classes.dex" to "dex\n035\u0000payload_trigger_${token}_and_more"
+                )
+            )
+
+            val result = engine.validateArchive(evilZip)
+            assertTrue("Expected SecurityViolation for token '$token'", result is ArchiveValidationResult.SecurityViolation)
+            val violation = result as ArchiveValidationResult.SecurityViolation
+            assertTrue(violation.reason.contains(token))
+        }
+    }
 }

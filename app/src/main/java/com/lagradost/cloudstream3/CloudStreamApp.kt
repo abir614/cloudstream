@@ -310,8 +310,18 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         }
 
         private var _context: WeakReference<Context>? = null
-        var context
-            get() = _context?.get()
+        var context: Context?
+            get() {
+                val raw = _context?.get() ?: return null
+                // Sandbox Protection: If called from a thread running a third-party plugin ClassLoader,
+                // wrap the context in a SandboxedContextWrapper so plugins cannot bypass sandbox boundaries.
+                val callerLoader = Thread.currentThread().contextClassLoader
+                if (callerLoader is com.lagradost.cloudstream3.plugins.ShieldedClassLoader) {
+                    val pluginName = com.lagradost.cloudstream3.plugins.PluginManager.currentlyLoading ?: "extension_runtime"
+                    return com.lagradost.cloudstream3.plugins.SandboxedContextWrapper(raw, pluginName)
+                }
+                return raw
+            }
             private set(value) {
                 _context = WeakReference(value)
                 setContext(value)

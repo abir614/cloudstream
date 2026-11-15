@@ -27,6 +27,16 @@ class SandboxedContextWrapperTest {
         override fun getCacheDir(): File = cache
         override fun getApplicationContext(): Context = this
         override fun getBaseContext(): Context = this
+        override fun getSystemService(name: String): Any? = "mock_service_$name"
+        override fun getSystemServiceName(serviceClass: Class<*>): String? {
+            return when (serviceClass.simpleName) {
+                "ActivityManager" -> Context.ACTIVITY_SERVICE
+                "ConnectivityManager" -> Context.CONNECTIVITY_SERVICE
+                "ClipboardManager" -> Context.CLIPBOARD_SERVICE
+                "LocationManager" -> Context.LOCATION_SERVICE
+                else -> null
+            }
+        }
     }
 
     private lateinit var fakeBaseContext: Context
@@ -111,17 +121,26 @@ class SandboxedContextWrapperTest {
     }
 
     @Test
-    fun `test getSystemService restricts privileged services`() {
-        val privileged = listOf(
+    fun `test getSystemService restricts privileged and sensitive services`() {
+        val restrictedServices = listOf(
+            Context.CLIPBOARD_SERVICE,
+            Context.TELEPHONY_SERVICE,
+            Context.LOCATION_SERVICE,
+            Context.WIFI_SERVICE,
             Context.ACCOUNT_SERVICE,
             Context.DEVICE_POLICY_SERVICE,
             Context.KEYGUARD_SERVICE,
-            Context.DROPBOX_SERVICE
+            Context.DROPBOX_SERVICE,
+            Context.NOTIFICATION_SERVICE,
+            "camera",
+            "bluetooth",
+            "media_projection",
+            "unknown_rogue_service"
         )
-        for (srv in privileged) {
+        for (srv in restrictedServices) {
             try {
                 sandboxedContext.getSystemService(srv)
-                fail("Expected SecurityException when requesting service '$srv'")
+                fail("Expected SecurityException when requesting restricted service '$srv'")
             } catch (_: SecurityException) {
                 // Expected
             }
@@ -129,9 +148,25 @@ class SandboxedContextWrapperTest {
     }
 
     @Test
-    fun `test getSystemService permits activity service for device memory profiling`() {
-        // Must not throw SecurityException so plugins can detect memory limits
-        sandboxedContext.getSystemService(Context.ACTIVITY_SERVICE)
+    fun `test getSystemService permits safe services for UI and memory profiling`() {
+        val safeServices = listOf(
+            Context.ACTIVITY_SERVICE,
+            Context.CONNECTIVITY_SERVICE,
+            Context.LAYOUT_INFLATER_SERVICE,
+            Context.WINDOW_SERVICE,
+            Context.POWER_SERVICE,
+            Context.AUDIO_SERVICE,
+            Context.INPUT_METHOD_SERVICE,
+            Context.UI_MODE_SERVICE,
+            Context.VIBRATOR_SERVICE,
+            Context.CAPTIONING_SERVICE,
+            Context.DISPLAY_SERVICE,
+            Context.ACCESSIBILITY_SERVICE
+        )
+        for (srv in safeServices) {
+            val result = sandboxedContext.getSystemService(srv)
+            assertNotNull("Safe service '$srv' should return non-null from mock context", result)
+        }
     }
 
     @Test

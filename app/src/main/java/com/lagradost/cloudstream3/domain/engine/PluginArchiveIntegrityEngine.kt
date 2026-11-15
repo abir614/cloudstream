@@ -30,6 +30,16 @@ class PluginArchiveIntegrityEngine(
         const val MANIFEST_FILE_NAME = "manifest.json"
 
         /**
+         * Forbidden destructive API signatures in extension DEX bytecode.
+         * Detects attempts to clear app data, terminate app processes, or invoke OS kill commands.
+         */
+        val FORBIDDEN_DEX_TOKENS = listOf(
+            "clearApplicationUserData" to "clearApplicationUserData".toByteArray(Charsets.UTF_8),
+            "killBackgroundProcesses" to "killBackgroundProcesses".toByteArray(Charsets.UTF_8),
+            "finishAndRemoveTask" to "finishAndRemoveTask".toByteArray(Charsets.UTF_8)
+        )
+
+        /**
          * Parses and normalizes an expected hash string from plugin metadata.
          * Handles prefixes (e.g. "sha256-", "sha256:", "sha-256-", "SHA256-", "sha512-")
          * and normalizes to (algorithm, hexHash).
@@ -231,6 +241,16 @@ class PluginArchiveIntegrityEngine(
                     }
 
                     val cleanName = entry.name.replace('\\', '/').removePrefix("./").trimStart('/')
+                    if (cleanName.endsWith(".dex", ignoreCase = true) && !entry.isDirectory) {
+                        zip.getInputStream(entry).use { stream ->
+                            val forbidden = scanDexForForbiddenTokens(stream)
+                            if (forbidden != null) {
+                                return ArchiveValidationResult.SecurityViolation(
+                                    "Malicious bytecode detected in entry '${entry.name}': contains forbidden destructive API '$forbidden'"
+                                )
+                            }
+                        }
+                    }
                     if (cleanName.equals(MANIFEST_FILE_NAME, ignoreCase = true) && !entry.isDirectory) {
                         if (entry.size > 0 || entry.size == -1L) {
                             hasManifest = true
@@ -258,5 +278,50 @@ class PluginArchiveIntegrityEngine(
         }
 
         return ArchiveValidationResult.Valid
+    }
+
+    /**
+     * Scans a DEX bytecode stream for forbidden destructive API signatures.
+     * Uses a chunked rolling buffer with overlap to detect split tokens with O(1) memory overhead.
+     */
+    fun scanDexForForbiddenTokens(stream: java.io.InputStream): String? {
+        val buffer = ByteArray(32 * 1024)
+        val overlapSize = 64
+        var carryOver = 0
+
+        while (true) {
+            val bytesRead = stream.read(buffer, carryOver, buffer.size - carryOver)
+            if (bytesRead <= 0) {
+                if (carryOver > 0) {
+                    for ((name, token) in FORBIDDEN_DEX_TOKENS) {
+                        if (indexOfSubarray(buffer, carryOver, token) != -1) return name
+                    }
+                }
+                break
+            }
+            val total = carryOver + bytesRead
+            for ((name, token) in FORBIDDEN_DEX_TOKENS) {
+                if (indexOfSubarray(buffer, total, token) != -1) return name
+            }
+            carryOver = Math.min(overlapSize, total)
+            System.arraycopy(buffer, total - carryOver, buffer, 0, carryOver)
+        }
+        return null
+    }
+
+    private fun indexOfSubarray(array: ByteArray, limit: Int, target: ByteArray): Int {
+        if (target.isEmpty() || limit < target.size) return -1
+        val maxStart = limit - target.size
+        for (i in 0..maxStart) {
+            var match = true
+            for (j in target.indices) {
+                if (array[i + j] != target[j]) {
+                    match = false
+                    break
+                }
+            }
+            if (match) return i
+        }
+        return -1
     }
 }

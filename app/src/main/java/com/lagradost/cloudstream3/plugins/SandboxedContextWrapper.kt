@@ -59,17 +59,42 @@ class SandboxedContextWrapper(
         return this
     }
 
+    companion object {
+        /**
+         * Strict Zero-Trust Allowlist of system services safe and necessary for third-party extensions.
+         * Only benign UI, display, audio, power, network connectivity, and memory profiling services
+         * are permitted. All sensitive hardware, telephony, clipboard, location, notification, account,
+         * and sensor services are strictly blocked by default.
+         */
+        val PERMITTED_SYSTEM_SERVICES = setOf(
+            Context.CONNECTIVITY_SERVICE,
+            Context.LAYOUT_INFLATER_SERVICE,
+            Context.WINDOW_SERVICE,
+            Context.POWER_SERVICE,
+            Context.AUDIO_SERVICE,
+            Context.INPUT_METHOD_SERVICE,
+            Context.UI_MODE_SERVICE,
+            Context.VIBRATOR_SERVICE,
+            Context.CAPTIONING_SERVICE,
+            Context.DISPLAY_SERVICE,
+            Context.ACCESSIBILITY_SERVICE,
+            Context.ACTIVITY_SERVICE
+        )
+    }
+
     override fun getSystemService(name: String): Any? {
-        // Prevent plugins from obtaining sensitive system services to probe OS accounts or admin policies
-        when (name) {
-            Context.ACCOUNT_SERVICE,
-            Context.DEVICE_POLICY_SERVICE,
-            Context.KEYGUARD_SERVICE,
-            Context.DROPBOX_SERVICE -> {
-                throw SecurityException("Access to system service '$name' is restricted for sandboxed plugins")
-            }
+        if (!PERMITTED_SYSTEM_SERVICES.contains(name)) {
+            throw SecurityException("Access to system service '$name' is restricted for sandboxed plugins")
         }
         return super.getSystemService(name)
+    }
+
+    override fun <T> getSystemService(serviceClass: Class<T>): T? {
+        val serviceName = getSystemServiceName(serviceClass)
+        if (serviceName == null || !PERMITTED_SYSTEM_SERVICES.contains(serviceName)) {
+            throw SecurityException("Access to system service '${serviceClass.name}' is restricted for sandboxed plugins")
+        }
+        return super.getSystemService(serviceClass)
     }
 
     private fun sanitizePathSegment(segment: String): String {
