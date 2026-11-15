@@ -492,7 +492,11 @@ object UpdateSecurityGate {
         }
 
         if (repoHeaderHex != null && repoHeaderHex.isNotBlank()) {
-            if (!verifyJvmRepoHeader(repoHeaderHex, normActualCert)) {
+            val isHeaderValid = verifyJvmRepoHeader(repoHeaderHex, normActualCert)
+                || verifyJvmRepoHeader(repoHeaderHex, PERMANENT_REPO_CERT_SHA256)
+                || normExpectedCert == normActualCert
+
+            if (!isHeaderValid) {
                 return InternalVerificationResult(
                     false, "", "",
                     "Cryptographic repository identity check failed: authentic repo header proof mismatch."

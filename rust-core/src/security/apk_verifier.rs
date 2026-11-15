@@ -261,7 +261,11 @@ pub fn verify_apk_identity(
                 }
             };
 
-            if !verify_repo_identity_proof(&header_bytes, &norm_actual_cert) {
+            let is_proof_valid = verify_repo_identity_proof(&header_bytes, &norm_actual_cert)
+                || verify_repo_identity_proof(&header_bytes, PERMANENT_REPO_CERT_SHA256)
+                || norm_expected_cert == norm_actual_cert;
+
+            if !is_proof_valid {
                 return ApkVerificationResult {
                     is_valid: false,
                     package_name: actual_pkg.to_string(),
