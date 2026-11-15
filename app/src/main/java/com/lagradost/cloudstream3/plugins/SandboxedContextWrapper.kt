@@ -86,7 +86,12 @@ class SandboxedContextWrapper(
         if (!PERMITTED_SYSTEM_SERVICES.contains(name)) {
             throw SecurityException("Access to system service '$name' is restricted for sandboxed plugins")
         }
-        return super.getSystemService(name)
+        return hostContext.getSystemService(name)
+    }
+
+    override fun getSystemServiceName(serviceClass: Class<*>): String? {
+        val name = hostContext.getSystemServiceName(serviceClass) ?: return null
+        return if (PERMITTED_SYSTEM_SERVICES.contains(name)) name else null
     }
 
     private fun sanitizePathSegment(segment: String): String {

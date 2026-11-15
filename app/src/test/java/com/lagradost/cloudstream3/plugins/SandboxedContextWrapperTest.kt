@@ -170,6 +170,14 @@ class SandboxedContextWrapperTest {
     }
 
     @Test
+    fun `test getSystemServiceName filters restricted service classes`() {
+        assertEquals(Context.ACTIVITY_SERVICE, sandboxedContext.getSystemServiceName(android.app.ActivityManager::class.java))
+        assertEquals(Context.CONNECTIVITY_SERVICE, sandboxedContext.getSystemServiceName(android.net.ConnectivityManager::class.java))
+        assertEquals(null, sandboxedContext.getSystemServiceName(android.content.ClipboardManager::class.java))
+        assertEquals(null, sandboxedContext.getSystemServiceName(android.location.LocationManager::class.java))
+    }
+
+    @Test
     fun `test file I-O operations operate strictly inside sandbox and block path traversal`() {
         val testFileName = "test_plugin_data.txt"
         sandboxedContext.openFileOutput(testFileName, Context.MODE_PRIVATE).use {

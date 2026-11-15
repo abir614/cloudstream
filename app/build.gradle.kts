@@ -326,7 +326,11 @@ android {
                 "META-INF/**/NOTICE*",
                 "META-INF/**/notice*",
                 "META-INF/*.kotlin_module",
-                "META-INF/version-control-info.textproto"
+                "META-INF/version-control-info.textproto",
+                "META-INF/AL2.0",
+                "META-INF/LGPL2.1",
+                "META-INF/gradle/incremental.annotation.processors",
+                "DebugProbesKt.bin"
             )
         }
     }
