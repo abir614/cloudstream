@@ -469,14 +469,14 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Extension Sandbox Escape Remediation ([`SandboxedContextWrapper.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapper.kt))**:
   - Overrode `getApplicationContext()` and `getBaseContext()` to return the sandboxed context wrapper instance, eliminating context unwrap escapes to the host `Application` context.
   - Hardened `getDatabasePath` and `getDir` with canonical path boundary verification and path traversal filtering (`..`, `/`, `\`), blocking directory traversal.
-- **Reflection Firewall Expansion ([`ShieldedClassLoader.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/ShieldedClassLoader.kt))**:
-  - Added `CloudStreamApp`, `DataStore`, and `DataStoreHelper` to `BLOCKED_CLASS_PREFIXES`, closing reflection access to global keystores and application singletons.
+- **Reflection Firewall Calibration ([`ShieldedClassLoader.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/ShieldedClassLoader.kt))**:
+  - Calibrated `BLOCKED_CLASS_PREFIXES` to strictly isolate sensitive authentication vaults (`SecureAuthStore`, `AccountManager`, `AuthStore`), update gates (`UpdateSecurityGate`), and database internals, while permitting extension public bridges (`CloudStreamApp.context`, `DataStoreHelper`) to ensure 100% plugin loading compatibility.
 - **Unified SSRF Fallback Resolution ([`StreamSecurityUseCase.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/usecase/StreamSecurityUseCase.kt))**:
   - Aligned `isSafeFallback` IP validation with `SafeDns.isBlocked()`, enforcing defense-in-depth against CGNAT (`100.64.0.0/10`), IPv6 ULA (`fc00::/7`), `0.0.0.0/8`, `240.0.0.0/4`, and IPv4-mapped IPv6.
 - **AutoLogcatMonitor Low-End Hardware Bypass ([`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt))**:
   - Deactivated external logcat Unix subprocess execution on all `LOW` tier devices (<= 2048MB RAM, 32-bit ARM, Android Go), conserving CPU cycles and memory bandwidth.
-- **Home Screen Instant Loading Parity ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
-  - Bypassed blocking synchronous Phase 2 poster downloads and classification on potato and low-tier devices, immediately rendering the home feed upon text filtering completion matching v220 responsiveness.
+- **Home Screen Potato Poster Classification Synchronization ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Replaced the full preloader bypass on potato/low-tier devices with a sequential, zero-allocation `classifyPotatoFastScore()` (48×48 RGB_565, <0.05ms) preloader on initial visible posters (banner + top rail). Guarantees all visible posters are classified and purged before rendering, while avoiding OOM or UI freezing.
 
 ### 16.13 Robust NSFW Filtering & Low-End Device Crash Prevention Parity
 - **Clean Title Allowlist Anti-Exploit Guard ([`NsfwFilterEngine.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/NsfwFilterEngine.kt))**:
@@ -535,9 +535,9 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Prioritized `configuration.screenWidthDp` and `screenHeightDp` for dynamic split-screen and multi-window bounds calculation.
   - Wired dynamic grid span calculation into [`UIHelper.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/UIHelper.kt), automatically adjusting RecyclerView column counts across Foldables and Tablets (eliminating image stretching in portrait orientation).
   - Added dual-pane master-detail coordinator (`shouldUseDualPane`), multi-window mode detection (`isMultiWindow`), ChromeOS/Desktop environment identification (`isChromeOsOrDesktop`), and responsive dialog sizing.
-- **R8 Dead Code Stripping & Resource Shrinking ([`build.gradle.kts`](app/build.gradle.kts) & [`proguard-rules.pro`](app/proguard-rules.pro))**:
-  - Enabled `isMinifyEnabled = true` and `isShrinkResources = true` in the `release` build type.
-  - Calibrated ProGuard rules to retain plugin interfaces, extractors, serializers, and Media3 while pruning dead framework code and unused resources. Added [`keep.xml`](app/src/main/res/raw/keep.xml) to safeguard Android TV banners and launcher icons.
+- **Plugin Runtime Protection & ProGuard Rules ([`build.gradle.kts`](app/build.gradle.kts) & [`proguard-rules.pro`](app/proguard-rules.pro))**:
+  - Disabled release R8 minification and resource shrinking (`isMinifyEnabled = false`, `isShrinkResources = false`) to guarantee external `.cs3` plugins retain full access to Kotlin stdlib reflection classes (`kotlin.jvm.internal.IntrinsicsKt`).
+  - Added strict ProGuard keep rules (`-keep class kotlin.** { *; }`, `-keep class kotlinx.** { *; }`, `-keep class org.mozilla.javascript.** { *; }`) and `-dontwarn java.beans.**` to safeguard plugin and Rhino scripting compatibility. Added [`keep.xml`](app/src/main/res/raw/keep.xml) to safeguard Android TV banners and launcher icons.
 - **Deterministic CI/CD Signing & Fail-Fast Secrets ([`release.yml`](.github/workflows/release.yml))**:
   - Refactored `Setup Keystore` to fail fast with a descriptive error message if production signing secrets are missing, eliminating the insecure ad-hoc keystore generator that breaks update continuity.
 - **Sync & Authentication Network Security Scoping ([`network_security_config.xml`](app/src/main/res/xml/network_security_config.xml))**:

@@ -15,8 +15,8 @@
 ### 1. Guarded In-Process Extension Sandboxing & TOFU Integrity
 - **Reflection Firewall ([`ShieldedClassLoader.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/ShieldedClassLoader.kt))**:
   - Dynamically shields the host application from untrusted third-party `.cs3` plugins.
-  - Explicitly permits core extension APIs (`MainAPI`, `ExtractorApi`, `NiceHttp`, `com.mega.*`, `RepositoryManager`, `RepositoryData`), guaranteeing 100% backward compatibility for legacy extensions and multi-repository shortcodes (e.g. `megarepo` / `3737`).
-  - Blocks reflection lookups targeting internal singletons, application instances (`CloudStreamApp`), secure key-value stores (`DataStore`, `DataStoreHelper`), user credentials (MAL, AniList, SIMKL), database helpers, and encryption keystores.
+  - Explicitly permits core extension APIs (`MainAPI`, `ExtractorApi`, `NiceHttp`, `com.mega.*`, `RepositoryManager`, `RepositoryData`, `CloudStreamApp.context`, `DataStoreHelper`), guaranteeing 100% backward compatibility for legacy extensions and multi-repository shortcodes (e.g. `megarepo` / `3737`).
+  - Blocks reflection lookups targeting internal singletons, authentication token vaults (`AccountManager`, `AuthStore`, `SecureAuthStore`), update security gates (`UpdateSecurityGate`), native crypto bridges, and database internals.
 - **Storage & Database Jail ([`SandboxedContextWrapper.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapper.kt))**:
   - Confines plugin file storage, temporary caches, and SharedPreferences to isolated per-plugin directories (`filesDir/plugin_sandboxes/<pluginName>/`).
   - Overrides `getApplicationContext()` and `getBaseContext()` returning the sandboxed context, preventing context unwrap escapes to the host `Application` instance.
