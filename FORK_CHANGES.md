@@ -553,4 +553,12 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Preserved full TFLite evaluation for monochrome/grayscale artwork and images with skin exposure (`bodySkinRatio >= 0.04f`).
   - Added comprehensive unit test coverage in [`NsfwFilterEngineTest.kt`](app/src/test/java/com/lagradost/cloudstream3/domain/NsfwFilterEngineTest.kt) verifying dHash consistency and rotational/contrast invariance.
 
+### 16.18 Plugin Sandboxed Service Compatibility & Telemetry Noise Suppression
+- **Plugin ActivityManager Service Restoration ([`SandboxedContextWrapper.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapper.kt))**:
+  - Removed `Context.ACTIVITY_SERVICE` from the sandboxed system service restriction list. Resolves a `SecurityException` crash during plugin loading for plugins that inspect device hardware capabilities (e.g. `StreamPlayPlugin` calling `StreamPlayConcurrency.detectDeviceProfile` to query `ActivityManager.isLowRamDevice` and `memoryClass`).
+- **Telemetry Noise Elimination ([`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt) & [`PluginManager.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/PluginManager.kt))**:
+  - Added noise filters in `AutoLogcatMonitor` suppressing benign Android OEM framework events (`primary.prof` missing sideload notices, ART GC weak pointer dereferences, `.odex` duplicate intern markers, WebView variations seed network notices, and Gralloc hardware mappers).
+  - Demoted `Couldn't find plugin` from `WARN` to `DEBUG` in `PluginManager.unloadPlugin`, preventing warning alerts when a plugin is uninstalled or installed for the first time.
+
+
 

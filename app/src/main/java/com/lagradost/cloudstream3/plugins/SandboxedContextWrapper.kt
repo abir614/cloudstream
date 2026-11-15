@@ -60,9 +60,8 @@ class SandboxedContextWrapper(
     }
 
     override fun getSystemService(name: String): Any? {
-        // Prevent plugins from obtaining sensitive system services to probe OS tasks or accounts
+        // Prevent plugins from obtaining sensitive system services to probe OS accounts or admin policies
         when (name) {
-            Context.ACTIVITY_SERVICE,
             Context.ACCOUNT_SERVICE,
             Context.DEVICE_POLICY_SERVICE,
             Context.KEYGUARD_SERVICE,

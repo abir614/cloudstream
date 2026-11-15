@@ -113,7 +113,6 @@ class SandboxedContextWrapperTest {
     @Test
     fun `test getSystemService restricts privileged services`() {
         val privileged = listOf(
-            Context.ACTIVITY_SERVICE,
             Context.ACCOUNT_SERVICE,
             Context.DEVICE_POLICY_SERVICE,
             Context.KEYGUARD_SERVICE,
@@ -127,6 +126,12 @@ class SandboxedContextWrapperTest {
                 // Expected
             }
         }
+    }
+
+    @Test
+    fun `test getSystemService permits activity service for device memory profiling`() {
+        // Must not throw SecurityException so plugins can detect memory limits
+        sandboxedContext.getSystemService(Context.ACTIVITY_SERVICE)
     }
 
     @Test

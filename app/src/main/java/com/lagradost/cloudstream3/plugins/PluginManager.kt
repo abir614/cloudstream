@@ -736,7 +736,7 @@ object PluginManager {
             ?: plugins.values.firstOrNull { it.filename == absolutePath || (it.filename?.let { f -> normalizePluginPath(f) } == canonical) }
             ?: urlPlugins[absolutePath]
         if (plugin == null) {
-            Log.w(TAG, "Couldn't find plugin $absolutePath")
+            Log.d(TAG, "Plugin not loaded, skipping unload: $absolutePath")
             return
         }
 

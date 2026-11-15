@@ -83,7 +83,11 @@ object AutoLogcatMonitor {
         "VelocityTracker",
         "ColorUtils",
         "ExoPlayerImplInternal",
-        "SandboxClient"
+        "SandboxClient",
+        "Gralloc3",
+        "Gralloc4",
+        "Gralloc",
+        "AudioCapabilities"
     )
 
     private fun isNoiseTag(tag: String): Boolean {
@@ -215,6 +219,11 @@ object AutoLogcatMonitor {
                             if (message.contains("expected specified color aspects", ignoreCase = true)) continue
                             if (message.contains("No movement data for pointerId", ignoreCase = true)) continue
                             if (message.contains("TextClassifier called on main thread", ignoreCase = true)) continue
+                            if (message.contains("primary.prof", ignoreCase = true)) continue
+                            if (message.contains("Duplicate interns in the .data.img.rel.ro", ignoreCase = true)) continue
+                            if (message.contains("Weak pointer dereference blocked", ignoreCase = true)) continue
+                            if (message.contains("variations_seed_loader", ignoreCase = true)) continue
+                            if (message.contains("Unsupported mime audio/", ignoreCase = true)) continue
 
                             val level = when (levelChar) {
                                 "E" -> TelemetryService.Level.ERROR
