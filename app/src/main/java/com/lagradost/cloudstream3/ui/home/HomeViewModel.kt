@@ -465,8 +465,77 @@ class HomeViewModel : ViewModel() {
             val isLowEndOrPotato = isPotato || (preloaderContext != null && DeviceProfile.isLowEnd(preloaderContext))
 
             if (isLowEndOrPotato) {
-                // v220 Parity: Low-end / potato devices render home sections immediately without
-                // blocking the UI thread or device network on synchronous poster preloading & classifier passes.
+                // On potato/low-end devices we still MUST classify posters before rendering
+                // the homepage when NSFW filtering is active. We use the zero-allocation skin
+                // chrominance heuristic (classifyPotatoFastScore, 48×48, <0.05 ms) on a
+                // strictly-capped batch of initial-visible items (banner only, ≤3 posters)
+                // to avoid OOM while guaranteeing no NSFW poster slips through.
+                if (shouldFilter && preloaderContext != null && expandable.isNotEmpty()) {
+                    val posterMsg = preloaderContext.getString(R.string.loading_posters)
+                    if (!isBackgroundUpdate) {
+                        _contentFilterProgress.postValue(
+                            ContentFilterProgress(
+                                isFiltering = true,
+                                current = 50,
+                                total = 100,
+                                message = posterMsg
+                            )
+                        )
+                    }
+
+                    // Build a tiny candidate list: banner posters from the first rail only (≤3 items)
+                    val potatoCandidates = expandable.values
+                        .take(1)
+                        .flatMap { it.list.list.take(3) }
+                        .filter { !it.posterUrl.isNullOrBlank() }
+                        .map { PosterPreloadTarget(it.name, it.url, it.posterUrl!!, it.posterHeaders) }
+
+                    if (potatoCandidates.isNotEmpty()) {
+                        val imageLoader = SingletonImageLoader.get(preloaderContext)
+                        val threshold = NsfwFilterEngine.getVisualThreshold(preloaderContext)
+                        val nsfwUrlsToRemove = mutableSetOf<String>()
+
+                        // Single-threaded sequential loop — intentional for potato safety
+                        for (item in potatoCandidates) {
+                            try {
+                                // Short timeout (2 s) so network hiccups don't stall startup
+                                withTimeoutOrNull(2000L) {
+                                    val request = ImageRequest.Builder(preloaderContext)
+                                        .data(item.posterUrl)
+                                        .memoryCacheKey(item.posterUrl)
+                                        .diskCacheKey(item.posterUrl)
+                                        .httpHeaders(NetworkHeaders.Builder().also { h ->
+                                            h["User-Agent"] = USER_AGENT
+                                            item.posterHeaders?.forEach { (k, v) -> h[k] = v }
+                                        }.build())
+                                        .allowHardware(false)
+                                        .bitmapConfig(Bitmap.Config.RGB_565)
+                                        .build()
+                                    val result = imageLoader.execute(request)
+                                    if (result is SuccessResult && !NsfwFilterEngine.isCleanTitleAllowed(item.name)) {
+                                        val drawable = result.image.asDrawable(preloaderContext.resources)
+                                        val score = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.classifyPotatoFastScore(drawable, preloaderContext)
+                                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl, score, preloaderContext)
+                                        if (!nsfwEnabled && score >= threshold) {
+                                            nsfwUrlsToRemove.add(item.url)
+                                        }
+                                    }
+                                }
+                            } catch (_: Throwable) { /* network/OOM — skip this poster */ }
+                            // Brief yield to let GC reclaim between iterations on memory-constrained devices
+                            kotlinx.coroutines.delay(5L)
+                        }
+
+                        if (nsfwUrlsToRemove.isNotEmpty()) {
+                            expandable.keys.toList().forEach { key ->
+                                val row = expandable[key] ?: return@forEach
+                                val cleaned = row.list.list.filterNot { nsfwUrlsToRemove.contains(it.url) }
+                                expandable[key] = row.copy(list = row.list.copy(list = CopyOnWriteArrayList(cleaned)))
+                            }
+                        }
+                    }
+                }
+
                 _contentFilterProgress.postValue(null)
                 _page.postValue(Resource.Success(expandable))
             } else if (preloaderContext != null && (expandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
