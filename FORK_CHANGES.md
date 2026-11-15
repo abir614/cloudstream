@@ -571,8 +571,10 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Context Unwrapping Shield ([`CloudStreamApp.kt`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) & [`PluginManager.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/PluginManager.kt))**:
   - Intercepted `CloudStreamApp.context` property getter: if the caller's thread classloader is `ShieldedClassLoader`, dynamically wraps the raw base context in `SandboxedContextWrapper`, preventing plugins from escaping the sandbox via static context access.
   - Set `Thread.currentThread().contextClassLoader = loader` during `pluginInstance.load()`.
-- **Rust Core Dependency Pruning ([`Cargo.toml`](rust-core/Cargo.toml) & [`Cargo.lock`](rust-core/Cargo.lock))**:
-  - Removed unused dependency `ipnet` from `rust-core`, resolving `warning: unused dependency ipnet` from `cargo clippy`.
+- **Dependency Catalog & Rust Core Pruning ([`Cargo.toml`](rust-core/Cargo.toml), [`Cargo.lock`](rust-core/Cargo.lock) & [`libs.versions.toml`](gradle/libs.versions.toml))**:
+  - Removed unused dependencies `ipnet` and `memchr` from `rust-core`, resolving the `unused dependency ipnet` warning from `cargo clippy`.
+  - Pruned unused `quickcheck`, `quickcheck_macros`, and `tempfile` dev-dependencies from `rust-core`.
+  - Removed dead `databinding` entry from `gradle/libs.versions.toml` (viewBinding is enabled natively by Android Gradle Plugin).
 
 
 

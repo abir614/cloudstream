@@ -19,7 +19,6 @@ url = "2.5.4"
 # Serialization & Zero-copy parsing
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
-memchr = "2.7.4"
 
 # Cryptography & Zero-Trust Identity Verification
 sha2 = "0.10.8"
@@ -38,12 +37,6 @@ argon2 = "0.6"
 # Android JNI integration (optional feature)
 jni = { version = "0.21.1", default-features = false }
 miniz_oxide = "0.9.1"
-
-[dev-dependencies]
-# Testing & Fuzz testing
-quickcheck = "1.0.3"
-quickcheck_macros = "1.0.3"
-tempfile = "3.16.0"
 
 [features]
 default = []
