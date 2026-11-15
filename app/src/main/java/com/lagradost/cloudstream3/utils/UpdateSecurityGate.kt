@@ -494,7 +494,6 @@ object UpdateSecurityGate {
         if (repoHeaderHex != null && repoHeaderHex.isNotBlank()) {
             val isHeaderValid = verifyJvmRepoHeader(repoHeaderHex, normActualCert)
                 || verifyJvmRepoHeader(repoHeaderHex, PERMANENT_REPO_CERT_SHA256)
-                || normExpectedCert == normActualCert
 
             if (!isHeaderValid) {
                 return InternalVerificationResult(

@@ -262,8 +262,7 @@ pub fn verify_apk_identity(
             };
 
             let is_proof_valid = verify_repo_identity_proof(&header_bytes, &norm_actual_cert)
-                || verify_repo_identity_proof(&header_bytes, PERMANENT_REPO_CERT_SHA256)
-                || norm_expected_cert == norm_actual_cert;
+                || verify_repo_identity_proof(&header_bytes, PERMANENT_REPO_CERT_SHA256);
 
             if !is_proof_valid {
                 return ApkVerificationResult {
