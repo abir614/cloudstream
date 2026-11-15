@@ -3,7 +3,6 @@ package com.lagradost.cloudstream3.utils
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.net.Uri
-import android.os.Build
 import android.os.Build.VERSION.SDK_INT
 import android.util.Log
 import android.widget.ImageView

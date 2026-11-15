@@ -54,7 +54,6 @@ import com.lagradost.cloudstream3.utils.UiText
 import com.lagradost.cloudstream3.utils.downloader.DownloadFileManagement.sanitizeFilename
 import com.lagradost.cloudstream3.utils.extractorApis
 import com.lagradost.cloudstream3.utils.txt
-import dalvik.system.PathClassLoader
 import com.lagradost.cloudstream3.plugins.ShieldedClassLoader
 import com.lagradost.cloudstream3.plugins.SandboxedContextWrapper
 import com.lagradost.cloudstream3.plugins.PluginFingerprintStore

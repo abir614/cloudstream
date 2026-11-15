@@ -4,7 +4,6 @@ import com.lagradost.cloudstream3.ui.coordinators.WindowHeightSizeClass
 import com.lagradost.cloudstream3.ui.coordinators.WindowSizeCoordinator
 import com.lagradost.cloudstream3.ui.coordinators.WindowWidthSizeClass
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WindowSizeCoordinatorTest {

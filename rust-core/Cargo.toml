@@ -38,6 +38,10 @@ argon2 = "0.6"
 jni = { version = "0.21.1", default-features = false }
 miniz_oxide = "0.9.1"
 
+[dev-dependencies]
+# Testing & Fuzz testing
+tempfile = "3.16.0"
+
 [features]
 default = []
 wasm-sandbox = ["dep:wasmi"]

@@ -7,7 +7,6 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 
 open class Sobreatsesuyp : ExtractorApi() {
     override val name = "Sobreatsesuyp"

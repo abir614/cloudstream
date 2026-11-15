@@ -3,7 +3,6 @@ package com.lagradost.cloudstream3.ui.coordinators
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Build
-import android.util.DisplayMetrics
 
 /**
  * Material 3 Window Width Size Class specification.
