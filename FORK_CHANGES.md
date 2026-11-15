@@ -564,13 +564,15 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Zero-Trust Strict System Service Allowlist ([`SandboxedContextWrapper.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapper.kt))**:
   - Replaced the vulnerable denylist with an explicit Zero-Trust allowlist of safe services (`CONNECTIVITY_SERVICE`, `LAYOUT_INFLATER_SERVICE`, `WINDOW_SERVICE`, `POWER_SERVICE`, `AUDIO_SERVICE`, `INPUT_METHOD_SERVICE`, `UI_MODE_SERVICE`, `VIBRATOR_SERVICE`, `CAPTIONING_SERVICE`, `DISPLAY_SERVICE`, `ACCESSIBILITY_SERVICE`, and `ACTIVITY_SERVICE`).
   - Blocked all sensitive system services (`CLIPBOARD_SERVICE`, `TELEPHONY_SERVICE`, `LOCATION_SERVICE`, `WIFI_SERVICE`, `BLUETOOTH_SERVICE`, `NOTIFICATION_SERVICE`, `MEDIA_PROJECTION_SERVICE`, `CAMERA_SERVICE`, `BIOMETRIC_SERVICE`, `ACCOUNT_SERVICE`, `DEVICE_POLICY_SERVICE`, `KEYGUARD_SERVICE`, `DROPBOX_SERVICE`) by default with `SecurityException`.
-  - Overrode both `getSystemService(String)` and `getSystemService(Class<T>)` to prevent class-based bypasses.
+  - Overrode virtual `getSystemService(String)` which seamlessly protects both `getSystemService(String)` and `Context.getSystemService(Class<T>)` (which delegates internally to `getSystemService(String)` in Android framework).
 - **DEX Bytecode Pre-Flight Security Gate ([`PluginArchiveIntegrityEngine.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/PluginArchiveIntegrityEngine.kt))**:
   - Added rolling chunk-based scanning across all `.dex` bytecode entries inside `.cs3` plugin archives.
   - Detects and rejects any archive containing destructive API tokens (`clearApplicationUserData`, `killBackgroundProcesses`, `finishAndRemoveTask`) with an immediate `ArchiveValidationResult.SecurityViolation`, neutralizing DoS and wipe attacks before bytecode instantiation.
 - **Context Unwrapping Shield ([`CloudStreamApp.kt`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) & [`PluginManager.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/PluginManager.kt))**:
   - Intercepted `CloudStreamApp.context` property getter: if the caller's thread classloader is `ShieldedClassLoader`, dynamically wraps the raw base context in `SandboxedContextWrapper`, preventing plugins from escaping the sandbox via static context access.
   - Set `Thread.currentThread().contextClassLoader = loader` during `pluginInstance.load()`.
+- **Rust Core Dependency Pruning ([`Cargo.toml`](rust-core/Cargo.toml) & [`Cargo.lock`](rust-core/Cargo.lock))**:
+  - Removed unused dependency `ipnet` from `rust-core`, resolving `warning: unused dependency ipnet` from `cargo clippy`.
 
 
 

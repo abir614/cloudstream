@@ -89,14 +89,6 @@ class SandboxedContextWrapper(
         return super.getSystemService(name)
     }
 
-    override fun <T> getSystemService(serviceClass: Class<T>): T? {
-        val serviceName = getSystemServiceName(serviceClass)
-        if (serviceName == null || !PERMITTED_SYSTEM_SERVICES.contains(serviceName)) {
-            throw SecurityException("Access to system service '${serviceClass.name}' is restricted for sandboxed plugins")
-        }
-        return super.getSystemService(serviceClass)
-    }
-
     private fun sanitizePathSegment(segment: String): String {
         if (segment.contains("..") || segment.contains("/") || segment.contains("\\") || segment.contains("\u0000")) {
             throw SecurityException("Path traversal attempt detected in segment: '$segment'")
