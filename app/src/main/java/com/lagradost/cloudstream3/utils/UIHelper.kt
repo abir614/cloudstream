@@ -684,14 +684,14 @@ object UIHelper {
      * when a content card or poster receives remote / D-pad focus.
      *
      * @param hasFocus Whether the view currently holds focus.
-     * @param scale Focused scale factor (default: 1.08f).
-     * @param elevation Focused translationZ in pixels (default: 16f).
+     * @param scale Focused scale factor (default: 1.12f).
+     * @param elevation Focused translationZ in pixels (default: 24f).
      * @param duration Animation duration in milliseconds (default: 180ms).
      */
     fun View.applyTvCardFocusHover(
         hasFocus: Boolean,
-        scale: Float = 1.08f,
-        elevation: Float = 16f,
+        scale: Float = 1.12f,
+        elevation: Float = 24f,
         duration: Long = 180L
     ) {
         if (!isLayout(com.lagradost.cloudstream3.ui.settings.Globals.TV)) return
@@ -708,13 +708,14 @@ object UIHelper {
 
         val targetScale = if (hasFocus) scale else 1.0f
         val targetZ = if (hasFocus) elevation else 0f
+        this.setTag(R.id.tv_card_scale_tag, targetScale)
 
         this.animate()
             .scaleX(targetScale)
             .scaleY(targetScale)
             .translationZ(targetZ)
             .setDuration(duration)
-            .setInterpolator(android.view.animation.DecelerateInterpolator(1.5f))
+            .setInterpolator(android.view.animation.DecelerateInterpolator(1.8f))
             .start()
     }
 
@@ -723,6 +724,7 @@ object UIHelper {
      */
     fun View.resetTvCardHover() {
         if (!isLayout(com.lagradost.cloudstream3.ui.settings.Globals.TV)) return
+        this.setTag(R.id.tv_card_scale_tag, null)
         this.animate().cancel()
         this.scaleX = 1.0f
         this.scaleY = 1.0f

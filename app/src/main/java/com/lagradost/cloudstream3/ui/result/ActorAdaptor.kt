@@ -97,7 +97,7 @@ class ActorAdaptor(
                 }
                 itemView.setOnFocusChangeListener { v, hasFocus ->
                     if (isLayout(TV)) {
-                        v.applyTvCardFocusHover(hasFocus, scale = 1.08f, elevation = 12f)
+                        v.applyTvCardFocusHover(hasFocus, scale = 1.12f, elevation = 20f)
                     }
                     if (hasFocus) {
                         focusCallback(v)

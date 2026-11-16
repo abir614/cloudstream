@@ -927,6 +927,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             val height: Int,
             val x: Float,
             val y: Float,
+            val scale: Float = 1.0f,
         ) {
             companion object {
                 fun lerp(a: FocusTarget, b: FocusTarget, lerp: Float): FocusTarget {
@@ -935,14 +936,15 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                         width = (a.width * ilerp + b.width * lerp).toInt(),
                         height = (a.height * ilerp + b.height * lerp).toInt(),
                         x = a.x * ilerp + b.x * lerp,
-                        y = a.y * ilerp + b.y * lerp
+                        y = a.y * ilerp + b.y * lerp,
+                        scale = a.scale * ilerp + b.scale * lerp
                     )
                 }
             }
         }
 
-        var last: FocusTarget = FocusTarget(0, 0, 0.0f, 0.0f)
-        var current: FocusTarget = FocusTarget(0, 0, 0.0f, 0.0f)
+        var last: FocusTarget = FocusTarget(0, 0, 0.0f, 0.0f, 1.0f)
+        var current: FocusTarget = FocusTarget(0, 0, 0.0f, 0.0f, 1.0f)
 
         var focusOutline: WeakReference<View> = WeakReference(null)
         var lastFocus: WeakReference<View> = WeakReference(null)
@@ -981,6 +983,10 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
                 translationX = target.x
                 translationY = target.y
+                scaleX = target.scale
+                scaleY = target.scale
+                translationZ = 40f
+                elevation = 40f
                 bringToFront()
             }
         }
@@ -1103,19 +1109,23 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                     x = currentX,
                     y = currentY,
                     width = focusOutline.measuredWidth,
-                    height = focusOutline.measuredHeight
+                    height = focusOutline.measuredHeight,
+                    scale = focusOutline.scaleX
                 )
+                val targetScale = (newFocus.getTag(R.id.tv_card_scale_tag) as? Float)
+                    ?: if (newFocus.scaleX > 1.0f) newFocus.scaleX else 1.0f
                 val end = FocusTarget(
                     x = x,
                     y = y,
                     width = newFocus.measuredWidth,
-                    height = newFocus.measuredHeight
+                    height = newFocus.measuredHeight,
+                    scale = targetScale
                 )
 
                 // if they are the same within then snap, aka scrolling
                 val deltaMinX = min(end.width / 2, 60.toPx)
                 val deltaMinY = min(end.height / 2, 60.toPx)
-                if (start.width == end.width && start.height == end.height && (start.x - end.x).absoluteValue < deltaMinX && (start.y - end.y).absoluteValue < deltaMinY) {
+                if (start.width == end.width && start.height == end.height && (start.scale - end.scale).absoluteValue < 0.01f && (start.x - end.x).absoluteValue < deltaMinX && (start.y - end.y).absoluteValue < deltaMinY) {
                     animator?.cancel()
                     last = start
                     current = end

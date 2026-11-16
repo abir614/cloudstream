@@ -151,7 +151,7 @@ android {
         }
     }
 
-    aaptOptions {
+    androidResources {
         noCompress += listOf("bin", "tflite")
     }
 

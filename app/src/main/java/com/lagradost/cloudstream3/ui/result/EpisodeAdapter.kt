@@ -370,7 +370,7 @@ class EpisodeAdapter(
                         itemView.resetTvCardHover()
                     }
                     itemView.setOnFocusChangeListener { view, hasFocus ->
-                        view.applyTvCardFocusHover(hasFocus, scale = 1.05f, elevation = 12f)
+                        view.applyTvCardFocusHover(hasFocus, scale = 1.08f, elevation = 18f)
                     }
                 }
 
@@ -477,7 +477,7 @@ class EpisodeAdapter(
                             itemView.resetTvCardHover()
                         }
                         itemView.setOnFocusChangeListener { view, hasFocus ->
-                            view.applyTvCardFocusHover(hasFocus, scale = 1.05f, elevation = 12f)
+                            view.applyTvCardFocusHover(hasFocus, scale = 1.08f, elevation = 18f)
                         }
                     }
 
