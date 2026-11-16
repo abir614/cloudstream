@@ -52,8 +52,12 @@ class TelemetryService(
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
 
     // Regex patterns for automatic privacy redaction
-    private val tokenRegex = Regex("(?i)(api[-_]?key|token|auth|bearer|password|secret)=([^&\\s]+)")
-    private val ipRegex = Regex("\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\b")
+    private val tokenRegex = Regex(
+        """(?i)(^|[?&;\s"'(\[{])(access_token|refresh_token|api[-_]?key|secret[-_]?key|client[-_]?secret|bearer[-_]?token|auth[-_]?token|bot[-_]?token|private[-_]?key|session[-_]?token|password|passwd|signature|\btoken\b|\bsecret\b|\bbearer\b)([:=]|\s*=\s*)([^&\s"'<>]+)"""
+    )
+    private val ipRegex = Regex(
+        """(?<![\w/.-])(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?![\w/.-])"""
+    )
 
     /**
      * Sanitizes sensitive data before storage or dispatch.
@@ -61,14 +65,16 @@ class TelemetryService(
     fun sanitize(input: String): String {
         if (input.isBlank()) return input
         var cleaned = tokenRegex.replace(input) { match ->
-            match.groupValues.getOrNull(1)?.let { "$it=[REDACTED]" } ?: "[REDACTED]"
+            "${match.groupValues[1]}${match.groupValues[2]}${match.groupValues[3]}[REDACTED]"
         }
         cleaned = ipRegex.replace(cleaned) { match ->
             val ip = match.value
-            if (ip.startsWith("127.") || ip.startsWith("10.") || ip.startsWith("192.168.")) {
+            if (ip == "127.0.0.1" || ip == "0.0.0.0" || ip == "10.0.2.2" || ip == "255.255.255.255") {
+                ip
+            } else if (ip.startsWith("192.168.") || ip.startsWith("10.") || ip.matches(Regex("""^172\.(1[6-9]|2[0-9]|3[0-1])\."""))) {
                 "[PRIVATE_IP]"
             } else {
-                ip
+                "[REDACTED_IP]"
             }
         }
         return cleaned

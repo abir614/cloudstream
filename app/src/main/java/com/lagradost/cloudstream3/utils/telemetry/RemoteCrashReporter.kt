@@ -464,17 +464,37 @@ object RemoteCrashReporter {
     }
 
     // --- Zero-Trust Sanitization ---
-    private val TOKEN_REGEX = Regex("""(?i)(token|key|secret|password|auth|bearer|access_token|refresh_token|session|signature)=([^&\s"']+)""")
-    private val IPV4_REGEX = Regex("""\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b""")
-    private val EMAIL_REGEX = Regex("""[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}""")
-    private val BOT_TOKEN_REGEX = Regex("""\d{8,10}:[a-zA-Z0-9_-]{35}""")
+    // Specifically matches sensitive credential parameters with delimiter boundaries
+    // to strictly prevent cropping benign keys (e.g. cache_key=path/to/file.jpg, item_key=anime/sub.json)
+    private val TOKEN_REGEX = Regex(
+        """(?i)(^|[?&;\s"'(\[{])(access_token|refresh_token|api[-_]?key|secret[-_]?key|client[-_]?secret|bearer[-_]?token|auth[-_]?token|bot[-_]?token|private[-_]?key|session[-_]?token|password|passwd|signature|\btoken\b|\bsecret\b|\bbearer\b)([:=]|\s*=\s*)([^&\s"'<>]+)"""
+    )
+    private val URL_API_KEY_REGEX = Regex(
+        """(?i)([?&]key=)([a-zA-Z0-9_-]{16,})(?![^&\s]*\.(?:m3u8|mp4|ts|mkv|avi|webm|jpg|jpeg|png|webp|json|html|xml|css|js))"""
+    )
+    private val IPV4_REGEX = Regex(
+        """(?<![\w/.-])(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?![\w/.-])"""
+    )
+    private val EMAIL_REGEX = Regex("""\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}\b""")
+    private val BOT_TOKEN_REGEX = Regex("""\b\d{8,10}:[a-zA-Z0-9_-]{35}\b""")
 
     fun sanitizeTelemetryText(raw: String?): String {
         if (raw.isNullOrBlank()) return ""
         var text = raw
-        text = TOKEN_REGEX.replace(text) { "${it.groupValues[1]}=[REDACTED]" }
+        text = TOKEN_REGEX.replace(text) { "${it.groupValues[1]}${it.groupValues[2]}${it.groupValues[3]}[REDACTED]" }
+        text = URL_API_KEY_REGEX.replace(text) { "${it.groupValues[1]}[REDACTED]" }
         text = BOT_TOKEN_REGEX.replace(text, "[REDACTED_BOT_TOKEN]")
-        text = IPV4_REGEX.replace(text, "[REDACTED_IP]")
+        text = IPV4_REGEX.replace(text) { match ->
+            val ip = match.value
+            // Preserve harmless standard loopback, wildcard, and broadcast diagnostic IPs
+            if (ip == "127.0.0.1" || ip == "0.0.0.0" || ip == "10.0.2.2" || ip == "255.255.255.255") {
+                ip
+            } else if (ip.startsWith("192.168.") || ip.startsWith("10.") || ip.matches(Regex("""^172\.(1[6-9]|2[0-9]|3[0-1])\."""))) {
+                "[PRIVATE_IP]"
+            } else {
+                "[REDACTED_IP]"
+            }
+        }
         text = EMAIL_REGEX.replace(text, "[REDACTED_EMAIL]")
         return text
     }

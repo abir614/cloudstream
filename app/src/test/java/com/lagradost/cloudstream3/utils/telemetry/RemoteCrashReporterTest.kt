@@ -49,6 +49,26 @@ class RemoteCrashReporterTest {
     }
 
     @Test
+    fun `test sanitizeTelemetryText preserves benign words, slashes, and dots`() {
+        val raw = "Cache entry cache_key=posters/123/banner.jpg.webp and item_key=anime/episodes/1.0.json, foreign_key=user_data.id/settings.pref"
+        val sanitized = RemoteCrashReporter.sanitizeTelemetryText(raw)
+
+        assertTrue(sanitized.contains("cache_key=posters/123/banner.jpg.webp"))
+        assertTrue(sanitized.contains("item_key=anime/episodes/1.0.json"))
+        assertTrue(sanitized.contains("foreign_key=user_data.id/settings.pref"))
+    }
+
+    @Test
+    fun `test sanitizeTelemetryText preserves version numbers and local diagnostic IPs`() {
+        val raw = "Loaded library v1.2.3.4 and connecting to 127.0.0.1:8080 or bind 0.0.0.0"
+        val sanitized = RemoteCrashReporter.sanitizeTelemetryText(raw)
+
+        assertTrue(sanitized.contains("v1.2.3.4"))
+        assertTrue(sanitized.contains("127.0.0.1:8080"))
+        assertTrue(sanitized.contains("0.0.0.0"))
+    }
+
+    @Test
     fun `test buildPayload produces structured fields matching worker ingestion contract`() {
         val testException = NullPointerException("Simulated null pointer in video parser")
         val payload = RemoteCrashReporter.buildPayload(
