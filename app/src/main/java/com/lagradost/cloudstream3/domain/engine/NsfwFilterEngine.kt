@@ -27,9 +27,9 @@ import java.util.Locale
 
 /**
  * Configurable Content Safety Sensitivity Levels:
- * - EXTREME (default 0.15f): Super Extreme peak shield (strictly blocks all adult, ecchi, beach, summer, swim, bikini, exposure, empty posters, provocative tropes).
- * - MODERATE (default 0.30f): Family Level sensitivity (strictly blocks explicit adult, ecchi, lewd, smut; preserves clean anime and summer/beach titles).
- * - LOW (default 0.55f): Hardcore sensitivity (strictly blocks explicit adult, pornography, hentai, and hardcore content).
+ * - EXTREME (default 0.10f): Super Extreme peak shield (strictly blocks all adult, ecchi, beach, summer, swim, bikini, exposure, empty posters, provocative tropes).
+ * - MODERATE (default 0.20f): Family Level sensitivity (strictly blocks explicit adult, ecchi, lewd, smut, sexy tropes; zero-leakage default setting).
+ * - LOW (default 0.40f): Hardcore sensitivity (strictly blocks explicit adult, pornography, hentai; tolerable soft ecchi/beach allowed).
  *
  * Each sensitivity level has a configurable Visual Detection Threshold (0.01f – 1.00f).
  * Invariant constraint: Extreme < Moderate < Low.
@@ -38,9 +38,9 @@ enum class NsfwFilterLevel(
     val key: String,
     val defaultVisualThreshold: Float
 ) {
-    LOW("low", 0.55f),
-    MODERATE("moderate", 0.30f),
-    EXTREME("extreme", 0.15f);
+    LOW("low", 0.40f),
+    MODERATE("moderate", 0.20f),
+    EXTREME("extreme", 0.10f);
 
     val visualThreshold: Float
         get() = NsfwFilterEngine.getVisualThreshold(null, this)
@@ -62,9 +62,9 @@ enum class NsfwFilterLevel(
  */
 object NsfwFilterEngine {
 
-    const val DEFAULT_THRESHOLD_EXTREME = 0.15f
-    const val DEFAULT_THRESHOLD_MODERATE = 0.30f
-    const val DEFAULT_THRESHOLD_LOW = 0.55f
+    const val DEFAULT_THRESHOLD_EXTREME = 0.10f
+    const val DEFAULT_THRESHOLD_MODERATE = 0.20f
+    const val DEFAULT_THRESHOLD_LOW = 0.40f
 
     const val PREF_KEY_THRESHOLD_EXTREME = "nsfw_visual_threshold_extreme_key"
     const val PREF_KEY_THRESHOLD_MODERATE = "nsfw_visual_threshold_moderate_key"
@@ -116,7 +116,14 @@ object NsfwFilterEngine {
                 NsfwFilterLevel.LOW -> ctx.getString(R.string.nsfw_visual_threshold_low_key)
             }
             val raw = prefs.getFloat(key, level.defaultVisualThreshold)
-            raw.coerceIn(0.01f, 1.00f)
+            // If user had legacy default values (0.15f, 0.30f, 0.55f), automatically upgrade to new calibrated defaults
+            val upgraded = when {
+                level == NsfwFilterLevel.EXTREME && Math.abs(raw - 0.15f) < 0.001f -> level.defaultVisualThreshold
+                level == NsfwFilterLevel.MODERATE && Math.abs(raw - 0.30f) < 0.001f -> level.defaultVisualThreshold
+                level == NsfwFilterLevel.LOW && Math.abs(raw - 0.55f) < 0.001f -> level.defaultVisualThreshold
+                else -> raw
+            }
+            upgraded.coerceIn(0.01f, 1.00f)
         } catch (_: Throwable) {
             level.defaultVisualThreshold
         }
@@ -160,7 +167,7 @@ object NsfwFilterEngine {
     }
 
     /**
-     * Resets visual thresholds to defaults (0.15, 0.30, 0.55).
+     * Resets visual thresholds to defaults (0.10, 0.20, 0.40).
      */
     fun resetVisualThresholdsToDefault(context: Context): Triple<Float, Float, Float> {
         val prefs = PreferenceManager.getDefaultSharedPreferences(context)
@@ -260,18 +267,30 @@ object NsfwFilterEngine {
             if (binding.seekbarLow.progress != pL) binding.seekbarLow.progress = pL
         }
 
-        binding.containerExtreme.setOnClickListener {
+        val selectExtreme = {
             selectedLevel = NsfwFilterLevel.EXTREME
             updateUI()
         }
-        binding.containerModerate.setOnClickListener {
+        val selectModerate = {
             selectedLevel = NsfwFilterLevel.MODERATE
             updateUI()
         }
-        binding.containerLow.setOnClickListener {
+        val selectLow = {
             selectedLevel = NsfwFilterLevel.LOW
             updateUI()
         }
+
+        binding.containerExtreme.setOnClickListener { selectExtreme() }
+        binding.radioExtreme.setOnClickListener { selectExtreme() }
+        binding.labelExtreme.setOnClickListener { selectExtreme() }
+
+        binding.containerModerate.setOnClickListener { selectModerate() }
+        binding.radioModerate.setOnClickListener { selectModerate() }
+        binding.labelModerate.setOnClickListener { selectModerate() }
+
+        binding.containerLow.setOnClickListener { selectLow() }
+        binding.radioLow.setOnClickListener { selectLow() }
+        binding.labelLow.setOnClickListener { selectLow() }
 
         var isUpdating = false
         fun handleSeekChange(tier: NsfwFilterLevel) {

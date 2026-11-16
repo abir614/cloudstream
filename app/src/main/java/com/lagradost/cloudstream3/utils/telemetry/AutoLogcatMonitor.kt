@@ -87,7 +87,16 @@ object AutoLogcatMonitor {
         "Gralloc3",
         "Gralloc4",
         "Gralloc",
-        "AudioCapabilities"
+        "AudioCapabilities",
+        "ashmem",
+        "QT",
+        "CCodec",
+        "DisplayEventDispatcher",
+        "Bundle",
+        "SpellCheckerSession",
+        "cr_media",
+        "RefClass",
+        "RepositoryManager"
     )
 
     private fun isNoiseMessage(message: String): Boolean {
@@ -137,7 +146,35 @@ object AutoLogcatMonitor {
             message.contains("Duplicate interns in the .data.img.rel.ro", ignoreCase = true) ||
             message.contains("Weak pointer dereference blocked", ignoreCase = true) ||
             message.contains("variations_seed_loader", ignoreCase = true) ||
-            message.contains("Unsupported mime audio/", ignoreCase = true)
+            message.contains("Unsupported mime audio/", ignoreCase = true) ||
+            message.contains("Pinning is deprecated", ignoreCase = true) ||
+            message.contains("Access denied finding property", ignoreCase = true) ||
+            message.contains("ClassLoader referenced unknown path", ignoreCase = true) ||
+            message.contains("A resource failed to call close", ignoreCase = true) ||
+            message.contains("response.body().close()", ignoreCase = true) ||
+            message.contains("ZipFile.close", ignoreCase = true) ||
+            message.contains("BBinder_init", ignoreCase = true) ||
+            message.contains("ro.vendor.", ignoreCase = true) ||
+            message.contains("ro.hardware.", ignoreCase = true) ||
+            message.contains("requestLayout() improperly called", ignoreCase = true) ||
+            message.contains("freeAllBuffers", ignoreCase = true) ||
+            message.contains("max input size is in reasonable range", ignoreCase = true) ||
+            message.contains("qt_process_init", ignoreCase = true) ||
+            message.contains("[QT]", ignoreCase = true) ||
+            message.contains("Key state expected Integer", ignoreCase = true) ||
+            message.contains("ClassCastException: java.lang.Boolean", ignoreCase = true) ||
+            message.contains("Vsync time out", ignoreCase = true) ||
+            message.contains("SPAN_EXCLUSIVE_EXCLUSIVE", ignoreCase = true) ||
+            message.contains("Support!!", ignoreCase = true) ||
+            message.contains("Failed downloading plugin from", ignoreCase = true) ||
+            message.contains("Deferring native library unloading", ignoreCase = true) ||
+            message.contains("DeadObjectException", ignoreCase = true) ||
+            message.contains("Failed to get suggestions", ignoreCase = true) ||
+            message.contains("BLUETOOTH_CONNECT permission is missing", ignoreCase = true) ||
+            message.contains("requires BLUETOOTH permission", ignoreCase = true) ||
+            message.contains("registerBluetoothIntentsIfNeeded", ignoreCase = true) ||
+            message.contains("CameraManagerExtPlugin", ignoreCase = true) ||
+            message.contains("Falling back to rate-limit-free CDN", ignoreCase = true)
     }
 
     private fun isNoiseTag(tag: String): Boolean {

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.DialogInterface
+import android.os.Build
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -81,6 +82,7 @@ import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.EmptyEvent
 import com.lagradost.cloudstream3.utils.SubtitleHelper.getFlagFromIso
 import com.lagradost.cloudstream3.utils.TvChannelUtils
+import com.lagradost.cloudstream3.utils.UIHelper.colorFromAttribute
 import com.lagradost.cloudstream3.utils.UIHelper.dismissSafe
 import com.lagradost.cloudstream3.utils.UIHelper.fixSystemBarsPadding
 import com.lagradost.cloudstream3.utils.UIHelper.getSpanCount
@@ -800,6 +802,11 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             binding.apply {
                 homeApiFab.text = displayApiName
                 homeChangeApi.text = displayApiName
+                homeLoadingBrandTitle.text = if (displayApiName.isNotBlank() && apiName != noneApi.name) {
+                    "CloudStream • $displayApiName"
+                } else {
+                    getString(R.string.app_name)
+                }
                 homePreviewReloadProvider.isGone = (apiName == noneApi.name)
                 homePreviewSearchButton.isGone = (apiName == noneApi.name)
             }
@@ -807,20 +814,57 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
 
         observe(homeViewModel.contentFilterProgress) { progress ->
             binding.apply {
+                val ctx = context
+                val primaryColor = ctx?.colorFromAttribute(R.attr.colorPrimary) ?: 0xFF3D50FA.toInt()
+                val isPotato = ctx?.let { DeviceProfile.isUltraPotato(it) || DeviceProfile.isLowEnd(it) } ?: false
+
                 if (progress != null && progress.isFiltering) {
                     homeLoading.isVisible = true
-                    homeLoadingIndicator.isVisible = true
-                    homeLoadingProgress.isGone = true
+                    homeLoading.alpha = 1f
+                    homeLoadingCard.isVisible = true
+                    homeAmbientGlow.isVisible = true
                     homeMasterRecycler.isGone = true
+
+                    // Low-spec optimization: stop shimmer animation on ultra-potato devices to conserve CPU/GPU
+                    homeLoadingShimmer.isVisible = true
+                    if (isPotato) {
+                        homeLoadingShimmer.stopShimmer()
+                        homeLoadingShimmer.alpha = 0.18f
+                    } else {
+                        homeLoadingShimmer.alpha = 0.28f
+                        homeLoadingShimmer.startShimmer()
+                    }
+
+                    // Foreground modern surface card
+                    homeLoadingProgress.isGone = true
+                    homeLoadingLogo.isVisible = true
+
                     homeFilteringProgressBar.isVisible = true
                     homeFilteringProgressBar.max = progress.total.coerceAtLeast(1)
-                    homeFilteringProgressBar.progress = progress.current
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        homeFilteringProgressBar.setProgress(progress.current, true)
+                    } else {
+                        homeFilteringProgressBar.progress = progress.current
+                    }
+
                     val percent = if (progress.total > 0) (progress.current * 100 / progress.total).coerceIn(0, 100) else 0
-                    homeLoadingText.text = "${progress.message} ($percent%)"
+                    homeLoadingPercentBadge.isVisible = true
+                    homeLoadingPercentBadge.text = "$percent%"
+                    homeLoadingPercentBadge.setTextColor(primaryColor)
+
+                    homeLoadingText.text = progress.message
                 } else {
                     homeFilteringProgressBar.isGone = true
+                    homeLoadingPercentBadge.isGone = true
                     homeLoadingProgress.isVisible = true
+                    homeLoadingLogo.isGone = true
                     homeLoadingText.text = getString(R.string.loading)
+                    homeLoadingShimmer.isVisible = true
+                    homeLoadingShimmer.alpha = 0.85f
+                    if (!isPotato) {
+                        homeLoadingShimmer.startShimmer()
+                    }
+                    homeAmbientGlow.isVisible = true
                 }
             }
         }
@@ -843,11 +887,22 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                         }) {
                             // Wait until RecyclerView layout pass is complete and child ViewHolders are drawn before dismissing loading screen
                             homeMasterRecycler.post {
-                                homeLoading.isVisible = false
+                                if (homeLoading.isVisible) {
+                                    homeMasterRecycler.alpha = 0f
+                                    homeMasterRecycler.isVisible = true
+                                    homeMasterRecycler.animate().alpha(1f).setDuration(220L).start()
+                                    homeLoading.animate().alpha(0f).setDuration(200L).withEndAction {
+                                        homeLoading.isVisible = false
+                                        homeLoading.alpha = 1f
+                                        homeLoadingShimmer.stopShimmer()
+                                        homeViewModel.clearFilterProgress()
+                                    }.start()
+                                } else {
+                                    homeLoading.isVisible = false
+                                    homeLoadingShimmer.stopShimmer()
+                                    homeViewModel.clearFilterProgress()
+                                }
                                 homeLoadingError.isVisible = false
-                                homeMasterRecycler.isVisible = true
-                                homeLoadingShimmer.stopShimmer()
-                                homeViewModel.clearFilterProgress()
                             }
                         }
 

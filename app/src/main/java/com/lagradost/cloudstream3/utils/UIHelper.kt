@@ -684,38 +684,73 @@ object UIHelper {
      * when a content card or poster receives remote / D-pad focus.
      *
      * @param hasFocus Whether the view currently holds focus.
-     * @param scale Focused scale factor (default: 1.12f).
-     * @param elevation Focused translationZ in pixels (default: 24f).
-     * @param duration Animation duration in milliseconds (default: 180ms).
+     * @param scale Focused scale factor (default: 1.5f).
+     * @param elevation Focused translationZ in pixels (default: 36f).
+     * @param duration Animation duration in milliseconds (default: 200ms).
      */
     fun View.applyTvCardFocusHover(
         hasFocus: Boolean,
-        scale: Float = 1.12f,
-        elevation: Float = 24f,
-        duration: Long = 180L
+        scale: Float = 1.5f,
+        elevation: Float = 36f,
+        duration: Long = 200L
     ) {
         if (!isLayout(com.lagradost.cloudstream3.ui.settings.Globals.TV)) return
 
-        // Prevent parent containers from clipping the enlarged/hovering card
-        (this.parent as? ViewGroup)?.let { p ->
-            p.clipChildren = false
-            p.clipToPadding = false
-            (p.parent as? ViewGroup)?.let { gp ->
-                gp.clipChildren = false
-                gp.clipToPadding = false
-            }
+        // Prevent all ancestor containers from clipping the enlarged/hovering card
+        var currentParent = this.parent as? ViewGroup
+        var depth = 0
+        while (currentParent != null && depth < 8) {
+            currentParent.clipChildren = false
+            currentParent.clipToPadding = false
+            currentParent = currentParent.parent as? ViewGroup
+            depth++
         }
 
         val targetScale = if (hasFocus) scale else 1.0f
         val targetZ = if (hasFocus) elevation else 0f
         this.setTag(R.id.tv_card_scale_tag, targetScale)
 
+        if (hasFocus) {
+            val width = this.width.toFloat()
+            val height = this.height.toFloat()
+            if (width > 0f && height > 0f) {
+                val loc = IntArray(2)
+                this.getLocationInWindow(loc)
+                val cardLeft = loc[0].toFloat()
+                val cardTop = loc[1].toFloat()
+                val displayMetrics = this.resources.displayMetrics
+                val screenWidth = displayMetrics.widthPixels.toFloat()
+                val screenHeight = displayMetrics.heightPixels.toFloat()
+
+                // Margin bounds (considering TV navbar safe area and screen bezels)
+                val navRailWidth = this.context.resources.getDimensionPixelSize(R.dimen.nav_rail_view_width).toFloat()
+                val minSafeLeft = navRailWidth.coerceAtLeast(50.toPx.toFloat())
+                val maxSafeRight = screenWidth - 16.toPx.toFloat()
+
+                // Adaptive horizontal pivot:
+                // Smooth interpolation between left edge (pivot at 0) and right edge (pivot at width)
+                val availableSpanX = (maxSafeRight - minSafeLeft - width).coerceAtLeast(1f)
+                val tX = ((cardLeft - minSafeLeft) / availableSpanX).coerceIn(0f, 1f)
+                this.pivotX = width * tX
+
+                // Adaptive vertical pivot:
+                val minSafeTop = 16.toPx.toFloat()
+                val maxSafeBottom = screenHeight - 16.toPx.toFloat()
+                val availableSpanY = (maxSafeBottom - minSafeTop - height).coerceAtLeast(1f)
+                val tY = ((cardTop - minSafeTop) / availableSpanY).coerceIn(0f, 1f)
+                this.pivotY = height * tY
+            }
+        } else {
+            this.pivotX = this.width / 2f
+            this.pivotY = this.height / 2f
+        }
+
         this.animate()
             .scaleX(targetScale)
             .scaleY(targetScale)
             .translationZ(targetZ)
             .setDuration(duration)
-            .setInterpolator(android.view.animation.DecelerateInterpolator(1.8f))
+            .setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
             .start()
     }
 
@@ -729,6 +764,8 @@ object UIHelper {
         this.scaleX = 1.0f
         this.scaleY = 1.0f
         this.translationZ = 0f
+        this.pivotX = this.width / 2f
+        this.pivotY = this.height / 2f
     }
 }
 

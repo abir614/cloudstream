@@ -138,6 +138,21 @@ object WindowSizeCoordinator {
         isHorizontalItem: Boolean = false,
         isTv: Boolean = false
     ): Int {
+        val externalState = try {
+            com.lagradost.cloudstream3.utils.display.DisplayTopologyManager.displayState.value
+        } catch (_: Throwable) {
+            null
+        }
+        val activeMonitor = externalState?.activeMonitor
+        if (activeMonitor != null && externalState.isConnected) {
+            if (activeMonitor.isUltraWide) {
+                return if (isHorizontalItem) 6 else 10
+            }
+            if (activeMonitor.is4KOrHigher || (activeMonitor.diagonalInches ?: 0f) >= 27f) {
+                return if (isHorizontalItem) 5 else 8
+            }
+        }
+
         if (isTv) {
             return if (isHorizontalItem) 4 else 7
         }

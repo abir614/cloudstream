@@ -140,4 +140,88 @@ class DeviceProfileTest {
         assertFalse(DeviceProfile.isUltraPotato(null))
         assertEquals(4, DeviceProfile.getInitialPrefetchItemCount(null))
     }
+
+    @Test
+    fun `test Snapdragon 8 Elite matching avoids Allwinner and sunny collisions`() {
+        val eliteId = "qcom sun sm8750 qualcomm technologies, inc sun"
+        val eliteTokens = eliteId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        val eliteIsAllwinner = false
+        assertTrue(DeviceProfile.matchesChip("sun", eliteId, eliteTokens, eliteIsAllwinner))
+        assertTrue(DeviceProfile.matchesChip("sm8750", eliteId, eliteTokens, eliteIsAllwinner))
+        assertTrue(DeviceProfile.KNOWN_FLAGSHIP_CHIPS.any { DeviceProfile.matchesChip(it, eliteId, eliteTokens, eliteIsAllwinner) })
+
+        // Allwinner H313
+        val awId = "sun50iw9 sunxi h313 allwinner allwinner h313 quad-core"
+        val awTokens = awId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        val awIsAllwinner = true
+        // "sun" must NOT match Allwinner
+        assertFalse(DeviceProfile.matchesChip("sun", awId, awTokens, awIsAllwinner))
+        // Must match known low chips
+        assertTrue(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, awId, awTokens, awIsAllwinner) })
+
+        // Redmi Note 10 (sunny)
+        val sunnyId = "qcom sm6150 sunny redmi note 10 qualcomm"
+        val sunnyTokens = sunnyId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertFalse(DeviceProfile.matchesChip("sun", sunnyId, sunnyTokens, false))
+    }
+
+    @Test
+    fun `test Amlogic TV box chip distinction without prefix false-positives`() {
+        // Modern Amlogic S905X4 4K box
+        val s905x4Id = "amlogic meson s905x4 mecool km2 plus"
+        val s905x4Tokens = s905x4Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        // Must NOT match "s905" or "s905x"
+        assertFalse(DeviceProfile.matchesChip("s905", s905x4Id, s905x4Tokens, false))
+        assertFalse(DeviceProfile.matchesChip("s905x", s905x4Id, s905x4Tokens, false))
+        assertTrue(DeviceProfile.matchesChip("s905x4", s905x4Id, s905x4Tokens, false))
+        assertTrue(DeviceProfile.KNOWN_MID_CHIPS.any { DeviceProfile.matchesChip(it, s905x4Id, s905x4Tokens, false) })
+        assertFalse(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, s905x4Id, s905x4Tokens, false) })
+
+        // Budget Amlogic S905W2 TV box
+        val s905w2Id = "amlogic meson-s905w2 tanix tx3 mini"
+        val s905w2Tokens = s905w2Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertTrue(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, s905w2Id, s905w2Tokens, false) })
+
+        // Legacy Amlogic S905 original
+        val s905Id = "amlogic s905 tx3"
+        val s905Tokens = s905Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertTrue(DeviceProfile.matchesChip("s905", s905Id, s905Tokens, false))
+        assertTrue(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, s905Id, s905Tokens, false) })
+    }
+
+    @Test
+    fun `test Samsung Galaxy A-series does not collide with Allwinner A-series`() {
+        // Samsung Galaxy A50 (Exynos 9610)
+        val a50Id = "samsung exynos9610 sm-a505f samsung galaxy a50"
+        val a50Tokens = a50Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        val a50IsAllwinner = false
+        assertFalse(DeviceProfile.matchesChip("a50", a50Id, a50Tokens, a50IsAllwinner))
+        assertFalse(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, a50Id, a50Tokens, a50IsAllwinner) })
+
+        // Real Allwinner A50 Tablet
+        val awA50Id = "sun8iw15p1 sun8i a50 allwinner allwinner a50 tablet"
+        val awA50Tokens = awA50Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        val awA50IsAllwinner = true
+        assertTrue(DeviceProfile.matchesChip("a50", awA50Id, awA50Tokens, awA50IsAllwinner))
+        assertTrue(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, awA50Id, awA50Tokens, awA50IsAllwinner) })
+    }
+
+    @Test
+    fun `test Unisoc T606 and Rockchip RK3528 profiling`() {
+        // Unisoc T606 (Mid-range octa-core)
+        val t606Id = "unisoc t606 motorola moto g04"
+        val t606Tokens = t606Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertTrue(DeviceProfile.KNOWN_MID_CHIPS.any { DeviceProfile.matchesChip(it, t606Id, t606Tokens, false) })
+        assertFalse(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, t606Id, t606Tokens, false) })
+
+        // Rockchip RK3528 (Budget TV box)
+        val rk3528Id = "rockchip rk3528 vontar r3 android tv"
+        val rk3528Tokens = rk3528Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertTrue(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, rk3528Id, rk3528Tokens, false) })
+
+        // Fire TV Stick 4K Max (MT8696)
+        val ftvId = "mediatek mt8696 amazon kf"
+        val ftvTokens = ftvId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertTrue(DeviceProfile.KNOWN_MID_CHIPS.any { DeviceProfile.matchesChip(it, ftvId, ftvTokens, false) })
+    }
 }

@@ -149,6 +149,12 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         } catch (_: Throwable) {
         }
 
+        // Initialize real-time hardware display & HDMI topology monitoring
+        try {
+            com.lagradost.cloudstream3.utils.display.DisplayTopologyManager.init(this)
+        } catch (_: Throwable) {
+        }
+
         try {
             val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
             val nsfwLevelKey = getString(R.string.nsfw_filter_level_key)

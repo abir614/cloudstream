@@ -17,7 +17,7 @@
   - `app/src/main/res/anim/pop_exit.xml`: Identical duplicate of `exit_anim.xml`. Removed; references consolidated into `exit_anim.xml`.
 - **Cargo & Binary Footprint Optimization**:
   - Removed `wasmi` WebAssembly interpreter from default Cargo build features (`default = []`).
-  - Added release profile optimizations: `opt-level = "z"`, `lto = "fat"`, `codegen-units = 1`, `panic = "abort"`, and `strip = true`.
+  - Added release profile optimizations: `opt-level = "z"`, `lto = "fat"`, `codegen-units = 1`, `panic = "unwind"`, and `strip = true`.
   - Automated binary stripping in GitHub Actions CI pipelines using `llvm-strip --strip-unneeded` across all target ABIs (`armeabi-v7a`, `arm64-v8a`, `x86_64`).
   - Result: Universal APK shrank by **1.68 MB**, armeabi-v7a APK shrank by **~361 KB**, arm64-v8a APK shrank by **~470 KB**.
 - **Static Analysis Compliance**:
@@ -231,7 +231,7 @@ Evaluated across a standardized 30-item ground-truth test suite consisting of 15
 | Category | Score | Certification Verdict | Technical Highlights |
 | :--- | :---: | :---: | :--- |
 | **Industrial Grade Engineering** | **100 / 100** | **Certified** | FFI `catch_unwind` panic isolation, dynamic 3-tier hardware profiling, INT8 quantized TFLite model mapped via `mmap`, WAL SQLite database mode, CodeQL and Trivy security scanning, ProGuard keep rules preserving plugin Kotlin runtime compatibility. |
-| **Universal Device Support** | **100 / 100** | **Certified** | Material 3 Window Size Classes (`WindowSizeCoordinator`), multi-window split screen detection, dynamic column scaling (3 to 8 columns), Leanback 10-foot D-Pad UI with 3D hover elevation and dual-layer contrast outline, SurfaceView zero-copy video overlay, 1080p capping on constrained SoCs (Allwinner H313), `minSdk 23` to `targetSdk 36`. |
+| **Universal Device Support** | **100 / 100** | **Certified** | Material 3 Window Size Classes (`WindowSizeCoordinator`), multi-window split screen detection, dynamic column scaling (3 to 8 columns), Leanback 10-foot D-Pad UI with 3D hover elevation and quad-layer contrast outline, SurfaceView zero-copy video overlay, 1080p capping on constrained SoCs (Allwinner H313), `minSdk 23` to `targetSdk 36`. |
 | **Defense-in-Depth Security** | **100 / 100** | **Certified** | Reflection Firewall (`ShieldedClassLoader`), jailed plugin storage & database access (`SandboxedContextWrapper`), hardware-backed AES-256-GCM KeyStore vault (`SecureAuthStore`), Certificate-Pinned GitHub client with transparent system CA fallback (`UpdateNetworkClient`), SSRF DNS rejection (`SafeDns`), offline Ed25519 signature attestation, release signing secrets enforced in CI. |
 
 *Report certified and finalized for production release.*

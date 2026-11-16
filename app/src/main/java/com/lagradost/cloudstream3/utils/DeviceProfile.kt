@@ -265,36 +265,86 @@ object DeviceProfile {
         }
     }
 
-    private val KNOWN_LOW_CHIPS = listOf(
-        // Allwinner
-        "sun50iw9", "sun50iw6", "sun50iw3", "sun50iw1", "sun50i", "sunxi", "sun8i", "sun4i", "sun7i", "allwinner",
-        "h313", "h616", "h618", "h700", "h713", "h728", "h6", "h3", "h5", "h2", "h2+",
-        "a133", "a133p", "a100", "a50", "a33", "a23", "a64", "a20", "a10",
-        "dolphin", "petrel", "cheetah", "eagle", "tulip",
-        // Rockchip budget / TV
-        "rk3128", "rk3229", "rk3328", "rk3528", "rk3026", "rk3066", "rk3188", "rk3368", "rk30board", "rk312x",
-        // Amlogic budget / TV
-        "s805", "s805x", "s905w", "s905w2", "s905l", "s905d", "s905y2", "s905y4", "meson-gxl", "meson-gxm", "meson-gxbb", "meson64", "gxl", "gxm", "gxbb",
-        // Unisoc / Spreadtrum
-        "sc7731", "sc9832", "sc9863", "sc9863a", "sc9850", "t310", "t606", "sprd", "sharkl", "sp9832", "sp7731",
-        // MediaTek entry-level / legacy
-        "mt6580", "mt6582", "mt6592", "mt6735", "mt6737", "mt6739", "mt6750", "mt6752", "mt6753", "mt6755", "mt6757",
-        "mt6761", "mt6762", "mt6765", "mt8167", "mt8127", "mt8163", "mt8168",
-        "helio a20", "helio a22", "helio g25", "helio g35", "helio p22", "helio p35",
-        // Qualcomm entry-level / legacy
-        "msm8909", "msm8916", "msm8917", "msm8920", "msm8937", "msm8940", "msm8952", "msm8953",
-        "qm215", "sdm429", "sdm439", "sdm450", "sm4250",
-        // Known problematic GPUs & Budget TV box models
-        "mali-g31", "mali-400", "mali-450", "mali-t720", "mali-t820", "ge8300", "ge8320", "ge8100",
-        "hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box",
-        "x96", "tanix", "t95", "hk1", "h96", "mxq", "v88", "tx3", "tx6", "a95x", "transpeed", "dq03"
+    private val ALLWINNER_A_CHIPS = setOf("a10", "a20", "a23", "a31", "a33", "a50", "a64")
+    private val ALLWINNER_H_CHIPS = setOf("h2", "h2+", "h3", "h5", "h6")
+
+    private val SHORT_EXACT_CHIPS = setOf(
+        "sun", "cape", "taro", "kona", "sunxi", "sun8i", "sun4i", "sun7i", "sun50i",
+        "g99", "g100", "s805", "s905", "s905x", "s912", "gxl", "gxm", "gxbb",
+        "t606", "t610", "t612", "t616", "t618", "t619", "t750", "t760", "t770", "t820", "t310",
+        "intel", "amd", "apple", "ryzen", "tegra"
     )
 
-    private val KNOWN_FLAGSHIP_CHIPS = listOf(
-        // Qualcomm Flagships (800 series, 8 Gen 1/2/3/4/Elite, 7+ Gen 2/3)
+    internal fun matchesChip(pattern: String, socIdentifier: String, socTokens: Set<String>, isAllwinnerPlatform: Boolean): Boolean {
+        if (pattern in ALLWINNER_A_CHIPS || pattern in ALLWINNER_H_CHIPS) {
+            return socIdentifier.contains("allwinner $pattern") || (isAllwinnerPlatform && pattern in socTokens)
+        }
+        if (pattern.contains(' ') || pattern.contains('-')) {
+            return socIdentifier.contains(pattern) ||
+                socIdentifier.contains(pattern.replace('-', ' ')) ||
+                socIdentifier.contains(pattern.replace("-", ""))
+        }
+        if (pattern.length <= 4 || pattern in SHORT_EXACT_CHIPS) {
+            return pattern in socTokens
+        }
+        return socIdentifier.contains(pattern) || pattern in socTokens
+    }
+
+    internal val KNOWN_LOW_CHIPS = listOf(
+        // Allwinner Budget / TV / Tablets
+        "sun50iw9", "sun50iw6", "sun50iw3", "sun50iw1", "sun50iw10", "sun50i", "sunxi", "sun8i", "sun4i", "sun5i", "sun7i", "allwinner",
+        "h313", "h616", "h618", "h700", "h713", "h728", "h6", "h3", "h5", "h2", "h2+",
+        "a133", "a133p", "a100", "a50", "a33", "a23", "a64", "a31", "a20", "a10",
+        "t507", "t527",
+        "dolphin", "petrel", "cheetah", "eagle", "tulip",
+        // Rockchip Budget / TV / Tablets
+        "rk3528", "rk3328", "rk3229", "rk3228a", "rk3228b", "rk3128", "rk3188", "rk3066", "rk3026", "rk3368", "rk30board", "rk312x",
+        // Amlogic Budget / TV / Sticks
+        "s805", "s805x", "s805x2", "s805y", "s812", "s802",
+        "s905", "s905x", "s905w", "s905w2", "s905w4", "s905l", "s905l2", "s905l3", "s905l3b",
+        "s905d", "s905d2", "s905d3", "s905y2", "s905y4", "s912",
+        "t950d", "t950d4", "t962", "t962e", "t962x",
+        "meson-gxbb", "meson-gxl", "meson-gxm", "meson-g12a", "meson64", "gxl", "gxm", "gxbb",
+        // Unisoc / Spreadtrum Budget
+        "sc7731", "sc9832", "sc9863", "sc9863a", "sc9850", "t310", "sprd", "sharkl", "sp9832", "sp7731",
+        // MediaTek Budget / Legacy / TV Sticks
+        "mt8695", "mt8693", "mt8516", "mt8167", "mt8127", "mt8163", "mt8168",
+        "mt6580", "mt6582", "mt6592", "mt6735", "mt6737", "mt6739", "mt6750", "mt6752", "mt6753", "mt6755", "mt6757",
+        "mt6761", "mt6762", "mt6765", "mt6765v",
+        "helio a20", "helio a22", "helio g25", "helio g35", "helio g36", "helio g37", "helio p22", "helio p35",
+        // Qualcomm Entry-level / Legacy
+        "msm8909", "msm8916", "msm8917", "msm8920", "msm8937", "msm8940", "msm8952", "msm8953",
+        "qm215", "sdm429", "sdm439", "sdm450", "sm4250",
+        // Samsung Exynos Budget / Legacy
+        "s5e3830", "exynos 850", "exynos 7904", "exynos 7884", "exynos 7870", "universal7870", "universal7884",
+        // HiSilicon Kirin Budget / Legacy
+        "kirin 710", "kirin 710f", "kirin 710a", "kirin 659", "kirin 650", "hi6260", "hi6250",
+        // Realtek Budget / Legacy
+        "rtd1195", "rtd1295", "rtd1296", "rtd1395",
+        // Broadcom TV / IPTV
+        "bcm7252", "bcm7252s", "bcm7260", "bcm7268", "bcm7271", "bcm72180", "bcm7445",
+        // Synaptics TV
+        "vs680", "vs640", "bg4ct", "bg5ct", "berlin",
+        // Known Problematic GPUs & Budget TV Box Clones / Brands
+        "mali-g31", "mali-400", "mali-450", "mali-t720", "mali-t820", "ge8300", "ge8320", "ge8100",
+        "hy320", "hy300", "hy350", "a10plus", "magcubic", "sinoy", "android tv box",
+        "x96", "x96q", "x96mini", "x96air", "x96max",
+        "tanix", "tx3", "tx6", "tx6s", "tx9", "tx1",
+        "t95", "t95max", "t95z", "t95plus",
+        "hk1", "hk1box", "hk1max", "hk1mini",
+        "h96", "h96max", "h96mini",
+        "mxq", "mxqpro", "mxq-4k", "mx10",
+        "v88", "v88pro",
+        "a95x", "a95x-f3", "a95x-f4",
+        "transpeed", "dq03", "dq08", "onten", "vontar", "lemfo"
+    )
+
+    internal val KNOWN_FLAGSHIP_CHIPS = listOf(
+        // Qualcomm Flagships (800 series, 8 Gen 1/2/3/4/Elite, 7+ Gen 2/3, Handhelds, XR)
         "sm8750", "sm8650", "sm8550", "sm8475", "sm8450", "sm8350", "sm8250", "sm8150", "sdm845",
         "sm7675", "sm7475",
-        "sun", "pineapple", "kalama", "cape", "taro", "lahaina", "kona",
+        "qcs8550", "sg4150p", "sm8350au", "xr2",
+        "sun", "pineapple", "kalama", "cape", "taro", "lahaina", "kona", "msmnile",
         "snapdragon 8 elite", "snapdragon 8 gen 4", "snapdragon 8 gen 3", "snapdragon 8 gen 2",
         "snapdragon 8+ gen 1", "snapdragon 8 gen 1", "snapdragon 888", "snapdragon 870", "snapdragon 865", "snapdragon 855",
         "snapdragon 7+ gen 3", "snapdragon 7+ gen 2", "snapdragon 7+",
@@ -302,32 +352,40 @@ object DeviceProfile {
         "dimensity 9400", "dimensity 9300", "dimensity 9200", "dimensity 9000",
         "dimensity 8300", "dimensity 8200", "dimensity 8100", "dimensity 8050", "dimensity 8020", "dimensity 8000",
         "dimensity 1300", "dimensity 1200", "dimensity 1100", "dimensity 1000",
-        "mt6991", "mt6989", "mt6985", "mt6983", "mt6895", "mt6893", "mt6891", "mt6889", "mt6897",
-        // Google Tensor
-        "tensor g4", "tensor g3", "tensor g2", "tensor", "gs101", "gs201", "zuma", "zumapro", "whitechapel", "cloudripper", "caiman", "komodo", "tokay",
+        "mt6991", "mt6989", "mt6985", "mt6983", "mt6897", "mt6896", "mt6895", "mt6893", "mt6891", "mt6889",
+        // Google Tensor (Pixel 6 through Pixel 9 Pro Fold)
+        "tensor g4", "tensor g3", "tensor g2", "tensor",
+        "gs101", "gs201", "zuma", "zumapro", "whitechapel", "cloudripper",
+        "caiman", "komodo", "tokay", "shiba", "husky", "akita",
+        "cheetah", "panther", "lynx", "felix", "tangorpro",
+        "oriole", "raven", "bluejay",
         // Samsung Exynos Flagships
-        "exynos 2500", "exynos 2400", "exynos 2200", "exynos 2100", "exynos 990", "exynos 9825", "exynos 9820",
-        "s5e9945", "s5e9925", "s5e9815", "s5e9830", "s5e9820",
-        // Nvidia Tegra (Shield TV / Pro)
-        "tegra", "tegra210", "foster", "darcy", "mdarcy",
-        // PC / Laptop / Desktop Processor
-        "intel", "amd", "ryzen", "core(tm)", "apple"
+        "exynos 2500", "exynos 2400", "exynos 2200", "exynos 2100", "exynos 990", "exynos 9825", "exynos 9820", "exynos 9810",
+        "s5e9945", "s5e9925", "s5e9840", "s5e9830", "s5e9825", "s5e9820", "s5e9810",
+        // HiSilicon Kirin Flagships
+        "kirin 9010", "kirin 9000s", "kirin 9000", "kirin 9000e", "kirin 990", "kirin 985", "kirin 980",
+        "hi36a0", "hi3690", "hi3680",
+        // Nvidia Tegra (Shield TV / Shield TV Pro)
+        "tegra", "tegra210", "tegra210b01", "foster", "darcy", "mdarcy",
+        // PC / Laptop / Desktop / Emulator Processors
+        "intel", "amd", "ryzen", "core(tm)", "apple", "x86_64"
     )
 
-    private val KNOWN_MID_CHIPS = listOf(
-        // MediaTek Helio G series (including Helio G100 Ultimate!)
+    internal val KNOWN_MID_CHIPS = listOf(
+        // MediaTek Helio G series (including Helio G100 Ultimate)
         "g100 ultimate", "g100-ultimate", "helio g100", "helio-g100", "g100",
         "g99 ultimate", "g99-ultimate", "g99 ultra", "helio g99", "helio-g99", "g99",
         "helio g96", "helio g95", "helio g90t", "helio g90", "helio g88", "helio g85", "helio g80", "helio g70",
         "helio p95", "helio p90", "helio p70", "helio p65", "helio p60",
-        "mt6789", "mt6789v", "mt6785", "mt6769", "mt6769t", "mt6769z", "mt6768", "mt6779", "mt6771",
+        "mt6789", "mt6789v", "mt6785", "mt6781", "mt6769", "mt6769t", "mt6769z", "mt6768", "mt6779", "mt6771",
         // MediaTek Dimensity Midrange
         "dimensity 7300", "dimensity 7200", "dimensity 7050", "dimensity 7025", "dimensity 7020", "dimensity 7000",
         "dimensity 6300", "dimensity 6100", "dimensity 6080", "dimensity 6020",
         "dimensity 1080", "dimensity 930", "dimensity 920", "dimensity 900", "dimensity 810", "dimensity 800", "dimensity 720", "dimensity 700",
-        "mt6878", "mt6886", "mt6877", "mt6877v", "mt6855", "mt6833", "mt6835", "mt6853", "mt6873",
-        // MediaTek Tablets / Kompanio
+        "mt6878", "mt6886", "mt6877", "mt6877v", "mt6855", "mt6835", "mt6833", "mt6833p", "mt6853", "mt6873",
+        // MediaTek Tablets / Kompanio / Smart TV
         "kompanio", "mt8788", "mt8781", "mt8183", "mt8188", "mt8768",
+        "mt8696", "mt8696t", "pentonic", "mt9972", "mt9638", "mt9653", "mt5895", "mt5896",
         // Qualcomm Snapdragon 7 series
         "snapdragon 7 gen 3", "snapdragon 7s gen 3", "snapdragon 7s gen 2", "snapdragon 7 gen 1",
         "snapdragon 782g", "snapdragon 780g", "snapdragon 778g", "snapdragon 768g", "snapdragon 765g", "snapdragon 750g", "snapdragon 732g", "snapdragon 730g", "snapdragon 720g",
@@ -335,20 +393,29 @@ object DeviceProfile {
         // Qualcomm Snapdragon 6 series
         "snapdragon 6 gen 3", "snapdragon 6s gen 3", "snapdragon 6 gen 1",
         "snapdragon 695", "snapdragon 685", "snapdragon 680", "snapdragon 678", "snapdragon 675", "snapdragon 670", "snapdragon 665", "snapdragon 662", "snapdragon 660",
-        "sm6475", "sm6450", "sm6375", "sm6225", "sm6150", "sm6125", "sm6115", "sdm660", "sdm636",
+        "sm6650", "volcano", "sm6475", "sm6450", "sm6375", "sm6225", "sm6150", "sm6125", "sm6115", "sdm660", "sdm636", "bengal", "yupik", "lito",
         // Qualcomm Snapdragon 4 series (Modern 5G)
         "snapdragon 4 gen 2", "snapdragon 4s gen 2", "snapdragon 4 gen 1", "snapdragon 480",
-        "sm4450", "sm4375", "sm4350",
+        "sm4450", "sm4375", "sm4350", "holi",
         // Samsung Exynos Midrange
         "exynos 1580", "exynos 1480", "exynos 1380", "exynos 1330", "exynos 1280", "exynos 1080", "exynos 980", "exynos 880",
-        "s5e8845", "s5e8835", "s5e8825", "s5e8535", "s5e8830", "s5e9630",
+        "s5e8855", "s5e8845", "s5e8835", "s5e8825", "s5e8535", "s5e8830", "s5e9630", "s5e8805",
         // Unisoc Modern Midrange
-        "unisoc t820", "unisoc t770", "unisoc t760", "unisoc t619", "unisoc t618", "unisoc t616", "unisoc t612", "unisoc t610",
-        "t820", "t770", "t760", "t619", "t618", "t616", "t612", "t610", "ums9620", "ums9230", "ums512",
-        // Rockchip Midrange
+        "unisoc t820", "unisoc t770", "unisoc t760", "unisoc t750",
+        "unisoc t619", "unisoc t618", "unisoc t616", "unisoc t612", "unisoc t610", "unisoc t606",
+        "t820", "t770", "t760", "t750", "t619", "t618", "t616", "t612", "t610", "t606",
+        "ums9620", "ums9230", "ums512",
+        // HiSilicon Kirin Midrange
+        "kirin 820", "kirin 810", "hi6280",
+        // Rockchip Midrange / Upper TV
         "rk3588", "rk3588s", "rk3576", "rk3568", "rk3566", "rk3399", "rk3399pro",
-        // Amlogic Midrange / High TV
-        "s922x", "a311d", "s905x4", "s905x3", "s905x2", "t962e", "t968"
+        // Amlogic Midrange / Modern 4K/8K TV
+        "s928x", "s928x-j", "s922x", "s922x-j", "s922x-h", "a311d", "a311d2",
+        "s905x5", "s905x5m", "s905x4", "s905x3", "s905x2",
+        "meson-sm1", "meson-g12b", "meson-tm2",
+        "t968", "t972", "t982",
+        // Realtek Midrange
+        "rtd1619", "rtd1619b", "rtd1619dr", "rtd1319", "rtd1319d"
     )
 
     private fun getCpuInfoString(): String {
@@ -399,8 +466,14 @@ object DeviceProfile {
             "hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box",
             "x96", "tanix", "t95", "hk1", "h96", "mxq", "v88", "tx3", "tx6", "a95x"
         )
-        return brokenGpuPatterns.any {
-            it in hardware || it in board || it in manufacturer || (soc.isNotEmpty() && it in soc) || it in model
+        val target = "$hardware $board $manufacturer $soc $model"
+        val tokens = target.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        return brokenGpuPatterns.any { pattern ->
+            if (pattern.length <= 3) {
+                pattern in tokens
+            } else {
+                pattern in target
+            }
         }
     }
 
@@ -543,13 +616,22 @@ object DeviceProfile {
             val isTablet = try {
                 appContext.resources.configuration.smallestScreenWidthDp >= 600
             } catch (_: Throwable) { false }
+
+            val externalState = try {
+                com.lagradost.cloudstream3.utils.display.DisplayTopologyManager.displayState.value
+            } catch (_: Throwable) { null }
+            val activeMon = externalState?.activeMonitor
+            val effectiveWidth = activeMon?.physicalWidth ?: dm.widthPixels
+            val effectiveHeight = activeMon?.physicalHeight ?: dm.heightPixels
+            val effectiveRefresh = activeMon?.currentRefreshRate ?: 60.0f
+
             DisplayCapability(
                 isTv = isTv,
                 isTablet = isTablet,
-                widthPx = dm.widthPixels,
-                heightPx = dm.heightPixels,
+                widthPx = effectiveWidth,
+                heightPx = effectiveHeight,
                 densityDpi = dm.densityDpi,
-                refreshRateHz = 60.0f
+                refreshRateHz = effectiveRefresh
             )
         } catch (_: Throwable) {
             DisplayCapability(false, false, 1280, 720, 160, 60.0f)
@@ -811,10 +893,19 @@ object DeviceProfile {
             val cpuInfo = getCpuInfoString().lowercase()
 
             val socIdentifier = "$hardware $board $model $manufacturer $product $device $soc $cpuInfo"
+            val socTokens = socIdentifier.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
 
-            val isLowChip = KNOWN_LOW_CHIPS.any { it in socIdentifier }
-            val isFlagshipChip = KNOWN_FLAGSHIP_CHIPS.any { it in socIdentifier }
-            val isMidChip = KNOWN_MID_CHIPS.any { it in socIdentifier }
+            val isAllwinnerPlatform = socTokens.contains("allwinner") || socTokens.contains("sunxi") || socTokens.any { it.startsWith("sun") && it.length > 3 }
+
+            val isLowChip = KNOWN_LOW_CHIPS.any { pattern ->
+                matchesChip(pattern, socIdentifier, socTokens, isAllwinnerPlatform)
+            }
+            val isFlagshipChip = KNOWN_FLAGSHIP_CHIPS.any { pattern ->
+                matchesChip(pattern, socIdentifier, socTokens, isAllwinnerPlatform)
+            }
+            val isMidChip = KNOWN_MID_CHIPS.any { pattern ->
+                matchesChip(pattern, socIdentifier, socTokens, isAllwinnerPlatform)
+            }
 
             val totalMb = getTotalRamMb(ctx)
             val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager

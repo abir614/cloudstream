@@ -17,6 +17,8 @@ import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.amap
+import android.app.ActivityManager
+import android.content.Context
 import com.lagradost.cloudstream3.mvvm.Resource
 import com.lagradost.cloudstream3.mvvm.debugAssert
 import com.lagradost.cloudstream3.mvvm.debugWarning
@@ -66,6 +68,8 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import android.graphics.Bitmap
 import coil3.SingletonImageLoader
 import coil3.asDrawable
@@ -75,6 +79,7 @@ import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import coil3.request.bitmapConfig
+import com.lagradost.cloudstream3.utils.UIHelper.toPx
 import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.DeviceTier
@@ -365,9 +370,15 @@ class HomeViewModel : ViewModel() {
     private var rawHomeData: List<HomePageResponse?>? = null
 
     fun rescanLoadedSources() {
-        val data = rawHomeData ?: return
         ioSafe {
-            populateHomeFromData(data)
+            _page.postValue(Resource.Loading())
+            _preview.postValue(Resource.Loading())
+            val data = rawHomeData
+            if (data != null && data.isNotEmpty()) {
+                populateHomeFromData(data)
+            } else {
+                loadAndCancel(DataStoreHelper.currentHomePage, forceReload = true)
+            }
         }
     }
 
@@ -460,166 +471,141 @@ class HomeViewModel : ViewModel() {
                 }
             }
 
-            // Phase 2: Pre-validate & Preload initial visible posters (rails + banner) with hardware-adaptive pacing
+            // Phase 2: Pre-validate & Preload posters across rails and previews before rendering home screen
             val preloaderContext = context ?: com.lagradost.cloudstream3.CloudStreamApp.context
-            val isLowEndOrPotato = isPotato || (preloaderContext != null && DeviceProfile.isLowEnd(preloaderContext))
+            val isLowEndOrPotato = isPotato || (preloaderContext != null && (DeviceProfile.isLowEnd(preloaderContext) || DeviceProfile.isUltraPotato(preloaderContext) || DeviceProfile.getTotalRamMb(preloaderContext) <= 2500L))
 
-            if (isLowEndOrPotato) {
-                // On potato/low-end devices we still MUST classify posters before rendering
-                // the homepage when NSFW filtering is active. We use the zero-allocation skin
-                // chrominance heuristic (classifyPotatoFastScore, 48×48, <0.05 ms) on a
-                // strictly-capped batch of initial-visible items (banner only, ≤3 posters)
-                // to avoid OOM while guaranteeing no NSFW poster slips through.
-                if (shouldFilter && preloaderContext != null && expandable.isNotEmpty()) {
-                    val posterMsg = preloaderContext.getString(R.string.loading_posters)
-                    if (!isBackgroundUpdate) {
-                        _contentFilterProgress.postValue(
-                            ContentFilterProgress(
-                                isFiltering = true,
-                                current = 50,
-                                total = 100,
-                                message = posterMsg
-                            )
-                        )
-                    }
-
-                    // Build a tiny candidate list: banner posters from the first rail only (≤3 items)
-                    val potatoCandidates = expandable.values
-                        .take(1)
-                        .flatMap { it.list.list.take(3) }
-                        .filter { !it.posterUrl.isNullOrBlank() }
-                        .map { PosterPreloadTarget(it.name, it.url, it.posterUrl!!, it.posterHeaders) }
-
-                    if (potatoCandidates.isNotEmpty()) {
-                        val imageLoader = SingletonImageLoader.get(preloaderContext)
-                        val threshold = NsfwFilterEngine.getVisualThreshold(preloaderContext)
-                        val nsfwUrlsToRemove = mutableSetOf<String>()
-
-                        // Single-threaded sequential loop — intentional for potato safety
-                        for (item in potatoCandidates) {
-                            try {
-                                // Short timeout (2 s) so network hiccups don't stall startup
-                                withTimeoutOrNull(2000L) {
-                                    val request = ImageRequest.Builder(preloaderContext)
-                                        .data(item.posterUrl)
-                                        .memoryCacheKey(item.posterUrl)
-                                        .diskCacheKey(item.posterUrl)
-                                        .httpHeaders(NetworkHeaders.Builder().also { h ->
-                                            h["User-Agent"] = USER_AGENT
-                                            item.posterHeaders?.forEach { (k, v) -> h[k] = v }
-                                        }.build())
-                                        .allowHardware(false)
-                                        .bitmapConfig(Bitmap.Config.RGB_565)
-                                        .build()
-                                    val result = imageLoader.execute(request)
-                                    if (result is SuccessResult && !NsfwFilterEngine.isCleanTitleAllowed(item.name)) {
-                                        val drawable = result.image.asDrawable(preloaderContext.resources)
-                                        val score = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.classifyPotatoFastScore(drawable, preloaderContext)
-                                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl, score, preloaderContext)
-                                        if (!nsfwEnabled && score >= threshold) {
-                                            nsfwUrlsToRemove.add(item.url)
-                                        }
-                                    }
-                                }
-                            } catch (_: Throwable) { /* network/OOM — skip this poster */ }
-                            // Brief yield to let GC reclaim between iterations on memory-constrained devices
-                            kotlinx.coroutines.delay(5L)
-                        }
-
-                        if (nsfwUrlsToRemove.isNotEmpty()) {
-                            expandable.keys.toList().forEach { key ->
-                                val row = expandable[key] ?: return@forEach
-                                val cleaned = row.list.list.filterNot { nsfwUrlsToRemove.contains(it.url) }
-                                expandable[key] = row.copy(list = row.list.copy(list = CopyOnWriteArrayList(cleaned)))
-                            }
-                        }
-                    }
-                }
-
-                _contentFilterProgress.postValue(null)
-                _page.postValue(Resource.Success(expandable))
-            } else if (preloaderContext != null && (expandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
-                val railItems = expandable.values
-                    .take(4)
-                    .flatMap { it.list.list.take(8) }
-                    .filter { !it.posterUrl.isNullOrBlank() }
-                    .map { PosterPreloadTarget(it.name, it.url, it.posterUrl!!, it.posterHeaders) }
-
+            if (preloaderContext != null && (expandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
                 val bannerItems = initialPreviews
                     .filter { !it.posterUrl.isNullOrBlank() || !it.backgroundPosterUrl.isNullOrBlank() }
+                    .take(5)
                     .map { preview ->
                         val pUrl = preview.backgroundPosterUrl ?: preview.posterUrl!!
                         PosterPreloadTarget(preview.name, preview.url, pUrl, preview.posterHeaders)
                     }
 
-                val initialItems = (bannerItems + railItems).distinctBy { it.posterUrl }
+                val allRailItems = expandable.values
+                    .flatMap { it.list.list }
+                    .filter { !it.posterUrl.isNullOrBlank() }
+                    .map { PosterPreloadTarget(it.name, it.url, it.posterUrl!!, it.posterHeaders) }
 
-                if (initialItems.isNotEmpty()) {
-                    val totalPosters = initialItems.size
+                // For low-end / potato devices, preload & filter 100% of all posters across all rails upfront during the loading screen.
+                // Background loading during active UI scrolling causes thread contention, memory spikes, and low-memory crashes on budget hardware.
+                // Serialized upfront loading (worker=1) ensures all posters are pre-cached and pre-filtered safely, keeping scrolling crash-free.
+                val allItemsToPreload = if (isLowEndOrPotato) {
+                    (bannerItems + allRailItems).distinctBy { it.posterUrl }
+                } else {
+                    // Standard / high-tier devices have ample RAM and multi-core CPUs to handle lazy background loading.
+                    // Preloading the top visible viewport (hero banners + first visible rails, capped at 16) avoids CDN rate-limiting and delays.
+                    (bannerItems + allRailItems.take(16)).distinctBy { it.posterUrl }.take(16)
+                }
+
+                if (allItemsToPreload.isNotEmpty()) {
+                    val totalPosters = allItemsToPreload.size
                     val posterMsg = preloaderContext.getString(R.string.loading_posters)
-                    val tier = DeviceProfile.tier(preloaderContext)
-                    val semaphore = Semaphore(if (isPotato) 2 else if (tier == DeviceTier.HIGH) 8 else 4)
+                    val nsfwConfig = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.getNsfwExecutionConfig(preloaderContext)
+                    val maxConcurrency = nsfwConfig.preloaderConcurrency
                     val imageLoader = SingletonImageLoader.get(preloaderContext)
                     val nsfwUrlsToRemove = ConcurrentHashMap.newKeySet<String>()
 
+                    if (!isBackgroundUpdate && !shouldFilter) {
+                        _contentFilterProgress.postValue(
+                            ContentFilterProgress(
+                                isFiltering = true,
+                                current = 0,
+                                total = 100,
+                                message = "$posterMsg (0/$totalPosters)"
+                            )
+                        )
+                    }
+
                     var postersProcessed = 0
                     coroutineScope {
-                        initialItems.map { item ->
+                        val channel = Channel<PosterPreloadTarget>(Channel.UNLIMITED)
+                        allItemsToPreload.forEach { channel.trySend(it) }
+                        channel.close()
+
+                        val workers = (0 until maxConcurrency).map {
                             async(Dispatchers.IO) {
-                                semaphore.withPermit {
+                                for (item in channel) {
                                     try {
-                                        val timeoutMs = if (isPotato) 3500L else 4000L
+                                        val timeoutMs = if (isLowEndOrPotato) 8000L else 10000L
                                         withTimeoutOrNull(timeoutMs) {
+                                            val posterWidthPx = 114.toPx
+                                            val posterHeightPx = 180.toPx
                                             val request = ImageRequest.Builder(preloaderContext)
                                                 .data(item.posterUrl)
                                                 .memoryCacheKey(item.posterUrl)
                                                 .diskCacheKey(item.posterUrl)
+                                                .size(width = posterWidthPx, height = posterHeightPx)
                                                 .httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
                                                     headerBuilder["User-Agent"] = USER_AGENT
                                                     item.posterHeaders?.forEach { (key, value) ->
                                                         headerBuilder[key] = value
                                                     }
                                                 }.build())
-                                                .allowHardware(!isPotato)
-                                                .bitmapConfig(if (isPotato) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888)
+                                                .allowHardware(!isLowEndOrPotato)
+                                                .bitmapConfig(if (isLowEndOrPotato) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888)
                                                 .build()
-                                            val result = imageLoader.execute(request)
+
+                                            var result = imageLoader.execute(request)
+                                            if (result !is SuccessResult) {
+                                                delay(100L)
+                                                result = imageLoader.execute(request)
+                                            }
+
                                             if (result is SuccessResult) {
                                                 val drawable = result.image.asDrawable(preloaderContext.resources)
                                                 if (shouldFilter && !NsfwFilterEngine.isCleanTitleAllowed(item.name)) {
                                                     val threshold = NsfwFilterEngine.getVisualThreshold(preloaderContext)
                                                     val score = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.classifyDrawableScore(preloaderContext, drawable)
-                                                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl!!, score, preloaderContext)
+                                                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl, score, preloaderContext)
                                                     if (!nsfwEnabled && score >= threshold) {
                                                         nsfwUrlsToRemove.add(item.url)
                                                     }
                                                 } else {
-                                                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl!!, 0.0f, preloaderContext)
+                                                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl, 0.0f, preloaderContext)
                                                 }
+                                            } else {
+                                                com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl, 0.0f, preloaderContext)
                                             }
                                         }
                                     } catch (_: Throwable) {
+                                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl, 0.0f, preloaderContext)
                                     }
-                                    synchronized(initialItems) {
+
+                                    synchronized(allItemsToPreload) {
                                         postersProcessed++
                                     }
                                     if (!isBackgroundUpdate) {
-                                        val posterPercent = (50 + (postersProcessed * 50 / totalPosters)).coerceIn(50, 100)
+                                        val posterPercent = if (shouldFilter) {
+                                            (50 + (postersProcessed * 50 / totalPosters)).coerceIn(50, 100)
+                                        } else {
+                                            (postersProcessed * 100 / totalPosters).coerceIn(0, 100)
+                                        }
                                         _contentFilterProgress.postValue(
                                             ContentFilterProgress(
                                                 isFiltering = true,
                                                 current = posterPercent,
                                                 total = 100,
-                                                message = posterMsg
+                                                message = "$posterMsg ($postersProcessed/$totalPosters)"
                                             )
                                         )
                                     }
-                                    if (isPotato) {
-                                        kotlinx.coroutines.delay(10L)
+                                    if (isLowEndOrPotato) {
+                                        val delayMs = nsfwConfig.coroutineDelayMs
+                                        if (delayMs > 0L) {
+                                            delay(delayMs)
+                                        }
+                                        // Dynamic low-memory back-pressure check:
+                                        if (postersProcessed % 8 == 0 && com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.isDeviceUnderMemoryPressure(preloaderContext)) {
+                                            delay(20L)
+                                        }
                                     }
                                 }
                             }
-                        }.awaitAll()
+                        }
+                        workers.awaitAll()
                     }
 
                     // Remove any items identified as NSFW during visual inspection BEFORE submitList
@@ -633,21 +619,19 @@ class HomeViewModel : ViewModel() {
                 }
             }
 
-            if (!isLowEndOrPotato) {
-                if (!isBackgroundUpdate) {
-                    _contentFilterProgress.postValue(
-                        ContentFilterProgress(
-                            isFiltering = true,
-                            current = 100,
-                            total = 100,
-                            message = context?.getString(R.string.loading) ?: "Loading"
-                        )
+            if (!isBackgroundUpdate) {
+                _contentFilterProgress.postValue(
+                    ContentFilterProgress(
+                        isFiltering = true,
+                        current = 100,
+                        total = 100,
+                        message = context?.getString(R.string.loading) ?: "Loading"
                     )
-                }
-
-                // Render home sections with posters already loaded, safe, and cached
-                _page.postValue(Resource.Success(expandable))
+                )
             }
+
+            // Render home sections with posters already loaded, safe, and cached
+            _page.postValue(Resource.Success(expandable))
 
             if (initialPreviews.isNotEmpty()) {
                 previewResponses.clear()
@@ -679,6 +663,8 @@ class HomeViewModel : ViewModel() {
             }
         } catch (e: Exception) {
             _randomItems.postValue(emptyList())
+            _contentFilterProgress.postValue(null)
+            _page.postValue(Resource.Failure(false, e.message ?: "Failed to load homepage"))
             logError(e)
         }
     }

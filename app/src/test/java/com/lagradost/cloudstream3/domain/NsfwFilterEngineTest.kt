@@ -163,18 +163,18 @@ class NsfwFilterEngineTest {
 
     @Test
     fun `test calibrated visual sensitivity thresholds`() {
-        assertEquals(0.55f, NsfwFilterLevel.LOW.defaultVisualThreshold, 0.001f)
-        assertEquals(0.30f, NsfwFilterLevel.MODERATE.defaultVisualThreshold, 0.001f)
-        assertEquals(0.15f, NsfwFilterLevel.EXTREME.defaultVisualThreshold, 0.001f)
+        assertEquals(0.40f, NsfwFilterLevel.LOW.defaultVisualThreshold, 0.001f)
+        assertEquals(0.20f, NsfwFilterLevel.MODERATE.defaultVisualThreshold, 0.001f)
+        assertEquals(0.10f, NsfwFilterLevel.EXTREME.defaultVisualThreshold, 0.001f)
     }
 
     @Test
     fun `test threshold ordering constraints and dynamic scaling`() {
         // Default values
-        val (defE, defM, defL) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.30f, 0.55f)
-        assertEquals(0.15f, defE, 0.001f)
-        assertEquals(0.30f, defM, 0.001f)
-        assertEquals(0.55f, defL, 0.001f)
+        val (defE, defM, defL) = NsfwFilterEngine.enforceThresholdConstraints(0.10f, 0.20f, 0.40f)
+        assertEquals(0.10f, defE, 0.001f)
+        assertEquals(0.20f, defM, 0.001f)
+        assertEquals(0.40f, defL, 0.001f)
 
         // When Extreme is increased above Moderate
         val (adjE1, adjM1, adjL1) = NsfwFilterEngine.enforceThresholdConstraints(0.40f, 0.30f, 0.55f, NsfwFilterLevel.EXTREME)

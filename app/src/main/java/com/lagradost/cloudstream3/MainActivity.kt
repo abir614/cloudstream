@@ -32,6 +32,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.children
 import androidx.core.view.get
 import androidx.core.view.isGone
@@ -742,6 +744,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         this.sendBroadcast(broadcastIntent)
         afterPluginsLoadedEvent -= ::onAllPluginsLoaded
         detachBackPressedCallback("MainActivityDefault")
+        com.lagradost.cloudstream3.utils.display.DisplayTopologyManager.removeListener(displayTopologyListener)
         super.onDestroy()
     }
 
@@ -921,6 +924,13 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
     var binding: ActivityMainBinding? = null
 
+    private val displayTopologyListener: (com.lagradost.cloudstream3.utils.display.ExternalDisplayState) -> Unit = { state ->
+        runOnUiThread {
+            optimizeDisplayRefreshRate()
+            binding?.homeRoot?.let { ViewCompat.requestApplyInsets(it) }
+        }
+    }
+
     object TvFocus {
         data class FocusTarget(
             val width: Int,
@@ -928,6 +938,8 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             val x: Float,
             val y: Float,
             val scale: Float = 1.0f,
+            val pivotX: Float = 0f,
+            val pivotY: Float = 0f,
         ) {
             companion object {
                 fun lerp(a: FocusTarget, b: FocusTarget, lerp: Float): FocusTarget {
@@ -937,14 +949,16 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                         height = (a.height * ilerp + b.height * lerp).toInt(),
                         x = a.x * ilerp + b.x * lerp,
                         y = a.y * ilerp + b.y * lerp,
-                        scale = a.scale * ilerp + b.scale * lerp
+                        scale = a.scale * ilerp + b.scale * lerp,
+                        pivotX = a.pivotX * ilerp + b.pivotX * lerp,
+                        pivotY = a.pivotY * ilerp + b.pivotY * lerp,
                     )
                 }
             }
         }
 
-        var last: FocusTarget = FocusTarget(0, 0, 0.0f, 0.0f, 1.0f)
-        var current: FocusTarget = FocusTarget(0, 0, 0.0f, 0.0f, 1.0f)
+        var last: FocusTarget = FocusTarget(0, 0, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f)
+        var current: FocusTarget = FocusTarget(0, 0, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f)
 
         var focusOutline: WeakReference<View> = WeakReference(null)
         var lastFocus: WeakReference<View> = WeakReference(null)
@@ -985,6 +999,8 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                 translationY = target.y
                 scaleX = target.scale
                 scaleY = target.scale
+                pivotX = target.pivotX
+                pivotY = target.pivotY
                 translationZ = 40f
                 elevation = 40f
                 bringToFront()
@@ -1086,7 +1102,9 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                 val out = IntArray(2)
                 newFocus.getLocationInWindow(out)
                 val (screenX, screenY) = out
-                var (x, y) = screenX.toFloat() to screenY.toFloat()
+                val parentLoc = IntArray(2)
+                (focusOutline.parent as? View)?.getLocationInWindow(parentLoc)
+                var (x, y) = (screenX - parentLoc[0]).toFloat() to (screenY - parentLoc[1]).toFloat()
                 val (currentX, currentY) = focusOutline.translationX to focusOutline.translationY
 
                 if (!newFocus.isLtr()) {
@@ -1110,7 +1128,9 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                     y = currentY,
                     width = focusOutline.measuredWidth,
                     height = focusOutline.measuredHeight,
-                    scale = focusOutline.scaleX
+                    scale = focusOutline.scaleX,
+                    pivotX = focusOutline.pivotX,
+                    pivotY = focusOutline.pivotY,
                 )
                 val targetScale = (newFocus.getTag(R.id.tv_card_scale_tag) as? Float)
                     ?: if (newFocus.scaleX > 1.0f) newFocus.scaleX else 1.0f
@@ -1119,7 +1139,9 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                     y = y,
                     width = newFocus.measuredWidth,
                     height = newFocus.measuredHeight,
-                    scale = targetScale
+                    scale = targetScale,
+                    pivotX = newFocus.pivotX,
+                    pivotY = newFocus.pivotY,
                 )
 
                 // if they are the same within then snap, aka scrolling
@@ -1227,6 +1249,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
         optimizeDisplayRefreshRate()
+        com.lagradost.cloudstream3.utils.display.DisplayTopologyManager.addListener(displayTopologyListener)
         updateTv()
 
         // backup when we update the app, I don't trust myself to not boot lock users, might want to make this a setting?
@@ -1324,9 +1347,27 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             }
         }
 
-        // overscan
-        val padding = settingsManager.getInt(getString(R.string.overscan_key), 0).toPx
-        binding?.homeRoot?.setPadding(padding, padding, padding, padding)
+        // Hardware & Display-Adaptive Window Insets: automatically adapts to external displays,
+        // hardware overscan, and system-reported safe zones without artificial black borders.
+        val userOverscan = settingsManager.getInt(getString(R.string.overscan_key), 0).toPx
+        binding?.homeRoot?.setPadding(userOverscan, userOverscan, userOverscan, userOverscan)
+
+        binding?.homeRoot?.let { root ->
+            ViewCompat.setOnApplyWindowInsetsListener(root) { view, windowInsets ->
+                val insets = windowInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout()
+                )
+                val userPref = settingsManager.getInt(getString(R.string.overscan_key), 0).toPx
+                val left = maxOf(insets.left, userPref)
+                val top = maxOf(insets.top, userPref)
+                val right = maxOf(insets.right, userPref)
+                val bottom = maxOf(insets.bottom, userPref)
+                view.setPadding(left, top, right, bottom)
+                windowInsets
+            }
+            ViewCompat.requestApplyInsets(root)
+        }
 
         changeStatusBarState(isLayout(EMULATOR))
 

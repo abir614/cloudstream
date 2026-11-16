@@ -335,6 +335,7 @@
             android:id="@+id/home_watch_child_recyclerview"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:clipChildren="false"
             android:clipToPadding="false"
             android:descendantFocusability="afterDescendants"
             android:nextFocusUp="@id/home_preview_info_btt"
@@ -369,9 +370,9 @@
                 android:fadingEdge="horizontal"
 
                 android:foreground="?android:attr/selectableItemBackgroundBorderless"
-                android:paddingStart="12dp"
+                android:paddingStart="8dp"
                 android:paddingTop="5dp"
-                android:paddingEnd="12dp"
+                android:paddingEnd="8dp"
 
                 android:paddingBottom="5dp"
                 android:requiresFadingEdge="horizontal">
@@ -465,12 +466,11 @@
             android:id="@+id/home_bookmarked_child_recyclerview"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:clipChildren="false"
             android:clipToPadding="false"
-
             android:descendantFocusability="afterDescendants"
             android:nextFocusLeft="@id/navigation_home"
             android:nextFocusUp="@id/home_type_holder"
-
             android:nextFocusDown="@id/home_child_recyclerview"
             android:orientation="horizontal"
             android:paddingStart="8dp"

@@ -476,7 +476,7 @@ object RemoteCrashReporter {
         """(?<![\w/.-])(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?![\w/.-])"""
     )
     private val EMAIL_REGEX = Regex("""\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}\b""")
-    private val BOT_TOKEN_REGEX = Regex("""\b\d{8,10}:[a-zA-Z0-9_-]{35}\b""")
+    private val BOT_TOKEN_REGEX = Regex("""\b(?:bot)?\d{8,10}:[a-zA-Z0-9_-]{35}\b""")
 
     fun sanitizeTelemetryText(raw: String?): String {
         if (raw.isNullOrBlank()) return ""

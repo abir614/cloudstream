@@ -129,12 +129,12 @@ object GithubReleases {
             if (response.isSuccessful) {
                 latestRelease = response.parsedSafe<GithubRelease>()
             } else if (response.code == 403 || response.code == 429) {
-                android.util.Log.w("GithubReleases", "GitHub REST API rate limit exceeded (HTTP ${response.code}). Falling back to rate-limit-free CDN release manifest.")
+                android.util.Log.i("GithubReleases", "GitHub REST API rate limit exceeded (HTTP ${response.code}). Falling back to rate-limit-free CDN release manifest.")
             } else {
-                android.util.Log.w("GithubReleases", "GitHub REST API returned HTTP ${response.code}. Attempting CDN fallback.")
+                android.util.Log.i("GithubReleases", "GitHub REST API returned HTTP ${response.code}. Attempting CDN fallback.")
             }
         } catch (t: Throwable) {
-            android.util.Log.w("GithubReleases", "Primary GitHub API check error: ${t.message}. Attempting CDN fallback.")
+            android.util.Log.i("GithubReleases", "Primary GitHub API check error: ${t.message}. Attempting CDN fallback.")
         }
 
         // Rate-limit proof CDN fallback: Fetches release.json directly from GitHub Release CDN (Fastly/Azure) with 0 rate limits

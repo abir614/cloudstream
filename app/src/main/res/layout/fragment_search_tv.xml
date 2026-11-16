@@ -126,6 +126,7 @@
         android:layout_height="match_parent"
         android:layout_marginStart="@dimen/navbar_width"
         android:background="?attr/primaryBlackBackground"
+        android:clipChildren="false"
         android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
         android:nextFocusLeft="@id/navigation_search"

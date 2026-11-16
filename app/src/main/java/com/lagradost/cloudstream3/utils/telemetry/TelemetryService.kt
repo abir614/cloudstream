@@ -69,12 +69,10 @@ class TelemetryService(
         }
         cleaned = ipRegex.replace(cleaned) { match ->
             val ip = match.value
-            if (ip == "127.0.0.1" || ip == "0.0.0.0" || ip == "10.0.2.2" || ip == "255.255.255.255") {
-                ip
-            } else if (ip.startsWith("192.168.") || ip.startsWith("10.") || ip.matches(Regex("""^172\.(1[6-9]|2[0-9]|3[0-1])\."""))) {
+            if (ip.startsWith("127.") || ip.startsWith("10.") || ip.startsWith("192.168.") || ip.matches(Regex("""^172\.(1[6-9]|2[0-9]|3[0-1])\."""))) {
                 "[PRIVATE_IP]"
             } else {
-                "[REDACTED_IP]"
+                ip
             }
         }
         return cleaned

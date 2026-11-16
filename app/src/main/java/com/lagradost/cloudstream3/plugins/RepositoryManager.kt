@@ -33,11 +33,11 @@ import java.util.concurrent.TimeUnit
  */
 @Serializable
 data class Repository(
-    @JsonProperty("iconUrl") @SerialName("iconUrl") val iconUrl: String?,
-    @JsonProperty("name") @SerialName("name") val name: String,
-    @JsonProperty("description") @SerialName("description") val description: String?,
-    @JsonProperty("manifestVersion") @SerialName("manifestVersion") val manifestVersion: Int,
-    @JsonProperty("pluginLists") @SerialName("pluginLists") val pluginLists: List<String>,
+    @JsonProperty("iconUrl") @SerialName("iconUrl") val iconUrl: String? = null,
+    @JsonProperty("name") @SerialName("name") val name: String = "",
+    @JsonProperty("description") @SerialName("description") val description: String? = null,
+    @JsonProperty("manifestVersion") @SerialName("manifestVersion") val manifestVersion: Int = 1,
+    @JsonProperty("pluginLists") @SerialName("pluginLists") val pluginLists: List<String> = emptyList(),
 )
 
 /**
@@ -172,7 +172,12 @@ object RepositoryManager {
                 Log.w("RepositoryManager", "Repository response from $url is not JSON object (starts with '${text.take(20)}')")
                 return@safeAsync null
             }
-            res.parsedSafe<Repository>()
+            val repo = res.parsedSafe<Repository>()
+            if (repo == null || repo.name.isBlank() || repo.pluginLists.isEmpty()) {
+                Log.w("RepositoryManager", "Repository from $url is invalid or has empty plugin list")
+                return@safeAsync null
+            }
+            repo
         }
     }
 
@@ -227,7 +232,11 @@ object RepositoryManager {
                 if (!response.isSuccessful) {
                     tempFile.delete()
                     response.okhttpResponse.close()
-                    Log.w("RepositoryManager", "Failed downloading plugin from $pluginUrl: HTTP ${response.code}")
+                    if (response.code == 404) {
+                        Log.d("RepositoryManager", "Plugin unavailable from $pluginUrl: HTTP 404")
+                    } else {
+                        Log.w("RepositoryManager", "Failed downloading plugin from $pluginUrl: HTTP ${response.code}")
+                    }
                     return@safeAsync null
                 }
 

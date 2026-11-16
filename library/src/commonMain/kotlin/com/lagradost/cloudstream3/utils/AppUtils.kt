@@ -41,7 +41,7 @@ object AppUtils {
         }
     }
 
-    const val MAX_JSON_PAYLOAD_SIZE = 25 * 1024 * 1024 // 25 MB limit against heap exhaustion
+    const val MAX_JSON_PAYLOAD_SIZE = 256 * 1024 * 1024 // 256 MB limit (expanded from 25 MB to support large backup restores)
     const val MAX_JSON_NESTING_DEPTH = 120 // Limit against deeply-nested stack overflow DoS
 
     fun validateJsonSafety(value: String) {
@@ -69,8 +69,8 @@ object AppUtils {
         if (serializer != null) {
             try {
                 return json.decodeFromString(serializer, value)
-            } catch (e: SerializationException) {
-                logError(e)
+            } catch (_: SerializationException) {
+                // Fall back to Jackson mapper below without polluting remote telemetry
             }
         }
 

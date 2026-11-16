@@ -56,7 +56,7 @@
                     android:id="@+id/radio_extreme"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:clickable="false"
+                    android:clickable="true"
                     android:focusable="false"
                     android:minWidth="0dp"
                     android:minHeight="0dp" />
@@ -91,7 +91,7 @@
                 android:layout_marginEnd="8dp"
                 android:focusable="true"
                 android:max="100"
-                android:progress="15" />
+                android:progress="10" />
 
             <!-- Dedicated Visible Numeric Input Box Row -->
             <LinearLayout
@@ -129,12 +129,12 @@
                     android:inputType="numberDecimal"
                     android:maxLength="5"
                     android:paddingHorizontal="8dp"
-                    android:text="0.15"
+                    android:text="0.10"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     tools:ignore="LabelFor"
-                    tools:text="0.15" />
+                    tools:text="0.10" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -169,7 +169,7 @@
                     android:id="@+id/radio_moderate"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:clickable="false"
+                    android:clickable="true"
                     android:focusable="false"
                     android:minWidth="0dp"
                     android:minHeight="0dp" />
@@ -204,7 +204,7 @@
                 android:layout_marginEnd="8dp"
                 android:focusable="true"
                 android:max="100"
-                android:progress="30" />
+                android:progress="20" />
 
             <!-- Dedicated Visible Numeric Input Box Row -->
             <LinearLayout
@@ -242,12 +242,12 @@
                     android:inputType="numberDecimal"
                     android:maxLength="5"
                     android:paddingHorizontal="8dp"
-                    android:text="0.30"
+                    android:text="0.20"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     tools:ignore="LabelFor"
-                    tools:text="0.30" />
+                    tools:text="0.20" />
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -282,7 +282,7 @@
                     android:id="@+id/radio_low"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:clickable="false"
+                    android:clickable="true"
                     android:focusable="false"
                     android:minWidth="0dp"
                     android:minHeight="0dp" />
@@ -317,7 +317,7 @@
                 android:layout_marginEnd="8dp"
                 android:focusable="true"
                 android:max="100"
-                android:progress="55" />
+                android:progress="40" />
 
             <!-- Dedicated Visible Numeric Input Box Row -->
             <LinearLayout
@@ -355,12 +355,12 @@
                     android:inputType="numberDecimal"
                     android:maxLength="5"
                     android:paddingHorizontal="8dp"
-                    android:text="0.55"
+                    android:text="0.40"
                     android:textColor="?attr/colorPrimary"
                     android:textSize="15sp"
                     android:textStyle="bold"
                     tools:ignore="LabelFor"
-                    tools:text="0.55" />
+                    tools:text="0.40" />
 
                 <TextView
                     android:layout_width="wrap_content"

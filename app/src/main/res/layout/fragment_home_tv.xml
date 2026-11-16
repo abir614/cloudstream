@@ -14,49 +14,17 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_marginStart="@dimen/navbar_width"
+        android:focusable="false"
+        android:clickable="false"
         android:visibility="visible"
         tools:visibility="visible">
 
-        <LinearLayout
-            android:id="@+id/home_loading_indicator"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:elevation="10dp"
-            android:visibility="visible">
-
-            <ProgressBar
-                android:id="@+id/home_loading_progress"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:indeterminate="true"
-                android:indeterminateTint="?attr/colorPrimary" />
-
-            <ProgressBar
-                android:id="@+id/home_filtering_progress_bar"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="280dp"
-                android:layout_height="10dp"
-                android:layout_marginTop="10dp"
-                android:indeterminate="false"
-                android:progressTint="?attr/colorPrimary"
-                android:visibility="gone"
-                tools:visibility="visible"
-                tools:progress="45" />
-
-            <TextView
-                android:id="@+id/home_loading_text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:text="@string/loading"
-                android:textColor="?attr/textColor"
-                android:textSize="18sp"
-                android:fontFamily="sans-serif-medium"
-                android:alpha="0.85" />
-        </LinearLayout>
+        <View
+            android:id="@+id/home_ambient_glow"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_ambient_loading"
+            android:importantForAccessibility="no" />
 
         <com.facebook.shimmer.ShimmerFrameLayout
             android:id="@+id/home_loading_shimmer"
@@ -131,6 +99,124 @@
             </LinearLayout>
         </com.facebook.shimmer.ShimmerFrameLayout>
 
+        <androidx.cardview.widget.CardView
+            android:id="@+id/home_loading_card"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_margin="32dp"
+            android:focusable="false"
+            android:clickable="false"
+            app:cardCornerRadius="28dp"
+            app:cardElevation="20dp"
+            app:cardBackgroundColor="?attr/primaryGrayBackground">
+
+            <LinearLayout
+                android:id="@+id/home_loading_indicator"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="360dp"
+                android:maxWidth="520dp"
+                android:orientation="vertical"
+                android:background="@drawable/bg_loading_card_inner"
+                android:paddingStart="32dp"
+                android:paddingEnd="32dp"
+                android:paddingTop="28dp"
+                android:paddingBottom="28dp"
+                android:gravity="center_horizontal">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <FrameLayout
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_gravity="center_vertical">
+
+                        <ProgressBar
+                            android:id="@+id/home_loading_progress"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_gravity="center"
+                            android:indeterminate="true"
+                            android:indeterminateTint="?attr/colorPrimary" />
+
+                        <ImageView
+                            android:id="@+id/home_loading_logo"
+                            android:layout_width="42dp"
+                            android:layout_height="42dp"
+                            android:layout_gravity="center"
+                            android:src="@drawable/cloud_2"
+                            android:contentDescription="@null"
+                            android:visibility="gone"
+                            tools:visibility="visible"
+                            app:tint="?attr/colorPrimary" />
+                    </FrameLayout>
+
+                    <TextView
+                        android:id="@+id/home_loading_brand_title"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="18dp"
+                        android:text="@string/app_name"
+                        android:textColor="?attr/textColor"
+                        android:textSize="18sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:singleLine="true"
+                        android:maxLines="1"
+                        android:ellipsize="end" />
+
+                    <TextView
+                        android:id="@+id/home_loading_percent_badge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="20dp"
+                        android:layout_marginEnd="4dp"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
+                        android:paddingTop="4dp"
+                        android:paddingBottom="4dp"
+                        android:background="@drawable/bg_percent_pill"
+                        android:text="0%"
+                        android:textColor="?attr/colorPrimary"
+                        android:textSize="14sp"
+                        android:fontFamily="sans-serif-bold"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+                </LinearLayout>
+
+                <ProgressBar
+                    android:id="@+id/home_filtering_progress_bar"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="10dp"
+                    android:layout_marginTop="20dp"
+                    android:layout_marginBottom="12dp"
+                    android:indeterminate="false"
+                    android:progressDrawable="@drawable/bg_horizontal_progress_modern"
+                    android:visibility="gone"
+                    tools:visibility="visible"
+                    tools:progress="45" />
+
+                <TextView
+                    android:id="@+id/home_loading_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/loading"
+                    android:textColor="?attr/grayTextColor"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:gravity="center_horizontal" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
     </FrameLayout>
 
     <LinearLayout
@@ -194,6 +280,8 @@
         android:id="@+id/home_master_recycler"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:descendantFocusability="afterDescendants"
         android:nextFocusLeft="@id/navigation_home"
         android:nextFocusUp="@id/home_bookmarked_child_recyclerview"

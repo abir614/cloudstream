@@ -207,52 +207,55 @@ class SubtitlesFragment : BaseDialogFragment<SubtitleSettingsBinding>(
             text?.let { text ->
                 val textSpanBuilder = SpannableStringBuilder(text)
 
-                // 2. apply edge
-                if (edgeSize > 0.0f) {
-                    textSpanBuilder.setSpan(
-                        OutlineSpan(edgeSize), 0, textSpanBuilder.length,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                }
-
-                // 3. apply bold + italic
-                val typeface = when (style.bold to style.italic) {
-                    (true to true) -> Typeface.BOLD_ITALIC
-                    (true to false) -> Typeface.BOLD
-                    (false to true) -> Typeface.ITALIC
-                    (false to false) -> Typeface.NORMAL
-                    else -> {
-                        Typeface.NORMAL
-                    }
-                }
-                if (typeface != Typeface.NORMAL) {
-                    val styleSpan = StyleSpan(typeface)
-                    textSpanBuilder.setSpan(
-                        styleSpan, 0, textSpanBuilder.length,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                }
-
-                // 4. apply radius
-                val radius = style.backgroundRadius ?: 0.0f
-                if (radius > 0.0f && style.backgroundColor != Color.TRANSPARENT) {
-                    val styleSpan = RoundedBackgroundColorSpan(
-                        style.backgroundColor,
-                        this.textAlignment ?: Layout.Alignment.ALIGN_CENTER,
-                        2.0F + radius * 0.5f,
-                        radius
-                    )
-                    textSpanBuilder.setSpan(
-                        styleSpan, 0, textSpanBuilder.length,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                }
-
-                // 5. remove captions but ensure that styling is kept
+                // 1. remove captions but ensure that styling is kept
                 // Just doing .replace removes all styling!
                 if (style.removeCaptions) {
                     for (match in captionRegex.findAll(text).toList().asReversed()) {
                         textSpanBuilder.delete(match.range.first, match.range.last + 1)
+                    }
+                }
+
+                // In Android framework, setting SPAN_EXCLUSIVE_EXCLUSIVE with start == end (length == 0)
+                // causes SpannableStringBuilder to log: "SPAN_EXCLUSIVE_EXCLUSIVE spans cannot have a zero length".
+                // Only apply styling spans if the builder contains characters.
+                if (textSpanBuilder.isNotEmpty()) {
+                    // 2. apply edge
+                    if (edgeSize > 0.0f) {
+                        textSpanBuilder.setSpan(
+                            OutlineSpan(edgeSize), 0, textSpanBuilder.length,
+                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                    }
+
+                    // 3. apply bold + italic
+                    val typeface = when (style.bold to style.italic) {
+                        (true to true) -> Typeface.BOLD_ITALIC
+                        (true to false) -> Typeface.BOLD
+                        (false to true) -> Typeface.ITALIC
+                        (false to false) -> Typeface.NORMAL
+                        else -> Typeface.NORMAL
+                    }
+                    if (typeface != Typeface.NORMAL) {
+                        val styleSpan = StyleSpan(typeface)
+                        textSpanBuilder.setSpan(
+                            styleSpan, 0, textSpanBuilder.length,
+                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                    }
+
+                    // 4. apply radius
+                    val radius = style.backgroundRadius ?: 0.0f
+                    if (radius > 0.0f && style.backgroundColor != Color.TRANSPARENT) {
+                        val styleSpan = RoundedBackgroundColorSpan(
+                            style.backgroundColor,
+                            this.textAlignment ?: Layout.Alignment.ALIGN_CENTER,
+                            2.0F + radius * 0.5f,
+                            radius
+                        )
+                        textSpanBuilder.setSpan(
+                            styleSpan, 0, textSpanBuilder.length,
+                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
                     }
                 }
 
