@@ -78,6 +78,13 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
     private lateinit var viewModel: ResultViewModel2
 
     override fun onDestroyView() {
+        try {
+            binding?.resultLoading?.stopShimmer()
+            binding?.resultEpisodes?.adapter = null
+            binding?.resultCastItems?.adapter = null
+            binding?.resultRecommendations?.adapter = null
+        } catch (_: Throwable) {
+        }
         loadingDialog?.dismissSafe(activity)
         loadingDialog = null
         popupDialog?.dismissSafe(activity)
@@ -982,6 +989,11 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                 resultFinishLoading.isVisible = data is Resource.Success
 
                 resultLoading.isVisible = data is Resource.Loading
+                if (data is Resource.Loading) {
+                    resultLoading.startShimmer()
+                } else {
+                    resultLoading.stopShimmer()
+                }
 
                 resultLoadingError.isVisible = data is Resource.Failure
                 //resultReloadConnectionOpenInBrowser.isVisible = data is Resource.Failure

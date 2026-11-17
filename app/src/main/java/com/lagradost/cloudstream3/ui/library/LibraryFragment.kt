@@ -145,7 +145,7 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
                 }
             }
 
-        val searchCallback = Runnable {
+        searchCallback = Runnable {
             val newText = binding.mainSearch.query.toString()
             libraryViewModel.sort(ListSorting.Query, newText)
         }
@@ -166,11 +166,11 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
                     return true
                 }
 
-                binding.mainSearch.removeCallbacks(searchCallback)
+                searchCallback?.let { binding.mainSearch.removeCallbacks(it) }
 
                 // Delay the execution of the search operation by 1 second (adjust as needed)
                 // this prevents running search when the user is typing
-                binding.mainSearch.postDelayed(searchCallback, 1000)
+                searchCallback?.let { binding.mainSearch.postDelayed(it, 1000) }
 
                 return true
             }
@@ -554,11 +554,14 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
     }
 
     private var loadingHandler: Handler? = null
+    private var searchCallback: Runnable? = null
 
     override fun onDestroyView() {
         loadingHandler?.removeCallbacksAndMessages(null)
         loadingHandler = null
         try {
+            searchCallback?.let { binding?.mainSearch?.removeCallbacks(it) }
+            searchCallback = null
             binding?.libraryLoadingShimmer?.stopShimmer()
             binding?.gridview?.adapter = null
         } catch (_: Throwable) {

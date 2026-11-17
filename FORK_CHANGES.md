@@ -675,6 +675,20 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Subprocess Clean Disposal ([`LogcatDialog.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/logcat/LogcatDialog.kt))**:
   - Added explicit `process?.destroy()` in `finally` block of logcat parser, preventing orphaned Linux processes and lingering file descriptors.
 
+### 16.27 End-to-End Resource Teardown, Fragment Adapter Detach & Timer Leak Remediation
+- **Universal Shimmer Lifecycle State Synchronization ([`ResultFragmentPhone.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultFragmentPhone.kt), [`ResultFragmentTv.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultFragmentTv.kt) & [`DownloadFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/download/DownloadFragment.kt))**:
+  - Bound `startShimmer()` and `stopShimmer()` directly to `Resource.Loading` state transitions across media results, episode loading, and download queues, preventing underlying ValueAnimators from cycling when views are hidden or finished loading.
+  - Added explicit shimmer termination across all fragments in `onDestroyView()`.
+- **RecyclerView Adapter Detachment & View Hierarchy Teardown ([`HomeFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeFragment.kt), [`SearchFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/search/SearchFragment.kt), [`ResultFragmentPhone.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultFragmentPhone.kt), [`ResultFragmentTv.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultFragmentTv.kt) & [`DownloadFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/download/DownloadFragment.kt))**:
+  - Unhooked RecyclerView adapters (`adapter = null`) and cancelled view animators on `onDestroyView()`, breaking retained references to adapters, view pools, and listeners, and enabling prompt garbage collection of inactive view trees during backstack navigation.
+- **Player Lifecycle & Host View Teardown ([`AbstractPlayerFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/AbstractPlayerFragment.kt) & [`GeneratorPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/GeneratorPlayer.kt))**:
+  - Implemented `onDestroyView()` in `AbstractPlayerFragment` to release `playerHostView?.release()` and null out host references when leaving the player fragment, freeing ExoPlayer decoders, media sessions, and auto-hide handlers promptly.
+  - Ensured playback positions are flushed to disk before tearing down player instances.
+- **Device Authentication CountDownTimer Dismissal Safety ([`SettingsAccount.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsAccount.kt))**:
+  - Attached `setOnDismissListener` to device PIN login dialogs to cancel active `CountDownTimer` instances upon dialog dismissal, stopping orphaned background timers and unneeded network polling coroutines.
+- **Search Query Callback Lifecycle Cleanup ([`LibraryFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/library/LibraryFragment.kt))**:
+  - Retained `searchCallback` reference and removed delayed callbacks from `mainSearch` on `onDestroyView()`, preventing post-destruction runnable executions.
+
 
 
 

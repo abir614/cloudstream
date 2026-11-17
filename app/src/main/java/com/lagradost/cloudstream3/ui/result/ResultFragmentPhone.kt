@@ -341,6 +341,11 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         resultBinding?.resultScroll?.setOnClickListener(null)
         resultBinding = null
         try {
+            binding?.resultLoading?.stopShimmer()
+            resultBinding?.resultEpisodeLoading?.stopShimmer()
+            resultBinding?.resultEpisodes?.adapter = null
+            resultBinding?.resultCastItems?.adapter = null
+            resultBinding?.resultMiniSync?.adapter = null
             syncBinding?.resultSyncLoadingShimmer?.stopShimmer()
         } catch (_: Throwable) {
         }
@@ -810,6 +815,11 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
             resultBinding?.apply {
                 // no failure?
                 resultEpisodeLoading.isVisible = episodes is Resource.Loading
+                if (episodes is Resource.Loading) {
+                    resultEpisodeLoading.startShimmer()
+                } else {
+                    resultEpisodeLoading.stopShimmer()
+                }
                 resultEpisodes.isVisible = episodes is Resource.Success
                 resultBatchDownloadButton.isVisible =
                     episodes is Resource.Success && episodes.value.isNotEmpty()
@@ -1076,6 +1086,11 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                 resultFinishLoading.isVisible = data is Resource.Success
 
                 resultLoading.isVisible = data is Resource.Loading
+                if (data is Resource.Loading) {
+                    resultLoading.startShimmer()
+                } else {
+                    resultLoading.stopShimmer()
+                }
 
                 resultLoadingError.isVisible = data is Resource.Failure
                 resultErrorText.isVisible = data is Resource.Failure

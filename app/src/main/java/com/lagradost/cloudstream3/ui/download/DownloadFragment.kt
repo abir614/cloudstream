@@ -73,6 +73,8 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
     override fun onDestroyView() {
         try {
             binding?.downloadLoadingBytes?.stopShimmer()
+            binding?.downloadLoading?.stopShimmer()
+            binding?.downloadList?.adapter = null
         } catch (_: Throwable) {
         }
         activity?.detachBackPressedCallback("Downloads")
@@ -97,6 +99,7 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
                 is Resource.Success -> {
                     (binding.downloadList.adapter as? DownloadAdapter)?.submitList(cards.value)
                     binding.textNoDownloads.isVisible = cards.value.isEmpty()
+                    binding.downloadLoading.stopShimmer()
                     binding.downloadLoading.isVisible = false
                     binding.downloadList.isVisible = true
                 }
@@ -104,10 +107,12 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
                 is Resource.Loading -> {
                     binding.downloadList.isVisible = false
                     binding.downloadLoading.isVisible = true
+                    binding.downloadLoading.startShimmer()
                 }
 
                 is Resource.Failure -> {
                     binding.downloadList.isVisible = true
+                    binding.downloadLoading.stopShimmer()
                     binding.downloadLoading.isVisible = false
                 }
             }

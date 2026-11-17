@@ -2173,6 +2173,7 @@ class GeneratorPlayer : FullScreenPlayer() {
     }
 
     override fun onDestroyView() {
+        flushCurrentPositionToDisk()
         currentVerifyLink?.cancel()
         dismissAllDialogs()
         super.onDestroyView()

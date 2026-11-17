@@ -233,7 +233,7 @@ class SettingsAccount : BasePreferenceFragmentCompat(), BiometricCallback {
                     val expirationMillis =
                         pinCodeData.expiresIn.times(1000).toLong()
 
-                    object : CountDownTimer(expirationMillis, 1000) {
+                    val timer = object : CountDownTimer(expirationMillis, 1000) {
                         override fun onTick(millisUntilFinished: Long) {
                             val secondsUntilFinished =
                                 millisUntilFinished.div(1000).toInt()
@@ -267,7 +267,11 @@ class SettingsAccount : BasePreferenceFragmentCompat(), BiometricCallback {
                             showToast(R.string.device_pin_expired_message)
                             dialog.dismissSafe(activity)
                         }
-                    }.start()
+                    }
+                    dialog.setOnDismissListener {
+                        timer.cancel()
+                    }
+                    timer.start()
                 }
             }
         }

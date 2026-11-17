@@ -151,6 +151,13 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
 
     override fun onDestroyView() {
         hideKeyboard()
+        try {
+            binding?.searchAutofitResults?.adapter = null
+            binding?.searchMasterRecycler?.adapter = null
+            binding?.searchHistoryRecycler?.adapter = null
+            binding?.searchSuggestionsRecycler?.adapter = null
+        } catch (_: Throwable) {
+        }
         bottomSheetDialog?.ownHide()
         activity?.detachBackPressedCallback("SearchFragment")
         super.onDestroyView()

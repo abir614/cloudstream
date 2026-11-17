@@ -588,6 +588,14 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
     }
 
     override fun onDestroyView() {
+        try {
+            binding?.homeLoadingShimmer?.stopShimmer()
+            binding?.homeAmbientGlow?.animate()?.cancel()
+            binding?.homeLoadingLogo?.animate()?.cancel()
+            binding?.homeFilteringProgressBar?.animate()?.cancel()
+            binding?.homeMasterRecycler?.adapter = null
+        } catch (_: Throwable) {
+        }
         (activity as? ComponentActivity)?.detachBackPressedCallback("HomeFragment_BackPress")
         bottomSheetDialog?.ownHide()
         super.onDestroyView()

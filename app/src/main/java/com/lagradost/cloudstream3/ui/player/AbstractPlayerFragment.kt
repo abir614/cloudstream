@@ -129,6 +129,12 @@ abstract class AbstractPlayerFragment<T : ViewBinding>(
         playerHostView?.onPictureInPictureModeChanged(isInPictureInPictureMode, activity)
     }
 
+    override fun onDestroyView() {
+        playerHostView?.release()
+        playerHostView = null
+        super.onDestroyView()
+    }
+
     override fun onDestroy() {
         playerHostView?.release()
         super.onDestroy()
