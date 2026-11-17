@@ -344,7 +344,6 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
             resultBinding?.resultEpisodes?.adapter = null
             resultBinding?.resultCastItems?.adapter = null
             resultBinding?.resultScroll?.setOnClickListener(null)
-            binding?.resultMiniSync?.adapter = null
             syncBinding?.resultSyncCheck?.adapter = null
             syncBinding?.resultSyncLoadingShimmer?.stopShimmer()
             recommendationBinding?.resultRecommendationsList?.adapter = null
