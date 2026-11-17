@@ -633,6 +633,19 @@ class HomeViewModel : ViewModel() {
             // Render home sections with posters already loaded, safe, and cached
             _page.postValue(Resource.Success(expandable))
 
+            // Reclaim resources immediately upon rendering home screen:
+            if (preloaderContext != null) {
+                if (isLowEndOrPotato) {
+                    // 1. Immediately persist all evaluated scores to flash storage
+                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(preloaderContext)
+                    // 2. Release idle TFLite inference sessions and scratch buffers to free native heap for UI rendering on budget hardware
+                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
+                } else {
+                    // Persist evaluated scores to flash storage
+                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(preloaderContext)
+                }
+            }
+
             if (initialPreviews.isNotEmpty()) {
                 previewResponses.clear()
                 previewResponses.addAll(initialPreviews)

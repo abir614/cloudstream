@@ -856,15 +856,23 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                 } else {
                     homeFilteringProgressBar.isGone = true
                     homeLoadingPercentBadge.isGone = true
-                    homeLoadingProgress.isVisible = true
-                    homeLoadingLogo.isGone = true
-                    homeLoadingText.text = getString(R.string.loading)
-                    homeLoadingShimmer.isVisible = true
-                    homeLoadingShimmer.alpha = 0.85f
-                    if (!isPotato) {
-                        homeLoadingShimmer.startShimmer()
+                    if (!homeMasterRecycler.isVisible) {
+                        homeLoadingProgress.isVisible = true
+                        homeLoadingLogo.isGone = true
+                        homeLoadingText.text = getString(R.string.loading)
+                        homeLoadingShimmer.isVisible = true
+                        homeLoadingShimmer.alpha = 0.85f
+                        if (!isPotato) {
+                            homeLoadingShimmer.startShimmer()
+                        }
+                        homeAmbientGlow.isVisible = true
+                    } else {
+                        // Main content is already rendered and visible; halt all background shimmer and glow animations
+                        homeLoadingShimmer.stopShimmer()
+                        homeLoadingShimmer.isGone = true
+                        homeAmbientGlow.isGone = true
+                        homeLoading.isGone = true
                     }
-                    homeAmbientGlow.isVisible = true
                 }
             }
         }
@@ -895,11 +903,15 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                                         homeLoading.isVisible = false
                                         homeLoading.alpha = 1f
                                         homeLoadingShimmer.stopShimmer()
+                                        homeLoadingShimmer.isGone = true
+                                        homeAmbientGlow.isGone = true
                                         homeViewModel.clearFilterProgress()
                                     }.start()
                                 } else {
                                     homeLoading.isVisible = false
                                     homeLoadingShimmer.stopShimmer()
+                                    homeLoadingShimmer.isGone = true
+                                    homeAmbientGlow.isGone = true
                                     homeViewModel.clearFilterProgress()
                                 }
                                 homeLoadingError.isVisible = false
@@ -911,6 +923,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                             homeLoadingError.isVisible = false
                             homeMasterRecycler.isVisible = true
                             homeLoadingShimmer.stopShimmer()
+                            homeLoadingShimmer.isGone = true
+                            homeAmbientGlow.isGone = true
                             homeViewModel.clearFilterProgress()
                         }
 

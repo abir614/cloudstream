@@ -655,6 +655,15 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Added message filters for ART GC contention notices (`"Deferring native library unloading due to contention"`), 3rd-party repository HTTP 404s (`"Failed downloading plugin from"`), and rate-limit CDN fallbacks (`"Falling back to rate-limit-free CDN"`).
   - Demoted 3rd-party repository 404s to `Log.d` in `RepositoryManager.kt` and GitHub rate-limit CDN notices to `Log.i` in `GithubReleases.kt`, eliminating spurious warning telemetry dispatches.
 
+### 16.25 Lifecycle Resource Reclamation & Background Shimmer Leak Fix
+- **Choreographer VSYNC Animator Leak Fix ([`HomeFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeFragment.kt))**:
+  - Remediated background CPU / Choreographer animation leak where `homeViewModel.clearFilterProgress()` posting `null` re-triggered the `else` branch of `observe(contentFilterProgress)`, calling `homeLoadingShimmer.startShimmer()` even after the home screen was rendered.
+  - Added visibility guards to guarantee shimmer and ambient glow are completely stopped and set to `isGone = true` once `homeMasterRecycler` is visible.
+- **Immediate Post-Preload Resource Reclamation ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Added immediate score persistence (`flushScoresToDisk`) upon completing homepage preloading to ensure all evaluated poster scores are written to flash storage without waiting for the delayed timer.
+  - Automatically release idle TFLite inference sessions and scratch buffers (`OnDeviceNsfwClassifier.release()`) on budget/potato hardware immediately after the loading screen completes, freeing $\approx 2-4$ MB of native heap and DRAM for UI rendering and video decoders.
+
+
 
 
 
