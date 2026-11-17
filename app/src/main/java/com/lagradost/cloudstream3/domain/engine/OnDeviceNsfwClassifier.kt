@@ -854,8 +854,9 @@ object OnDeviceNsfwClassifier {
             am.getMemoryInfo(mi)
             val rt = Runtime.getRuntime()
             val remainingHeap = rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())
-            // Critical OS memory state: OS lowMemory flag, available physical RAM under 30MB, or JVM remaining heap under 16MB
-            mi.lowMemory || mi.availMem < 30 * 1024 * 1024L || remainingHeap < 16 * 1024 * 1024L
+            // Critical OS memory state: OS lowMemory flag, available physical RAM within 32MB of threshold (or <64MB), or JVM remaining heap under 20MB
+            val ramCriticalThreshold = (mi.threshold + 32 * 1024 * 1024L).coerceAtLeast(64 * 1024 * 1024L)
+            mi.lowMemory || mi.availMem < ramCriticalThreshold || remainingHeap < 20 * 1024 * 1024L
         } catch (_: Throwable) {
             false
         }

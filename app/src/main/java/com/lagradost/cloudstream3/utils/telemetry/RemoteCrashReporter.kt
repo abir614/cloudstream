@@ -1170,84 +1170,238 @@ object RemoteCrashReporter {
         }
     }
 
+    private const val SESSION_TRACKER_FILE = "telemetry_active_session.json"
+
+    fun recordSessionHeartbeat(
+        context: Context?,
+        stage: String,
+        pluginName: String? = null,
+        isForeground: Boolean = true
+    ) {
+        val ctx = context ?: getContext() ?: return
+        thread(start = true, isDaemon = true, name = "TelemetryHeartbeat") {
+            try {
+                val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                val mi = ActivityManager.MemoryInfo()
+                am?.getMemoryInfo(mi)
+                val rt = Runtime.getRuntime()
+                val remainingHeapMb = (rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())) / (1024 * 1024)
+                val availMb = mi.availMem / (1024 * 1024)
+                val totalMb = DeviceProfile.getTotalRamMb(ctx)
+                val thresholdMb = mi.threshold / (1024 * 1024)
+                val isLowRam = am?.isLowRamDevice == true
+
+                val file = ctx.filesDir.resolve(SESSION_TRACKER_FILE)
+                val currentPid = android.os.Process.myPid()
+
+                val json = if (file.exists() && file.isFile) {
+                    try {
+                        JSONObject(file.readText())
+                    } catch (_: Throwable) {
+                        JSONObject()
+                    }
+                } else {
+                    JSONObject().apply {
+                        put("pid", currentPid)
+                        put("startTime", System.currentTimeMillis())
+                    }
+                }
+
+                json.put("pid", currentPid)
+                json.put("lastHeartbeat", System.currentTimeMillis())
+                json.put("stage", stage)
+                if (pluginName != null) {
+                    json.put("activePlugin", pluginName)
+                }
+                json.put("availRamMb", availMb)
+                json.put("totalRamMb", totalMb)
+                json.put("thresholdMb", thresholdMb)
+                json.put("jvmFreeHeapMb", remainingHeapMb)
+                json.put("isLowRam", isLowRam)
+                json.put("isForeground", isForeground)
+                json.put("status", "ACTIVE")
+
+                file.writeText(json.toString())
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    fun markSessionGracefulExit(context: Context?) {
+        val ctx = context ?: getContext() ?: return
+        try {
+            val file = ctx.filesDir.resolve(SESSION_TRACKER_FILE)
+            if (file.exists() && file.isFile) {
+                file.delete()
+            }
+        } catch (_: Throwable) {
+        }
+    }
+
+    fun markSessionHandledCrash(context: Context?) {
+        val ctx = context ?: getContext() ?: return
+        try {
+            val file = ctx.filesDir.resolve(SESSION_TRACKER_FILE)
+            if (file.exists() && file.isFile) {
+                val json = try { JSONObject(file.readText()) } catch (_: Throwable) { JSONObject() }
+                json.put("status", "HANDLED_CRASH")
+                file.writeText(json.toString())
+            }
+        } catch (_: Throwable) {
+        }
+    }
+
     /**
-     * On Android 11+ (API 30+), inspects ApplicationExitInfo to detect abnormal process terminations
-     * that bypass JVM uncaught exception handlers (native SIGSEGV/SIGABRT in Rust/C++, ANR freezes, LowMemoryKiller).
-     * Normal user closures (REASON_USER_REQUESTED, REASON_USER_STOPPED, REASON_EXIT_SELF) are strictly ignored.
+     * Inspects active session state and ApplicationExitInfo to detect abnormal process terminations
+     * that bypass JVM uncaught exception handlers (Linux kernel LowMemoryKiller / SIGKILL, native SIGSEGV/SIGABRT, ANR).
+     * Operates universally across all Android versions (API 21-36).
      */
     private fun checkHistoricalProcessExits(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         thread(start = true, isDaemon = true, name = "HistoricalExitChecker") {
             try {
-                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return@thread
-                val exitList = am.getHistoricalProcessExitReasons(context.packageName, 0, 3)
-                if (exitList.isNullOrEmpty()) return@thread
+                // Phase 1: Universal Abrupt Termination Detector (API 21-36 fallback for silent LMK / SIGKILL)
+                val trackerFile = context.filesDir.resolve(SESSION_TRACKER_FILE)
+                if (trackerFile.exists() && trackerFile.isFile) {
+                    val raw = try { trackerFile.readText() } catch (_: Throwable) { null }
+                    if (!raw.isNullOrBlank()) {
+                        val json = try { JSONObject(raw) } catch (_: Throwable) { null }
+                        val prevPid = json?.optInt("pid", 0) ?: 0
+                        val currentPid = android.os.Process.myPid()
+                        val status = json?.optString("status", "") ?: ""
+                        val wasForeground = json?.optBoolean("isForeground", false) ?: false
 
-                val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
-                val lastReportedTimestamp = prefs.getLong(PREF_LAST_REPORTED_EXIT_TIMESTAMP, 0L)
+                        if (prevPid != 0 && prevPid != currentPid && status == "ACTIVE" && wasForeground) {
+                            val tombstoneFile = context.filesDir.resolve(CRASH_TOMBSTONE_FILE)
+                            val hasHandledTombstone = tombstoneFile.exists()
 
-                for (info in exitList) {
-                    val exitTimestamp = info.timestamp
-                    if (exitTimestamp <= lastReportedTimestamp) continue
+                            if (!hasHandledTombstone) {
+                                val stage = json.optString("stage", "Unknown")
+                                val activePlugin = json.optString("activePlugin", "None")
+                                val availMb = json.optLong("availRamMb", -1L)
+                                val totalMb = json.optLong("totalRamMb", -1L)
+                                val thresholdMb = json.optLong("thresholdMb", -1L)
+                                val jvmFreeMb = json.optLong("jvmFreeHeapMb", -1L)
+                                val isLowRam = json.optBoolean("isLowRam", false)
+                                val startTime = json.optLong("startTime", 0L)
+                                val lastHeartbeat = json.optLong("lastHeartbeat", 0L)
+                                val uptimeSec = if (startTime > 0L && lastHeartbeat >= startTime) {
+                                    (lastHeartbeat - startTime) / 1000L
+                                } else 0L
 
-                    val reason = info.reason
-                    val (isAbnormal, reasonTag, reasonTitle) = when (reason) {
-                        ApplicationExitInfo.REASON_CRASH_NATIVE -> Triple(true, "NativeCrash", "Native Process Crash (SIGSEGV/SIGABRT)")
-                        ApplicationExitInfo.REASON_ANR -> Triple(true, "AppNotResponding", "Application Not Responding (ANR Freeze)")
-                        ApplicationExitInfo.REASON_LOW_MEMORY -> Triple(true, "LowMemoryKill", "Process Terminated by Android Low Memory Killer (LMK)")
-                        ApplicationExitInfo.REASON_SIGNALED -> Triple(true, "OSSignaled", "Process Terminated by OS Signal (Signal ${info.status})")
-                        ApplicationExitInfo.REASON_USER_REQUESTED,
-                        ApplicationExitInfo.REASON_USER_STOPPED,
-                        ApplicationExitInfo.REASON_EXIT_SELF,
-                        ApplicationExitInfo.REASON_CRASH -> Triple(false, "", "")
-                        else -> Triple(false, "", "")
-                    }
+                                val forensicDetails = buildString {
+                                    appendLine("ABNORMAL PROCESS EXIT FORENSIC LOG (Universal Kernel LMK / SIGKILL)")
+                                    appendLine("Reason: Process Terminated Abruptly by OS Kernel (SIGKILL / LowMemoryKiller)")
+                                    appendLine("Description: Foreground process terminated abruptly without triggering JVM uncaught exception handlers or graceful destruction.")
+                                    appendLine("Previous Process PID: $prevPid")
+                                    appendLine("Foreground Active Duration: ${uptimeSec}s")
+                                    appendLine("Last Recorded Stage: $stage")
+                                    appendLine("Active Plugin: $activePlugin")
+                                    appendLine("Memory State at Termination:")
+                                    appendLine("  - Free Physical RAM: ${availMb} MB / ${totalMb} MB (Kernel Low-RAM Threshold: ${thresholdMb} MB)")
+                                    appendLine("  - Free JVM Heap: ${jvmFreeMb} MB")
+                                    appendLine("  - Android Go Low-RAM Flag: $isLowRam")
+                                    appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})")
+                                    appendLine("OS: Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
+                                }
 
-                    if (isAbnormal) {
-                        val description = info.description ?: "No exit description provided by OS"
-                        val pssMb = info.pss / 1024L
-                        val rssMb = info.rss / 1024L
+                                val payload = buildPayload(
+                                    context = context,
+                                    level = "FATAL",
+                                    tag = "LowMemoryKill",
+                                    message = "Process Terminated Abruptly by OS (Likely LowMemoryKiller / SIGKILL): Last Stage: $stage",
+                                    error = null,
+                                    fullLog = forensicDetails,
+                                    extraData = mapOf(
+                                        "exit_reason" to "Abrupt OS Kill / LMK (API ${Build.VERSION.SDK_INT})",
+                                        "pid" to prevPid.toString(),
+                                        "last_stage" to stage,
+                                        "avail_ram_mb" to availMb.toString(),
+                                        "active_plugin" to activePlugin
+                                    )
+                                )
 
-                        val tombstoneTrace = try {
-                            info.traceInputStream?.bufferedReader()?.use { it.readText() }
-                        } catch (_: Throwable) {
-                            null
-                        }
-
-                        val forensicDetails = buildString {
-                            appendLine("ABNORMAL PROCESS EXIT FORENSIC LOG")
-                            appendLine("Reason: $reasonTitle")
-                            appendLine("Description: $description")
-                            appendLine("Process Memory at Exit: ${pssMb} MB PSS • ${rssMb} MB RSS")
-                            appendLine("Process PID: ${info.pid} • Importance: ${info.importance}")
-                            if (!tombstoneTrace.isNullOrBlank()) {
-                                appendLine("\n--- NATIVE/ANR TOMBSTONE TRACE ---")
-                                appendLine(tombstoneTrace.take(4000))
+                                dispatchEncrypted(payload)
                             }
                         }
-
-                        val payload = buildPayload(
-                            context = context,
-                            level = "FATAL",
-                            tag = reasonTag,
-                            message = "$reasonTitle: $description",
-                            error = null,
-                            fullLog = forensicDetails,
-                            extraData = mapOf(
-                                "exit_reason" to reasonTitle,
-                                "pid" to info.pid.toString(),
-                                "pss_mb" to pssMb.toString()
-                            )
-                        )
-
-                        if (dispatchEncrypted(payload)) {
-                            prefs.edit().putLong(PREF_LAST_REPORTED_EXIT_TIMESTAMP, exitTimestamp).apply()
-                            Log.i(TAG, "Successfully reported abnormal process exit: $reasonTitle")
-                        }
-                    } else {
-                        prefs.edit().putLong(PREF_LAST_REPORTED_EXIT_TIMESTAMP, exitTimestamp).apply()
                     }
-                    break
+                    try { trackerFile.delete() } catch (_: Throwable) {}
+                }
+
+                // Register tracking for current process
+                recordSessionHeartbeat(context, "APP_LAUNCH", isForeground = true)
+
+                // Phase 2: On Android 11+ (API 30+), inspect ApplicationExitInfo for native tombstone traces
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return@thread
+                    val exitList = am.getHistoricalProcessExitReasons(context.packageName, 0, 3)
+                    if (exitList.isNullOrEmpty()) return@thread
+
+                    val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context)
+                    val lastReportedTimestamp = prefs.getLong(PREF_LAST_REPORTED_EXIT_TIMESTAMP, 0L)
+
+                    for (info in exitList) {
+                        val exitTimestamp = info.timestamp
+                        if (exitTimestamp <= lastReportedTimestamp) continue
+
+                        val reason = info.reason
+                        val (isAbnormal, reasonTag, reasonTitle) = when (reason) {
+                            ApplicationExitInfo.REASON_CRASH_NATIVE -> Triple(true, "NativeCrash", "Native Process Crash (SIGSEGV/SIGABRT)")
+                            ApplicationExitInfo.REASON_ANR -> Triple(true, "AppNotResponding", "Application Not Responding (ANR Freeze)")
+                            ApplicationExitInfo.REASON_LOW_MEMORY -> Triple(true, "LowMemoryKill", "Process Terminated by Android Low Memory Killer (LMK)")
+                            ApplicationExitInfo.REASON_SIGNALED -> Triple(true, "OSSignaled", "Process Terminated by OS Signal (Signal ${info.status})")
+                            ApplicationExitInfo.REASON_USER_REQUESTED,
+                            ApplicationExitInfo.REASON_USER_STOPPED,
+                            ApplicationExitInfo.REASON_EXIT_SELF,
+                            ApplicationExitInfo.REASON_CRASH -> Triple(false, "", "")
+                            else -> Triple(false, "", "")
+                        }
+
+                        if (isAbnormal) {
+                            val description = info.description ?: "No exit description provided by OS"
+                            val pssMb = info.pss / 1024L
+                            val rssMb = info.rss / 1024L
+
+                            val tombstoneTrace = try {
+                                info.traceInputStream?.bufferedReader()?.use { it.readText() }
+                            } catch (_: Throwable) {
+                                null
+                            }
+
+                            val forensicDetails = buildString {
+                                appendLine("ABNORMAL PROCESS EXIT FORENSIC LOG")
+                                appendLine("Reason: $reasonTitle")
+                                appendLine("Description: $description")
+                                appendLine("Process Memory at Exit: ${pssMb} MB PSS • ${rssMb} MB RSS")
+                                appendLine("Process PID: ${info.pid} • Importance: ${info.importance}")
+                                if (!tombstoneTrace.isNullOrBlank()) {
+                                    appendLine("\n--- NATIVE/ANR TOMBSTONE TRACE ---")
+                                    appendLine(tombstoneTrace.take(4000))
+                                }
+                            }
+
+                            val payload = buildPayload(
+                                context = context,
+                                level = "FATAL",
+                                tag = reasonTag,
+                                message = "$reasonTitle: $description",
+                                error = null,
+                                fullLog = forensicDetails,
+                                extraData = mapOf(
+                                    "exit_reason" to reasonTitle,
+                                    "pid" to info.pid.toString(),
+                                    "pss_mb" to pssMb.toString()
+                                )
+                            )
+
+                            if (dispatchEncrypted(payload)) {
+                                prefs.edit().putLong(PREF_LAST_REPORTED_EXIT_TIMESTAMP, exitTimestamp).apply()
+                                Log.i(TAG, "Successfully reported abnormal process exit: $reasonTitle")
+                            }
+                        } else {
+                            prefs.edit().putLong(PREF_LAST_REPORTED_EXIT_TIMESTAMP, exitTimestamp).apply()
+                        }
+                        break
+                    }
                 }
             } catch (t: Throwable) {
                 Log.d(TAG, "Historical process exit check failed: ${t.message}")

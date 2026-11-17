@@ -804,9 +804,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                 homeApiFab.text = displayApiName
                 homeChangeApi.text = displayApiName
                 homeLoadingBrandTitle.text = if (displayApiName.isNotBlank() && apiName != noneApi.name) {
-                    "CloudStream • $displayApiName"
+                    displayApiName
                 } else {
-                    getString(R.string.app_name)
+                    ""
                 }
                 homePreviewReloadProvider.isGone = (apiName == noneApi.name)
                 homePreviewSearchButton.isGone = (apiName == noneApi.name)
@@ -820,6 +820,16 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                 val isPotato = ctx?.let { DeviceProfile.isUltraPotato(it) || DeviceProfile.isLowEnd(it) } ?: false
 
                 if (progress != null && progress.isFiltering) {
+                    val activeApi = currentApiName ?: homeViewModel.apiName.value
+                    val pluginTitle = if (!activeApi.isNullOrBlank() && activeApi != noneApi.name) {
+                        ctx?.getDisplayName(activeApi) ?: activeApi
+                    } else {
+                        ""
+                    }
+                    if (pluginTitle.isNotBlank()) {
+                        homeLoadingBrandTitle.text = pluginTitle
+                    }
+
                     homeLoading.isVisible = true
                     homeLoading.alpha = 1f
                     homeLoadingCard.isVisible = true

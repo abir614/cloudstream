@@ -332,12 +332,16 @@ object ImageLoader {
 
         val tier = DeviceProfile.tier(context)
         val isPotato = DeviceProfile.isUltraPotato(context)
-        val allowHw = tier != DeviceTier.LOW && !isPotato && !hasPotentialBrokenHardware()
+        val config = DeviceProfile.getCoilConfig(context)
+        val allowHw = tier != DeviceTier.LOW && !isPotato && !hasPotentialBrokenHardware() && config.allowHardwareBitmaps
 
         // headers can be overridden by extensions.
         this.load(imageData, SingletonImageLoader.get(context)) {
             this.diskCacheKey(imageKey)
             this.memoryCacheKey(imageKey)
+            if (config.useRgb565) {
+                this.bitmapConfig(Bitmap.Config.RGB_565)
+            }
             if (needsInspection) {
                 // Software bitmap required for zero-copy CPU pixel inspection by TFLite & Canvas
                 this.allowHardware(false)

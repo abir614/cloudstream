@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import coil3.ImageLoader
@@ -66,6 +67,7 @@ class ExceptionHandler(
 
             // CRITICAL STEP 1: Persist crash tombstone to disk synchronously BEFORE network dispatch
             try {
+                com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.markSessionHandledCrash(appContext)
                 com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.saveCrashTombstone(
                     context = appContext,
                     error = error,
@@ -136,6 +138,46 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             exceptionHandler = it
             Thread.setDefaultUncaughtExceptionHandler(it)
         }
+
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            private var startedActivities = 0
+
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+
+            override fun onActivityStarted(activity: Activity) {
+                startedActivities++
+                if (startedActivities == 1) {
+                    com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.recordSessionHeartbeat(
+                        activity,
+                        stage = "FOREGROUND: ${activity.javaClass.simpleName}",
+                        isForeground = true
+                    )
+                }
+            }
+
+            override fun onActivityResumed(activity: Activity) {}
+
+            override fun onActivityPaused(activity: Activity) {}
+
+            override fun onActivityStopped(activity: Activity) {
+                startedActivities = (startedActivities - 1).coerceAtLeast(0)
+                if (startedActivities == 0) {
+                    com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.recordSessionHeartbeat(
+                        activity,
+                        stage = "BACKGROUND",
+                        isForeground = false
+                    )
+                }
+            }
+
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+
+            override fun onActivityDestroyed(activity: Activity) {
+                if (activity is MainActivity && activity.isFinishing) {
+                    com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.markSessionGracefulExit(activity)
+                }
+            }
+        })
 
         // Flush any unsent crash dumps from previous sessions if telemetry is enabled
         if (com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.isTelemetryEnabled(this)) {

@@ -98,6 +98,20 @@ data class CoilTierConfig(
     val useRgb565: Boolean
 )
 
+data class DynamicResourceBudget(
+    val availRamMb: Long,
+    val totalRamMb: Long,
+    val freeHeapMb: Long,
+    val cpuCores: Int,
+    val isLowMemory: Boolean,
+    val isLowEnd: Boolean,
+    val viewportPreloadCount: Int,
+    val preloaderConcurrency: Int,
+    val pacingDelayMs: Long,
+    val useRgb565: Boolean,
+    val allowHardwareBitmaps: Boolean
+)
+
 /**
  * Centralized Hardware-Adaptive Profile Engine.
  * Dynamically computes device capability tier (LOW, MID, HIGH) based on SoC chipset architecture,
@@ -261,6 +275,89 @@ object DeviceProfile {
                 crossfadeMs = 150,
                 allowHardwareBitmaps = true,
                 useRgb565 = false
+            )
+        }
+    }
+
+    /**
+     * Real-time hardware and resource profiler.
+     * Continuously tracks available physical RAM, active JVM heap headroom, CPU core availability,
+     * and low-memory pressure to dynamically budget image preloading, worker thread concurrency,
+     * and viewport caching limits.
+     */
+    fun getDynamicResourceBudget(ctx: Context): DynamicResourceBudget {
+        val appContext = ctx.applicationContext ?: ctx
+        val am = appContext.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val mi = ActivityManager.MemoryInfo()
+        am?.getMemoryInfo(mi)
+        val rt = Runtime.getRuntime()
+        val availMb = if (mi.availMem > 0) mi.availMem / (1024 * 1024) else 512L
+        val totalMb = getTotalRamMb(appContext)
+        val maxHeapMb = rt.maxMemory() / (1024 * 1024)
+        val usedHeapMb = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024)
+        val freeHeapMb = (maxHeapMb - usedHeapMb).coerceAtLeast(0L)
+        val cores = rt.availableProcessors()
+        val isPotato = isUltraPotato(appContext)
+        val isLowEnd = isPotato || tier(appContext) == DeviceTier.LOW || (am?.isLowRamDevice == true) || totalMb <= 2500L
+        val isLowMem = mi.lowMemory || availMb < 150L || freeHeapMb < 18L
+        val hasBrokenGpu = hasBrokenHardwareGpu()
+
+        return when {
+            // Tier 1: Severe resource starvation (<150MB free RAM, <18MB free JVM heap, or Android lowMemory signal)
+            isLowMem -> DynamicResourceBudget(
+                availRamMb = availMb,
+                totalRamMb = totalMb,
+                freeHeapMb = freeHeapMb,
+                cpuCores = cores,
+                isLowMemory = true,
+                isLowEnd = true,
+                viewportPreloadCount = 8,
+                preloaderConcurrency = 1,
+                pacingDelayMs = 12L,
+                useRgb565 = true,
+                allowHardwareBitmaps = false
+            )
+            // Tier 2: Low-end / potato hardware (e.g. Allwinner H313, 1GB RAM, Android TV sticks)
+            isLowEnd -> DynamicResourceBudget(
+                availRamMb = availMb,
+                totalRamMb = totalMb,
+                freeHeapMb = freeHeapMb,
+                cpuCores = cores,
+                isLowMemory = false,
+                isLowEnd = true,
+                viewportPreloadCount = 14,
+                preloaderConcurrency = if (cores >= 4 && availMb >= 60L && freeHeapMb >= 16L) 2 else 1,
+                pacingDelayMs = 2L,
+                useRgb565 = true,
+                allowHardwareBitmaps = false
+            )
+            // Tier 3: Mid-tier devices (e.g. 4-6GB RAM)
+            totalMb <= 6000L -> DynamicResourceBudget(
+                availRamMb = availMb,
+                totalRamMb = totalMb,
+                freeHeapMb = freeHeapMb,
+                cpuCores = cores,
+                isLowMemory = false,
+                isLowEnd = false,
+                viewportPreloadCount = 20,
+                preloaderConcurrency = cores.coerceIn(3, 4),
+                pacingDelayMs = 0L,
+                useRgb565 = false,
+                allowHardwareBitmaps = !hasBrokenGpu
+            )
+            // Tier 4: High-end flagship devices (8GB+ RAM, multi-core flagship SoC)
+            else -> DynamicResourceBudget(
+                availRamMb = availMb,
+                totalRamMb = totalMb,
+                freeHeapMb = freeHeapMb,
+                cpuCores = cores,
+                isLowMemory = false,
+                isLowEnd = false,
+                viewportPreloadCount = 28,
+                preloaderConcurrency = cores.coerceIn(4, 8),
+                pacingDelayMs = 0L,
+                useRgb565 = false,
+                allowHardwareBitmaps = !hasBrokenGpu
             )
         }
     }

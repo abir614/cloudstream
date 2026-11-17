@@ -98,7 +98,11 @@ object AutoLogcatMonitor {
         "RefClass",
         "RepositoryManager",
         "AconfigFlags",
-        "aconfig"
+        "aconfig",
+        "DRM/DcfDecoder",
+        "DcfDecoder",
+        "linker",
+        "ion"
     )
 
     private fun isNoiseMessage(message: String): Boolean {
@@ -122,7 +126,7 @@ object AutoLogcatMonitor {
             message.contains("avc:  denied") || message.contains("avc: denied") ||
             message.contains("READ_DEVICE_CONFIG", ignoreCase = true) ||
             message.contains("resources.arsc in APK", ignoreCase = true) ||
-            message.contains("Accessing hidden method Landroid/view/WindowInsets", ignoreCase = true) ||
+            message.contains("Accessing hidden method", ignoreCase = true) ||
             message.contains("AIBinder_linkToDeath", ignoreCase = true) ||
             message.contains("Unknown bits set in runtime_flags", ignoreCase = true) ||
             message.contains("Media Quality Service not found", ignoreCase = true) ||
@@ -179,7 +183,14 @@ object AutoLogcatMonitor {
             message.contains("AconfigFlags", ignoreCase = true) ||
             message.contains("aconfig_flags.pb", ignoreCase = true) ||
             message.contains("Failed to read Aconfig values", ignoreCase = true) ||
-            message.contains("Falling back to rate-limit-free CDN", ignoreCase = true)
+            message.contains("Falling back to rate-limit-free CDN", ignoreCase = true) ||
+            message.contains("decodeDrmImageIfNeeded", ignoreCase = true) ||
+            message.contains("unused DT entry", ignoreCase = true) ||
+            message.contains("Found duplicate classes", ignoreCase = true) ||
+            message.contains("Found duplicated class", ignoreCase = true) ||
+            message.contains("wastes RAM and hurts startup performance", ignoreCase = true) ||
+            message.contains("ioctl c0044901", ignoreCase = true) ||
+            (message.contains("ioctl", ignoreCase = true) && message.contains("Invalid argument", ignoreCase = true))
     }
 
     private fun isNoiseTag(tag: String): Boolean {
