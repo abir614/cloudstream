@@ -665,6 +665,17 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Android 15 OEM BSP AconfigFlags Noise Suppression ([`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt))**:
   - Filtered benign Android 14/15 OEM vendor log noise where missing `/vendor/etc/aconfig_flags.pb` emitted error logs under tag `AconfigFlags`. Added `"AconfigFlags"` and `"aconfig"` to `noiseTagDenylist` and message pattern filters.
 
+### 16.26 Comprehensive Lifecycle Resource Reclamation & Animator Leak Prevention
+- **Dialog & Fragment Shimmer Animator Halting ([`MainActivity.kt`](app/src/main/java/com/lagradost/cloudstream3/MainActivity.kt), [`DownloadFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/download/DownloadFragment.kt) & [`ResultFragmentPhone.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultFragmentPhone.kt))**:
+  - Guarded popup preview dismissals, download storage updates, and result sync views with explicit `stopShimmer()` calls during view dismissal and destruction (`onDestroyView`), completely stopping Choreographer VSYNC callbacks.
+- **LibraryFragment Delayed Handler & View Teardown ([`LibraryFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/library/LibraryFragment.kt))**:
+  - Implemented missing `onDestroyView()` lifecycle cleanup: purged pending delayed loading runnables (`loadingHandler.removeCallbacksAndMessages(null)`), stopped shimmer animators, and unhooked gridview adapters to prevent view hierarchy memory retention.
+- **EasterEgg Monke Animation & Context Leak Remediation ([`EasterEggMonkeFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/EasterEggMonkeFragment.kt))**:
+  - Explicitly cancelled all active floating `ObjectAnimator`s on child monkey views and purged the `activeMonkeys` collection upon `onDestroyView`, eliminating view and activity context retention.
+- **Subprocess Clean Disposal ([`LogcatDialog.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/logcat/LogcatDialog.kt))**:
+  - Added explicit `process?.destroy()` in `finally` block of logcat parser, preventing orphaned Linux processes and lingering file descriptors.
+
+
 
 
 

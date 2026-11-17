@@ -876,6 +876,10 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
     }
 
     private fun hidePreviewPopupDialog() {
+        try {
+            bottomPreviewBinding?.resultviewPreviewLoadingShimmer?.stopShimmer()
+        } catch (_: Throwable) {
+        }
         bottomPreviewPopup.dismissSafe(this)
         lastPopupJob?.cancel()
         lastPopupJob = null

@@ -343,7 +343,7 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
             }
         }
 
-        val handler = Handler(Looper.getMainLooper())
+        val handler = Handler(Looper.getMainLooper()).also { loadingHandler = it }
 
         observe(libraryViewModel.pages) { resource ->
             when (resource) {
@@ -551,6 +551,19 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
         super.onConfigurationChanged(newConfig)
         val adapter = binding?.viewpager?.adapter ?: return
         adapter.notifyItemRangeChanged(0, adapter.itemCount)
+    }
+
+    private var loadingHandler: Handler? = null
+
+    override fun onDestroyView() {
+        loadingHandler?.removeCallbacksAndMessages(null)
+        loadingHandler = null
+        try {
+            binding?.libraryLoadingShimmer?.stopShimmer()
+            binding?.gridview?.adapter = null
+        } catch (_: Throwable) {
+        }
+        super.onDestroyView()
     }
 
     private val sortChangeClickListener = View.OnClickListener { view ->

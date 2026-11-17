@@ -170,8 +170,17 @@ class EasterEggMonkeFragment : BaseFragment<FragmentEasterEggMonkeBinding>(
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
-        activity?.showSystemUI()
         spawningJob?.cancel()
+        spawningJob = null
+        activeMonkeys.forEach { monkey ->
+            try {
+                (monkey.tag as? ObjectAnimator)?.cancel()
+                monkey.animation?.cancel()
+            } catch (_: Throwable) {
+            }
+        }
+        activeMonkeys.clear()
+        activity?.showSystemUI()
+        super.onDestroyView()
     }
 }

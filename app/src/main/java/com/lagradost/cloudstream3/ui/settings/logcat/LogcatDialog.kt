@@ -52,13 +52,15 @@ fun LogcatDialog(dismiss: () -> Unit) {
     val list = remember { mutableStateOf(persistentListOf<LogcatItem>()) }
     var isLoading by remember { mutableStateOf(true) }
     LaunchedEffect(dismiss) {
+        var process: Process? = null
         try {
             isLoading = true
 
             // https://developer.android.com/studio/command-line/logcat
-            val process = Runtime.getRuntime().exec("logcat --binary -d")
+            val proc = Runtime.getRuntime().exec("logcat --binary -d")
+            process = proc
             val items = arrayListOf<LogcatItem>()
-            LogcatBinaryParser(process.inputStream).use { parser ->
+            LogcatBinaryParser(proc.inputStream).use { parser ->
                 while (true) {
                     val item = parser.parseItem() ?: break
                     items.add(item)
@@ -69,6 +71,7 @@ fun LogcatDialog(dismiss: () -> Unit) {
         } catch (e: Exception) {
             logError(e) // kinda ironic
         } finally {
+            try { process?.destroy() } catch (_: Throwable) {}
             isLoading = false
         }
     }

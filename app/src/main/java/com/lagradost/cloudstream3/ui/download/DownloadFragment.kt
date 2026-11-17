@@ -71,6 +71,10 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
     }
 
     override fun onDestroyView() {
+        try {
+            binding?.downloadLoadingBytes?.stopShimmer()
+        } catch (_: Throwable) {
+        }
         activity?.detachBackPressedCallback("Downloads")
         super.onDestroyView()
     }

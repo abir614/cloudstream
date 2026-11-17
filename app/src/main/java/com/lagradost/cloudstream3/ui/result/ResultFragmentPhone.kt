@@ -340,6 +340,10 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         playerBinding = null
         resultBinding?.resultScroll?.setOnClickListener(null)
         resultBinding = null
+        try {
+            syncBinding?.resultSyncLoadingShimmer?.stopShimmer()
+        } catch (_: Throwable) {
+        }
         syncBinding = null
         recommendationBinding = null
         activity?.detachBackPressedCallback(this@ResultFragmentPhone.toString())
