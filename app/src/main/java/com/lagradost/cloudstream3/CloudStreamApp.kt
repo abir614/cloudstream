@@ -52,27 +52,45 @@ class ExceptionHandler(
                 fullReport = com.lagradost.cloudstream3.di.ServiceLocator.telemetry.captureCrash(error, errorFile)
             } catch (_: Throwable) {
                 // Fallback to basic printstream if telemetry fails
-                PrintStream(errorFile).use { ps ->
-                    ps.println("Currently loading extension: ${PluginManager.currentlyLoading ?: "none"}")
-                    ps.println("Fatal exception on thread ${thread.name} ($threadId)")
-                    error.printStackTrace(ps)
+                val sw = java.io.StringWriter()
+                val ps = java.io.PrintWriter(sw)
+                ps.println("Currently loading extension: ${PluginManager.currentlyLoading ?: "none"}")
+                ps.println("Fatal exception on thread ${thread.name} ($threadId)")
+                error.printStackTrace(ps)
+                fullReport = sw.toString()
+                try {
+                    errorFile.writeText(fullReport)
+                } catch (_: Throwable) {
                 }
             }
 
-            // Silent, automated background crash report to secure Cloudflare proxy
+            // CRITICAL STEP 1: Persist crash tombstone to disk synchronously BEFORE network dispatch
             try {
-                val sent = com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.dispatchSync(
+                com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.saveCrashTombstone(
+                    context = appContext,
+                    error = error,
+                    thread = thread,
+                    fullLog = fullReport
+                )
+            } catch (_: Throwable) {
+            }
+
+            // CRITICAL STEP 2: Emergency synchronous network dispatch on dedicated worker thread
+            // with 3.5s join to prevent NetworkOnMainThreadException and guarantee real-time delivery
+            try {
+                val sent = com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.dispatchSyncWithTimeout(
                     context = appContext,
                     thread = thread,
                     error = error,
-                    fullLog = fullReport
+                    fullLog = fullReport,
+                    timeoutMs = 3500L
                 )
-                if (!sent && !fullReport.isNullOrBlank()) {
-                    com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.savePendingReport(appContext, fullReport)
+                if (sent) {
+                    com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.clearPendingReport(appContext)
                 }
             } catch (_: Throwable) {
             }
-        } catch (_: FileNotFoundException) {
+        } catch (_: Throwable) {
         }
         try {
             onError()

@@ -221,6 +221,12 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             if (errorFile.exists() && errorFile.isFile) {
                 lastError = errorFile.readText(Charset.defaultCharset())
                 errorFile.delete()
+                if (!lastError.isNullOrBlank()) {
+                    com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.dispatchPendingCrashLog(
+                        context,
+                        lastError ?: ""
+                    )
+                }
             } else {
                 lastError = null
             }

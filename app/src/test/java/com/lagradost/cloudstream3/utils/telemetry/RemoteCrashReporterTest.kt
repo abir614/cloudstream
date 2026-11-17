@@ -158,4 +158,25 @@ class RemoteCrashReporterTest {
         assertEquals("https://cloudstream.app-log-collector.workers.dev/handshake", RemoteCrashReporter.HANDSHAKE_ENDPOINT)
         assertEquals("https://cloudstream.app-log-collector.workers.dev/report", RemoteCrashReporter.REPORT_ENDPOINT)
     }
+
+    @Test
+    fun `test buildPayload produces structured FATAL crash payload with forensic traces`() {
+        val testException = RuntimeException("Fatal memory allocation failure in player")
+        val fullForensicDump = "CLOUDSTREAM ENTERPRISE CRASH TOMBSTONE\nFatal memory allocation failure"
+        val payload = RemoteCrashReporter.buildPayload(
+            context = null,
+            level = "FATAL",
+            tag = "FatalCrash",
+            message = testException.message ?: "Uncaught fatal crash",
+            thread = Thread.currentThread(),
+            error = testException,
+            fullLog = fullForensicDump
+        )
+
+        assertEquals("FATAL", payload.getString("level"))
+        assertEquals("FatalCrash", payload.getString("tag"))
+        assertTrue(payload.getString("exception").contains("RuntimeException: Fatal memory allocation failure in player"))
+        assertTrue(payload.getString("stackTrace").contains("Fatal memory allocation failure in player"))
+        assertEquals(fullForensicDump, payload.getString("fullLog"))
+    }
 }
