@@ -17,8 +17,6 @@ import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.newMovieLoadResponse
 import com.lagradost.cloudstream3.amap
-import android.app.ActivityManager
-import android.content.Context
 import com.lagradost.cloudstream3.mvvm.Resource
 import com.lagradost.cloudstream3.mvvm.debugAssert
 import com.lagradost.cloudstream3.mvvm.debugWarning
@@ -66,8 +64,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import android.graphics.Bitmap
@@ -82,7 +78,6 @@ import coil3.request.bitmapConfig
 import com.lagradost.cloudstream3.utils.UIHelper.toPx
 import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.utils.DeviceProfile
-import com.lagradost.cloudstream3.utils.DeviceTier
 import java.util.EnumSet
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ConcurrentHashMap

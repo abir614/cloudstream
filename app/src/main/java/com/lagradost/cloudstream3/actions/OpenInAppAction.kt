@@ -56,12 +56,6 @@ fun makeTempM3U8Intent(
         text += "\n#EXTINF:0,${link.name}\n${link.url}"
     }
 
-    //With subtitles it doesn't work for no reason :(
-    /*for (sub in result.subs) {
-        val normalizedName = sub.name.replace("[^a-zA-Z0-9 ]".toRegex(), "")
-        text += "\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",NAME=\"${normalizedName}\",DEFAULT=NO,AUTOSELECT=NO,FORCED=NO,LANGUAGE=\"${sub.languageCode}\",URI=\"${sub.url}\""
-    }*/
-
     text += "\n#EXT-X-ENDLIST"
     outputFile.writeText(text)
 

@@ -605,13 +605,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
         view.context.selectHomepage(currentApiName) { api ->
             homeViewModel.loadAndCancel(api, forceReload = true, fromUI = true)
         }
-        /*val validAPIs = view.context?.filterProviderByPreferredMedia()?.toMutableList() ?: mutableListOf()
-
-        validAPIs.add(0, randomApi)
-        validAPIs.add(0, noneApi)
-        view.popupMenuNoIconsAndNoStringRes(validAPIs.mapIndexed { index, api -> Pair(index, api.name) }) {
-            homeViewModel.loadAndCancel(validAPIs[itemId].name)
-        }*/
     }
 
     private var currentApiName: String? = null

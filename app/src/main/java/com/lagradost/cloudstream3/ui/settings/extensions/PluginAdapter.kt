@@ -163,22 +163,6 @@ class PluginAdapter(
 
         binding.extVotes.isVisible = false
 
-        // Disable this for now as the vote api is down, this will also significantly improve the lag
-        // from doing all these network requests
-        /*if (!isLocal) {
-            ioSafe {
-                metadata.getVotes().main { votes ->
-                    val currentRecycleCount = (holder as? RepositoryViewHolderState)?.recycleCount
-
-                    // Only set the text if the view is correctly rendered
-                    if (currentRecycleCount == oldRecycleCount) {
-                        binding.extVotes.setText(txt(R.string.extension_rating, prettyCount(votes)))
-                        binding.extVotes.isVisible = true
-                    }
-                }
-            }
-        }*/
-
         if (metadata.fileSize != null) {
             binding.extFilesize.isVisible = true
             binding.extFilesize.text = formatShortFileSize(itemView.context, metadata.fileSize)
@@ -207,17 +191,6 @@ class PluginAdapter(
             if (current >= target) return current
             return findClosestBase2(target, current * 2, max)
         }
-
-        // DO NOT MOVE, as running this test will result in ExceptionInInitializerError on prerelease due to static variables using Resources.getSystem()
-        // this test function is only to show how the function works
-        /*@Test
-        fun testFindClosestBase2() {
-            Assert.assertEquals(16, findClosestBase2(0))
-            Assert.assertEquals(256, findClosestBase2(170))
-            Assert.assertEquals(256, findClosestBase2(256))
-            Assert.assertEquals(512, findClosestBase2(257))
-            Assert.assertEquals(512, findClosestBase2(700))
-        }*/
 
         private val iconSizeExact = 32.toPx
         private val iconSize by lazy {

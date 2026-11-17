@@ -36,17 +36,6 @@ abstract class BaseFetchButton(context: Context, attributeSet: AttributeSet) :
     lateinit var progressBar: ContentLoadingProgressBar
     var progressText: TextView? = null
 
-    /* val gid: String? get() = sessionIdToGid[persistentId]
-
-    // used for resuming data
-    var _lastRequestOverride: UriRequest? = null
-    var lastRequest: UriRequest?
-        get() = _lastRequestOverride ?: sessionIdToLastRequest[persistentId]
-        set(value) {
-            _lastRequestOverride = value
-        }
-
-    var files: List<AbstractClient.JsonFile> = emptyList() */
     protected var isZeroBytes: Boolean = true
 
     fun inflate(@LayoutRes layout: Int) {
@@ -169,11 +158,6 @@ abstract class BaseFetchButton(context: Context, attributeSet: AttributeSet) :
             resetView()
         }
     }
-
-    /*fun downloadEvent(data: Pair<Int, VideoDownloadManager.DownloadActionType>) {
-        val (id, action) = data
-
-    }*/
 
     fun downloadProgressEvent(data: Triple<Int, Long, Long>) {
         val (id, bytesDownloaded, bytesTotal) = data

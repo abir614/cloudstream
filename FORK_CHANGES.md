@@ -689,6 +689,22 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Search Query Callback Lifecycle Cleanup ([`LibraryFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/library/LibraryFragment.kt))**:
   - Retained `searchCallback` reference and removed delayed callbacks from `mainSearch` on `onDestroyView()`, preventing post-destruction runnable executions.
 
+### 16.28 Codebase-Wide Redundant, Duplicate & Dead Code Elimination
+- **Compose Multiplatform Dead Code Purge ([`AppBar.kt`](shared/src/commonMain/kotlin/com/mihon/material/AppBar.kt))**:
+  - Eradicated 234 lines of dead, commented-out Mihon legacy composables (`AppBarActions`, `SearchToolbar`, `AppBarAction`), trimming file size by 58% and eliminating unused state imports.
+- **App Shell & Navigation Dead Code Cleanup ([`MainActivity.kt`](app/src/main/java/com/lagradost/cloudstream3/MainActivity.kt))**:
+  - Removed 112 lines of obsolete code, including unused `TransitionManager` blocks, legacy layout margin calculations, unused `NavOptions` builders, and commented navigation listeners.
+- **Media Result & Player Legacy Code Purge ([`ResultFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultFragment.kt), [`CustomSubtitleDecoderFactory.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CustomSubtitleDecoderFactory.kt) & [`FullScreenPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/FullScreenPlayer.kt))**:
+  - Purged 101 lines of commented-out legacy fragment lifecycle code, obsolete `reloadViewModel`, and dead TV navigation margin code in `ResultFragment`.
+  - Removed dead CEA decoder stubs in `CustomSubtitleDecoderFactory` and obsolete Netflix back-key comment in `FullScreenPlayer`.
+- **Core Library & Provider Legacy Cleanup ([`MainAPI.kt`](library/src/commonMain/kotlin/com/lagradost/cloudstream3/MainAPI.kt) & [`SyncRedirector.kt`](library/src/commonMain/kotlin/com/lagradost/cloudstream3/metaproviders/SyncRedirector.kt))**:
+  - Removed 52 lines of unfinished experimental tag draft code (`ITag`, `GenreResponse`) in `MainAPI` and 24 lines of commented legacy sync URL lookup in `SyncRedirector`.
+- **Settings, Download Buttons & Actions Cleanup ([`PluginAdapter.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/extensions/PluginAdapter.kt), [`BaseFetchButton.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/download/button/BaseFetchButton.kt) & [`OpenInAppAction.kt`](app/src/main/java/com/lagradost/cloudstream3/actions/OpenInAppAction.kt))**:
+  - Eradicated dead vote API coroutine stubs and inline `@Test` functions in `PluginAdapter`, removed dead `gid` resuming getters in `BaseFetchButton`, and purged disabled subtitle m3u8 formatting in `OpenInAppAction`.
+- **Unused Import Removal & View Binding Reference Optimization ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt), [`ResultFragmentPhone.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultFragmentPhone.kt) & [`ResultFragmentTv.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultFragmentTv.kt))**:
+  - Removed unused imports (`ActivityManager`, `Context`, `Semaphore`, `withPermit`, `DeviceTier`) in `HomeViewModel`.
+  - Corrected view targets (`resultBinding` vs `binding`, `resultRecommendationsList`) and lifecycle teardown across phone and TV result views.
+
 
 
 

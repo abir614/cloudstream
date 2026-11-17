@@ -259,17 +259,6 @@ class CustomDecoder(private val fallbackFormat: Format?) : SubtitleParser {
                     MimeTypes.APPLICATION_TTML -> TtmlParser()
                     MimeTypes.APPLICATION_SUBRIP -> CustomSubripParser()
                     MimeTypes.APPLICATION_TX3G -> Tx3gParser(fallbackFormat.initializationData)
-                    // These decoders are not converted to parsers yet
-                    // TODO
-//                            MimeTypes.APPLICATION_CEA608, MimeTypes.APPLICATION_MP4CEA608 -> Cea608Decoder(
-//                                mimeType,
-//                                fallbackFormat.accessibilityChannel,
-//                                Cea608Decoder.MIN_DATA_CHANNEL_TIMEOUT_MS
-//                            )
-//                            MimeTypes.APPLICATION_CEA708 -> Cea708Decoder(
-//                                fallbackFormat.accessibilityChannel,
-//                                fallbackFormat.initializationData
-//                            )
                     MimeTypes.APPLICATION_DVBSUBS -> DvbParser(fallbackFormat.initializationData)
                     MimeTypes.APPLICATION_PGS -> PgsParser()
                     else -> null

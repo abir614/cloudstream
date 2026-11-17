@@ -82,7 +82,7 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
             binding?.resultLoading?.stopShimmer()
             binding?.resultEpisodes?.adapter = null
             binding?.resultCastItems?.adapter = null
-            binding?.resultRecommendations?.adapter = null
+            binding?.resultRecommendationsList?.adapter = null
         } catch (_: Throwable) {
         }
         loadingDialog?.dismissSafe(activity)

@@ -338,17 +338,19 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         updateUIEvent -= ::updateUI
         playerHostView?.release()
         playerBinding = null
-        resultBinding?.resultScroll?.setOnClickListener(null)
-        resultBinding = null
         try {
-            binding?.resultLoading?.stopShimmer()
+            resultBinding?.resultLoading?.stopShimmer()
             resultBinding?.resultEpisodeLoading?.stopShimmer()
             resultBinding?.resultEpisodes?.adapter = null
             resultBinding?.resultCastItems?.adapter = null
-            resultBinding?.resultMiniSync?.adapter = null
+            resultBinding?.resultScroll?.setOnClickListener(null)
+            binding?.resultMiniSync?.adapter = null
+            syncBinding?.resultSyncCheck?.adapter = null
             syncBinding?.resultSyncLoadingShimmer?.stopShimmer()
+            recommendationBinding?.resultRecommendationsList?.adapter = null
         } catch (_: Throwable) {
         }
+        resultBinding = null
         syncBinding = null
         recommendationBinding = null
         activity?.detachBackPressedCallback(this@ResultFragmentPhone.toString())

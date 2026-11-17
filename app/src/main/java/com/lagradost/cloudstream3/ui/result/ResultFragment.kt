@@ -190,44 +190,6 @@ object ResultFragment {
 
     val updateUIEvent = Event<Int?>()
 
-    //private var updateUIListener: (() -> Unit)? = null
-
-
-    //protected open val resultLayout = R.layout.fragment_result_swipe
-
-    /* override var layout = R.layout.fragment_result_swipe
-
-     override fun onCreateView(
-         inflater: LayoutInflater,
-         container: ViewGroup?,
-         savedInstanceState: Bundle?,
-     ): View? {
-
-         return super.onCreateView(inflater, container, savedInstanceState)
-     }
-
-     override fun onDestroyView() {
-         updateUIListener = null
-         super.onDestroyView()
-     }
-
-     override fun onResume() {
-         afterPluginsLoadedEvent += ::reloadViewModel
-         super.onResume()
-         activity?.setNavigationBarColorCompat(R.attr.primaryBlackBackground)
-     }
-
-     override fun onDestroy() {
-         afterPluginsLoadedEvent -= ::reloadViewModel
-         super.onDestroy()
-     }
-
-
-     private fun updateUI() {
-         syncModel.updateUserData()
-         viewModel.reloadEpisodes()
-     }*/
-
     data class StoredData(
         val url: String,
         val apiName: String,
@@ -313,67 +275,4 @@ object ResultFragment {
         }
         return StoredData(url, apiName, name, showFillers, dubStatus, start, playerAction, restart)
     }
-
-    /*private fun reloadViewModel(forceReload: Boolean) {
-        if (!viewModel.hasLoaded() || forceReload) {
-            val storedData = getStoredData(activity ?: context ?: return) ?: return
-
-            viewModel.load(
-                activity,
-                storedData.url ?: return,
-                storedData.apiName,
-                storedData.showFillers,
-                storedData.dubStatus,
-                storedData.start
-            )
-        }
-    }
-
-    @SuppressLint("SetTextI18n")
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
-
-
-        updateUIListener = ::updateUI
-
-        val restart = arguments?.getBoolean(RESTART_BUNDLE) ?: false
-        if (restart) {
-            arguments?.putBoolean(RESTART_BUNDLE, false)
-        }
-
-        activity?.window?.decorView?.clearFocus()
-        hideKeyboard()
-        context?.updateHasTrailers()
-
-        /* val backParameter = result_back.layoutParams as FrameLayout.LayoutParams
-         backParameter.setMargins(
-             backParameter.leftMargin,
-             backParameter.topMargin + requireContext().getStatusBarHeight(),
-             backParameter.rightMargin,
-             backParameter.bottomMargin
-         )
-         result_back.layoutParams = backParameter*/
-
-        val storedData = (activity ?: context)?.let {
-            getStoredData(it)
-        }
-
-        // This is to band-aid FireTV navigation
-        val isTv = isTvSettings()
-        result_season_button?.isFocusableInTouchMode = isTv
-        result_episode_select?.isFocusableInTouchMode = isTv
-        result_dub_select?.isFocusableInTouchMode = isTv
-            if (storedData?.url != null) {
-                if (restart || !viewModel.hasLoaded()) {
-                    viewModel.load(
-                        activity,
-                        storedData.url,
-                        storedData.apiName,
-                        storedData.showFillers,
-                        storedData.dubStatus,
-                        storedData.start
-                    )
-                }
-            }
-    }*/
 }

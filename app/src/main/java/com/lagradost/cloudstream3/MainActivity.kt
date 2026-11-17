@@ -529,40 +529,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             R.id.navigation_test_providers,
         ).contains(destination.id)
 
-
-        /*val dontPush = listOf(
-            R.id.navigation_home,
-            R.id.navigation_search,
-            R.id.navigation_results_phone,
-            R.id.navigation_results_tv,
-            R.id.navigation_player,
-            R.id.navigation_quick_search,
-        ).contains(destination.id)
-
-        binding?.navHostFragment?.apply {
-            val params = layoutParams as ConstraintLayout.LayoutParams
-            val push =
-                if (!dontPush && isLayout(TV or EMULATOR)) resources.getDimensionPixelSize(R.dimen.navbar_width) else 0
-
-            if (!this.isLtr()) {
-                params.setMargins(
-                    params.leftMargin,
-                    params.topMargin,
-                    push,
-                    params.bottomMargin
-                )
-            } else {
-                params.setMargins(
-                    push,
-                    params.topMargin,
-                    params.rightMargin,
-                    params.bottomMargin
-                )
-            }
-
-            layoutParams = params
-        }*/
-
         binding?.apply {
             navRailView.isVisible = isNavVisible && isLandscape()
             navView.isVisible = isNavVisible && !isLandscape()
@@ -1195,29 +1161,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                         updateFocusView(lastFocus.get(), same = true)
                     }, 200)
                 }
-
-                /*
-
-                the following is working, but somewhat bad code code
-
-                if (!wasGone) {
-                    (focusOutline.parent as? ViewGroup)?.let {
-                        TransitionManager.endTransitions(it)
-                        TransitionManager.beginDelayedTransition(
-                            it,
-                            TransitionSet().addTransition(ChangeBounds())
-                                .addTransition(ChangeTransform())
-                                .setDuration(100)
-                        )
-                    }
-                }
-
-                focusOutline.layoutParams = focusOutline.layoutParams?.apply {
-                    width = newFocus.measuredWidth
-                    height = newFocus.measuredHeight
-                }
-                focusOutline.translationX = x.toFloat()
-                focusOutline.translationY = y.toFloat()*/
             }
         }
     }
@@ -1787,15 +1730,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             } else detachBackPressedCallback("MainActivity")
         }
 
-        /*navOptions = NavOptions.Builder()
-            .setLaunchSingleTop(true)
-            .setEnterAnim(R.anim.nav_enter_anim)
-            .setExitAnim(R.anim.nav_exit_anim)
-            .setPopEnterAnim(R.anim.nav_pop_enter)
-            .setPopExitAnim(R.anim.nav_pop_exit)
-            .setPopUpTo(navController.graph.startDestination, false)
-            .build()*/
-
         val rippleColor = ColorStateList.valueOf(getResourceColor(R.attr.colorPrimary, 0.1f))
 
         binding?.navView?.apply {
@@ -1824,11 +1758,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                 itemActiveIndicatorColor = rippleColor
             }
             setupWithNavController(navController)
-            /*if (isLayout(TV or EMULATOR)) {
-                background?.alpha = 200
-            } else {
-                background?.alpha = 255
-            }*/
 
             setOnItemSelectedListener { item ->
                 onNavDestinationSelected(
@@ -1891,29 +1820,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
                 prevView = view
                 prevId = id
-                // Uncomment for focus expand
-                /*if (!isLayout(TV)) {
-                    view.onFocusChangeListener = null
-                } else {
-                    view.onFocusChangeListener =
-                        View.OnFocusChangeListener { v, hasFocus ->
-                            if (hasFocus) {
-                                focus += id
-                                binding?.navRailView?.labelVisibilityMode =
-                                    NavigationRailView.LABEL_VISIBILITY_LABELED
-                                binding?.navRailView?.expand()
-                            } else {
-                                focus -= id
-                                v.post {
-                                    if (focus.isEmpty()) {
-                                        binding?.navRailView?.labelVisibilityMode =
-                                            NavigationRailView.LABEL_VISIBILITY_UNLABELED
-                                        binding?.navRailView?.collapse()
-                                    }
-                                }
-                            }
-                        }
-                }*/
             }
         }
 
@@ -1964,24 +1870,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         }
 
         updateHasTrailers()
-        /*nav_view.setOnNavigationItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.navigation_home -> {
-                    navController.navigate(R.id.navigation_home, null, navOptions)
-                }
-                R.id.navigation_search -> {
-                    navController.navigate(R.id.navigation_search, null, navOptions)
-                }
-                R.id.navigation_downloads -> {
-                    navController.navigate(R.id.navigation_downloads, null, navOptions)
-                }
-                R.id.navigation_settings -> {
-                    navController.navigate(R.id.navigation_settings, null, navOptions)
-                }
-            }
-            true
-        }*/
-
 
         if (!checkWrite()) {
             requestRW()
