@@ -1144,9 +1144,11 @@ object RemoteCrashReporter {
                             if (dispatchEncrypted(payload)) {
                                 clearPendingReport(context)
                                 Log.i(TAG, "Pending crash dump flushed on network reconnect")
-                                try {
-                                    cm.unregisterNetworkCallback(this@object)
-                                } catch (_: Throwable) {}
+                                networkCallback?.let { activeCb ->
+                                    try {
+                                        cm.unregisterNetworkCallback(activeCb)
+                                    } catch (_: Throwable) {}
+                                }
                                 networkCallback = null
                             }
                         } catch (_: Throwable) {
@@ -1205,9 +1207,6 @@ object RemoteCrashReporter {
                         val description = info.description ?: "No exit description provided by OS"
                         val pssMb = info.pss / 1024L
                         val rssMb = info.rss / 1024L
-                        val subReason = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            " (SubReason: ${info.subReason})"
-                        } else ""
 
                         val tombstoneTrace = try {
                             info.traceInputStream?.bufferedReader()?.use { it.readText() }
@@ -1217,7 +1216,7 @@ object RemoteCrashReporter {
 
                         val forensicDetails = buildString {
                             appendLine("ABNORMAL PROCESS EXIT FORENSIC LOG")
-                            appendLine("Reason: $reasonTitle$subReason")
+                            appendLine("Reason: $reasonTitle")
                             appendLine("Description: $description")
                             appendLine("Process Memory at Exit: ${pssMb} MB PSS • ${rssMb} MB RSS")
                             appendLine("Process PID: ${info.pid} • Importance: ${info.importance}")
