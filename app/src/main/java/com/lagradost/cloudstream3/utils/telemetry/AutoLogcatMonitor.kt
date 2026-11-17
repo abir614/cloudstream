@@ -96,7 +96,9 @@ object AutoLogcatMonitor {
         "SpellCheckerSession",
         "cr_media",
         "RefClass",
-        "RepositoryManager"
+        "RepositoryManager",
+        "AconfigFlags",
+        "aconfig"
     )
 
     private fun isNoiseMessage(message: String): Boolean {
@@ -174,6 +176,9 @@ object AutoLogcatMonitor {
             message.contains("requires BLUETOOTH permission", ignoreCase = true) ||
             message.contains("registerBluetoothIntentsIfNeeded", ignoreCase = true) ||
             message.contains("CameraManagerExtPlugin", ignoreCase = true) ||
+            message.contains("AconfigFlags", ignoreCase = true) ||
+            message.contains("aconfig_flags.pb", ignoreCase = true) ||
+            message.contains("Failed to read Aconfig values", ignoreCase = true) ||
             message.contains("Falling back to rate-limit-free CDN", ignoreCase = true)
     }
 

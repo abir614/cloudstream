@@ -662,6 +662,8 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Immediate Post-Preload Resource Reclamation ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
   - Added immediate score persistence (`flushScoresToDisk`) upon completing homepage preloading to ensure all evaluated poster scores are written to flash storage without waiting for the delayed timer.
   - Automatically release idle TFLite inference sessions and scratch buffers (`OnDeviceNsfwClassifier.release()`) on budget/potato hardware immediately after the loading screen completes, freeing $\approx 2-4$ MB of native heap and DRAM for UI rendering and video decoders.
+- **Android 15 OEM BSP AconfigFlags Noise Suppression ([`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt))**:
+  - Filtered benign Android 14/15 OEM vendor log noise where missing `/vendor/etc/aconfig_flags.pb` emitted error logs under tag `AconfigFlags`. Added `"AconfigFlags"` and `"aconfig"` to `noiseTagDenylist` and message pattern filters.
 
 
 
