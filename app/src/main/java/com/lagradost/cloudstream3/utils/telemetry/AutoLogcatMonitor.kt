@@ -102,7 +102,14 @@ object AutoLogcatMonitor {
         "DRM/DcfDecoder",
         "DcfDecoder",
         "linker",
-        "ion"
+        "ion",
+        "SchedAssist",
+        "IJankManager",
+        "UAH_CLIENT",
+        "ServiceManagerCppClient",
+        "OplusBracketLog",
+        "OplusPredictiveBackController",
+        "OplusViewMirrorManager"
     )
 
     private fun isNoiseMessage(message: String): Boolean {
@@ -190,7 +197,12 @@ object AutoLogcatMonitor {
             message.contains("Found duplicated class", ignoreCase = true) ||
             message.contains("wastes RAM and hurts startup performance", ignoreCase = true) ||
             message.contains("ioctl c0044901", ignoreCase = true) ||
-            (message.contains("ioctl", ignoreCase = true) && message.contains("Invalid argument", ignoreCase = true))
+            (message.contains("ioctl", ignoreCase = true) && message.contains("Invalid argument", ignoreCase = true)) ||
+            message.contains("open sharedFd failed", ignoreCase = true) ||
+            message.contains("Failed to get isDeclared for", ignoreCase = true) ||
+            message.contains("updateBlastSurfaceIfNeeded", ignoreCase = true) ||
+            message.contains("slideSceneEnd unknown scene", ignoreCase = true) ||
+            message.contains("uahInit enter", ignoreCase = true)
     }
 
     private fun isNoiseTag(tag: String): Boolean {
