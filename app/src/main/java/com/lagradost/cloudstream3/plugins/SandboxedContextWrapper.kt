@@ -179,13 +179,15 @@ class SandboxedContextWrapper(
         val lower = name.lowercase()
         if (lower.contains("cs_secure") ||
             lower.contains("secure_auth") ||
-            lower.contains("rebuild_preference") ||
             lower.contains("auth_token")
         ) {
             throw SecurityException("Access to protected host preferences '$name' denied for plugin '$pluginName'")
         }
+        // If a plugin accesses the default SDK host preferences ("rebuild_preference"),
+        // safely redirect it to the plugin's own namespaced preferences file so SDK setKey/getKey works seamlessly!
+        val targetName = if (lower == "rebuild_preference") "default_prefs" else name
         // Namespace SharedPreferences so plugins cannot overwrite host or other plugin settings
-        return hostContext.getSharedPreferences("cs_plugin_${sanitizedName}_$name", mode)
+        return hostContext.getSharedPreferences("cs_plugin_${sanitizedName}_$targetName", mode)
     }
 
     private fun assertSafeDatabaseName(name: String) {

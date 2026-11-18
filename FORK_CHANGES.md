@@ -872,5 +872,9 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Graceful Loading Screen Completion ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt), [`HomeFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeFragment.kt))**:
   - Content filter progress smoothly advances to 100% upon completion of all poster downloads.
   - The landing page renders with zero missing images, zero pop-in jank, and zero subsequent background list mutations, ensuring a completely stable and graceful landing experience.
+- **Plugin Sandbox Default SharedPreferences Isolation ([`SandboxedContextWrapper.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapper.kt), [`SandboxedContextWrapperTest.kt`](app/src/test/java/com/lagradost/cloudstream3/plugins/SandboxedContextWrapperTest.kt))**:
+  - Fixed false-positive `SecurityException` when plugins call standard SDK persistence (`setKey`/`getKey`/`CloudStreamApp.setKey`), which references default `rebuild_preference`.
+  - Transparently maps `rebuild_preference` calls from plugins to their dedicated isolated namespace (`cs_plugin_<pluginName>_default_prefs`), safeguarding host preferences while allowing third-party extensions (e.g. CineStream) to persist settings without crashes.
+
 
 

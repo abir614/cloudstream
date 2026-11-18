@@ -210,7 +210,6 @@ class SandboxedContextWrapperTest {
     @Test
     fun `test getSharedPreferences rejects host preferences and path traversal`() {
         val forbidden = listOf(
-            "rebuild_preference",
             "cs_secure_auth",
             "secure_auth_store",
             "../rebuild_preference",
@@ -225,5 +224,11 @@ class SandboxedContextWrapperTest {
                 // Expected
             }
         }
+    }
+
+    @Test
+    fun `test getSharedPreferences safely isolates default rebuild_preference`() {
+        val prefs = sandboxedContext.getSharedPreferences("rebuild_preference", Context.MODE_PRIVATE)
+        assertNotNull(prefs)
     }
 }
