@@ -856,6 +856,7 @@ object RemoteCrashReporter {
         if (!isDispatcherRunning.compareAndSet(false, true)) return
         thread(start = true, isDaemon = true, name = "RemoteDiagnosticQueueWorker") {
             try {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
                 while (true) {
                     val batch = mutableListOf<DiagnosticEvent>()
                     val first = diagnosticQueue.poll()
@@ -1259,6 +1260,7 @@ object RemoteCrashReporter {
     private fun checkHistoricalProcessExits(context: Context) {
         thread(start = true, isDaemon = true, name = "HistoricalExitChecker") {
             try {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
                 // Phase 1: Universal Abrupt Termination Detector (API 21-36 fallback for silent LMK / SIGKILL)
                 val trackerFile = context.filesDir.resolve(SESSION_TRACKER_FILE)
                 if (trackerFile.exists() && trackerFile.isFile) {

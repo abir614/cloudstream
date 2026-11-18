@@ -1190,6 +1190,7 @@ class CS3IPlayer : IPlayer {
                     val factory = if (isSoftwareDecodingEnabled) {
                         FixedNextRenderersFactory(context, compressor).apply {
                             setEnableDecoderFallback(true)
+                            setAllowedVideoJoiningTimeMs(5000L)
                             forceEnableMediaCodecAsynchronousQueueing()
                             setExtensionRendererMode(
                                 if (isSoftwareDecodingPreferred)
@@ -1204,6 +1205,7 @@ class CS3IPlayer : IPlayer {
                             // no nextlib = EXTENSION_RENDERER_MODE_OFF, no compressor = fully default sink
                             DefaultRenderersFactory(context).apply {
                                 setEnableDecoderFallback(true)
+                                setAllowedVideoJoiningTimeMs(5000L)
                                 forceEnableMediaCodecAsynchronousQueueing()
                             }
                         } else {
@@ -1220,6 +1222,7 @@ class CS3IPlayer : IPlayer {
                                     .build()
                             }.apply {
                                 setEnableDecoderFallback(true)
+                                setAllowedVideoJoiningTimeMs(5000L)
                                 forceEnableMediaCodecAsynchronousQueueing()
                             }
                         }

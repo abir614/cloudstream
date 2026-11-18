@@ -17,7 +17,7 @@
         android:layout_height="match_parent"
         android:background="@android:color/black"
         android:focusable="false"
-        app:surface_type="texture_view"
+        app:surface_type="surface_view"
         app:auto_show="true"
         app:backgroundTint="@android:color/black"
         app:controller_layout_id="@layout/player_custom_layout"
