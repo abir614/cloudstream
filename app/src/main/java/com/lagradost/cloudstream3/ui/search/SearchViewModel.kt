@@ -126,8 +126,12 @@ class SearchViewModel : ViewModel() {
     }
 
     fun updateHistory() = ioSafe {
+        val nsfwEnabled = isNsfwGloballyEnabled()
+        val filterLevel = NsfwFilterEngine.getFilterLevel(CloudStreamApp.context)
         val items = getKeys("$currentAccount/$SEARCH_HISTORY_KEY")?.mapNotNull {
             getKey<SearchHistoryItem>(it)
+        }?.filter { item ->
+            nsfwEnabled || !NsfwFilterEngine.isNsfwText(item.searchText, filterLevel = filterLevel)
         }?.sortedByDescending { it.searchedAt } ?: emptyList()
         _currentHistory.postValue(items)
     }

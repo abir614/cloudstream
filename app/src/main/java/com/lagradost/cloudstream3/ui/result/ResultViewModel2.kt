@@ -2654,6 +2654,16 @@ class ResultViewModel2 : ViewModel() {
                 return@ioSafe
             }
 
+            val nsfwEnabled = isNsfwGloballyEnabled()
+            if (!nsfwEnabled && NsfwFilterEngine.isNsfwProvider(api)) {
+                _page.postValue(
+                    Resource.Failure(
+                        false,
+                        "Adult content is disabled in settings"
+                    )
+                )
+                return@ioSafe
+            }
 
             // validate url
             val validUrlResource = safeApiCall {
@@ -2683,6 +2693,24 @@ class ResultViewModel2 : ViewModel() {
                 is Resource.Success -> {
                     if (!isActive) return@ioSafe
                     val rawResponse = data.value
+                    if (!nsfwEnabled) {
+                        val filterLevel = NsfwFilterEngine.getFilterLevel(context)
+                        val isNsfw = NsfwFilterEngine.isNsfwText(
+                            rawResponse.name,
+                            validUrl,
+                            rawResponse.tags?.joinToString(" ") ?: "",
+                            filterLevel
+                        ) || (rawResponse.posterUrl?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true)
+                        if (isNsfw) {
+                            _page.postValue(
+                                Resource.Failure(
+                                    false,
+                                    "Adult content is disabled in settings"
+                                )
+                            )
+                            return@ioSafe
+                        }
+                    }
                     val mainId = rawResponse.getId()
 
                     preferDubStatus = getDub(mainId) ?: preferDubStatus

@@ -411,5 +411,24 @@ class NsfwFilterEngineTest {
         }
         assertFalse(NsfwFilterEngine.isNsfwProvider(cleanAnimeApi))
     }
+
+    @Test
+    fun `test isNsfwText detects adult keywords in history and search suggestions`() {
+        assertTrue(NsfwFilterEngine.isNsfwText("hentai school girls"))
+        assertTrue(NsfwFilterEngine.isNsfwText("uncensored jav javhd"))
+        assertTrue(NsfwFilterEngine.isNsfwText("erotic milf"))
+        assertFalse(NsfwFilterEngine.isNsfwText("Spider-Man Across the Spider-Verse"))
+        assertFalse(NsfwFilterEngine.isNsfwText("Attack on Titan Season 4"))
+        assertFalse(NsfwFilterEngine.isNsfwText("Interstellar"))
+    }
+
+    @Test
+    fun `test isNsfwUrl detects adult domains in download and result poster paths`() {
+        assertTrue(NsfwFilterEngine.isNsfwUrl("https://static.hanime.tv/posters/cover123.jpg"))
+        assertTrue(NsfwFilterEngine.isNsfwUrl("https://t.nhentai.net/galleries/123/cover.jpg"))
+        assertTrue(NsfwFilterEngine.isNsfwUrl("https://cdn.hentaicity.com/images/poster.png"))
+        assertFalse(NsfwFilterEngine.isNsfwUrl("https://image.tmdb.org/t/p/w500/8UlWHLM29295Q9CzENR9Z.jpg"))
+        assertFalse(NsfwFilterEngine.isNsfwUrl("https://m.media-amazon.com/images/M/MV5BMDFkYTc0MGEt.jpg"))
+    }
 }
 

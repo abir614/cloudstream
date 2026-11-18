@@ -900,6 +900,19 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Bound `viewportPreloadCount` on `DynamicResourceBudget` for mid and flagship viewport limits.
   - Extended adult content filtration across QuickSearch and synchronized Library lists: items in `QuickSearchFragment` and account-synced items (MAL, AniList) in `LibraryViewModel` are strictly filtered against `NsfwFilterEngine.isNsfw` when adult content is disabled.
 
+### 16.44 Defense-in-Depth Cross-Screen Adult Containment & History Protection
+- **External Search Suggestion Filtering ([`SearchSuggestionApi.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/search/SearchSuggestionApi.kt))**:
+  - Bound `include_adult` dynamically to `isNsfwGloballyEnabled()` for TMDB multi-search queries, strictly requesting safe results when adult content is disabled.
+  - Filtered extracted suggestion titles with `NsfwFilterEngine.isNsfwText`, preventing third-party suggestion services from leaking adult keywords into the search UI.
+- **Search History Adult Term Screening ([`SearchViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/search/SearchViewModel.kt))**:
+  - Filtered persisted search history in `updateHistory()` through `NsfwFilterEngine.isNsfwText`, guaranteeing that previous queries made while adult content was active are never exposed when content filtering is re-enabled.
+- **Resume Watching & Bookmark Home Feed Sanitization ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Filtered `getResumeWatching()` and bookmarked data in `loadStoredData()` with `!NsfwFilterEngine.isNsfw(it, filterLevel)` when NSFW is disabled, preventing prior adult viewing sessions from appearing on the home feed.
+- **Direct Result Loading & Provider Barrier ([`ResultViewModel2.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultViewModel2.kt))**:
+  - Intercepted `load()` to immediately fail with `Resource.Failure(false, "Adult content is disabled in settings")` if the requested provider is identified as adult via `NsfwFilterEngine.isNsfwProvider` or if the scraped item title/URL/tags match adult content when adult mode is disabled.
+- **Downloads Header Poster Censorship ([`DownloadAdapter.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/download/DownloadAdapter.kt))**:
+  - Applied `NsfwFilterEngine` screening to downloaded media in `DownloadAdapter`, falling back to `default_cover` or `applyCensoredPoster` when adult filtering is active.
+
 
 
 

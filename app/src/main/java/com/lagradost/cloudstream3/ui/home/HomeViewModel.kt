@@ -177,7 +177,14 @@ class HomeViewModel : ViewModel() {
                 activity?.addProgramsToContinueWatching(resumeWatchingResult)
             }
         }
-        resumeWatchingResult?.let {
+        val nsfwEnabled = context?.isNsfwEnabled() ?: false
+        val filterLevel = NsfwFilterEngine.getFilterLevel(context)
+        val filtered = if (!nsfwEnabled) {
+            resumeWatchingResult?.filterNot { NsfwFilterEngine.isNsfw(it, filterLevel) }
+        } else {
+            resumeWatchingResult
+        }
+        filtered?.let {
             _resumeWatching.postValue(it)
         }
     }
@@ -218,9 +225,18 @@ class HomeViewModel : ViewModel() {
 
             )
 
+        val nsfwEnabled = context?.isNsfwEnabled() ?: false
+        val filterLevel = NsfwFilterEngine.getFilterLevel(context)
         val list = withContext(Dispatchers.IO) {
             watchStatusIds.filter { watchPrefNotNull.contains(it.second) }
                 .mapNotNull { getBookmarkedData(it.first) }
+                .let { bookmarks ->
+                    if (!nsfwEnabled) {
+                        bookmarks.filterNot { NsfwFilterEngine.isNsfw(it, filterLevel) }
+                    } else {
+                        bookmarks
+                    }
+                }
                 .sortedBy { -it.latestUpdatedTime }
         }
         _bookmarks.postValue(Pair(true, list))

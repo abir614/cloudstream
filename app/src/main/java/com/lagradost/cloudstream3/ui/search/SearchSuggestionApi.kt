@@ -1,8 +1,11 @@
 package com.lagradost.cloudstream3.ui.search
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.mvvm.logError
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.nicehttp.NiceResponse
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,6 +41,7 @@ object SearchSuggestionApi {
      */
     suspend fun getSuggestions(query: String): List<String> {
         if (query.isBlank() || query.length < 2) return emptyList()
+        val nsfwEnabled = isNsfwGloballyEnabled()
         
         return try {
             val response = app.get(
@@ -45,12 +49,13 @@ object SearchSuggestionApi {
                 params = mapOf(
                     "api_key" to TMDB_API_KEY,
                     "query" to query,
-                    "language" to "en-US"
+                    "language" to "en-US",
+                    "include_adult" to if (nsfwEnabled) "true" else "false"
                 ),
                 cacheTime = 60 * 24  // Cache for 1 day (cacheUnit default is Minutes)
             )
             
-            parseSuggestions(response)
+            parseSuggestions(response, nsfwEnabled)
         } catch (e: Exception) {
             logError(e)
             emptyList()
@@ -59,14 +64,16 @@ object SearchSuggestionApi {
     
     /**
      * Parses the TMDB search response and extracts movie/TV show titles.
-     * Filters to only include movies, TV shows, and anime.
+     * Filters to only include movies, TV shows, and anime, screening against adult terms.
      */
-    private suspend fun parseSuggestions(response: NiceResponse): List<String> {
+    private suspend fun parseSuggestions(response: NiceResponse, nsfwEnabled: Boolean = isNsfwGloballyEnabled()): List<String> {
         return try {
+            val filterLevel = NsfwFilterEngine.getFilterLevel(CloudStreamApp.context)
             val parsed = response.parsed<TmdbSearchResult>()
             parsed.results
                 ?.filter { it.mediaType == "movie" || it.mediaType == "tv" }
                 ?.mapNotNull { it.title ?: it.name }
+                ?.filter { title -> nsfwEnabled || !NsfwFilterEngine.isNsfwText(title, filterLevel = filterLevel) }
                 ?.distinct()
                 ?.take(10)
                 ?: emptyList()

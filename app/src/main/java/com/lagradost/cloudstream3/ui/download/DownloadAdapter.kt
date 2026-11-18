@@ -17,8 +17,12 @@ import com.lagradost.cloudstream3.ui.NoStateAdapter
 import com.lagradost.cloudstream3.ui.ViewHolderState
 import com.lagradost.cloudstream3.ui.download.button.DownloadStatusTell
 import com.lagradost.cloudstream3.utils.AppContextUtils.getNameFull
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
+import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import com.lagradost.cloudstream3.utils.DataStoreHelper.getViewPos
+import com.lagradost.cloudstream3.utils.ImageLoader.applyCensoredPoster
 import com.lagradost.cloudstream3.utils.ImageLoader.loadImage
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.downloader.DownloadObjects
 
 const val DOWNLOAD_ACTION_PLAY_FILE = 0
@@ -102,8 +106,20 @@ class DownloadAdapter(
                 }
             }
 
+            val context = itemView.context
+            val isAdultAllowed = context.isNsfwEnabled()
+            val filterLevel = NsfwFilterEngine.getFilterLevel(context)
+            val isNsfw = NsfwFilterEngine.isNsfwText(data.name, data.url, filterLevel = filterLevel) ||
+                (data.poster?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true)
+
             downloadHeaderPoster.apply {
-                loadImage(data.poster)
+                if (!isAdultAllowed && isNsfw) {
+                    setImageResource(R.drawable.default_cover)
+                } else if (isAdultAllowed && shouldCensorPosters(context) && isNsfw) {
+                    applyCensoredPoster(this, data.poster)
+                } else {
+                    loadImage(data.poster)
+                }
                 if (isMultiDeleteState) {
                     setOnClickListener {
                         toggleIsChecked(deleteCheckbox, data.id)

@@ -44,11 +44,17 @@
 - [x] TV D-pad focus safety: ViewPager2 carousel and Leanback grid cells blank out without invalidating layout geometry or breaking focus navigation.
 
 ### Task 3: End-to-End Audit & Verification of Remaining UI Screens
-- [ ] Verify `QuickSearchFragment.kt` applies `NsfwFilterEngine.filterSearchResults` across all search result feeds.
-- [ ] Verify `LibraryViewModel.kt` filters synced library items against `NsfwFilterEngine.isNsfwText` when adult content is disabled.
-- [ ] Run full project audit checklist verification across all tracked files.
+- [x] Verify `QuickSearchFragment.kt` applies `NsfwFilterEngine.filterSearchResults` across all search result feeds.
+- [x] Verify `LibraryViewModel.kt` filters synced library items against `NsfwFilterEngine.isNsfwText` when adult content is disabled.
+- [x] Enforce adult screening on TMDB search suggestions (`SearchSuggestionApi.kt`) with `include_adult` parameter and title filtration.
+- [x] Enforce adult screening on search history in `SearchViewModel.kt` (`updateHistory`).
+- [x] Enforce adult screening on home feed bookmarks and continue-watching in `HomeViewModel.kt`.
+- [x] Guard `ResultViewModel2.kt:load()` against direct adult provider or adult title entry when NSFW is disabled.
+- [x] Censor adult downloaded posters in `DownloadAdapter.kt`.
+- [x] Run full project audit checklist verification across all tracked files.
 
 ### Task 4: CI Build & Deployment Verification
-- [ ] Monitor GitHub Actions CI pipeline for Build #368 (`51b474d`).
-- [ ] Confirm 100% green passing status across Pre-release, Security Audit, CodeQL, and Dependency Submission.
-- [ ] Verify live Telegram telemetry feed (`https://t.me/s/cloudstreamdata`) for zero new crash reports.
+- [x] Monitor GitHub Actions CI pipeline for Build #369 (`5d82b01`).
+- [x] Confirm 100% green passing status across Pre-release, Security Audit, CodeQL, and Dependency Submission for Build #369.
+- [x] Verify live Telegram telemetry feed (`https://t.me/s/cloudstreamdata`) for zero new crash reports (Post #1213 verified from Build #366).
+- [ ] Monitor GitHub Actions CI pipeline for Build #370.
