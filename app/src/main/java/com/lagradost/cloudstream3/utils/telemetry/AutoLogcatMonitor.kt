@@ -202,6 +202,11 @@ object AutoLogcatMonitor {
             message.contains("Failed to get isDeclared for", ignoreCase = true) ||
             message.contains("updateBlastSurfaceIfNeeded", ignoreCase = true) ||
             message.contains("slideSceneEnd unknown scene", ignoreCase = true) ||
+            message.contains("missed Gc histogram windows", ignoreCase = true) ||
+            message.contains("usap_pool_primary", ignoreCase = true) ||
+            message.contains("primary.prof", ignoreCase = true) ||
+            message.contains("READ_DEVICE_CONFIG", ignoreCase = true) ||
+            message.contains("Failed to resolve or verify SHA256SUMS", ignoreCase = true) ||
             message.contains("uahInit enter", ignoreCase = true)
     }
 
@@ -295,7 +300,13 @@ object AutoLogcatMonitor {
                             return
                         }
 
-                        // App-Origin Immunity: Any log originating from CloudStream, plugins, or containing
+                        // Strict noise rejection: system framework, OS runtime, and known benign messages
+                        // are ALWAYS filtered out, even if the OS logcat line quotes the application package name.
+                        if (isNoiseTag(currentTag) || isNoiseMessage(fullMessage)) {
+                            return
+                        }
+
+                        // App-Origin Immunity: Any non-noise log originating from CloudStream, plugins, or containing
                         // an actionable exception stack trace is ALWAYS preserved for debugging.
                         val isFirstPartyAppLog = currentTag.contains("cloudstream", ignoreCase = true) ||
                             currentTag == "ApiError" ||
@@ -303,12 +314,7 @@ object AutoLogcatMonitor {
                             (fullMessage.contains("Exception") && fullMessage.contains("at "))
 
                         if (!isFirstPartyAppLog) {
-                            if (isNoiseTag(currentTag)) {
-                                return
-                            }
-
-                            // Filter out common benign spam messages
-                            if (isNoiseMessage(fullMessage)) return
+                            if (currentLevel < TelemetryService.Level.ERROR) return
                         }
 
                         // Record forensic breadcrumb

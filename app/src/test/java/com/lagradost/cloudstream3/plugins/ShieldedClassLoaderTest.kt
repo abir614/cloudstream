@@ -79,4 +79,24 @@ class ShieldedClassLoaderTest {
             assertTrue("Expected slash notation $name to be blocked", ShieldedClassLoader.isBlocked(name))
         }
     }
+
+    @Test
+    fun `test RepositoryManager isSafeRepositoryUrl enforces security boundary against SSRF and local probing`() {
+        // Block dangerous schemes
+        assertFalse(RepositoryManager.isSafeRepositoryUrl("file:///etc/passwd", allowLocalInDebug = false))
+        assertFalse(RepositoryManager.isSafeRepositoryUrl("javascript:alert(1)", allowLocalInDebug = false))
+        assertFalse(RepositoryManager.isSafeRepositoryUrl("content://media/external/images", allowLocalInDebug = false))
+        assertFalse(RepositoryManager.isSafeRepositoryUrl("data:text/html;base64,PHNjcmlwdD4=", allowLocalInDebug = false))
+
+        // Block loopback and local probing
+        assertFalse(RepositoryManager.isSafeRepositoryUrl("http://localhost:8080/repo.json", allowLocalInDebug = false))
+        assertFalse(RepositoryManager.isSafeRepositoryUrl("http://127.0.0.1:8080/repo.json", allowLocalInDebug = false))
+        assertFalse(RepositoryManager.isSafeRepositoryUrl("http://192.168.1.1/repo.json", allowLocalInDebug = false))
+        assertFalse(RepositoryManager.isSafeRepositoryUrl("http://10.0.0.1/repo.json", allowLocalInDebug = false))
+        assertFalse(RepositoryManager.isSafeRepositoryUrl("http://169.254.169.254/latest/meta-data/", allowLocalInDebug = false))
+
+        // Allow legitimate public HTTPS repositories
+        assertTrue(RepositoryManager.isSafeRepositoryUrl("https://raw.githubusercontent.com/self-similarity/MegaRepo/builds/repo.json", allowLocalInDebug = false))
+        assertTrue(RepositoryManager.isSafeRepositoryUrl("https://cdn.jsdelivr.net/gh/user/repo@main/repo.json", allowLocalInDebug = false))
+    }
 }

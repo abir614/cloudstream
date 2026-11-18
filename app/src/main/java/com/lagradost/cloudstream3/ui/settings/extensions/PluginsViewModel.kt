@@ -79,14 +79,8 @@ class PluginsViewModel : ViewModel() {
             canUseCache: Boolean = true
         ): List<PluginWrapper> {
             Log.i(TAG, "getPlugins = $repository")
-            if (canUseCache && repositoryCache.containsKey(repository.url)) {
-                repositoryCache[repository.url]?.let {
-                    return it
-                }
-            }
-
-            return RepositoryManager.getRepoPlugins(repository)
-                ?.also { repositoryCache[repository.url] = it } ?: emptyList()
+            return RepositoryManager.getRepoPlugins(repository, forceRefresh = !canUseCache)
+                ?: emptyList()
         }
 
         /**
@@ -210,20 +204,35 @@ class PluginsViewModel : ViewModel() {
             .getStringSet(context.getString(R.string.prefer_media_type_key), emptySet())
             ?.contains(TvType.NSFW.ordinal.toString()) == true
 
-        val plugins = repositories.flatMap { repositoryUrl ->
-            getPlugins(repositoryUrl)
+        val accumulated = java.util.Collections.synchronizedList(mutableListOf<PluginViewData>())
+        val seenUrls = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+        // Fetch repositories concurrently with progressive async streaming
+        repositories.amap { repository ->
+            val repoPlugins = getPlugins(repository)
+            val filtered = repoPlugins.filter {
+                it.plugin.tvTypes?.contains(TvType.NSFW.name) != true || isAdult
+            }.map { plugin ->
+                PluginViewData(plugin, isDownloaded(context, plugin.plugin.internalName, plugin.repositoryData.url))
+            }.filter {
+                seenUrls.add(it.pluginWrapper.plugin.url)
+            }
+
+            if (filtered.isNotEmpty()) {
+                accumulated.addAll(filtered)
+                val snapshot = synchronized(accumulated) { accumulated.toList() }
+                this.plugins = snapshot
+                _filteredPlugins.postValue(
+                    false to snapshot.filterTvTypes().filterLang().sortByQuery(currentQuery)
+                )
+            }
         }
 
-        val list = plugins.filter {
-            // Show all non-nsfw plugins or all if nsfw is enabled
-            it.plugin.tvTypes?.contains(TvType.NSFW.name) != true || isAdult
-        }.map { plugin ->
-            PluginViewData(plugin, isDownloaded(context, plugin.plugin.internalName, plugin.repositoryData.url))
-        }
-
-        this.plugins = list
+        // Final consolidated dispatch ensures complete list is presented
+        val finalSnapshot = synchronized(accumulated) { accumulated.toList() }
+        this.plugins = finalSnapshot
         _filteredPlugins.postValue(
-            false to list.filterTvTypes().filterLang().sortByQuery(currentQuery)
+            false to finalSnapshot.filterTvTypes().filterLang().sortByQuery(currentQuery)
         )
     }
 

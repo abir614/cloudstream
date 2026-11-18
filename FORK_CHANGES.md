@@ -846,3 +846,17 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Tracks 100% genuine, proportional progress directly from actual items processed: Phase 1 (metadata scanning) accounts for 0%–20%, and Phase 2 (viewport image loading & scoring) accounts for 20%–100%.
   - Clamped individual image request timeouts to 2000ms and added an overall 2200ms grace deadline (`withTimeoutOrNull(2200L)`), guaranteeing that slow CDN servers never stall UI rendering.
 
+### 16.40 Multi-Repository Progressive Async Streaming, Event Propagation & Telemetry Hygiene
+- **Multi-Repository & Nested Sub-Repository Resolution ([`RepositoryManager.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/RepositoryManager.kt), [`ExtensionsFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/extensions/ExtensionsFragment.kt))**:
+  - Extended repository parsing to support JSON collections, multi-repo arrays (`[ { name, url }, ... ]`), and manifests declaring nested `repositories` or `subRepositories` (e.g. MegaRepo / shortcode collections).
+  - Implemented `addRepositories` batch registration, eliminating sequential round-trips when multiple repositories are declared.
+  - Automatically triggers `afterRepositoryLoadedEvent` upon any repository mutation, ensuring the extensions screen reloads dynamically without requiring users to navigate away and return.
+- **Progressive Async Plugin Streaming & Unified Memory Cache ([`PluginsViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/extensions/PluginsViewModel.kt), [`RepositoryManager.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/RepositoryManager.kt))**:
+  - Migrated repository plugin fetching from sequential `flatMap` to parallel `amap` execution with progressive live-data emission. As each repository completes, its plugins immediately render on screen, eliminating blank-screen stalls during large repository downloads.
+  - Introduced unified `repoPluginsCache` with 5-minute TTL and per-list timeouts (`withTimeout(12000L)`), sharing fetched results across `PluginsViewModel`, `ExtensionsViewModel`, and UI fragments.
+- **SSRF & Loopback Isolation Firewall ([`RepositoryManager.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/RepositoryManager.kt), [`ShieldedClassLoaderTest.kt`](app/src/test/java/com/lagradost/cloudstream3/plugins/ShieldedClassLoaderTest.kt))**:
+  - Enforced `isSafeRepositoryUrl` validation across all repository and plugin URLs, strictly blocking private subnet probing (`127.0.0.1`, `localhost`, `10.0.0.0/8`, `192.168.0.0/16`, `172.16.0.0/12`, `169.254.0.0/16`) and unsafe URI schemes (`file://`, `javascript:`, `content:`).
+- **Logcat Noise Suppression & InAppUpdater Timeout Filtering ([`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt), [`InAppUpdater.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/InAppUpdater.kt))**:
+  - Re-ordered logcat filtering to guarantee that OS runtime notices (ART profiles, GC histogram adjustments, Zygote USAP pool SELinux audit logs, `InteractionJankMonitor` permission checks) are suppressed regardless of whether the log mentions the app package name.
+  - Downgraded transient `SocketTimeoutException` and `UnknownHostException` during background `SHA256SUMS` checks to debug level (`Log.d`), eliminating false-positive system warnings.
+

@@ -129,7 +129,11 @@ object InAppUpdater {
                 line.contains(targetAssetFileName)
             }?.split("""\s+""".toRegex())?.firstOrNull()?.trim()?.lowercase()
         } catch (e: Throwable) {
-            Log.w(LOG_TAG, "Failed to resolve or verify SHA256SUMS: $e")
+            if (e is java.net.SocketTimeoutException || e is java.net.UnknownHostException || e is java.io.IOException) {
+                Log.d(LOG_TAG, "Transient network timeout checking SHA256SUMS: $e")
+            } else {
+                Log.w(LOG_TAG, "Failed to resolve or verify SHA256SUMS: $e")
+            }
             null
         }
     }

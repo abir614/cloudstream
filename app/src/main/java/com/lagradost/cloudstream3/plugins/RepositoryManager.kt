@@ -17,8 +17,11 @@ import com.lagradost.cloudstream3.plugins.PluginManager.getPluginSanitizedFileNa
 import com.lagradost.cloudstream3.plugins.PluginManager.unloadPlugin
 import com.lagradost.cloudstream3.ui.settings.extensions.REPOSITORIES_KEY
 import com.lagradost.cloudstream3.ui.settings.extensions.RepositoryData
+import com.lagradost.cloudstream3.MainActivity
+import com.lagradost.cloudstream3.utils.Coroutines.main
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -26,6 +29,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -38,6 +42,8 @@ data class Repository(
     @JsonProperty("description") @SerialName("description") val description: String? = null,
     @JsonProperty("manifestVersion") @SerialName("manifestVersion") val manifestVersion: Int = 1,
     @JsonProperty("pluginLists") @SerialName("pluginLists") val pluginLists: List<String> = emptyList(),
+    @JsonProperty("repositories") @SerialName("repositories") val repositories: List<RepositoryData> = emptyList(),
+    @JsonProperty("subRepositories") @SerialName("subRepositories") val subRepositories: List<String> = emptyList(),
 )
 
 /**
@@ -130,9 +136,41 @@ object RepositoryManager {
         return "https://cdn.jsdelivr.net/gh/$user/$repo@$rest"
     }
 
+    /**
+     * Enforces the App Isolation & Security boundary.
+     * Prevents SSRF attacks and loopback/private subnet probing via malicious repository links.
+     */
+    fun isSafeRepositoryUrl(url: String, allowLocalInDebug: Boolean = true): Boolean {
+        val trimmed = url.trim()
+        val lower = trimmed.lowercase()
+        if (!lower.startsWith("https://") && !lower.startsWith("http://")) {
+            return false
+        }
+        if (allowLocalInDebug && com.lagradost.cloudstream3.BuildConfig.DEBUG) return true
+
+        return try {
+            val uri = java.net.URI(trimmed)
+            val host = uri.host?.lowercase() ?: return false
+            if (host == "localhost" || host == "127.0.0.1" || host == "::1" || host.endsWith(".local") || host.endsWith(".internal")) {
+                return false
+            }
+            val parts = host.split(".")
+            if (parts.size == 4 && parts.all { it.toIntOrNull() != null }) {
+                val ip0 = parts[0].toInt()
+                val ip1 = parts[1].toInt()
+                if (ip0 == 10 || ip0 == 127 || (ip0 == 192 && ip1 == 168) || (ip0 == 172 && ip1 in 16..31) || (ip0 == 169 && ip1 == 254) || ip0 == 0) {
+                    return false
+                }
+            }
+            true
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     suspend fun parseRepoUrl(url: String): String? {
         val fixedUrl = url.trim()
-        return if (fixedUrl.contains("^https?://".toRegex())) {
+        val candidate = if (fixedUrl.contains("^https?://".toRegex())) {
             fixedUrl
         } else if (fixedUrl.contains("^(cloudstreamrepo://)|(https://cs\\.repo/\\??)".toRegex())) {
             fixedUrl.replace("^(cloudstreamrepo://)|(https://cs\\.repo/\\??)".toRegex(), "").let {
@@ -144,22 +182,25 @@ object RepositoryManager {
             safeAsync {
                 if (fixedUrl.startsWith("!")) {
                     val response = app.get("https://py.md/${fixedUrl.removePrefix("!")}", allowRedirects = false)
-                    val url = response.headers["Location"] ?: return@safeAsync null
-                    if (url.startsWith("https://py.md/404")) return@safeAsync null
-                    if (url.removeSuffix("/") == "https://py.md") return@safeAsync null
-                    return@safeAsync url
+                    val loc = response.headers["Location"] ?: return@safeAsync null
+                    if (loc.startsWith("https://py.md/404")) return@safeAsync null
+                    if (loc.removeSuffix("/") == "https://py.md") return@safeAsync null
+                    return@safeAsync loc
                 } else {
                     val response = app.get("https://cutt.ly/${fixedUrl}", allowRedirects = false)
-                    val url = response.headers["Location"] ?: return@safeAsync null
-                    if (url.startsWith("https://cutt.ly/404")) return@safeAsync null
-                    if (url.removeSuffix("/") == "https://cutt.ly") return@safeAsync null
-                    return@safeAsync url
+                    val loc = response.headers["Location"] ?: return@safeAsync null
+                    if (loc.startsWith("https://cutt.ly/404")) return@safeAsync null
+                    if (loc.removeSuffix("/") == "https://cutt.ly") return@safeAsync null
+                    return@safeAsync loc
                 }
             }
         } else null
+
+        return candidate?.takeIf { isSafeRepositoryUrl(it) }
     }
 
     suspend fun parseRepository(url: String): Repository? {
+        if (!isSafeRepositoryUrl(url)) return null
         return safeAsync {
             // Take manifestVersion and such into account later
             val res = app.get(convertRawGitUrl(url), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
@@ -173,7 +214,7 @@ object RepositoryManager {
                 return@safeAsync null
             }
             val repo = res.parsedSafe<Repository>()
-            if (repo == null || repo.name.isBlank() || repo.pluginLists.isEmpty()) {
+            if (repo == null || (repo.name.isBlank() && repo.pluginLists.isEmpty() && repo.repositories.isEmpty() && repo.subRepositories.isEmpty())) {
                 Log.w("RepositoryManager", "Repository from $url is invalid or has empty plugin list")
                 return@safeAsync null
             }
@@ -181,7 +222,57 @@ object RepositoryManager {
         }
     }
 
+    /**
+     * Parses a repository URL that may contain multiple repositories, either as a JSON array
+     * `[ { "name": "...", "url": "..." }, ... ]` or as a manifest declaring `repositories` / `subRepositories`.
+     */
+    suspend fun parseMultiRepositories(url: String): List<RepositoryData> {
+        if (!isSafeRepositoryUrl(url)) return emptyList()
+        return safeAsync {
+            val res = app.get(convertRawGitUrl(url), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
+            if (!res.isSuccessful) {
+                res.okhttpResponse.close()
+                return@safeAsync emptyList()
+            }
+            val text = res.text.trim()
+            if (text.startsWith("[")) {
+                // Direct JSON array of RepositoryData
+                val directList = res.parsedSafe<Array<RepositoryData>>()?.toList()
+                if (!directList.isNullOrEmpty()) {
+                    return@safeAsync directList.filter { isSafeRepositoryUrl(it.url) }
+                }
+                // Or JSON array of Repository
+                val repoList = res.parsedSafe<Array<Repository>>()?.toList()
+                if (!repoList.isNullOrEmpty()) {
+                    return@safeAsync repoList.mapNotNull {
+                        if (it.name.isNotBlank() && isSafeRepositoryUrl(it.iconUrl ?: url)) {
+                            RepositoryData(it.iconUrl, it.name, url)
+                        } else null
+                    }
+                }
+            } else if (text.startsWith("{")) {
+                val repo = res.parsedSafe<Repository>()
+                if (repo != null) {
+                    val result = mutableListOf<RepositoryData>()
+                    result.addAll(repo.repositories.filter { isSafeRepositoryUrl(it.url) })
+                    if (repo.subRepositories.isNotEmpty()) {
+                        val subRepos = repo.subRepositories.amap { subUrl ->
+                            if (isSafeRepositoryUrl(subUrl)) {
+                                val sub = parseRepository(subUrl)
+                                if (sub != null) RepositoryData(sub.iconUrl, sub.name, subUrl) else null
+                            } else null
+                        }.filterNotNull()
+                        result.addAll(subRepos)
+                    }
+                    return@safeAsync result
+                }
+            }
+            emptyList()
+        } ?: emptyList()
+    }
+
     private suspend fun parsePlugins(pluginUrls: String): List<SitePlugin> {
+        if (!isSafeRepositoryUrl(pluginUrls)) return emptyList()
         // Take manifestVersion and such into account later
         return try {
             val res = app.get(convertRawGitUrl(pluginUrls), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
@@ -201,16 +292,40 @@ object RepositoryManager {
         }
     }
 
+    // Unified in-memory cache with 5-minute TTL to share loaded repository plugins across ViewModels and UI
+    private val repoPluginsCache = ConcurrentHashMap<String, Pair<Long, List<PluginWrapper>>>()
+    private const val CACHE_DURATION_MS = 5 * 60 * 1000L
+
     /**
-     * Gets all plugins from repositories and pairs them with the repository url
+     * Gets all plugins from repositories and pairs them with the repository url.
+     * Uses memory cache and resilient timeouts so slow or dead URLs do not break big repositories.
      */
-    suspend fun getRepoPlugins(repositoryData: RepositoryData): List<PluginWrapper>? {
+    suspend fun getRepoPlugins(repositoryData: RepositoryData, forceRefresh: Boolean = false): List<PluginWrapper>? {
+        if (!isSafeRepositoryUrl(repositoryData.url)) return null
+
+        if (!forceRefresh) {
+            val cached = repoPluginsCache[repositoryData.url]
+            if (cached != null && (System.currentTimeMillis() - cached.first) < CACHE_DURATION_MS) {
+                return cached.second
+            }
+        }
+
         val repo = parseRepository(repositoryData.url) ?: return null
         val list = repo.pluginLists.amap { url ->
-            parsePlugins(url).map {
-                PluginWrapper(repo, repositoryData, it)
+            if (!isSafeRepositoryUrl(url)) return@amap emptyList()
+            try {
+                withTimeout(12000L) {
+                    parsePlugins(url).map {
+                        PluginWrapper(repo, repositoryData, it)
+                    }
+                }
+            } catch (t: Throwable) {
+                Log.w("RepositoryManager", "Timeout or failure fetching plugin list from $url: $t")
+                emptyList()
             }
         }.flatten()
+
+        repoPluginsCache[repositoryData.url] = Pair(System.currentTimeMillis(), list)
         return list
     }
 
@@ -299,11 +414,28 @@ object RepositoryManager {
 
     // Don't want to read before we write in another thread
     private val repoLock = Mutex()
+
     suspend fun addRepository(repository: RepositoryData) {
+        if (!isSafeRepositoryUrl(repository.url)) return
         repoLock.withLock {
             val currentRepos = getRepositories()
             // No duplicates
             setKey(REPOSITORIES_KEY, (currentRepos + repository).distinctBy { it.url })
+        }
+        main {
+            MainActivity.afterRepositoryLoadedEvent.invoke(true)
+        }
+    }
+
+    suspend fun addRepositories(repositories: List<RepositoryData>) {
+        val valid = repositories.filter { isSafeRepositoryUrl(it.url) }
+        if (valid.isEmpty()) return
+        repoLock.withLock {
+            val currentRepos = getRepositories()
+            setKey(REPOSITORIES_KEY, (currentRepos + valid).distinctBy { it.url })
+        }
+        main {
+            MainActivity.afterRepositoryLoadedEvent.invoke(true)
         }
     }
 
@@ -318,6 +450,10 @@ object RepositoryManager {
             // No duplicates
             val newRepos = currentRepos.filter { it.url != repository.url }
             setKey(REPOSITORIES_KEY, newRepos)
+        }
+        repoPluginsCache.remove(repository.url)
+        main {
+            MainActivity.afterRepositoryLoadedEvent.invoke(true)
         }
 
         val file = File(

@@ -292,34 +292,47 @@ class ExtensionsFragment : BaseFragment<FragmentExtensionsBinding>(
                             showToast(R.string.error_invalid_data, Toast.LENGTH_SHORT)
                             return@ioSafe
                         }
+                        val multiRepos = RepositoryManager.parseMultiRepositories(url)
                         val repository = RepositoryManager.parseRepository(url)
 
                         // Exit if wrong repository
-                        if (repository == null) {
+                        if (repository == null && multiRepos.isEmpty()) {
                             showToast(R.string.no_repository_found_error, Toast.LENGTH_LONG)
                             return@ioSafe
                         }
 
-                        val fixedName = if (!name.isNullOrBlank()) name
-                        else repository.name
-                        val newRepo = RepositoryData(repository.iconUrl, fixedName, url)
-                        RepositoryManager.addRepository(newRepo)
-                        extensionViewModel.loadStats()
-                        extensionViewModel.loadRepositories()
+                        val toAdd = mutableListOf<RepositoryData>()
+                        if (repository != null) {
+                            val fixedName = if (!name.isNullOrBlank()) name else repository.name
+                            toAdd.add(RepositoryData(repository.iconUrl, fixedName, url))
+                            toAdd.addAll(repository.repositories)
+                        }
+                        toAdd.addAll(multiRepos)
 
-                        dialog.dismissSafe(activity) // Only dismiss if the repo was added
+                        val finalRepos = toAdd.distinctBy { it.url }
+                        RepositoryManager.addRepositories(finalRepos)
 
-                        val plugins = RepositoryManager.getRepoPlugins(newRepo)
-                        if (plugins.isNullOrEmpty()) {
-                            showToast(R.string.no_plugins_found_error, Toast.LENGTH_LONG)
-                            return@ioSafe
+                        main {
+                            dialog.dismissSafe(activity)
+                            reloadRepositories()
                         }
 
-                        this@ExtensionsFragment.activity?.addRepositoryDialog(
-                            newRepo
-                        )
+                        val primaryRepo = finalRepos.firstOrNull()
+                        if (primaryRepo != null) {
+                            val plugins = RepositoryManager.getRepoPlugins(primaryRepo)
+                            if (plugins.isNullOrEmpty()) {
+                                showToast(R.string.no_plugins_found_error, Toast.LENGTH_LONG)
+                                return@ioSafe
+                            }
+
+                            this@ExtensionsFragment.activity?.addRepositoryDialog(
+                                primaryRepo
+                            )
+                        }
                     } finally {
-                        binding.applyBtt.hideProgress()
+                        main {
+                            binding.applyBtt.hideProgress()
+                        }
                     }
                 }
             }

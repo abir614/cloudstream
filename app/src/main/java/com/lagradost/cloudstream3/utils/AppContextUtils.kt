@@ -376,21 +376,29 @@ object AppContextUtils {
 
     fun Activity.loadRepository(url: String) {
         ioSafe {
-            val repo = RepositoryManager.parseRepository(url) ?: return@ioSafe
-            val data = RepositoryData(
-                repo.iconUrl ?: "",
-                repo.name,
-                url
-            )
-            RepositoryManager.addRepository(data)
+            val multiRepos = RepositoryManager.parseMultiRepositories(url)
+            val repo = RepositoryManager.parseRepository(url)
+            if (repo == null && multiRepos.isEmpty()) return@ioSafe
+
+            val toAdd = mutableListOf<RepositoryData>()
+            if (repo != null) {
+                toAdd.add(RepositoryData(repo.iconUrl ?: "", repo.name, url))
+                toAdd.addAll(repo.repositories)
+            }
+            toAdd.addAll(multiRepos)
+
+            val distinct = toAdd.distinctBy { it.url }
+            RepositoryManager.addRepositories(distinct)
+
+            val primary = distinct.firstOrNull() ?: return@ioSafe
             main {
                 showToast(
-                    getString(R.string.player_loaded_subtitles, repo.name),
+                    getString(R.string.player_loaded_subtitles, primary.name),
                     Toast.LENGTH_LONG
                 )
             }
             afterRepositoryLoadedEvent.invoke(true)
-            addRepositoryDialog(data)
+            addRepositoryDialog(primary)
         }
     }
 
