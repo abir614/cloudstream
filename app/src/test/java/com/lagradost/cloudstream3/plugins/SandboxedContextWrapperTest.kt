@@ -2,6 +2,7 @@ package com.lagradost.cloudstream3.plugins
 
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.SharedPreferences
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -23,6 +24,8 @@ class SandboxedContextWrapperTest {
         private val files: File,
         private val cache: File
     ) : ContextWrapper(null) {
+        val requestedPrefNames = mutableListOf<String>()
+
         override fun getFilesDir(): File = files
         override fun getCacheDir(): File = cache
         override fun getApplicationContext(): Context = this
@@ -35,6 +38,40 @@ class SandboxedContextWrapperTest {
                 "ClipboardManager" -> Context.CLIPBOARD_SERVICE
                 "LocationManager" -> Context.LOCATION_SERVICE
                 else -> null
+            }
+        }
+
+        override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
+            requestedPrefNames.add(name)
+            return FakeSharedPreferences(name)
+        }
+
+        private class FakeSharedPreferences(val name: String) : SharedPreferences {
+            private val data = mutableMapOf<String, Any?>()
+            override fun getAll(): Map<String, *> = data
+            override fun getString(key: String?, defValue: String?): String? = (data[key] as? String) ?: defValue
+            override fun getStringSet(key: String?, defValues: Set<String>?): Set<String>? = (data[key] as? Set<String>) ?: defValues
+            override fun getInt(key: String?, defValue: Int): Int = (data[key] as? Int) ?: defValue
+            override fun getLong(key: String?, defValue: Long): Long = (data[key] as? Long) ?: defValue
+            override fun getFloat(key: String?, defValue: Float): Float = (data[key] as? Float) ?: defValue
+            override fun getBoolean(key: String?, defValue: Boolean): Boolean = (data[key] as? Boolean) ?: defValue
+            override fun contains(key: String?): Boolean = data.containsKey(key)
+            override fun edit(): SharedPreferences.Editor = FakeEditor(data)
+            override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+            override fun unregisterOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener?) {}
+
+            private class FakeEditor(private val data: MutableMap<String, Any?>) : SharedPreferences.Editor {
+                private val temp = mutableMapOf<String, Any?>()
+                override fun putString(key: String?, value: String?) = apply { key?.let { temp[it] = value } }
+                override fun putStringSet(key: String?, values: Set<String>?) = apply { key?.let { temp[it] = values } }
+                override fun putInt(key: String?, value: Int) = apply { key?.let { temp[it] = value } }
+                override fun putLong(key: String?, value: Long) = apply { key?.let { temp[it] = value } }
+                override fun putFloat(key: String?, value: Float) = apply { key?.let { temp[it] = value } }
+                override fun putBoolean(key: String?, value: Boolean) = apply { key?.let { temp[it] = value } }
+                override fun remove(key: String?) = apply { key?.let { temp.remove(it); data.remove(it) } }
+                override fun clear() = apply { temp.clear(); data.clear() }
+                override fun commit(): Boolean { data.putAll(temp); return true }
+                override fun apply() { data.putAll(temp) }
             }
         }
     }
@@ -230,5 +267,8 @@ class SandboxedContextWrapperTest {
     fun `test getSharedPreferences safely isolates default rebuild_preference`() {
         val prefs = sandboxedContext.getSharedPreferences("rebuild_preference", Context.MODE_PRIVATE)
         assertNotNull(prefs)
+        val fakeHost = fakeBaseContext as FakeContext
+        assertTrue(fakeHost.requestedPrefNames.any { it.contains("default_prefs") })
+        assertFalse(fakeHost.requestedPrefNames.contains("rebuild_preference"))
     }
 }
