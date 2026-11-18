@@ -533,7 +533,7 @@ class HomeViewModel : ViewModel() {
                         !isMemCached || !isDiskCached || (shouldFilter && !isScored)
                     }
                 } else {
-                    val initialLimit = budget.initialPosterLimit.coerceIn(4, 8)
+                    val initialLimit = budget.viewportPreloadCount.coerceIn(4, 8)
                     val initialVisibleTargets = (bannerItems + allRailItems.take(initialLimit)).distinctBy { it.posterUrl }
                     initialVisibleTargets.filter { target ->
                         val isMemCached = try {

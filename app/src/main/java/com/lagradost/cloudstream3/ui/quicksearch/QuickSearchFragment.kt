@@ -39,6 +39,8 @@ import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterProviderByPreferredMedia
 import com.lagradost.cloudstream3.utils.AppContextUtils.filterSearchResultByFilmQuality
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.isRecyclerScrollable
 import com.lagradost.cloudstream3.utils.AppContextUtils.ownHide
 import com.lagradost.cloudstream3.utils.AppContextUtils.ownShow
@@ -224,10 +226,12 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
                 // https://stackoverflow.com/questions/6866238/concurrent-modification-exception-adding-to-an-arraylist
                 listLock.lock()
                 (binding.quickSearchMasterRecycler.adapter as? ParentItemAdapter)?.apply {
+                    val isAdultAllowed = context?.isNsfwEnabled() ?: false
                     val newItems = list.map { ongoing ->
                         val dataList = ongoing.value.list
+                        val nsfwFiltered = NsfwFilterEngine.filterSearchResults(dataList, isAdultAllowed)
                         val dataListFiltered =
-                            context?.filterSearchResultByFilmQuality(dataList) ?: dataList
+                            context?.filterSearchResultByFilmQuality(nsfwFiltered) ?: nsfwFiltered
 
                         val homePageList = HomePageList(
                             ongoing.key,
@@ -275,8 +279,10 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
                     it.value.let { data ->
                         val adapter =
                             (binding.quickSearchAutofitResults.adapter as? SearchAdapter)
+                        val isAdultAllowed = context?.isNsfwEnabled() ?: false
+                        val nsfwFiltered = NsfwFilterEngine.filterSearchResults(data.list, isAdultAllowed)
                         adapter?.submitList(
-                            context?.filterSearchResultByFilmQuality(data.list) ?: data.list
+                            context?.filterSearchResultByFilmQuality(nsfwFiltered) ?: nsfwFiltered
                         )
                         adapter?.hasNext = data.hasNext
                     }

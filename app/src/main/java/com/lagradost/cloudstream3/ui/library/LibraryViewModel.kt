@@ -15,6 +15,8 @@ import com.lagradost.cloudstream3.syncproviders.SyncAPI
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.utils.DataStoreHelper.currentAccount
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 
 enum class ListSorting(@StringRes val stringRes: Int) {
     Query(R.string.none),
@@ -113,10 +115,17 @@ class LibraryViewModel : ViewModel() {
                 sortingMethods = library.supportedListSorting.toList()
                 repo.requireLibraryRefresh = false
 
-                val pages = library.allLibraryLists.map {
+                val isAdultAllowed = isNsfwGloballyEnabled()
+                val filterLevel = NsfwFilterEngine.getFilterLevel()
+                val pages = library.allLibraryLists.map { list ->
+                    val filteredItems = if (!isAdultAllowed) {
+                        list.items.filterNot { item -> NsfwFilterEngine.isNsfw(item, filterLevel) }
+                    } else {
+                        list.items
+                    }
                     SyncAPI.Page(
-                        it.name,
-                        it.items
+                        list.name,
+                        filteredItems
                     )
                 }
 

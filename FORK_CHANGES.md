@@ -896,6 +896,9 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **Active TFLite Neural Classification on Low-End Hardware ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
   - Recalibrated `isDeviceUnderMemoryPressure` so that low-end devices with 100MB+ available RAM no longer bypass the 5MB TFLite model. TFLite executes safely (<1MB RAM footprint) and accurately classifies `CLASS_HENTAI`.
   - Calibrated `isSkinTone` and `analyzeFastMetrics` with enhanced pale/cel-shaded anime tone detection, and eliminated false-positive `0.0f` safe score caching on image network timeouts.
+- **Cross-Screen Adult Content Barrier ([`QuickSearchFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/quicksearch/QuickSearchFragment.kt), [`LibraryViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/library/LibraryViewModel.kt), [`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Bound `viewportPreloadCount` on `DynamicResourceBudget` for mid and flagship viewport limits.
+  - Extended adult content filtration across QuickSearch and synchronized Library lists: items in `QuickSearchFragment` and account-synced items (MAL, AniList) in `LibraryViewModel` are strictly filtered against `NsfwFilterEngine.isNsfw` when adult content is disabled.
 
 
 
