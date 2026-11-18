@@ -76,6 +76,8 @@ import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
 import com.lagradost.cloudstream3.ui.settings.Globals.PHONE
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.utils.AppContextUtils.isRtl
@@ -696,14 +698,66 @@ object UIHelper {
     ) {
         if (!isLayout(com.lagradost.cloudstream3.ui.settings.Globals.TV)) return
 
-        // Prevent all ancestor containers from clipping the enlarged/hovering card
+        // Prevent all ancestor containers from clipping the enlarged/hovering card,
+        // and find ancestor containers (enclosing row and horizontal list) to hoist their
+        // translationZ above adjacent rows during vertical D-pad navigation.
         var currentParent = this.parent as? ViewGroup
         var depth = 0
+        var horizontalContainer: View? = null
+        var rowContainer: View? = null
+
         while (currentParent != null && depth < 8) {
             currentParent.clipChildren = false
             currentParent.clipToPadding = false
-            currentParent = currentParent.parent as? ViewGroup
+
+            val grandParent = currentParent.parent
+            if (grandParent is RecyclerView) {
+                val lm = grandParent.layoutManager
+                val isVertical = when (lm) {
+                    is LinearLayoutManager -> lm.orientation == RecyclerView.VERTICAL
+                    else -> true
+                }
+                if (isVertical && rowContainer == null) {
+                    rowContainer = currentParent
+                }
+            } else if (currentParent is RecyclerView && (currentParent.layoutManager as? LinearLayoutManager)?.orientation == RecyclerView.HORIZONTAL) {
+                if (horizontalContainer == null) {
+                    horizontalContainer = currentParent
+                }
+            }
+
+            currentParent = grandParent as? ViewGroup
             depth++
+        }
+
+        // Hoist the entire parent row and horizontal rail above adjacent rows so that
+        // vertical jumps (upper <-> down) never paint the adjacent line over the zoomed card.
+        if (hasFocus) {
+            val rowTargetZ = (elevation * 0.7f).coerceAtLeast(16f)
+            horizontalContainer?.animate()?.cancel()
+            horizontalContainer?.translationZ = rowTargetZ
+
+            rowContainer?.animate()?.cancel()
+            rowContainer?.translationZ = rowTargetZ
+        } else {
+            val targetContainer = rowContainer
+            val targetHorizontal = horizontalContainer
+            val anchorView = targetContainer ?: targetHorizontal ?: this
+            anchorView.post {
+                val hasAnyFocus = targetContainer?.hasFocus() == true || targetHorizontal?.hasFocus() == true
+                if (!hasAnyFocus) {
+                    targetContainer?.animate()
+                        ?.translationZ(0f)
+                        ?.setDuration(duration)
+                        ?.setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
+                        ?.start()
+                    targetHorizontal?.animate()
+                        ?.translationZ(0f)
+                        ?.setDuration(duration)
+                        ?.setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
+                        ?.start()
+                }
+            }
         }
 
         val targetScale = if (hasFocus) scale else 1.0f
@@ -740,9 +794,6 @@ object UIHelper {
                 val tY = ((cardTop - minSafeTop) / availableSpanY).coerceIn(0f, 1f)
                 this.pivotY = height * tY
             }
-        } else {
-            this.pivotX = this.width / 2f
-            this.pivotY = this.height / 2f
         }
 
         this.animate()
