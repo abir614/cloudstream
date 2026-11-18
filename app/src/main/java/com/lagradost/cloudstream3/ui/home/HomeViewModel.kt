@@ -401,8 +401,7 @@ class HomeViewModel : ViewModel() {
             val filterMsg = context?.getString(R.string.content_filtering_in_progress) ?: "Content Filtering in Progress"
 
             if (!isBackgroundUpdate && shouldFilter && totalTextItems > 0) {
-                // Immediate snappy start at 25% gives instantaneous responsive feedback
-                _contentFilterProgress.postValue(ContentFilterProgress(isFiltering = true, current = 25, total = 100, message = filterMsg))
+                _contentFilterProgress.postValue(ContentFilterProgress(isFiltering = true, current = 0, total = 100, message = filterMsg))
             }
 
             val newExpandable = ConcurrentHashMap<String, ExpandableHomepageList>()
@@ -412,7 +411,7 @@ class HomeViewModel : ViewModel() {
                     val nsfwFiltered = NsfwFilterEngine.filterHomePageList(list, nsfwEnabled)
                     processedCount += list.list.size
                     if (!isBackgroundUpdate && shouldFilter && totalTextItems > 0) {
-                        val phase1Percent = (25 + (processedCount * 15 / totalTextItems)).coerceIn(25, 40)
+                        val phase1Percent = (processedCount * 20 / totalTextItems).coerceIn(0, 20)
                         _contentFilterProgress.postValue(
                             ContentFilterProgress(
                                 isFiltering = true,
@@ -558,9 +557,9 @@ class HomeViewModel : ViewModel() {
                     val posterMsg = preloaderContext.getString(R.string.loading_posters)
                     val maxConcurrency = budget.preloaderConcurrency
 
-                    // Snappy, animated progress feedback starting from 40% (post-Phase 1)
+                    // True proportional progress tracking: Phase 2 covers the remaining 80% (20% -> 100%)
                     if (!isBackgroundUpdate && totalPosters > 2) {
-                        val initialPercent = if (shouldFilter) 40 else 0
+                        val initialPercent = if (shouldFilter) 20 else 0
                         _contentFilterProgress.postValue(
                             ContentFilterProgress(
                                 isFiltering = true,
@@ -629,7 +628,7 @@ class HomeViewModel : ViewModel() {
                                     }
                                     if (!isBackgroundUpdate && totalPosters > 2) {
                                         val posterPercent = if (shouldFilter) {
-                                            (40 + (postersProcessed * 60 / totalPosters)).coerceIn(40, 100)
+                                            (20 + (postersProcessed * 80 / totalPosters)).coerceIn(20, 100)
                                         } else {
                                             (postersProcessed * 100 / totalPosters).coerceIn(0, 100)
                                         }

@@ -842,7 +842,7 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Scaled network preloader concurrency: 4–6 workers on low-end/potato (was 2), 8–12 on mid-tier (was 4–6), 12–20 on high-end (was 6–10).
   - Expanded OkHttp connection pool and dispatcher limits in Coil (up to 24–40 max requests and 12 idle connections on low tiers), avoiding socket queue bottlenecks.
   - Reduced focused viewport preload targets (6–8 cards on low-end, 12 on mid-tier, 16 on flagships) to match physical viewport visibility.
-- **Snappy Perceived Progress & Deadline Grace Window ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
-  - Initial progress leaps immediately to 25% upon start, advancing smoothly from 25% -> 40% -> 60% -> 80% -> 100% in under 300ms.
+- **Strictly Proportional Progress Tracking & Deadline Grace Window ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Tracks 100% genuine, proportional progress directly from actual items processed: Phase 1 (metadata scanning) accounts for 0%–20%, and Phase 2 (viewport image loading & scoring) accounts for 20%–100%.
   - Clamped individual image request timeouts to 2000ms and added an overall 2200ms grace deadline (`withTimeoutOrNull(2200L)`), guaranteeing that slow CDN servers never stall UI rendering.
 
