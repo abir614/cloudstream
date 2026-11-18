@@ -430,14 +430,35 @@ object OnDeviceNsfwClassifier {
         }
     }
 
-    // Ultra-lightweight reusable scratch structures for potato devices (< 10 KB total memory, 0 MB native RAM)
+    // Ultra-lightweight reusable scratch structures for potato devices (< 10 KB per worker thread, 0 MB native RAM)
     private const val POTATO_DIM = 48
-    private val potatoPixels = IntArray(POTATO_DIM * POTATO_DIM)
-    private val potatoRect = Rect(0, 0, POTATO_DIM, POTATO_DIM)
-    private val potatoPaint = Paint(Paint.FILTER_BITMAP_FLAG)
-    private var potatoBitmap: Bitmap? = null
-    private var potatoCanvas: Canvas? = null
-    private val potatoLock = Any()
+
+    private class PotatoScratch {
+        var bitmap: Bitmap? = try {
+            Bitmap.createBitmap(POTATO_DIM, POTATO_DIM, Bitmap.Config.RGB_565)
+        } catch (_: Throwable) { null }
+        var canvas: Canvas? = bitmap?.let { Canvas(it) }
+        val pixels: IntArray = IntArray(POTATO_DIM * POTATO_DIM)
+        val rect: Rect = Rect(0, 0, POTATO_DIM, POTATO_DIM)
+        val paint: Paint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+        fun release() {
+            try { bitmap?.recycle() } catch (_: Throwable) {}
+            bitmap = null
+            canvas = null
+        }
+    }
+
+    private val threadLocalPotato = ThreadLocal<PotatoScratch>()
+
+    private fun getPotatoScratch(): PotatoScratch {
+        var scratch = threadLocalPotato.get()
+        if (scratch == null || scratch.bitmap == null || scratch.bitmap?.isRecycled == true) {
+            scratch = PotatoScratch()
+            threadLocalPotato.set(scratch)
+        }
+        return scratch
+    }
 
     // Persistent high-speed caching: up to 5,000 URLs mapped to inference confidence score (0.0f - 1.0f)
     private const val SCORE_CACHE_CAPACITY = 5000
@@ -532,50 +553,45 @@ object OnDeviceNsfwClassifier {
      * on a tiny 48x48 scratch sample (< 0.03ms, zero native allocations).
      */
     fun analyzeFastMetrics(drawable: Drawable, ctx: Context? = null): FastAnalysisResult? {
-        synchronized(potatoLock) {
-            if (potatoBitmap == null || potatoBitmap?.isRecycled == true) {
-                try {
-                    potatoBitmap = Bitmap.createBitmap(POTATO_DIM, POTATO_DIM, Bitmap.Config.RGB_565)
-                    potatoCanvas = Canvas(potatoBitmap!!)
-                } catch (_: Throwable) {
-                    return null
-                }
-            }
-            val canvas = potatoCanvas ?: return null
-            val sBitmap = potatoBitmap ?: return null
-            if (sBitmap.isRecycled) return null
+        val scratch = getPotatoScratch()
+        val canvas = scratch.canvas ?: return null
+        val sBitmap = scratch.bitmap ?: return null
+        if (sBitmap.isRecycled) return null
+        val potatoPixels = scratch.pixels
+        val potatoRect = scratch.rect
+        val potatoPaint = scratch.paint
 
-            return try {
-                canvas.drawColor(Color.BLACK)
-                if (drawable is BitmapDrawable) {
-                    val b = drawable.bitmap
-                    if (b == null || b.isRecycled) return null
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
-                        val copy = try {
-                            b.copy(Bitmap.Config.RGB_565, false)
+        return try {
+            canvas.drawColor(Color.BLACK)
+            if (drawable is BitmapDrawable) {
+                val b = drawable.bitmap
+                if (b == null || b.isRecycled) return null
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && b.config == Bitmap.Config.HARDWARE) {
+                    val copy = try {
+                        b.copy(Bitmap.Config.RGB_565, false)
+                    } catch (_: Throwable) {
+                        try {
+                            b.copy(Bitmap.Config.ARGB_8888, false)
                         } catch (_: Throwable) {
-                            try {
-                                b.copy(Bitmap.Config.ARGB_8888, false)
-                            } catch (_: Throwable) {
-                                null
-                            }
+                            null
                         }
-                        if (copy != null) {
-                            try {
-                                canvas.drawBitmap(copy, null, potatoRect, potatoPaint)
-                            } finally {
-                                try { copy.recycle() } catch (_: Throwable) {}
-                            }
-                        } else {
-                            return null
+                    }
+                    if (copy != null) {
+                        try {
+                            canvas.drawBitmap(copy, null, potatoRect, potatoPaint)
+                        } finally {
+                            try { copy.recycle() } catch (_: Throwable) {}
                         }
                     } else {
-                        canvas.drawBitmap(b, null, potatoRect, potatoPaint)
+                        return null
                     }
                 } else {
-                    drawable.setBounds(0, 0, POTATO_DIM, POTATO_DIM)
-                    drawable.draw(canvas)
+                    canvas.drawBitmap(b, null, potatoRect, potatoPaint)
                 }
+            } else {
+                drawable.setBounds(0, 0, POTATO_DIM, POTATO_DIM)
+                drawable.draw(canvas)
+            }
 
                 sBitmap.getPixels(potatoPixels, 0, POTATO_DIM, 0, 0, POTATO_DIM, POTATO_DIM)
 
@@ -664,7 +680,6 @@ object OnDeviceNsfwClassifier {
                 null
             }
         }
-    }
 
     /**
      * Ultra-fast zero-native-allocation skin chrominance analyzer for potato & low-RAM devices (< 0.05ms, 0 MB native RAM).
@@ -1652,11 +1667,8 @@ object OnDeviceNsfwClassifier {
                 activeSessionCount.decrementAndGet()
             }
             sharedModelBuffer = null
-            synchronized(potatoLock) {
-                potatoBitmap?.recycle()
-                potatoBitmap = null
-                potatoCanvas = null
-            }
+            threadLocalPotato.get()?.release()
+            threadLocalPotato.remove()
         } catch (_: Throwable) {
         }
     }

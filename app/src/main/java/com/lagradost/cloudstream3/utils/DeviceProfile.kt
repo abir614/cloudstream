@@ -311,9 +311,9 @@ object DeviceProfile {
                 cpuCores = cores,
                 isLowMemory = true,
                 isLowEnd = true,
-                viewportPreloadCount = 8,
-                preloaderConcurrency = 1,
-                pacingDelayMs = 12L,
+                viewportPreloadCount = 10,
+                preloaderConcurrency = 2,
+                pacingDelayMs = 0L,
                 useRgb565 = true,
                 allowHardwareBitmaps = false
             )
@@ -326,8 +326,8 @@ object DeviceProfile {
                 isLowMemory = false,
                 isLowEnd = true,
                 viewportPreloadCount = 14,
-                preloaderConcurrency = if (cores >= 4 && availMb >= 60L && freeHeapMb >= 16L) 2 else 1,
-                pacingDelayMs = 2L,
+                preloaderConcurrency = cores.coerceIn(2, 4),
+                pacingDelayMs = 0L,
                 useRgb565 = true,
                 allowHardwareBitmaps = false
             )
@@ -340,7 +340,7 @@ object DeviceProfile {
                 isLowMemory = false,
                 isLowEnd = false,
                 viewportPreloadCount = 20,
-                preloaderConcurrency = cores.coerceIn(3, 4),
+                preloaderConcurrency = cores.coerceIn(4, 6),
                 pacingDelayMs = 0L,
                 useRgb565 = false,
                 allowHardwareBitmaps = !hasBrokenGpu
@@ -354,7 +354,7 @@ object DeviceProfile {
                 isLowMemory = false,
                 isLowEnd = false,
                 viewportPreloadCount = 28,
-                preloaderConcurrency = cores.coerceIn(4, 8),
+                preloaderConcurrency = cores.coerceIn(6, 10),
                 pacingDelayMs = 0L,
                 useRgb565 = false,
                 allowHardwareBitmaps = !hasBrokenGpu
