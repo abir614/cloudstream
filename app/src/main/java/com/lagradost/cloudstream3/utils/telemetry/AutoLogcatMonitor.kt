@@ -281,7 +281,7 @@ object AutoLogcatMonitor {
                         currentMessage.clear()
                         currentLineCount = 0
 
-                        if (isNoiseTag(currentTag) || currentTag == TAG || currentTag == "RemoteCrashReporter") {
+                        if (currentTag == TAG || currentTag == "RemoteCrashReporter") {
                             return
                         }
 
@@ -295,8 +295,21 @@ object AutoLogcatMonitor {
                             return
                         }
 
-                        // Filter out common benign spam messages
-                        if (isNoiseMessage(fullMessage)) return
+                        // App-Origin Immunity: Any log originating from CloudStream, plugins, or containing
+                        // an actionable exception stack trace is ALWAYS preserved for debugging.
+                        val isFirstPartyAppLog = currentTag.contains("cloudstream", ignoreCase = true) ||
+                            currentTag == "ApiError" ||
+                            fullMessage.contains("com.lagradost", ignoreCase = true) ||
+                            (fullMessage.contains("Exception") && fullMessage.contains("at "))
+
+                        if (!isFirstPartyAppLog) {
+                            if (isNoiseTag(currentTag)) {
+                                return
+                            }
+
+                            // Filter out common benign spam messages
+                            if (isNoiseMessage(fullMessage)) return
+                        }
 
                         // Record forensic breadcrumb
                         try {
