@@ -254,7 +254,7 @@ class HomeViewModel : ViewModel() {
         _contentFilterProgress.postValue(null)
     }
 
-    private val expandable: MutableMap<String, ExpandableHomepageList> = mutableMapOf()
+    private val expandable: ConcurrentHashMap<String, ExpandableHomepageList> = ConcurrentHashMap()
     private val _page =
         MutableLiveData<Resource<Map<String, ExpandableHomepageList>>>(Resource.Loading())
     val page: LiveData<Resource<Map<String, ExpandableHomepageList>>> = _page
@@ -300,7 +300,7 @@ class HomeViewModel : ViewModel() {
                     current.hasNext = false
                 }
             }
-            _page.postValue(Resource.Success(expandable))
+            _page.postValue(Resource.Success(HashMap(expandable)))
         }
 
         lock -= name
@@ -386,7 +386,6 @@ class HomeViewModel : ViewModel() {
         isBackgroundUpdate: Boolean = false
     ) {
         try {
-            expandable.clear()
             val nsfwEnabled = context?.isNsfwEnabled() ?: true
             val isPotato = context?.let { com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.isPotatoDevice(it) } ?: false
 
@@ -400,6 +399,7 @@ class HomeViewModel : ViewModel() {
                 _contentFilterProgress.postValue(ContentFilterProgress(isFiltering = true, current = 0, total = 100, message = filterMsg))
             }
 
+            val newExpandable = ConcurrentHashMap<String, ExpandableHomepageList>()
             var processedCount = 0
             homeData.forEach { home ->
                 home?.items?.forEach { list ->
@@ -423,7 +423,7 @@ class HomeViewModel : ViewModel() {
                     if (nsfwFiltered != null) {
                         val filteredList =
                             context?.filterHomePageListByFilmQuality(nsfwFiltered) ?: nsfwFiltered
-                        expandable[list.name] =
+                        newExpandable[list.name] =
                             ExpandableHomepageList(
                                 filteredList.copy(
                                     list = CopyOnWriteArrayList(
@@ -441,8 +441,8 @@ class HomeViewModel : ViewModel() {
             var randomItems: List<SearchResponse> = emptyList()
             var initialPreviews: List<LoadResponse> = emptyList()
 
-            // Reuse already-filtered items from expandable to eliminate duplicate second-pass filterSearchResults
-            val filteredHomeItems = expandable.values
+            // Reuse already-filtered items from newExpandable to eliminate duplicate second-pass filterSearchResults
+            val filteredHomeItems = newExpandable.values
                 .flatMap { it.list.list }
                 .distinctBy { it.url }
 
@@ -474,7 +474,7 @@ class HomeViewModel : ViewModel() {
             val preloaderContext = context ?: com.lagradost.cloudstream3.CloudStreamApp.context
             val budget = preloaderContext?.let { DeviceProfile.getDynamicResourceBudget(it) }
 
-            if (preloaderContext != null && budget != null && (expandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
+            if (preloaderContext != null && budget != null && (newExpandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
                 val imageLoader = SingletonImageLoader.get(preloaderContext)
                 com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.ensureScoresLoaded(preloaderContext)
 
@@ -486,7 +486,7 @@ class HomeViewModel : ViewModel() {
                         PosterPreloadTarget(preview.name, preview.url, pUrl, preview.posterHeaders)
                     }
 
-                val allRailItems = expandable.values
+                val allRailItems = newExpandable.values
                     .flatMap { it.list.list }
                     .filter { !it.posterUrl.isNullOrBlank() }
                     .map { PosterPreloadTarget(it.name, it.url, it.posterUrl!!, it.posterHeaders) }
@@ -703,10 +703,10 @@ class HomeViewModel : ViewModel() {
 
                 // Remove any items identified as NSFW during visual inspection BEFORE submitList
                 if (nsfwUrlsToRemove.isNotEmpty()) {
-                    expandable.keys.toList().forEach { key ->
-                        val row = expandable[key] ?: return@forEach
+                    newExpandable.keys.toList().forEach { key ->
+                        val row = newExpandable[key] ?: return@forEach
                         val cleanedList = row.list.list.filterNot { nsfwUrlsToRemove.contains(it.url) }
-                        expandable[key] = row.copy(list = row.list.copy(list = CopyOnWriteArrayList(cleanedList)))
+                        newExpandable[key] = row.copy(list = row.list.copy(list = CopyOnWriteArrayList(cleanedList)))
                     }
                 }
             }
@@ -722,8 +722,14 @@ class HomeViewModel : ViewModel() {
                 )
             }
 
+            // Atomically update expandable cache with new data
+            synchronized(expandable) {
+                expandable.clear()
+                expandable.putAll(newExpandable)
+            }
+
             // Render home sections with posters already loaded, safe, and cached
-            _page.postValue(Resource.Success(expandable))
+            _page.postValue(Resource.Success(HashMap(newExpandable)))
             if (preloaderContext != null) {
                 com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.recordSessionHeartbeat(
                     preloaderContext,

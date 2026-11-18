@@ -774,6 +774,17 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Removed duplicate viewport decoding loop, priming visible viewport items directly on the first pass and launching repeat sessions in under 60ms without showing the progress dialog.
   - Tuned quad-core low-end budget concurrency to 2 workers for parallel network I/O, halving cold preload latency while keeping heap usage within safe limits.
 
+### 16.34 Thread-Safe Homepage State Isolation & Accurate OS Exit Intent Telemetry
+- **Eliminated Runtime `ConcurrentModificationException` ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Replaced the mutable `LinkedHashMap` behind `expandable` with a thread-safe `ConcurrentHashMap`.
+  - Replaced direct mutation of the shared `expandable` map during `populateHomeFromData` with an isolated local `newExpandable` map.
+  - Performed an atomic `synchronized(expandable)` swap and published an immutable `HashMap(newExpandable)` snapshot to `_page` LiveData observers.
+  - Completely eliminates coroutine race conditions where expanding a row or iterating homepage lists collided with background filter/preload passes on multi-core devices (e.g., Infinix Android 16).
+- **Accurate OS-Level Exit Intent Filtering ([`RemoteCrashReporter.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/RemoteCrashReporter.kt))**:
+  - Enhanced universal abrupt termination detection to query `ApplicationExitInfo` on Android 11+ (API 30–36) before dispatching forensic reports.
+  - Correctly recognizes intentional user dismissals (`REASON_USER_REQUESTED`, `REASON_USER_STOPPED`, `REASON_EXIT_SELF`), eliminating false-positive "Likely LowMemoryKiller / SIGKILL" alarms when users swipe away the app from recent tasks.
+  - On older Android versions (API < 30), verifies physical RAM headroom against the kernel low-memory threshold, ensuring only genuine memory exhaustion events trigger LMK alerts.
+
 
 
 

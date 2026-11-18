@@ -1274,7 +1274,35 @@ object RemoteCrashReporter {
                             val tombstoneFile = context.filesDir.resolve(CRASH_TOMBSTONE_FILE)
                             val hasHandledTombstone = tombstoneFile.exists()
 
-                            if (!hasHandledTombstone) {
+                            var isIntentionalUserExit = false
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+                                val prevExit = try {
+                                    am?.getHistoricalProcessExitReasons(context.packageName, prevPid, 1)?.firstOrNull()
+                                } catch (_: Throwable) { null }
+                                if (prevExit != null) {
+                                    when (prevExit.reason) {
+                                        ApplicationExitInfo.REASON_USER_REQUESTED,
+                                        ApplicationExitInfo.REASON_USER_STOPPED,
+                                        ApplicationExitInfo.REASON_EXIT_SELF,
+                                        ApplicationExitInfo.REASON_OTHER,
+                                        ApplicationExitInfo.REASON_CRASH -> {
+                                            isIntentionalUserExit = true
+                                        }
+                                    }
+                                }
+                            } else {
+                                // On API < 30, only consider it an LMK if device was actually under memory pressure
+                                val availMb = json.optLong("availRamMb", -1L)
+                                val thresholdMb = json.optLong("thresholdMb", -1L)
+                                val isLowRam = json.optBoolean("isLowRam", false)
+                                if (!isLowRam && availMb > (thresholdMb + 64L).coerceAtLeast(128L)) {
+                                    // Free RAM was hundreds of megabytes above threshold; exit was intentional task dismissal
+                                    isIntentionalUserExit = true
+                                }
+                            }
+
+                            if (!hasHandledTombstone && !isIntentionalUserExit) {
                                 val stage = json.optString("stage", "Unknown")
                                 val activePlugin = json.optString("activePlugin", "None")
                                 val availMb = json.optLong("availRamMb", -1L)
