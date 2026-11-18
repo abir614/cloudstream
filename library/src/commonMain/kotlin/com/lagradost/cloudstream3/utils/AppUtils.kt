@@ -42,22 +42,36 @@ object AppUtils {
     }
 
     const val MAX_JSON_PAYLOAD_SIZE = 256 * 1024 * 1024 // 256 MB limit (expanded from 25 MB to support large backup restores)
-    const val MAX_JSON_NESTING_DEPTH = 120 // Limit against deeply-nested stack overflow DoS
+    const val MAX_JSON_NESTING_DEPTH = 512 // Limit against deeply-nested stack overflow DoS
 
     fun validateJsonSafety(value: String) {
         if (value.length > MAX_JSON_PAYLOAD_SIZE) {
             throw IllegalArgumentException("JSON payload exceeds maximum allowed size (${value.length} bytes)")
         }
         var depth = 0
+        var inString = false
+        var isEscaped = false
         for (i in 0 until value.length) {
             val c = value[i]
-            if (c == '{' || c == '[') {
-                depth++
-                if (depth > MAX_JSON_NESTING_DEPTH) {
-                    throw IllegalArgumentException("JSON nesting depth exceeds safety threshold ($depth > $MAX_JSON_NESTING_DEPTH)")
+            if (inString) {
+                if (isEscaped) {
+                    isEscaped = false
+                } else if (c == '\\') {
+                    isEscaped = true
+                } else if (c == '"') {
+                    inString = false
                 }
-            } else if (c == '}' || c == ']') {
-                if (depth > 0) depth--
+            } else {
+                if (c == '"') {
+                    inString = true
+                } else if (c == '{' || c == '[') {
+                    depth++
+                    if (depth > MAX_JSON_NESTING_DEPTH) {
+                        throw IllegalArgumentException("JSON nesting depth exceeds safety threshold ($depth > $MAX_JSON_NESTING_DEPTH)")
+                    }
+                } else if (c == '}' || c == ']') {
+                    if (depth > 0) depth--
+                }
             }
         }
     }

@@ -876,5 +876,14 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Fixed false-positive `SecurityException` when plugins call standard SDK persistence (`setKey`/`getKey`/`CloudStreamApp.setKey`), which references default `rebuild_preference`.
   - Transparently maps `rebuild_preference` calls from plugins to their dedicated isolated namespace (`cs_plugin_<pluginName>_default_prefs`), safeguarding host preferences while allowing third-party extensions (e.g. CineStream) to persist settings without crashes.
 
+### 16.42 JSON Parser String-Aware Depth Scanning & Thread-Safe Plugin Concurrency
+- **String-Literal-Aware JSON Depth Validation ([`AppUtils.kt`](library/src/commonMain/kotlin/com/lagradost/cloudstream3/utils/AppUtils.kt))**:
+  - Upgraded `validateJsonSafety` with string literal and escape tracking (`inString`, `isEscaped`). Delimiters (`{`, `[`, `}`, `]`) embedded inside JSON strings (such as URLs, serialized data, or query parameters) are ignored, eliminating false-positive `IllegalArgumentException: JSON nesting depth exceeds safety threshold` errors during large backup restores.
+  - Expanded `MAX_JSON_NESTING_DEPTH` from 120 to 512 to support complex, deeply-nested backup snapshots and sync state without compromising stack overflow protection.
+- **Thread-Safe Plugin Collections ([`PluginManager.kt`](app/src/main/java/com/lagradost/cloudstream3/plugins/PluginManager.kt))**:
+  - Replaced raw `LinkedHashMap` and `HashMap` in `plugins`, `urlPlugins`, and `classLoaders` with `ConcurrentHashMap`.
+  - Guaranteed thread-safe iteration and atomic mutations during concurrent plugin downloads, updates, and unloads (`unloadPlugin`), permanently preventing `ConcurrentModificationException`.
+
+
 
 

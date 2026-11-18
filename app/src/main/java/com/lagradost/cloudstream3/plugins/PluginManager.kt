@@ -193,14 +193,14 @@ object PluginManager {
 
     // Maps filepath to plugin
     val plugins: MutableMap<String, BasePlugin> =
-        LinkedHashMap<String, BasePlugin>()
+        java.util.concurrent.ConcurrentHashMap<String, BasePlugin>()
 
     // Maps urls to plugin
     val urlPlugins: MutableMap<String, BasePlugin> =
-        LinkedHashMap<String, BasePlugin>()
+        java.util.concurrent.ConcurrentHashMap<String, BasePlugin>()
 
     private val classLoaders: MutableMap<ClassLoader, BasePlugin> =
-        HashMap<ClassLoader, BasePlugin>()
+        java.util.concurrent.ConcurrentHashMap<ClassLoader, BasePlugin>()
 
     var loadedLocalPlugins = false
         private set
