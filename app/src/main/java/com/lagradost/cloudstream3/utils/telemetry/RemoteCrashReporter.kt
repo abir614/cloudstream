@@ -1293,15 +1293,16 @@ object RemoteCrashReporter {
                                         }
                                     }
                                 }
-                            } else {
-                                // On API < 30, only consider it an LMK if device was actually under memory pressure
-                                val availMb = json.optLong("availRamMb", -1L)
-                                val thresholdMb = json.optLong("thresholdMb", -1L)
-                                val isLowRam = json.optBoolean("isLowRam", false)
-                                if (!isLowRam && availMb > (thresholdMb + 64L).coerceAtLeast(128L)) {
-                                    // Free RAM was hundreds of megabytes above threshold; exit was intentional task dismissal
-                                    isIntentionalUserExit = true
-                                }
+                            }
+
+                            // Universal headroom guard across all Android versions:
+                            // If the device had abundant free physical RAM (e.g. 3GB+ free) well above the kernel threshold,
+                            // an abrupt termination is an intentional user swipe / OS task dismissal, NEVER a true LowMemoryKill.
+                            val availMb = json.optLong("availRamMb", -1L)
+                            val thresholdMb = json.optLong("thresholdMb", -1L)
+                            val isLowRam = json.optBoolean("isLowRam", false)
+                            if (!isLowRam && availMb > (thresholdMb + 64L).coerceAtLeast(128L)) {
+                                isIntentionalUserExit = true
                             }
 
                             if (!hasHandledTombstone && !isIntentionalUserExit) {

@@ -821,6 +821,15 @@ For full transparency, developers and users can inspect live, real-time diagnost
 - **SQLite DatabaseHelper Nested Class Context ([`SqliteDataRepository.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/persistence/SqliteDataRepository.kt))**:
   - Passed and retained constructor `ctx: Context` inside nested static `DatabaseHelper`, eliminating outer class non-inner receiver references for kernel zero-copy `PRAGMA mmap_size` configuration.
 
+### 16.38 Proportional Preloader Progress Weighting & Universal Exit Telemetry
+- **Proportional Phase Weighting ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Re-calibrated preloader progress distribution between Phase 1 (instant in-memory metadata/string scanning, 0%–15%) and Phase 2 (network poster downloading, bitmap decoding, and visual TFLite AI screening, 15%–100%).
+  - Eliminated the progress bar drop-back glitch where the bar leaped to 50% in 2ms and then dropped to 0% at the start of poster downloading, establishing a strictly monotonic and smooth progress animation from 0% to 100%.
+- **Universal Memory Headroom Guard for Historical Process Exits ([`RemoteCrashReporter.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/RemoteCrashReporter.kt))**:
+  - Enforced free physical RAM headroom evaluation across all Android versions (API 21–36): when available RAM is hundreds of megabytes above the kernel low-memory threshold (e.g. 3GB+ free on an 8GB device), an abrupt process termination is classified as an intentional user task dismissal or background cleanup, permanently eliminating false-positive LMK alerts.
+
+
+
 
 
 

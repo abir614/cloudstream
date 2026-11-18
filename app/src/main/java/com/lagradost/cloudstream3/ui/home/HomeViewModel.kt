@@ -406,7 +406,7 @@ class HomeViewModel : ViewModel() {
                     val nsfwFiltered = NsfwFilterEngine.filterHomePageList(list, nsfwEnabled)
                     processedCount += list.list.size
                     if (!isBackgroundUpdate && shouldFilter && totalTextItems > 0) {
-                        val phase1Percent = (processedCount * 50 / totalTextItems).coerceIn(0, 50)
+                        val phase1Percent = (processedCount * 15 / totalTextItems).coerceIn(0, 15)
                         _contentFilterProgress.postValue(
                             ContentFilterProgress(
                                 isFiltering = true,
@@ -558,10 +558,11 @@ class HomeViewModel : ViewModel() {
 
                     // Only show progress dialog if there are multiple uncached items to fetch
                     if (!isBackgroundUpdate && totalPosters > 2) {
+                        val initialPercent = if (shouldFilter) 15 else 0
                         _contentFilterProgress.postValue(
                             ContentFilterProgress(
                                 isFiltering = true,
-                                current = 0,
+                                current = initialPercent,
                                 total = 100,
                                 message = "$posterMsg (0/$totalPosters)"
                             )
@@ -625,7 +626,7 @@ class HomeViewModel : ViewModel() {
                                     }
                                     if (!isBackgroundUpdate && totalPosters > 2) {
                                         val posterPercent = if (shouldFilter) {
-                                            (50 + (postersProcessed * 50 / totalPosters)).coerceIn(50, 100)
+                                            (15 + (postersProcessed * 85 / totalPosters)).coerceIn(15, 100)
                                         } else {
                                             (postersProcessed * 100 / totalPosters).coerceIn(0, 100)
                                         }
