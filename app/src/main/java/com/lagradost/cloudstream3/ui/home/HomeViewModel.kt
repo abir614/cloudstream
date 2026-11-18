@@ -473,9 +473,13 @@ class HomeViewModel : ViewModel() {
             // Phase 2: Hardware-Adaptive Preload & Viewport Cache Warmer
             val preloaderContext = context ?: com.lagradost.cloudstream3.CloudStreamApp.context
             val budget = preloaderContext?.let { DeviceProfile.getDynamicResourceBudget(it) }
+            val imageLoader = preloaderContext?.let { SingletonImageLoader.get(it) }
+            val threshold = preloaderContext?.let { NsfwFilterEngine.getVisualThreshold(it) } ?: 0.40f
+            val posterWidthPx = 114.toPx
+            val posterHeightPx = 180.toPx
+            var uncachedOffscreenItems: List<PosterPreloadTarget> = emptyList()
 
-            if (preloaderContext != null && budget != null && (newExpandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
-                val imageLoader = SingletonImageLoader.get(preloaderContext)
+            if (preloaderContext != null && budget != null && imageLoader != null && (newExpandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
                 com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.ensureScoresLoaded(preloaderContext)
 
                 val bannerItems = initialPreviews
@@ -492,7 +496,6 @@ class HomeViewModel : ViewModel() {
                     .map { PosterPreloadTarget(it.name, it.url, it.posterUrl!!, it.posterHeaders) }
 
                 val nsfwUrlsToRemove = ConcurrentHashMap.newKeySet<String>()
-                val threshold = NsfwFilterEngine.getVisualThreshold(preloaderContext)
 
                 // 1. Instant metadata & persistent score evaluation for offscreen rails (0ms, zero bitmap allocation):
                 if (shouldFilter) {
@@ -518,9 +521,6 @@ class HomeViewModel : ViewModel() {
                     .distinctBy { it.posterUrl }
                     .take(budget.viewportPreloadCount)
 
-                val posterWidthPx = 114.toPx
-                val posterHeightPx = 180.toPx
-
                 val uncachedViewportItems = mutableListOf<PosterPreloadTarget>()
                 for (target in viewportTargets) {
                     val isMemCached = try {
@@ -532,7 +532,7 @@ class HomeViewModel : ViewModel() {
                 }
 
                 // For Low-End devices, collect offscreen items to prefetch asynchronously into flash DiskCache:
-                val uncachedOffscreenItems = if (budget.isLowEnd) {
+                uncachedOffscreenItems = if (budget.isLowEnd) {
                     (bannerItems + allRailItems)
                         .distinctBy { it.posterUrl }
                         .filter { offscreen -> !viewportTargets.any { it.posterUrl == offscreen.posterUrl } }
@@ -686,8 +686,8 @@ class HomeViewModel : ViewModel() {
             // Phase 3: Hardware & Kernel Accelerated Background Offscreen Prefetcher
             // Pre-caches offscreen posters directly into flash DiskCache with MemoryCache DISABLED (0 MB JVM heap footprint)
             // Ensures 100% of offscreen rails are primed in flash DiskCache before the user scrolls down!
-            if (budget?.isLowEnd == true && uncachedOffscreenItems.isNotEmpty() && preloaderContext != null) {
-                viewModelScope.launch(Dispatchers.IO) {
+            if (budget?.isLowEnd == true && uncachedOffscreenItems.isNotEmpty() && preloaderContext != null && imageLoader != null) {
+                ioSafe {
                     try {
                         android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
                         val offscreenChannel = Channel<PosterPreloadTarget>(Channel.UNLIMITED)
@@ -730,12 +730,11 @@ class HomeViewModel : ViewModel() {
                         }
                         offscreenWorkers.awaitAll()
                         com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(preloaderContext)
+                        // Post-prefetch inference reclamation for low-end hardware
+                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
                     } catch (_: Throwable) {}
                 }
-            }
-
-            // Reclaim resources immediately upon rendering home screen:
-            if (preloaderContext != null) {
+            } else if (preloaderContext != null) {
                 if (budget?.isLowEnd == true) {
                     // 1. Immediately persist all evaluated scores to flash storage
                     com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(preloaderContext)

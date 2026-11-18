@@ -30,8 +30,8 @@ class SqliteDataRepository(
     private val dbHelper = DatabaseHelper(context, dbName)
     private val flows = ConcurrentHashMap<String, MutableStateFlow<Any?>>()
 
-    private class DatabaseHelper(context: Context, name: String) :
-        SQLiteOpenHelper(context, name, null, DATABASE_VERSION) {
+    private class DatabaseHelper(private val ctx: Context, name: String) :
+        SQLiteOpenHelper(ctx, name, null, DATABASE_VERSION) {
 
         override fun onConfigure(db: SQLiteDatabase) {
             super.onConfigure(db)
@@ -47,8 +47,8 @@ class SqliteDataRepository(
                 db.execSQL("PRAGMA temp_store = MEMORY;")
                 // 3. Linux Kernel Zero-Copy Memory-Mapped I/O (mmap_size):
                 // Bypasses read() syscalls and user-kernel buffer copying, reading B-Tree pages directly from Linux page cache
-                val mmapBytes = if (com.lagradost.cloudstream3.utils.DeviceProfile.isUltraPotato(context) ||
-                    com.lagradost.cloudstream3.utils.DeviceProfile.isLowEnd(context)) {
+                val mmapBytes = if (com.lagradost.cloudstream3.utils.DeviceProfile.isUltraPotato(ctx) ||
+                    com.lagradost.cloudstream3.utils.DeviceProfile.isLowEnd(ctx)) {
                     8L * 1024 * 1024 // 8 MB on low-end / potato devices
                 } else {
                     32L * 1024 * 1024 // 32 MB on mid/high-end devices

@@ -814,6 +814,15 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Scaled network worker concurrency: 2–4 workers on low-end, 4–6 on mid-tier, 6–10 on flagships.
   - Removed artificial delays (`pacingDelayMs`) and mid-loop `System.gc()` pauses, allowing non-blocking network socket reads and tiny 40KB thumbnail decoding to run at full hardware speed without exceeding heap thresholds.
 
+### 16.37 Preload Coroutine Scope & SQLite Helper Context Refinements
+- **Scoped Preloader Variable Hoisting ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Hoisted `uncachedOffscreenItems`, `imageLoader`, `threshold`, and thumbnail pixel bounds to the preloader method scope, ensuring seamless availability between the foreground viewport renderer and background flash disk prefetcher.
+  - Routed background offscreen prefetching via `ioSafe` to guarantee structured concurrency on the worker dispatcher and post-prefetch inference session reclamation.
+- **SQLite DatabaseHelper Nested Class Context ([`SqliteDataRepository.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/persistence/SqliteDataRepository.kt))**:
+  - Passed and retained constructor `ctx: Context` inside nested static `DatabaseHelper`, eliminating outer class non-inner receiver references for kernel zero-copy `PRAGMA mmap_size` configuration.
+
+
+
 
 
 
