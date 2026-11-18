@@ -224,4 +224,22 @@ class DeviceProfileTest {
         val ftvTokens = ftvId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
         assertTrue(DeviceProfile.KNOWN_MID_CHIPS.any { DeviceProfile.matchesChip(it, ftvId, ftvTokens, false) })
     }
+
+    @Test
+    fun `test capable hardware with older kernel avoids potato demotion`() {
+        // Nvidia Shield TV (Tegra X1, kernel 4.9/3.10)
+        val shieldId = "tegra tegra210 foster nvidia shield android tv"
+        val shieldTokens = shieldId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertTrue(DeviceProfile.KNOWN_FLAGSHIP_CHIPS.any { DeviceProfile.matchesChip(it, shieldId, shieldTokens, false) })
+
+        // Amlogic S922X (Beelink / Ugoos / Fire TV Cube, kernel 4.9)
+        val s922xId = "amlogic s922x ugoos am6 android tv"
+        val s922xTokens = s922xId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertTrue(DeviceProfile.KNOWN_MID_CHIPS.any { DeviceProfile.matchesChip(it, s922xId, s922xTokens, false) })
+
+        // Snapdragon 845 (Galaxy S9 / Pixel 3, kernel 4.9)
+        val sdm845Id = "qcom sdm845 samsung star2qltechn"
+        val sdm845Tokens = sdm845Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertTrue(DeviceProfile.KNOWN_FLAGSHIP_CHIPS.any { DeviceProfile.matchesChip(it, sdm845Id, sdm845Tokens, false) })
+    }
 }

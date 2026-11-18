@@ -846,15 +846,54 @@ object DeviceProfile {
     fun isUltraPotato(ctx: Context?): Boolean {
         if (ctx == null) return false
         val totalMb = getTotalRamMb(ctx)
+
+        // 1. Extreme physical memory starvation: <= 1024MB RAM is always ultra-potato
+        if (totalMb <= 1024) return true
+
         val swapMb = getZramSwapMb()
-        val isLegacyKernel = isLegacyLinuxKernel()
         val isLowRam = try {
             (ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true
         } catch (_: Throwable) {
             false
         }
-        // Ultra-low RAM condition: <= 1024MB RAM, Android Go <= 1536MB, <= 1536MB RAM with zero zRAM swap, or <= 2048MB with legacy Linux kernel (< 4.9)
-        return totalMb <= 1024 || (isLowRam && totalMb <= 1536) || (totalMb <= 1536 && swapMb == 0L) || (totalMb <= 2048 && isLegacyKernel)
+
+        // 2. Hardware capability check: A device with capable hardware (flagship, mid-tier SoC,
+        // or 64-bit multi-core CPU with >= 1.8GB RAM) is NEVER an ultra-potato, regardless of kernel age.
+        // An older kernel alone does not justify demoting capable hardware.
+        val cores = Runtime.getRuntime().availableProcessors()
+        val has64Bit = try { Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() ?: true } catch (_: Throwable) { true }
+
+        val hardware = Build.HARDWARE?.lowercase() ?: ""
+        val board = Build.BOARD?.lowercase() ?: ""
+        val model = Build.MODEL?.lowercase() ?: ""
+        val manufacturer = Build.MANUFACTURER?.lowercase() ?: ""
+        val product = Build.PRODUCT?.lowercase() ?: ""
+        val device = Build.DEVICE?.lowercase() ?: ""
+        val soc = if (Build.VERSION.SDK_INT >= 31) {
+            "${Build.SOC_MODEL?.lowercase() ?: ""} ${Build.SOC_MANUFACTURER?.lowercase() ?: ""}"
+        } else ""
+        val cpuInfo = getCpuInfoString().lowercase()
+        val socIdentifier = "$hardware $board $model $manufacturer $product $device $soc $cpuInfo"
+        val socTokens = socIdentifier.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        val isAllwinnerPlatform = socTokens.contains("allwinner") || socTokens.contains("sunxi") || socTokens.any { it.startsWith("sun") && it.length > 3 }
+
+        val isCapableSoC = KNOWN_FLAGSHIP_CHIPS.any { pattern ->
+            matchesChip(pattern, socIdentifier, socTokens, isAllwinnerPlatform)
+        } || KNOWN_MID_CHIPS.any { pattern ->
+            matchesChip(pattern, socIdentifier, socTokens, isAllwinnerPlatform)
+        }
+
+        if (isCapableSoC || (totalMb >= 1800 && has64Bit && cores >= 4)) {
+            return false
+        }
+
+        // 3. Hardware + Kernel combination: An older kernel (< 4.9) only triggers ultra-potato
+        // when the hardware itself is also constrained (e.g. <= 1536MB RAM, 32-bit only, or < 4 cores).
+        val isLegacyKernel = isLegacyLinuxKernel()
+        val isConstrainedRam = (isLowRam && totalMb <= 1536) || (totalMb <= 1536 && swapMb == 0L)
+        val isLegacyWeakHardware = isLegacyKernel && (totalMb <= 1536 || !has64Bit || cores < 4)
+
+        return isConstrainedRam || isLegacyWeakHardware
     }
 
     fun getSearchConcurrency(ctx: Context?): Int {
