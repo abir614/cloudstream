@@ -515,7 +515,7 @@ object DeviceProfile {
         "rtd1619", "rtd1619b", "rtd1619dr", "rtd1319", "rtd1319d"
     )
 
-    private fun getCpuInfoString(): String {
+    fun getCpuInfoString(): String {
         cachedCpuInfo?.let { return it }
         val info = try {
             val file = File("/proc/cpuinfo")
