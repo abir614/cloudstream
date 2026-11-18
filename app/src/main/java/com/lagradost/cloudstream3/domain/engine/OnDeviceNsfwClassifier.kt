@@ -224,8 +224,9 @@ object OnDeviceNsfwClassifier {
 
         // Robust YCbCr human skin chrominance cluster (light, medium, and dark skin tones)
         val isSkinChrominance = y in 50..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8
-        // Stylized anime/illustrated peach tones
-        val isAnimeSkin = r in 205..255 && g in 175..245 && b in 150..235 && r > g && g > b && (r - b) in 8..70 && (r - g) in 4..40
+        // Stylized anime/illustrated peach tones & pale anime tones
+        val isAnimeSkin = (r in 190..255 && g in 160..248 && b in 140..240 && r >= g && (r - b) in 6..75) ||
+                          (r in 240..255 && g in 215..245 && b in 195..235 && (r - g) in 4..25 && (r - b) in 10..40)
         // Darker human skin tones
         val isDarkerSkin = r in 70..190 && g in 45..150 && b in 25..110 && r > g && g > b && (r - b) >= 12 && (r - g) >= 8
 
@@ -662,14 +663,14 @@ object OnDeviceNsfwClassifier {
                 // False-positive rejection: uniform colored backdrop (e.g. solid yellow, beige, or gold poster)
                 val potatoScore = if (upperSkinRatio > 0.70f && bodySkinRatio > 0.70f) {
                     0.0f
-                } else if (bodySkinRatio > 0.48f && maxRowSkinRatio >= 0.42f) {
-                    ((bodySkinRatio - 0.48f) * 2.0f + 0.42f).coerceIn(0.0f, 1.0f)
-                } else if (bodySkinRatio > 0.35f && maxRowSkinRatio >= 0.35f && upperSkinRatio < 0.25f) {
-                    0.30f
-                } else if (bodySkinRatio > 0.25f && maxRowSkinRatio >= 0.25f) {
-                    0.22f
+                } else if (bodySkinRatio > 0.40f && maxRowSkinRatio >= 0.35f) {
+                    ((bodySkinRatio - 0.40f) * 2.0f + 0.45f).coerceIn(0.0f, 1.0f)
+                } else if (bodySkinRatio > 0.28f && maxRowSkinRatio >= 0.28f) {
+                    0.35f
                 } else if (bodySkinRatio > 0.18f && maxRowSkinRatio >= 0.18f) {
-                    0.12f
+                    0.25f
+                } else if (bodySkinRatio > 0.12f && maxRowSkinRatio >= 0.12f) {
+                    0.15f
                 } else {
                     0.0f
                 }
@@ -861,7 +862,9 @@ object OnDeviceNsfwClassifier {
     }
 
     /**
-     * Checks if the device is currently experiencing critical memory pressure.
+     * Checks if the device is currently experiencing critical memory exhaustion.
+     * Guard against OutOfMemoryError: only activates when OS lowMemory flag is signaled,
+     * available physical RAM drops below 25MB, or JVM remaining heap is under 8MB.
      */
     fun isDeviceUnderMemoryPressure(ctx: Context): Boolean {
         return try {
@@ -870,9 +873,7 @@ object OnDeviceNsfwClassifier {
             am.getMemoryInfo(mi)
             val rt = Runtime.getRuntime()
             val remainingHeap = rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())
-            // Critical OS memory state: OS lowMemory flag, available physical RAM within 32MB of threshold (or <64MB), or JVM remaining heap under 20MB
-            val ramCriticalThreshold = (mi.threshold + 32 * 1024 * 1024L).coerceAtLeast(64 * 1024 * 1024L)
-            mi.lowMemory || mi.availMem < ramCriticalThreshold || remainingHeap < 20 * 1024 * 1024L
+            mi.lowMemory || mi.availMem < 25 * 1024 * 1024L || remainingHeap < 8 * 1024 * 1024L
         } catch (_: Throwable) {
             false
         }

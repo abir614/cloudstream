@@ -391,7 +391,7 @@ class HomeViewModel : ViewModel() {
                 android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_MORE_FAVORABLE)
             } catch (_: Throwable) {}
 
-            val nsfwEnabled = context?.isNsfwEnabled() ?: true
+            val nsfwEnabled = context?.isNsfwEnabled() ?: false
             val isPotato = context?.let { com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.isPotatoDevice(it) } ?: false
 
             val allRows = homeData.mapNotNull { it?.items }.flatten()
@@ -472,13 +472,13 @@ class HomeViewModel : ViewModel() {
             }
 
             // Phase 2: Hardware-Adaptive Complete Preload, NSFW Filtering & Safe Poster Rearrangement
-            val preloaderContext = context ?: com.lagradost.cloudstream3.CloudStreamApp.context
+            val preloaderContext = context ?: com.lagradost.cloudstream3.CloudStreamApp.context ?: com.lagradost.cloudstream3.CloudStreamApp.appContext
             val budget = preloaderContext?.let { DeviceProfile.getDynamicResourceBudget(it) }
             val imageLoader = preloaderContext?.let { SingletonImageLoader.get(it) }
-            val threshold = preloaderContext?.let { NsfwFilterEngine.getVisualThreshold(it) } ?: 0.40f
+            val threshold = preloaderContext?.let { NsfwFilterEngine.getVisualThreshold(it) } ?: NsfwFilterLevel.MODERATE.defaultVisualThreshold
             val posterWidthPx = 114.toPx
             val posterHeightPx = 180.toPx
-            val isUnderMidTier = budget?.isLowEnd == true || (preloaderContext != null && (DeviceProfile.isLowEnd(preloaderContext) || DeviceProfile.isUltraPotato(preloaderContext) || DeviceProfile.getTotalRamMb(preloaderContext) <= 3000L))
+            val isLowEnd = budget?.isLowEnd == true || (preloaderContext != null && (DeviceProfile.isLowEnd(preloaderContext) || DeviceProfile.isUltraPotato(preloaderContext)))
 
             if (preloaderContext != null && budget != null && imageLoader != null && (newExpandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
                 com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.ensureScoresLoaded(preloaderContext)
@@ -515,9 +515,10 @@ class HomeViewModel : ViewModel() {
                 }
 
                 // 2. Hardware-Adaptive Workload Partitioning:
-                // For devices under Mid-tier, load EVERY poster during the loading screen to eliminate post-render crashes.
-                // Preloading all posters ensures 100% complete priming before the landing page is ever rendered.
-                val itemsToLoad = if (isUnderMidTier) {
+                // LOW-END ONLY: load EVERY poster during the loading screen to eliminate post-render crashes.
+                // MID & FLAGSHIP: ONLY preload a few posters (initial visible viewport: banners + first 6-8 rail posters).
+                // Rest of them are loaded in lazy loading / on demand via Coil as the user scrolls!
+                val itemsToLoad = if (isLowEnd) {
                     allTargets.filter { target ->
                         val isMemCached = try {
                             imageLoader.memoryCache?.get(coil3.memory.MemoryCache.Key(target.posterUrl)) != null
@@ -532,7 +533,9 @@ class HomeViewModel : ViewModel() {
                         !isMemCached || !isDiskCached || (shouldFilter && !isScored)
                     }
                 } else {
-                    allTargets.filter { target ->
+                    val initialLimit = budget.initialPosterLimit.coerceIn(4, 8)
+                    val initialVisibleTargets = (bannerItems + allRailItems.take(initialLimit)).distinctBy { it.posterUrl }
+                    initialVisibleTargets.filter { target ->
                         val isMemCached = try {
                             imageLoader.memoryCache?.get(coil3.memory.MemoryCache.Key(target.posterUrl)) != null
                         } catch (_: Throwable) { false }
@@ -543,7 +546,7 @@ class HomeViewModel : ViewModel() {
                 if (itemsToLoad.isNotEmpty()) {
                     val totalPosters = itemsToLoad.size
                     val posterMsg = preloaderContext.getString(R.string.loading_posters)
-                    val maxConcurrency = if (isUnderMidTier) budget.preloaderConcurrency.coerceIn(2, 4) else budget.preloaderConcurrency
+                    val maxConcurrency = if (isLowEnd) budget.preloaderConcurrency.coerceIn(2, 4) else budget.preloaderConcurrency
 
                     // True proportional progress tracking: Phase 2 covers the remaining 80% (20% -> 100%)
                     if (!isBackgroundUpdate && totalPosters > 1) {
@@ -568,7 +571,7 @@ class HomeViewModel : ViewModel() {
                             async(Dispatchers.IO) {
                                 for (item in channel) {
                                     try {
-                                        val timeoutMs = if (isUnderMidTier) 3000L else 2000L
+                                        val timeoutMs = if (isLowEnd) 3000L else 2000L
                                         withTimeoutOrNull(timeoutMs) {
                                             val request = ImageRequest.Builder(preloaderContext)
                                                 .data(item.posterUrl)
@@ -581,8 +584,8 @@ class HomeViewModel : ViewModel() {
                                                         headerBuilder[key] = value
                                                     }
                                                 }.build())
-                                                .allowHardware(if (isUnderMidTier) false else budget.allowHardwareBitmaps)
-                                                .bitmapConfig(if (isUnderMidTier || budget.useRgb565) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888)
+                                                .allowHardware(if (isLowEnd) false else budget.allowHardwareBitmaps)
+                                                .bitmapConfig(if (isLowEnd || budget.useRgb565) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888)
                                                 .diskCachePolicy(CachePolicy.ENABLED)
                                                 .memoryCachePolicy(CachePolicy.ENABLED)
                                                 .build()
@@ -600,12 +603,10 @@ class HomeViewModel : ViewModel() {
                                                 } else {
                                                     com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl, 0.0f, preloaderContext)
                                                 }
-                                            } else {
-                                                com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl, 0.0f, preloaderContext)
                                             }
                                         }
                                     } catch (_: Throwable) {
-                                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.recordScore(item.posterUrl, 0.0f, preloaderContext)
+                                        // Do not falsely mark failed/timed-out images as clean
                                     }
 
                                     synchronized(itemsToLoad) {
@@ -629,7 +630,7 @@ class HomeViewModel : ViewModel() {
                                 }
                             }
                         }
-                        val overallTimeoutMs = if (isUnderMidTier) 12000L else 6000L
+                        val overallTimeoutMs = if (isLowEnd) 12000L else 6000L
                         withTimeoutOrNull(overallTimeoutMs) {
                             workers.awaitAll()
                         }
@@ -686,7 +687,7 @@ class HomeViewModel : ViewModel() {
 
                 // Persist visual classification scores to flash disk
                 com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(preloaderContext)
-                if (isUnderMidTier) {
+                if (isLowEnd) {
                     // Release TFLite inference session to reclaim native memory before rendering the landing page
                     com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
                 }

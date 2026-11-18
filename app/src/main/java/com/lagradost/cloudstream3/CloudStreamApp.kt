@@ -106,6 +106,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
 
     override fun onCreate() {
         super.onCreate()
+        appContext = this
         com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.init(this)
 
         // Bridge all caught exceptions from library & extractors into Telemetry
@@ -262,6 +263,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
 
     override fun attachBaseContext(base: Context?) {
         super.attachBaseContext(base)
+        appContext = base
         context = base
     }
 
@@ -375,10 +377,14 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             }
         }
 
+        @Volatile
+        var appContext: Context? = null
+            internal set
+
         private var _context: WeakReference<Context>? = null
         var context: Context?
             get() {
-                val raw = _context?.get() ?: return null
+                val raw = _context?.get() ?: appContext ?: return null
                 // Sandbox Protection: If called from a thread running a third-party plugin ClassLoader,
                 // wrap the context in a SandboxedContextWrapper so plugins cannot bypass sandbox boundaries.
                 val callerLoader = Thread.currentThread().contextClassLoader

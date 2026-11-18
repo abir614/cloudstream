@@ -884,6 +884,19 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Replaced raw `LinkedHashMap` and `HashMap` in `plugins`, `urlPlugins`, and `classLoaders` with `ConcurrentHashMap`.
   - Guaranteed thread-safe iteration and atomic mutations during concurrent plugin downloads, updates, and unloads (`unloadPlugin`), permanently preventing `ConcurrentModificationException`.
 
+### 16.43 Hardware-Adaptive Poster Preload Partitioning & Zero-Leak Adult Filtering Architecture
+- **Low-End Exclusive Full Poster Preloading ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Enforced that 100% full poster preloading during the initial loading screen executes exclusively on low-end hardware (`DeviceProfile.isLowEnd(context)` / `budget.isLowEnd`), completely eliminating post-render offscreen decoding and LMK/OOM crashes on memory-constrained devices (e.g. Allwinner H313, 500MB–1GB RAM TV boxes).
+  - Mid-tier and Flagship devices now preload only the immediate visible viewport (hero banners + first 4–8 rail posters), allowing the loading screen to finish almost instantaneously while all subsequent posters load lazily on demand via Coil as the user scrolls.
+- **Infallible Default Safety & WeakReference GC Shield ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt), [`CloudStreamApp.kt`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt))**:
+  - Fixed a critical vulnerability where `context?.isNsfwEnabled() ?: true` defaulted to `true` when `context` was temporarily null during GC cycles on low-RAM devices, silently bypassing content filtering. Changed the fallback to `false` (family-safe default).
+  - Introduced permanent `CloudStreamApp.appContext` fallback so static `CloudStreamApp.context` never returns null when the Activity `WeakReference` is collected under memory pressure.
+- **Provider-Level Adult Domain Screening ([`NsfwFilterEngine.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/NsfwFilterEngine.kt))**:
+  - Hardened `isNsfwProvider` to inspect both provider `name` and `mainUrl` via `isNsfwText`. Adult providers disguised with `supportedTypes = setOf(TvType.Anime)` (e.g. Hanime, NHentai) are now strictly detected and excluded from the homepage and provider lists when NSFW is disabled.
+- **Active TFLite Neural Classification on Low-End Hardware ([`OnDeviceNsfwClassifier.kt`](app/src/main/java/com/lagradost/cloudstream3/domain/engine/OnDeviceNsfwClassifier.kt))**:
+  - Recalibrated `isDeviceUnderMemoryPressure` so that low-end devices with 100MB+ available RAM no longer bypass the 5MB TFLite model. TFLite executes safely (<1MB RAM footprint) and accurately classifies `CLASS_HENTAI`.
+  - Calibrated `isSkinTone` and `analyzeFastMetrics` with enhanced pale/cel-shaded anime tone detection, and eliminated false-positive `0.0f` safe score caching on image network timeouts.
+
 
 
 

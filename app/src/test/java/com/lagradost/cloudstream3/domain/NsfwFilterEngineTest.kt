@@ -387,5 +387,29 @@ class NsfwFilterEngineTest {
         val invHash = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.computeDHash64(lightToDark)
         assertTrue(gradHash1 != invHash)
     }
+
+    @Test
+    fun `test isNsfwProvider identifies adult providers by type, name, and domain`() {
+        val declaredAdultApi = object : com.lagradost.cloudstream3.MainAPI() {
+            override var name = "SafeName"
+            override var mainUrl = "https://safe.tv"
+            override var supportedTypes = setOf(TvType.NSFW)
+        }
+        assertTrue(NsfwFilterEngine.isNsfwProvider(declaredAdultApi))
+
+        val disguisedHentaiApi = object : com.lagradost.cloudstream3.MainAPI() {
+            override var name = "HanimeTV"
+            override var mainUrl = "https://hanime.tv"
+            override var supportedTypes = setOf(TvType.Anime)
+        }
+        assertTrue(NsfwFilterEngine.isNsfwProvider(disguisedHentaiApi))
+
+        val cleanAnimeApi = object : com.lagradost.cloudstream3.MainAPI() {
+            override var name = "Zoro Anime"
+            override var mainUrl = "https://zoro.to"
+            override var supportedTypes = setOf(TvType.Anime)
+        }
+        assertFalse(NsfwFilterEngine.isNsfwProvider(cleanAnimeApi))
+    }
 }
 

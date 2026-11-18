@@ -909,10 +909,13 @@ object NsfwFilterEngine {
     }
 
     /**
-     * Checks if a provider API is declared as an adult/NSFW provider.
+     * Checks if a provider API is declared or classified as an adult/NSFW provider.
+     * Evaluates provider supported types, provider name, and primary domain.
      */
     fun isNsfwProvider(api: MainAPI): Boolean {
-        return api.supportedTypes.contains(TvType.NSFW) || api.supportedTypes == setOf(TvType.NSFW)
+        if (api.supportedTypes.contains(TvType.NSFW) || api.supportedTypes == setOf(TvType.NSFW)) return true
+        if (isNsfwText(api.name, api.mainUrl, null, NsfwFilterLevel.LOW)) return true
+        return false
     }
 
     fun isNsfwProvider(repo: APIRepository): Boolean {
