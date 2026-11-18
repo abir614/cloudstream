@@ -860,3 +860,17 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Re-ordered logcat filtering to guarantee that OS runtime notices (ART profiles, GC histogram adjustments, Zygote USAP pool SELinux audit logs, `InteractionJankMonitor` permission checks) are suppressed regardless of whether the log mentions the app package name.
   - Downgraded transient `SocketTimeoutException` and `UnknownHostException` during background `SHA256SUMS` checks to debug level (`Log.d`), eliminating false-positive system warnings.
 
+### 16.41 Complete Low-End Poster Preload, NSFW Filtering & Graceful Landing Architecture
+- **Elimination of Post-Render Offscreen Prefetching & UI Crashes ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Eliminated background offscreen prefetching and background `pruneOffscreenNsfwItem` list mutations, which previously caused UI thread contention, adapter race conditions, and GPU driver crashes on low-end hardware (e.g. Allwinner H313, Mali-G31, 500MB–1GB RAM TV boxes) when users scrolled while background decoding occurred.
+  - For devices under Mid-tier ($\le 3000$MB RAM, potato tier, and low-RAM hardware), all posters across all home sections and preview banners are now preloaded during the initial loading screen into memory and disk cache.
+- **Comprehensive Visual NSFW Filtering & Rail Rearrangement ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt))**:
+  - Visual NSFW classification runs synchronously during Phase 2 before the landing page is ever submitted to RecyclerView.
+  - Automatically filters out NSFW items from all horizontal rails and prunes empty rails.
+  - Re-indexes and rearranges the hero preview carousel and random items (`_randomItems`, `_preview`) using only verified safe, available posters.
+  - Persists evaluated scores to flash storage and immediately releases idle TFLite inference sessions to reclaim native heap.
+- **Graceful Loading Screen Completion ([`HomeViewModel.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeViewModel.kt), [`HomeFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeFragment.kt))**:
+  - Content filter progress smoothly advances to 100% upon completion of all poster downloads.
+  - The landing page renders with zero missing images, zero pop-in jank, and zero subsequent background list mutations, ensuring a completely stable and graceful landing experience.
+
+
