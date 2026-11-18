@@ -140,47 +140,54 @@ object OnDeviceNsfwClassifier {
         val totalMb = DeviceProfile.getTotalRamMb(ctx)
         val isLowEnd = isPotato || tier == DeviceTier.LOW || isLowRamDevice || totalMb <= 2500L
 
+        // Hardware SIMD vectorization: Enable XNNPACK across 64-bit and 32-bit ARM with NEON support
+        val hasNeon = try {
+            val cpu = DeviceProfile.getCpuInfoString().lowercase()
+            has64Bit || cpu.contains("neon") || cpu.contains("asimd")
+        } catch (_: Throwable) { has64Bit }
+        val useXnnpack = hasNeon || has64Bit
+
         return when {
             // Tier 1: Severe resource starvation (critical low memory < 180MB, tight heap < 20MB, or <= 2 cores)
             isLowMem || availMb < 180L || freeHeapMb < 20L || cores <= 2 -> {
                 NsfwExecutionConfig(
-                    preloaderConcurrency = 1,
+                    preloaderConcurrency = 4,
                     maxSessions = 1,
                     interpreterThreads = 1,
-                    useXnnpack = has64Bit,
-                    coroutineDelayMs = 8L,
-                    cpuPacingSleepMs = 10L
+                    useXnnpack = useXnnpack,
+                    coroutineDelayMs = 0L,
+                    cpuPacingSleepMs = 0L
                 )
             }
             // Tier 2: Low-end / potato with healthy resource headroom (>= 350MB free RAM, >= 4 cores, >= 28MB heap)
             isLowEnd && availMb >= 350L && cores >= 4 && freeHeapMb >= 28L -> {
                 NsfwExecutionConfig(
-                    preloaderConcurrency = 2,
+                    preloaderConcurrency = 6,
                     maxSessions = 2,
-                    interpreterThreads = 2,
-                    useXnnpack = has64Bit,
-                    coroutineDelayMs = 2L,
-                    cpuPacingSleepMs = 4L
+                    interpreterThreads = cores.coerceIn(2, 4),
+                    useXnnpack = useXnnpack,
+                    coroutineDelayMs = 0L,
+                    cpuPacingSleepMs = 0L
                 )
             }
             // Tier 3: Standard low-end (e.g. 180MB - 349MB free RAM)
             isLowEnd -> {
                 NsfwExecutionConfig(
-                    preloaderConcurrency = 2,
-                    maxSessions = 1,
-                    interpreterThreads = 1,
-                    useXnnpack = has64Bit,
-                    coroutineDelayMs = 4L,
-                    cpuPacingSleepMs = 6L
+                    preloaderConcurrency = 6,
+                    maxSessions = 2,
+                    interpreterThreads = cores.coerceIn(1, 2),
+                    useXnnpack = useXnnpack,
+                    coroutineDelayMs = 0L,
+                    cpuPacingSleepMs = 0L
                 )
             }
             // Tier 4: High-end device
             tier == DeviceTier.HIGH -> {
                 NsfwExecutionConfig(
-                    preloaderConcurrency = 6,
+                    preloaderConcurrency = 20,
                     maxSessions = cores.coerceIn(3, 4),
-                    interpreterThreads = 3,
-                    useXnnpack = has64Bit,
+                    interpreterThreads = cores.coerceIn(2, 4),
+                    useXnnpack = useXnnpack,
                     coroutineDelayMs = 0L,
                     cpuPacingSleepMs = 0L
                 )
@@ -188,10 +195,10 @@ object OnDeviceNsfwClassifier {
             // Tier 5: Standard / Mid device
             else -> {
                 NsfwExecutionConfig(
-                    preloaderConcurrency = 4,
-                    maxSessions = 2,
+                    preloaderConcurrency = 12,
+                    maxSessions = cores.coerceIn(2, 3),
                     interpreterThreads = 2,
-                    useXnnpack = has64Bit,
+                    useXnnpack = useXnnpack,
                     coroutineDelayMs = 0L,
                     cpuPacingSleepMs = 0L
                 )
@@ -757,13 +764,7 @@ object OnDeviceNsfwClassifier {
                 val score = classifyDrawableScore(appContext, drawable)
                 recordScore(imageKey, score, appContext, dHash)
 
-                // Dynamic hardware-adaptive CPU yield to maintain silky 60fps UI scrolling
-                val pacingSleep = getNsfwExecutionConfig(appContext).cpuPacingSleepMs
-                if (pacingSleep > 0L) {
-                    try {
-                        Thread.sleep(pacingSleep)
-                    } catch (_: InterruptedException) {}
-                }
+                // Direct unthrottled scoring for maximum throughput
 
                 val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
                 mainHandler.post {

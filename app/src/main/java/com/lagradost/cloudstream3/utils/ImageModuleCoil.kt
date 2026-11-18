@@ -103,30 +103,30 @@ object ImageLoader {
         val dispatcher = Dispatcher().apply {
             when (tier) {
                 DeviceTier.LOW -> if (isPotato) {
-                    maxRequests = 16
-                    maxRequestsPerHost = 6
+                    maxRequests = 24
+                    maxRequestsPerHost = 8
                 } else {
-                    maxRequests = 32
-                    maxRequestsPerHost = 12
+                    maxRequests = 40
+                    maxRequestsPerHost = 16
                 }
                 DeviceTier.MID -> {
-                    maxRequests = 64
-                    maxRequestsPerHost = 20
+                    maxRequests = 80
+                    maxRequestsPerHost = 24
                 }
                 DeviceTier.HIGH -> {
-                    maxRequests = 96
-                    maxRequestsPerHost = 32
+                    maxRequests = 128
+                    maxRequestsPerHost = 48
                 }
             }
         }
 
         val connectionPool = ConnectionPool(
             maxIdleConnections = when (tier) {
-                DeviceTier.LOW -> if (isPotato) 3 else 8
-                DeviceTier.MID -> 16
-                DeviceTier.HIGH -> 32
+                DeviceTier.LOW -> if (isPotato) 6 else 12
+                DeviceTier.MID -> 24
+                DeviceTier.HIGH -> 48
             },
-            keepAliveDuration = if (isPotato) 2L else 5L,
+            keepAliveDuration = if (isPotato) 3L else 5L,
             timeUnit = TimeUnit.MINUTES
         )
 
