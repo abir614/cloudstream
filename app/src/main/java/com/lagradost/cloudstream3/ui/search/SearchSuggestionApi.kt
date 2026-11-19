@@ -73,7 +73,7 @@ object SearchSuggestionApi {
             parsed.results
                 ?.filter { it.mediaType == "movie" || it.mediaType == "tv" }
                 ?.mapNotNull { it.title ?: it.name }
-                ?.filter { title -> nsfwEnabled || !NsfwFilterEngine.isNsfwText(title, filterLevel = filterLevel) }
+                ?.filter { title -> nsfwEnabled || !NsfwFilterEngine.isNsfwText(title, level = filterLevel) }
                 ?.distinct()
                 ?.take(10)
                 ?: emptyList()

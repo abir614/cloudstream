@@ -131,7 +131,7 @@ class SearchViewModel : ViewModel() {
         val items = getKeys("$currentAccount/$SEARCH_HISTORY_KEY")?.mapNotNull {
             getKey<SearchHistoryItem>(it)
         }?.filter { item ->
-            nsfwEnabled || !NsfwFilterEngine.isNsfwText(item.searchText, filterLevel = filterLevel)
+            nsfwEnabled || !NsfwFilterEngine.isNsfwText(item.searchText, level = filterLevel)
         }?.sortedByDescending { it.searchedAt } ?: emptyList()
         _currentHistory.postValue(items)
     }

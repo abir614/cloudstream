@@ -696,7 +696,7 @@ object NsfwFilterEngine {
      */
     fun isNsfwText(
         title: String,
-        url: String,
+        url: String = "",
         tags: String? = null,
         level: NsfwFilterLevel = getFilterLevel()
     ): Boolean {

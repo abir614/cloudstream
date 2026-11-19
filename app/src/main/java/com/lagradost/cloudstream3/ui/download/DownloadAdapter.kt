@@ -106,11 +106,11 @@ class DownloadAdapter(
                 }
             }
 
-            val context = itemView.context
+            val context = root.context
             val isAdultAllowed = context.isNsfwEnabled()
             val filterLevel = NsfwFilterEngine.getFilterLevel(context)
-            val isNsfw = NsfwFilterEngine.isNsfwText(data.name, data.url, filterLevel = filterLevel) ||
-                (data.poster?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true)
+            val isNsfw = NsfwFilterEngine.isNsfwText(data.name, data.url, level = filterLevel) ||
+                (data.poster?.let { NsfwFilterEngine.isNsfwUrl(it, level = filterLevel) } == true)
 
             downloadHeaderPoster.apply {
                 if (!isAdultAllowed && isNsfw) {
