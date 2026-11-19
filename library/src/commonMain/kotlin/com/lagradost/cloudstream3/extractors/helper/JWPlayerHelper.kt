@@ -48,7 +48,7 @@ object JwPlayerHelper {
         headers: Map<String, String> = mapOf(),
     ): Boolean {
         val sourceMatches = sourceRegex.findAll(script).flatMap { sourceMatch ->
-            val match = sourceMatch.groupValues.getOrNull(1)?.addMarks("file", "label", "type") ?: return@flatMap emptyList()
+            val match = sourceMatch.groupValues[1].addMarks("file", "label", "type")
             tryParseJson<List<Source>>(match).orEmpty()
         }.toList()
 
@@ -81,11 +81,26 @@ object JwPlayerHelper {
         }
 
         /**
-         * Fallback to searching for HLS streams
+         * Fallback to searching for HLS streams, e.g.
+         *
+         * ```js
+         * var links = {
+         *     "hls2": "https://mmmmmmmmmm.qqqqqqqqqqqq.com/hls2/01/00000/ggggggggg_l/master.m3u8?t=##################&s=123456",
+         *     "hls3": "https://mmmmmmmmmm.qqqqqqqqqqqq.space/#########/hls3/01/00000/ggggggggg_l/master.txt",
+         *     "hls4": "/stream/zzzzzzzzzzzzzzz/hhhhhhhhhhh/123456789/123456/master.m3u8",
+         * };
+         *
+         * jwplayer("vplayer").setup({
+         *     sources: [{
+         *         file: links.hls4 || links.hls3 || links.hls2,
+         *         type: "hls",
+         *     }],
+         * });
+         * ```
          */
         if (extractedLinks.isEmpty()) {
-            extractedLinks = m3u8Regex.findAll(script).toList().mapNotNull { match ->
-                val cleanUrl = match.groupValues.getOrNull(1)?.replace("\\/", "/") ?: return@mapNotNull null
+            extractedLinks = m3u8Regex.findAll(script).toList().map { match ->
+                val cleanUrl = match.groupValues[1].replace("\\/", "/")
                 val isM3u8 = cleanUrl.contains(".m3u8") || cleanUrl.contains(".txt")
                 newExtractorLink(
                     source = sourceName,
@@ -100,19 +115,17 @@ object JwPlayerHelper {
         }
 
         val tracksMatches = tracksRegex.findAll(script).flatMap { trackMatch ->
-            val match = trackMatch.groupValues.getOrNull(1)?.addMarks("file", "kind", "label") ?: return@flatMap emptyList()
+            val match = trackMatch.groupValues[1].addMarks("file", "kind", "label")
             tryParseJson<List<Track>>(match).orEmpty()
         }.toList()
 
         val subtitleFiles = tracksMatches.filter {
             (it.kind.orEmpty().contains("caption") || it.kind.orEmpty()
-                .contains("subtitle")) && !it.file.isNullOrBlank() && !it.label.isNullOrBlank()
-        }.mapNotNull {
-            val label = it.label ?: return@mapNotNull null
-            val file = it.file ?: return@mapNotNull null
+                .contains("subtitle")) && it.file != null && it.label != null
+        }.map {
             newSubtitleFile(
-                lang = label,
-                url = fixUrl(file, mainUrl),
+                lang = it.label!!,
+                url = fixUrl(it.file!!, mainUrl),
             )
         }
 

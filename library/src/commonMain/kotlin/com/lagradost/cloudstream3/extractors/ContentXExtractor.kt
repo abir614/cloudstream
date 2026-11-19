@@ -2,6 +2,7 @@
 
 package com.lagradost.cloudstream3.extractors
 
+import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
@@ -14,7 +15,7 @@ open class ContentX : ExtractorApi() {
         val extRef   = referer ?: ""
 
         val iSource  = app.get(url, referer=extRef).text
-        val iExtract = Regex("""window\.openPlayer\('([^']+)'""").find(iSource)?.groups?.get(1)?.value ?: return
+        val iExtract = Regex("""window\.openPlayer\('([^']+)'""").find(iSource)!!.groups[1]?.value ?: throw ErrorLoadingException("iExtract is null")
 
         val subUrls = mutableSetOf<String>()
         Regex("""\"file\":\"([^\"]+)\",\"label\":\"([^\"]+)\"""").findAll(iSource).forEach {
@@ -32,7 +33,7 @@ open class ContentX : ExtractorApi() {
         }
 
         val vidSource  = app.get("${mainUrl}/source2.php?v=${iExtract}", referer=extRef).text
-        val vidExtract = Regex("""file\":\"([^\"]+)""").find(vidSource)?.groups?.get(1)?.value ?: return
+        val vidExtract = Regex("""file\":\"([^\"]+)""").find(vidSource)!!.groups[1]?.value ?: throw ErrorLoadingException("vidExtract is null")
         val m3uLink    = vidExtract.replace("\\", "")
 
         callback.invoke(
@@ -47,10 +48,10 @@ open class ContentX : ExtractorApi() {
             }
         )
 
-        val iDublaj = Regex(""",\"([^']+)\",\"Türkçe""").find(iSource)?.groups?.get(1)?.value
+        val iDublaj = Regex(""",\"([^']+)\",\"Türkçe""").find(iSource)!!.groups[1]?.value
         if (iDublaj != null) {
             val dublajSource  = app.get("${mainUrl}/source2.php?v=${iDublaj}", referer=extRef).text
-            val dublajExtract = Regex("""file\":\"([^\"]+)""").find(dublajSource)?.groups?.get(1)?.value ?: return
+            val dublajExtract = Regex("""file\":\"([^\"]+)""").find(dublajSource)!!.groups[1]?.value ?: throw ErrorLoadingException("dublajExtract is null")
             val dublajLink    = dublajExtract.replace("\\", "")
 
             callback.invoke(

@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.extractors
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.cloudstream3.ErrorLoadingException
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.base64DecodeArray
@@ -46,23 +47,21 @@ class Megacloud : Rabbitstream() {
 
     private suspend fun getKeys(): List<List<Int>> {
         val script = app.get(scriptUrl).text
-        fun matchingKey(value: String): String? {
-            return Regex(",$value=((?:0x)?([0-9a-fA-F]+))").find(script)?.groupValues?.getOrNull(1)
-                ?.removePrefix("0x")
+        fun matchingKey(value: String): String {
+            return Regex(",$value=((?:0x)?([0-9a-fA-F]+))").find(script)?.groupValues?.get(1)
+                ?.removePrefix("0x") ?: throw ErrorLoadingException("Failed to match the key")
         }
 
         val regex = Regex("case\\s*0x[0-9a-f]+:(?![^;]*=partKey)\\s*\\w+\\s*=\\s*(\\w+)\\s*,\\s*\\w+\\s*=\\s*(\\w+);")
-        val indexPairs = regex.findAll(script).toList().mapNotNull { match ->
-            val v1 = match.groupValues.getOrNull(1) ?: return@mapNotNull null
-            val v2 = match.groupValues.getOrNull(2) ?: return@mapNotNull null
-            val matchKey1 = matchingKey(v1) ?: return@mapNotNull null
-            val matchKey2 = matchingKey(v2) ?: return@mapNotNull null
+        val indexPairs = regex.findAll(script).toList().map { match ->
+            val matchKey1 = matchingKey(match.groupValues[1])
+            val matchKey2 = matchingKey(match.groupValues[2])
             try {
                 listOf(matchKey1.toInt(16), matchKey2.toInt(16))
             } catch (_: NumberFormatException) {
-                null
+                emptyList()
             }
-        }
+        }.filter { it.isNotEmpty() }
 
         return indexPairs
     }

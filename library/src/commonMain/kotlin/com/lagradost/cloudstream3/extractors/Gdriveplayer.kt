@@ -91,10 +91,8 @@ open class Gdriveplayer : ExtractorApi() {
         val sourceData = decryptedData?.substringAfter("sources:[")?.substringBefore("],")
         val subData = decryptedData?.substringAfter("tracks:[")?.substringBefore("],")
 
-        Regex("\"file\":\"(\\S+?)\".*?res=(\\d+)").findAll(sourceData ?: return).mapNotNull {
-            val link = it.groupValues.getOrNull(1) ?: return@mapNotNull null
-            val quality = it.groupValues.getOrNull(2) ?: return@mapNotNull null
-            link to quality
+        Regex("\"file\":\"(\\S+?)\".*?res=(\\d+)").findAll(sourceData ?: return).map {
+            it.groupValues[1] to it.groupValues[2]
         }.toList().distinctBy { it.second }.map { (link, quality) ->
             callback.invoke(
                 newExtractorLink(

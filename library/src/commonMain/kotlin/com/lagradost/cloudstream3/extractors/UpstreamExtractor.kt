@@ -17,6 +17,7 @@ open class UpstreamExtractor : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ) {
+        //Log.i(this.name, "Result => (no extractor) ${url}")
         val doc = app.get(url, referer = referer).text
         if (doc.isNotBlank()) {
             var reg = Regex("(?<=master)(.*)(?=hls)")
@@ -24,7 +25,7 @@ open class UpstreamExtractor : ExtractorApi() {
                 it.trim('|')
             }?.toList()
             reg = Regex("(?<=\\|file\\|)(.*)(?=\\|remove\\|)")
-            val domainList = reg.find(doc)?.groupValues?.getOrNull(1)?.split("|")
+            val domainList = reg.find(doc)?.groupValues?.get(1)?.split("|")
             var domain = when (!domainList.isNullOrEmpty()) {
                 true -> {
                     if (domainList.isNotEmpty()) {
@@ -39,8 +40,10 @@ open class UpstreamExtractor : ExtractorApi() {
                 }
                 false -> ""
             }
+            //Log.i(this.name, "Result => (domain) ${domain}")
             if (domain.isEmpty()) {
                 domain = "s96.upstreamcdn.co"
+                //Log.i(this.name, "Result => (default domain) ${domain}")
             }
 
             result?.forEach {

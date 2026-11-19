@@ -3,6 +3,11 @@ package com.lagradost.cloudstream3.extractors
 import com.lagradost.cloudstream3.utils.*
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.SubtitleFile
+import com.lagradost.cloudstream3.USER_AGENT
+import com.lagradost.cloudstream3.newSubtitleFile
+import com.lagradost.cloudstream3.utils.*
+
+// import android.util.Log
 
 class Uqload1 : Uqload() {
     override var mainUrl = "https://uqload.com"
@@ -34,7 +39,8 @@ open class Uqload : ExtractorApi() {
         callback: (ExtractorLink) -> Unit
     ) {
         with(app.get(url)) {  // raised error ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED (3003) is due to the response: "error_nofile"
-            srcRegex.find(this.text)?.groupValues?.getOrNull(1)?.let { link ->
+            srcRegex.find(this.text)?.groupValues?.get(1)?.let { link ->
+                // Log.d("CS3debugUQload","decoded URL: $link")
                 callback.invoke(
                     newExtractorLink(
                         source = name,

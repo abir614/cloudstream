@@ -33,15 +33,13 @@ open class SecvideoOnline : ExtractorApi() {
 
             for (file in files) {
                 val labelAndSourceMatch = labelSourceRegex.find(file) ?: continue
-                val sourceUrl = labelAndSourceMatch.groupValues.getOrNull(2) ?: continue
-                val qualityStr = labelAndSourceMatch.groupValues.getOrNull(1) ?: ""
                 callback.invoke(
                     newExtractorLink(
                         source = name,
                         name = name,
-                        url = sourceUrl
+                        url = labelAndSourceMatch.groupValues[2]
                     ) {
-                        quality = qualityStr.replace("p", "").toIntOrNull()
+                        quality = labelAndSourceMatch.groupValues[1].replace("p", "").toIntOrNull()
                             ?: Qualities.Unknown.value
                         this.type = ExtractorLinkType.VIDEO
                     }
@@ -55,12 +53,10 @@ open class SecvideoOnline : ExtractorApi() {
 
             for (subtitle in subtitles) {
                 val languageAndSourceMatch = labelSourceRegex.find(subtitle) ?: continue
-                val lang = languageAndSourceMatch.groupValues.getOrNull(1) ?: continue
-                val subUrl = languageAndSourceMatch.groupValues.getOrNull(2) ?: continue
                 subtitleCallback.invoke(
                     newSubtitleFile(
-                        lang = lang,
-                        url = subUrl
+                        lang = languageAndSourceMatch.groupValues[1],
+                        url = languageAndSourceMatch.groupValues[2]
                     )
                 )
             }

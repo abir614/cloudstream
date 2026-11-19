@@ -7,6 +7,8 @@ import kotlinx.serialization.Serializable
 
 class WcoHelper {
     companion object {
+        private const val BACKUP_KEY_DATA = "github_keys_backup"
+
         @Serializable
         data class ExternalKeys(
             @JsonProperty("wco_key") @SerialName("wco_key") val wcoKey: String? = null,

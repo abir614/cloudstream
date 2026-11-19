@@ -916,6 +916,33 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Differentiated between initial visible viewport and offscreen rail posters during low-end preloading: offscreen posters already stored in disk cache (`isDiskCached == true`) and scored (`isScored == true`) bypass redundant decoding on warm start, while only the top visible cards are warmed into memory.
   - Reduced warm start homepage loading duration on low-end hardware from multiple seconds down to ~30–50ms.
 
+### 16.45 Upstream v4.9.1 Synchronization & Feature-Stream Hardening
+- **HW+ Video Engine & Decoder Resilience ([`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt), [`FixedNextRenderersFactory.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/FixedNextRenderersFactory.kt))**:
+  - Synchronized upstream HW+ video decoding (`#3312`) featuring `FixedNextRenderersFactoryWithoutVideo` to support hardware video decoding coupled with software audio decoding.
+  - Hardened with `DeviceProfile.hasBrokenHardwareGpu()`: on Mali-G31 and weak GPU SoCs (Allwinner H313, Rockchip RK3528), automatically forces safe decoder fallback to prevent GPU driver crashes (`libGLES_mali.so`).
+- **External Kodi Player Action ([`KodiPackage.kt`](app/src/main/java/com/lagradost/cloudstream3/actions/temp/KodiPackage.kt), [`VideoClickAction.kt`](app/src/main/java/com/lagradost/cloudstream3/actions/VideoClickAction.kt), [`AndroidManifest.xml`](app/src/main/AndroidManifest.xml))**:
+  - Ported upstream Kodi playback package (`#3328`) with safe defensive indexing and header pipe-delimited intent URLs. Declared package visibility in `<queries>`.
+- **Jetpack Compose Extensions Screen & Sandboxed Management ([`AndroidRepositoryManager.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/extensions/AndroidRepositoryManager.kt), [`ExtensionsScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/extensions/ExtensionsScreen.kt), [`ExtensionsViewModel2.kt`](shared/src/commonMain/kotlin/com/lagradost/cloudstream4/viewmodels/ExtensionsViewModel2.kt))**:
+  - Synchronized complete Jetpack Compose Extensions & Repositories screen (`#3258`) across Android and Multiplatform Compose targets.
+  - Hardened all plugin lifecycle operations to route through `PluginFingerprintStore` (TOFU pinning) and `PluginManager.loadPlugin` (`ShieldedClassLoader` and `SandboxedContextWrapper`).
+  - Enforced zero-leak adult content filtering across repository listings, search, and downloads via `NsfwFilterEngine.isNsfwProvider` and `isNsfwText`.
+- **Home Hero Banner Shimmer & Dimensions ([`HomeParentItemAdapterPreview.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeParentItemAdapterPreview.kt), [`loading_hero_banner.xml`](app/src/main/res/layout/loading_hero_banner.xml), [`fragment_home.xml`](app/src/main/res/layout/fragment_home.xml), [`fragment_home_tv.xml`](app/src/main/res/layout/fragment_home_tv.xml))**:
+  - Synchronized hero banner shimmer layout and matching dimensions (`#3143`), while strictly preserving custom TV focus outline styling (`@drawable/outline`), elevation hoists (`translationZ = 24f`), and ambient loading cards.
+- **Provider & Sync Hardening ([`AniListApi.kt`](app/src/main/java/com/lagradost/cloudstream3/syncproviders/providers/AniListApi.kt), [`TheIntroDBSkip.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/videoskip/TheIntroDBSkip.kt), [`APIRepository.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/APIRepository.kt), [`ResultViewModel2.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/result/ResultViewModel2.kt))**:
+  - Updated AniList API GraphQL parser with nullable dates, dynamic mutation variable omission, and GraphQL error trapping (`#3300`) with test suite (`AniListParsingTest.kt`).
+  - Upgraded TheIntroDB to v4 endpoint (`5cddd5b36`).
+  - Deduplicated `APIRepository` observer registration into `companion object` (`#3288`) with test suite (`APIRepositoryObserverTest.kt`).
+  - Resolved Chromecast episode indexing within selected season (`#3275`).
+- **System, Storage & Preferences ([`DirectoryPicker.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/utils/DirectoryPicker.kt), [`SettingsGeneralScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsGeneralScreen.kt), [`SettingsUpdatesScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsUpdatesScreen.kt), [`CommonActivity.kt`](app/src/main/java/com/lagradost/cloudstream3/CommonActivity.kt))**:
+  - Handled non-persistable SAF provider grants safely without crashing (`#3252`).
+  - Applied DNS preferences immediately before network client re-initialization (`3afed626f`).
+  - Enqueued WorkManager periodic tasks on backup frequency changes (`ad44a64f0`).
+  - Suppressed Android 13 notification permission prompt while biometric authentication is active (`#3256`).
+- **Weblate Localizations & v4.9.1 Version Bump ([`gradle/libs.versions.toml`](gradle/libs.versions.toml), [`library/api/jvm/library.api`](library/api/jvm/library.api))**:
+  - Synchronized translation updates across 20+ languages and Fastlane Store descriptions.
+  - Removed deprecated `@Prerelease` extractor annotations, bumped base version to `4.9.1` (`versionCode = "69"`), and updated binary compatibility validator signatures.
+
+
 
 
 

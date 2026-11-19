@@ -28,12 +28,9 @@ import kotlin.math.round
 
 // Taken from https://github.com/terrakok/FuzzyKot/blob/f794d43/fuzzykot/src/commonMain/kotlin/com/github/terrakok/fuzzykot/Levenshtein.kt
 object Levenshtein {
-    var nativeFuzzyRatioProvider: ((String, String) -> Int?)? = null
-
     fun ratio(s1: String, s2: String, processor: (String) -> String = { it }): Int {
         val p1 = processor(s1)
         val p2 = processor(s2)
-        nativeFuzzyRatioProvider?.invoke(p1, p2)?.let { return it }
         return round(100 * basicRatio(p1, p2)).toInt()
     }
 
@@ -74,8 +71,6 @@ object Levenshtein {
     }
 
     private fun basicRatio(s1: String, s2: String): Double {
-        val nativeScore = nativeFuzzyRatioProvider?.invoke(s1, s2)
-        if (nativeScore != null) return nativeScore / 100.0
         val lensum = s1.length + s2.length
         if (lensum == 0) return 1.0
         val editDistance = levEditDistance(s1, s2, 1)

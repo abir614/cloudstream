@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fleeksoft.ksoup.Ksoup
 import com.lagradost.cloudstream3.AudioFile
 import com.lagradost.cloudstream3.IDownloadableMinimum
-import com.lagradost.cloudstream3.Prerelease
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
@@ -339,9 +338,6 @@ import io.ktor.http.decodeURLPart
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.withTimeout
-import kotlin.coroutines.coroutineContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -470,7 +466,6 @@ val INFER_TYPE: ExtractorLinkType? = null
  *
  * ClearKey is supported on Android devices running Android 5.0 (API Level 21) and up.
  */
-@Prerelease
 val CLEARKEY_DRM_UUID = Uuid.fromLongs(-0x1d8e62a7567a4c37L, 0x781AB030AF78D30EL)
 
 /**
@@ -479,7 +474,6 @@ val CLEARKEY_DRM_UUID = Uuid.fromLongs(-0x1d8e62a7567a4c37L, 0x781AB030AF78D30EL
  *
  * Widevine is supported on Android devices running Android 4.3 (API Level 18) and up.
  */
-@Prerelease
 val WIDEVINE_DRM_UUID = Uuid.fromLongs(-0x121074568629b532L, -0x5c37d8232ae2de13L)
 
 /**
@@ -489,7 +483,6 @@ val WIDEVINE_DRM_UUID = Uuid.fromLongs(-0x121074568629b532L, -0x5c37d8232ae2de13
  * PlayReady is supported on all AndroidTV devices. Note that most other Android devices do not
  * provide PlayReady support.
  */
-@Prerelease
 val PLAYREADY_DRM_UUID = Uuid.fromLongs(-0x65fb0f8667bfbd7aL, -0x546d19a41f77a06bL)
 
 // Deprecate after next stable
@@ -551,7 +544,6 @@ suspend fun newDrmExtractorLink(
     return builder
 }
 
-@Prerelease
 suspend fun newDrmExtractorLink(
     source: String,
     name: String,
@@ -931,18 +923,6 @@ suspend fun loadExtractor(
 }
 
 
-internal const val PER_SOURCE_TIMEOUT_MS = 5_000L
-
-private val cleanMainUrlCache: MutableMap<String, String> = mutableMapOf()
-
-internal fun ExtractorApi.getCleanMainUrl(): String {
-    return cleanMainUrlCache[mainUrl] ?: synchronized(cleanMainUrlCache) {
-        cleanMainUrlCache.getOrPut(mainUrl) {
-            mainUrl.replace(schemaStripRegex, "")
-        }
-    }
-}
-
 /**
  * Tries to load the appropriate extractor based on link, returns true if any extractor is loaded.
  * */
@@ -962,15 +942,13 @@ suspend fun loadExtractor(
     // Iterate in reverse order so the new registered ExtractorApi takes priority
     for (index in extractorApis.lastIndex downTo 0) {
         val extractor = extractorApis[index]
-        if (compareUrl.startsWith(extractor.getCleanMainUrl())) {
+        if (compareUrl.startsWith(extractor.mainUrl.replace(schemaStripRegex, ""))) {
             try {
-                withTimeout(PER_SOURCE_TIMEOUT_MS) {
-                    extractor.getUrl(currentUrl, referer, subtitleCallback, callback)
-                }
+                extractor.getUrl(currentUrl, referer, subtitleCallback, callback)
             } catch (e: Exception) {
                 logError(e)
-                // Rethrow only if the parent coroutine scope itself was cancelled, not if individual extractor timed out
-                if (e is CancellationException && !coroutineContext.isActive) {
+                // Rethrow if we have timed out
+                if (e is CancellationException) {
                     throw e
                 }
             }
@@ -981,27 +959,17 @@ suspend fun loadExtractor(
     // this is to match mirror domains - like example.com, example.net
     for (index in extractorApis.lastIndex downTo 0) {
         val extractor = extractorApis[index]
-        val cleanUrl = extractor.getCleanMainUrl()
-        // Fast pre-filter: skip completely dissimilar domains before running O(N*M) Levenshtein
-        if (cleanUrl.isNotEmpty() && !currentUrl.contains(cleanUrl, ignoreCase = true)) {
-            val minLen = minOf(4, cleanUrl.length)
-            if (minLen > 0 && !compareUrl.regionMatches(0, cleanUrl, 0, minLen, ignoreCase = true)) {
-                continue
-            }
-        }
         if (Levenshtein.partialRatio(
                 extractor.mainUrl,
                 currentUrl
             ) > 80
         ) {
             try {
-                withTimeout(PER_SOURCE_TIMEOUT_MS) {
-                    extractor.getUrl(currentUrl, referer, subtitleCallback, callback)
-                }
+                extractor.getUrl(currentUrl, referer, subtitleCallback, callback)
             } catch (e: Exception) {
                 logError(e)
-                // Rethrow only if the parent coroutine scope itself was cancelled, not if individual extractor timed out
-                if (e is CancellationException && !coroutineContext.isActive) {
+                // Rethrow if we have timed out
+                if (e is CancellationException) {
                     throw e
                 }
             }
@@ -1456,6 +1424,10 @@ abstract class ExtractorApi {
 
     /** Determines which plugin a given provider is from. This is the full path to the plugin. */
     var sourcePlugin: String? = null
+
+    //suspend fun getSafeUrl(url: String, referer: String? = null): List<ExtractorLink>? {
+    //    return safeAsync { getUrl(url, referer) }
+    //}
 
     // this is the new extractorapi, override to add subtitles and stuff
     @Throws

@@ -3,6 +3,7 @@
 package com.lagradost.cloudstream3.extractors
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.cloudstream3.ErrorLoadingException
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.USER_AGENT
 import com.lagradost.cloudstream3.app
@@ -39,11 +40,11 @@ open class Odnoklassniki : ExtractorApi() {
         val embedUrl = url.replace("/video/", "/videoembed/")
         val videoReq = app.get(embedUrl, headers = headers).text.replace("\\&quot;", "\"").replace("\\\\", "\\")
             .replace(Regex("\\\\u([0-9A-Fa-f]{4})")) { matchResult ->
-                matchResult.groupValues.getOrNull(1)?.toIntOrNull(16)?.toChar()?.toString() ?: matchResult.value
+                matchResult.groupValues[1].toInt(16).toChar().toString()
             }
 
-        val videosStr = Regex(""""videos":(\[[^]]*])""").find(videoReq)?.groupValues?.getOrNull(1) ?: return
-        val videos = tryParseJson<List<OkRuVideo>>(videosStr) ?: return
+        val videosStr = Regex(""""videos":(\[[^]]*])""").find(videoReq)?.groupValues?.get(1) ?: throw ErrorLoadingException("Video not found")
+        val videos = tryParseJson<List<OkRuVideo>>(videosStr) ?: throw ErrorLoadingException("Video not found")
         for (video in videos) {
             val videoUrl = if (video.url.startsWith("//")) "https:${video.url}" else video.url
             val quality = video.name.uppercase()

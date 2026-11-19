@@ -3,7 +3,8 @@ package com.lagradost.cloudstream3.extractors
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.utils.AppUtils.tryParseJson
+import com.lagradost.cloudstream3.base64Decode
+import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorApi
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.getQualityFromName
@@ -26,7 +27,7 @@ open class GUpload: ExtractorApi() {
         val response = app.get(url, referer = referer).text
 
         val playerConfigString = response.substringAfter("const config = ").substringBefore(";")
-        val playerConfig = tryParseJson<VideoInfo>(playerConfigString) ?: return
+        val playerConfig = parseJson<VideoInfo>(playerConfigString)
 
         callback.invoke(
             newExtractorLink(
@@ -34,7 +35,7 @@ open class GUpload: ExtractorApi() {
                 name = name,
                 url = playerConfig.videoUrl,
             ) {
-                Regex("/(\\d+p)\\.").find(playerConfig.videoUrl)?.groupValues?.getOrNull(1)?.let {
+                Regex("/(\\d+p)\\.").find(playerConfig.videoUrl)?.groupValues?.get(1)?.let {
                     quality = getQualityFromName(it)
                 }
             }

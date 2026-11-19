@@ -18,13 +18,13 @@ open class Acefile : ExtractorApi() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit,
     ) {
-        val id = "/(?:d|download|player|f|file)/(\\w+)".toRegex().find(url)?.groupValues?.getOrNull(1) ?: return
-        val script = getAndUnpack(app.get("$mainUrl/player/$id").text)
-        val service = """service\s*=\s*['"]([^'"]+)""".toRegex().find(script)?.groupValues?.getOrNull(1) ?: return
-        val serverUrl = """['"](\S+check&id\S+?)['"]""".toRegex().find(script)?.groupValues?.getOrNull(1)
-            ?.replace("\"+service+\"", service) ?: return
+        val id = "/(?:d|download|player|f|file)/(\\w+)".toRegex().find(url)?.groupValues?.get(1)
+        val script = getAndUnpack(app.get("$mainUrl/player/${id ?: return}").text)
+        val service = """service\s*=\s*['"]([^'"]+)""".toRegex().find(script)?.groupValues?.get(1)
+        val serverUrl = """['"](\S+check&id\S+?)['"]""".toRegex().find(script)?.groupValues?.get(1)
+            ?.replace("\"+service+\"", service ?: return)
 
-        val video = app.get(serverUrl, referer = "$mainUrl/").parsedSafe<Source>()?.data
+        val video = app.get(serverUrl ?: return, referer = "$mainUrl/").parsedSafe<Source>()?.data
 
         callback.invoke(
             newExtractorLink(

@@ -2,6 +2,7 @@
 
 package com.lagradost.cloudstream3.extractors
 
+import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 
@@ -13,8 +14,9 @@ open class SibNet : ExtractorApi() {
     override suspend fun getUrl(url: String, referer: String?, subtitleCallback: (SubtitleFile) -> Unit, callback: (ExtractorLink) -> Unit) {
         val extRef  = referer ?: ""
         val iSource = app.get(url, referer=extRef).text
-        val m3uRaw = Regex("""player.src\(\[\{src: \"([^\"]+)""").find(iSource)?.groupValues?.getOrNull(1) ?: return
-        val m3uLink = "${mainUrl}${m3uRaw}"
+        var m3uLink = Regex("""player.src\(\[\{src: \"([^\"]+)""").find(iSource)?.groupValues?.get(1) ?: throw ErrorLoadingException("m3u link not found")
+
+        m3uLink = "${mainUrl}${m3uLink}"
 
         callback.invoke(
             newExtractorLink(

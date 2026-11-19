@@ -19,13 +19,11 @@
         <item>Google</item>
         <item>Cloudflare</item>
         <!--        <item>OpenDns</item>-->
-        <item>AdGuard (Unfiltered)</item>
+        <item>AdGuard</item>
         <item>DNS.WATCH</item>
         <item>Quad9</item>
         <item>DNS.SB</item>
         <item>Canadian Shield</item>
-        <item>Cloudflare (Mozilla)</item>
-        <item>Resilient Multi-Tier (Mozilla+Quad9 -> CF+Google)</item>
     </array>
     <array name="dns_pref_values">
         <item>0</item>
@@ -37,8 +35,6 @@
         <item>6</item>
         <item>7</item>
         <item>8</item>
-        <item>9</item>
-        <item>10</item>
     </array>
 
     <array name="title_info_pref_names">

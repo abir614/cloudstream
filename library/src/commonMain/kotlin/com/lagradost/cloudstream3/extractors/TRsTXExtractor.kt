@@ -3,10 +3,12 @@
 package com.lagradost.cloudstream3.extractors
 
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.lagradost.api.Log
 import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 open class TRsTX : ExtractorApi() {
     override val name = "TRsTX"
@@ -21,10 +23,16 @@ open class TRsTX : ExtractorApi() {
     ) {
         val extRef = referer ?: ""
         val videoReq = app.get(url, referer = extRef).text
-        val file = Regex("""file\":\"([^\"]+)""").find(videoReq)?.groupValues?.getOrNull(1) ?: return
+        val file = Regex("""file\":\"([^\"]+)""").find(videoReq)?.groupValues?.get(1) ?: throw ErrorLoadingException("File not found")
         val postLink = "$mainUrl/" + file.replace("\\", "")
-        val postJson: List<TrstxVideoData> = app.post(postLink, referer = extRef)
-            .parsedSafe<List<TrstxVideoData>>()?.drop(1) ?: return
+        val rawList = app.post(postLink, referer = extRef).parsedSafe<List<JsonElement>>() ?: throw ErrorLoadingException("Post link not found")
+        val postJson: List<TrstxVideoData> = rawList.drop(1).map { item ->
+            val mapItem = item as Map<*, *>
+            TrstxVideoData(
+                title = mapItem["title"] as? String,
+                file = mapItem["file"] as? String,
+            )
+        }
 
         val vidLinks = mutableSetOf<String>()
         val vidMap = mutableListOf<Map<String, String>>()

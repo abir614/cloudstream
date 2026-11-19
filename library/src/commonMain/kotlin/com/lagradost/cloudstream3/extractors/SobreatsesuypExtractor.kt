@@ -7,6 +7,7 @@ import com.lagradost.cloudstream3.*
 import com.lagradost.cloudstream3.utils.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 open class Sobreatsesuyp : ExtractorApi() {
     override val name = "Sobreatsesuyp"
@@ -21,10 +22,16 @@ open class Sobreatsesuyp : ExtractorApi() {
     ) {
         val extRef = referer ?: ""
         val videoReq = app.get(url, referer = extRef).text
-        val file = Regex("""file\":\"([^\"]+)""").find(videoReq)?.groupValues?.getOrNull(1) ?: return
+        val file = Regex("""file\":\"([^\"]+)""").find(videoReq)?.groupValues?.get(1) ?: throw ErrorLoadingException("File not found")
         val postLink = "$mainUrl/" + file.replace("\\", "")
-        val postJson: List<SobreatsesuypVideoData> = app.post(postLink, referer = extRef)
-            .parsedSafe<List<SobreatsesuypVideoData>>()?.drop(1) ?: return
+        val rawList = app.post(postLink, referer = extRef).parsedSafe<List<JsonElement>>() ?: throw ErrorLoadingException("Post link not found")
+        val postJson: List<SobreatsesuypVideoData> = rawList.drop(1).map { item ->
+            val mapItem = item as Map<*, *>
+            SobreatsesuypVideoData(
+                title = mapItem["title"] as? String,
+                file = mapItem["file"] as? String,
+            )
+        }
 
         for (item in postJson) {
             if (item.file == null || item.title == null) continue
