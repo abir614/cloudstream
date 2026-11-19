@@ -265,7 +265,7 @@ object AndroidRepositoryManager : RepositoryManager {
             com.lagradost.cloudstream3.APIHolder.apis.filter { api ->
                 api.sourcePlugin == file.absolutePath && com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.isNsfwProvider(api)
             }.forEach {
-                com.lagradost.cloudstream3.plugins.PluginManager.removePluginMapping(it)
+                com.lagradost.cloudstream3.APIHolder.removePluginMapping(it)
             }
         }
 

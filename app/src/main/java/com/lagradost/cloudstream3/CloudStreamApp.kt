@@ -196,7 +196,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             com.lagradost.cloudstream3.services.ExtensionSandboxClient.bind(this)
 
             // Wire native high-performance accelerators into core library hooks
-            com.lagradost.cloudstream3.utils.Levenshtein.nativeFuzzyRatioProvider = { s1, s2 ->
+            com.lagradost.cloudstream3.utils.Levenshtein.nativeFuzzyRatioProvider = { s1: String, s2: String ->
                 com.lagradost.cloudstream3.services.NativeCoreBridge.fuzzyRatio(s1, s2)
             }
             com.lagradost.cloudstream3.utils.JsUnpacker.nativeUnpacker = { script ->
