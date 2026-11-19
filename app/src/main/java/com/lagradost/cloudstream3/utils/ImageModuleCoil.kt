@@ -38,6 +38,7 @@ import com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel
 import com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
+import kotlinx.coroutines.Dispatchers
 import com.lagradost.cloudstream3.network.SafeDns
 import com.lagradost.cloudstream3.network.addAdGuardDns
 import com.lagradost.cloudstream3.network.addCanadianShieldDns
@@ -103,11 +104,11 @@ object ImageLoader {
         val dispatcher = Dispatcher().apply {
             when (tier) {
                 DeviceTier.LOW -> if (isPotato) {
-                    maxRequests = 24
-                    maxRequestsPerHost = 8
+                    maxRequests = 10
+                    maxRequestsPerHost = 4
                 } else {
-                    maxRequests = 40
-                    maxRequestsPerHost = 16
+                    maxRequests = 20
+                    maxRequestsPerHost = 6
                 }
                 DeviceTier.MID -> {
                     maxRequests = 80
@@ -176,10 +177,17 @@ object ImageLoader {
     internal fun buildImageLoader(context: PlatformContext): ImageLoader {
         val isBrokenHardware = hasPotentialBrokenHardware()
         val tier = DeviceProfile.tier(context)
+        val isPotato = DeviceProfile.isUltraPotato(context)
         val config = DeviceProfile.getCoilConfig(context)
         val httpClient = getImageHttpClient(context)
+        val coilDispatcher = if (isPotato || tier == DeviceTier.LOW) {
+            Dispatchers.IO.limitedParallelism(3)
+        } else {
+            Dispatchers.IO.limitedParallelism(8)
+        }
 
         return ImageLoader.Builder(context)
+            .coroutineContext(coilDispatcher)
             .crossfade(config.crossfadeMs)
             .allowHardware(SDK_INT >= 28 && !isBrokenHardware && config.allowHardwareBitmaps)
             .diskCachePolicy(CachePolicy.ENABLED)

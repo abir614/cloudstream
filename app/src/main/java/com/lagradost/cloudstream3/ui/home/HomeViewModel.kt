@@ -656,7 +656,11 @@ class HomeViewModel : ViewModel() {
                                 }
                             }
                         }
-                        val overallTimeoutMs = if (isLowEnd) 12000L else 6000L
+                        val overallTimeoutMs = if (isLowEnd) {
+                            (totalPosters * 3000L).coerceIn(40000L, 180000L)
+                        } else {
+                            10000L
+                        }
                         withTimeoutOrNull(overallTimeoutMs) {
                             workers.awaitAll()
                         }
@@ -713,10 +717,6 @@ class HomeViewModel : ViewModel() {
 
                 // Persist visual classification scores to flash disk
                 com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(preloaderContext)
-                if (isLowEnd) {
-                    // Release TFLite inference session to reclaim native memory before rendering the landing page
-                    com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
-                }
             }
 
             // 4. Loading screen finishes & landing page loads gracefully
