@@ -468,7 +468,6 @@ class HomeViewModel : ViewModel() {
                     context?.filterSearchResultByFilmQuality(filteredHomeItems.shuffled())
                         ?: filteredHomeItems.shuffled()
 
-                _randomItems.postValue(randomItems)
                 currentShuffledList = randomItems
 
                 val targetApi = repo?.api ?: noneApi
@@ -565,7 +564,8 @@ class HomeViewModel : ViewModel() {
                         val isMemCached = try {
                             imageLoader.memoryCache?.get(coil3.memory.MemoryCache.Key(target.posterUrl)) != null
                         } catch (_: Throwable) { false }
-                        !isMemCached
+                        val isScored = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.getCachedScore(target.posterUrl, preloaderContext) != null || NsfwFilterEngine.isCleanTitleAllowed(target.name)
+                        !isMemCached || (shouldFilter && !isScored)
                     }
                 }
 
