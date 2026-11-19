@@ -19,6 +19,7 @@ import com.lagradost.cloudstream3.plugins.PluginManager
 import com.lagradost.cloudstream3.plugins.PluginManager.getPluginPath
 import com.lagradost.cloudstream3.plugins.PluginWrapper
 import com.lagradost.cloudstream3.plugins.RepositoryManager
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.txt
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.Coroutines.main
@@ -90,9 +91,13 @@ class PluginsViewModel : ViewModel() {
             ioSafe {
                 if (activity == null) return@ioSafe
                 val plugins = getPlugins(repository)
+                val isAdult = activity.isNsfwEnabled()
 
                 plugins.filter { pluginWrapper ->
-                    !isDownloaded(
+                    val isPluginNsfw = pluginWrapper.plugin.tvTypes?.contains(TvType.NSFW.name) == true ||
+                        pluginWrapper.plugin.tvTypes?.any { t -> t.equals("nsfw", ignoreCase = true) } == true ||
+                        com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.isNsfwText(pluginWrapper.plugin.name, pluginWrapper.plugin.url)
+                    (!isPluginNsfw || isAdult) && !isDownloaded(
                         activity,
                         pluginWrapper.plugin.internalName,
                         repository.url
@@ -200,9 +205,7 @@ class PluginsViewModel : ViewModel() {
     }
 
     private suspend fun updatePluginListPrivate(context: Context, repositories: List<RepositoryData>) {
-        val isAdult = PreferenceManager.getDefaultSharedPreferences(context)
-            .getStringSet(context.getString(R.string.prefer_media_type_key), emptySet())
-            ?.contains(TvType.NSFW.ordinal.toString()) == true
+        val isAdult = context.isNsfwEnabled()
 
         val accumulated = java.util.Collections.synchronizedList(mutableListOf<PluginViewData>())
         val seenUrls = java.util.Collections.synchronizedSet(mutableSetOf<String>())
@@ -211,7 +214,10 @@ class PluginsViewModel : ViewModel() {
         repositories.amap { repository ->
             val repoPlugins = getPlugins(repository)
             val filtered = repoPlugins.filter {
-                it.plugin.tvTypes?.contains(TvType.NSFW.name) != true || isAdult
+                val isPluginNsfw = it.plugin.tvTypes?.contains(TvType.NSFW.name) == true ||
+                    it.plugin.tvTypes?.any { t -> t.equals("nsfw", ignoreCase = true) } == true ||
+                    com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.isNsfwText(it.plugin.name, it.plugin.url)
+                !isPluginNsfw || isAdult
             }.map { plugin ->
                 PluginViewData(plugin, isDownloaded(context, plugin.plugin.internalName, plugin.repositoryData.url))
             }.filter {

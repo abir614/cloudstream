@@ -1538,7 +1538,10 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                         val isAdultAllowed = ctx.isNsfwEnabled()
                         val filterLevel = NsfwFilterEngine.getFilterLevel(ctx)
                         val isNsfw = NsfwFilterEngine.isNsfwText(d.title, d.url, d.tags.joinToString(" "), filterLevel) ||
-                            (d.posterImage ?: d.posterBackgroundImage)?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true
+                            (d.posterImage ?: d.posterBackgroundImage)?.let {
+                                NsfwFilterEngine.isNsfwUrl(it, filterLevel) ||
+                                com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.isCachedNsfw(it, ctx, filterLevel)
+                            } == true
 
                         if (!isAdultAllowed && isNsfw) {
                             resultviewPreviewPoster.setImageDrawable(null)

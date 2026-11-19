@@ -224,9 +224,10 @@ object OnDeviceNsfwClassifier {
 
         // Robust YCbCr human skin chrominance cluster (light, medium, and dark skin tones)
         val isSkinChrominance = y in 50..245 && cb in 75..135 && cr in 130..180 && r > g && (r - b) >= 10 && (r - g) >= 8
-        // Stylized anime/illustrated peach tones & pale anime tones
+        // Stylized anime/illustrated peach tones, pale anime tones & pinkish anime highlights
         val isAnimeSkin = (r in 190..255 && g in 160..248 && b in 140..240 && r >= g && (r - b) in 6..75) ||
-                          (r in 240..255 && g in 215..245 && b in 195..235 && (r - g) in 4..25 && (r - b) in 10..40)
+                          (r in 240..255 && g in 215..245 && b in 195..235 && (r - g) in 4..25 && (r - b) in 10..40) ||
+                          (r in 220..255 && g in 180..245 && b in 180..245 && r >= g && r >= b && (r - minOf(g, b)) in 4..65)
         // Darker human skin tones
         val isDarkerSkin = r in 70..190 && g in 45..150 && b in 25..110 && r > g && g > b && (r - b) >= 12 && (r - g) >= 8
 
@@ -472,7 +473,7 @@ object OnDeviceNsfwClassifier {
     private const val SCORE_CACHE_CAPACITY = 5000
     private const val SCORES_FILE_NAME = "cs3_visual_scores.bin"
     private const val SCORES_MAGIC = 0x43533353 // "CS3S"
-    private const val SCORES_VERSION = 5
+    private const val SCORES_VERSION = 6
 
     private val scoreCache = LruCache<String, Float>(SCORE_CACHE_CAPACITY)
     // Perceptual difference hash (dHash) cache: cross-URL deduplication across mirror CDNs and alternate providers
@@ -730,7 +731,7 @@ object OnDeviceNsfwClassifier {
                         null
                     }
                     if (checkTag == imageKey) {
-                        val score = classifyPotatoFastScore(targetDrawable, appContext)
+                        val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(targetDrawable, appContext) else 1.0f
                         recordScore(imageKey, score, appContext, dHash)
                         val threshold = NsfwFilterEngine.getVisualThreshold(appContext)
                         applyVisualFilterResult(activeView, imageKey, targetDrawable, score, threshold, appContext, false)
@@ -743,9 +744,9 @@ object OnDeviceNsfwClassifier {
             try {
                 val drawable = targetDrawable
 
-                // If device is under active severe memory pressure or model unavailable, use zero-heap potato fast score directly
+                // If device is under active severe memory pressure or model unavailable, use safe fallback
                 if (isDeviceUnderMemoryPressure(appContext) || isModelPermanentlyUnavailable) {
-                    val score = classifyPotatoFastScore(drawable, appContext)
+                    val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(drawable, appContext) else maxOf(classifyPotatoFastScore(drawable, appContext), 1.0f)
                     recordScore(imageKey, score, appContext, dHash)
                     val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
                     mainHandler.post {
@@ -1126,12 +1127,12 @@ object OnDeviceNsfwClassifier {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             return sessionPool.poll()
         }
-        // If all sessions are currently checked out, briefly wait for one to be returned (up to 60ms)
-        val deadline = System.currentTimeMillis() + 60L
+        // If all sessions are currently checked out, wait for one to be returned (up to 1500ms on background threads)
+        val deadline = System.currentTimeMillis() + 1500L
         while (System.currentTimeMillis() < deadline) {
             sessionPool.poll()?.let { return it }
             try {
-                Thread.sleep(2L)
+                Thread.sleep(5L)
             } catch (_: InterruptedException) {
                 break
             }
@@ -1165,26 +1166,19 @@ object OnDeviceNsfwClassifier {
                 return cachedDHashScore
             }
 
-            // 2. Active memory pressure guard: if OS is critically low on RAM (<20MB), fall back to zero-heap potato score
+            // 2. Active memory pressure guard: if OS is critically low on RAM (<20MB), fall back to safe score
             if (isDeviceUnderMemoryPressure(ctx) || isModelPermanentlyUnavailable) {
-                dHashCache.put(fast.dHash, fast.potatoScore)
-                return fast.potatoScore
-            }
-
-            // 3. Skin Pre-Filter Cascade:
-            // Over 65% of posters (scenery, vehicles, robots, title typography, fully-clothed winter portraits)
-            // have < 4% body skin. Bypassing TFLite eliminates 60-70% of neural invocations.
-            if (fast.bodySkinRatio < 0.04f && fast.upperSkinRatio < 0.15f && !fast.isMonochrome) {
-                dHashCache.put(fast.dHash, 0.0f)
-                return 0.0f
+                val fallback = if (ctx.isNsfwEnabled()) fast.potatoScore else maxOf(fast.potatoScore, 1.0f)
+                dHashCache.put(fast.dHash, fallback)
+                return fallback
             }
         } else {
             if (isDeviceUnderMemoryPressure(ctx) || isModelPermanentlyUnavailable) {
-                return classifyPotatoFastScore(drawable, ctx)
+                return if (ctx.isNsfwEnabled()) classifyPotatoFastScore(drawable, ctx) else 1.0f
             }
         }
 
-        val session = borrowSession(ctx) ?: return fast?.potatoScore ?: classifyPotatoFastScore(drawable, ctx)
+        val session = borrowSession(ctx) ?: return if (ctx.isNsfwEnabled()) (fast?.potatoScore ?: classifyPotatoFastScore(drawable, ctx)) else 1.0f
         val score = try {
             session.execute(drawable, ctx)
         } finally {
@@ -1421,34 +1415,23 @@ object OnDeviceNsfwClassifier {
                 return
             }
 
-            // 2b. Active critical memory pressure -> apply potato score directly
+            // 2b. Active critical memory pressure -> apply safe fallback score
             if (isDeviceUnderMemoryPressure(appContext) || isModelPermanentlyUnavailable) {
-                val score = fast.potatoScore
+                val score = if (appContext.isNsfwEnabled()) fast.potatoScore else maxOf(fast.potatoScore, 1.0f)
                 recordScore(imageKey, score, appContext, fast.dHash)
                 applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
                 return
             }
-
-            // 2c. Skin Pre-Filter Cascade:
-            // Posters with < 4% body skin and not monochrome are guaranteed clean SFW (0.0f)
-            // Immediately apply without queuing background worker task!
-            if (fast.bodySkinRatio < 0.04f && fast.upperSkinRatio < 0.15f && !fast.isMonochrome) {
-                val score = 0.0f
-                recordScore(imageKey, score, appContext, fast.dHash)
-                val animate = DeviceProfile.tier(imageView.context) != DeviceTier.LOW
-                applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, animate)
-                return
-            }
         } else {
             if (isDeviceUnderMemoryPressure(appContext) || isModelPermanentlyUnavailable) {
-                val score = classifyPotatoFastScore(drawable, appContext)
+                val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(drawable, appContext) else 1.0f
                 recordScore(imageKey, score, appContext)
                 applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
                 return
             }
         }
 
-        // 3. Poster has potential skin exposure or is monochrome -> offload TFLite INT8 inference to worker pool
+        // 3. Offload TFLite INT8 inference to worker pool
         val weakImageView = WeakReference(imageView)
         try {
             workerExecutor.execute(
@@ -1461,8 +1444,8 @@ object OnDeviceNsfwClassifier {
                 )
             )
         } catch (_: Throwable) {
-            // If submission fails due to executor rejection, safely run potato classification immediately
-            val score = fast?.potatoScore ?: classifyPotatoFastScore(drawable, appContext)
+            // If submission fails due to executor rejection, safely run fallback immediately
+            val score = if (appContext.isNsfwEnabled()) (fast?.potatoScore ?: classifyPotatoFastScore(drawable, appContext)) else 1.0f
             recordScore(imageKey, score, appContext, fast?.dHash)
             applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
         }

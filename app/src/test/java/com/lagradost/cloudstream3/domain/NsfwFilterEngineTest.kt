@@ -404,6 +404,13 @@ class NsfwFilterEngineTest {
         }
         assertTrue(NsfwFilterEngine.isNsfwProvider(disguisedHentaiApi))
 
+        val doujinApi = object : com.lagradost.cloudstream3.MainAPI() {
+            override var name = "DoujinDesu"
+            override var mainUrl = "https://doujindesu.tv"
+            override var supportedTypes = setOf(TvType.Anime)
+        }
+        assertTrue(NsfwFilterEngine.isNsfwProvider(doujinApi))
+
         val cleanAnimeApi = object : com.lagradost.cloudstream3.MainAPI() {
             override var name = "Zoro Anime"
             override var mainUrl = "https://zoro.to"
@@ -417,6 +424,9 @@ class NsfwFilterEngineTest {
         assertTrue(NsfwFilterEngine.isNsfwText("hentai school girls"))
         assertTrue(NsfwFilterEngine.isNsfwText("uncensored jav javhd"))
         assertTrue(NsfwFilterEngine.isNsfwText("erotic milf"))
+        assertTrue(NsfwFilterEngine.isNsfwText("doujinshi collection"))
+        assertTrue(NsfwFilterEngine.isNsfwText("ahegao face"))
+        assertTrue(NsfwFilterEngine.isNsfwText("manhwa18 chapter 1"))
         assertFalse(NsfwFilterEngine.isNsfwText("Spider-Man Across the Spider-Verse"))
         assertFalse(NsfwFilterEngine.isNsfwText("Attack on Titan Season 4"))
         assertFalse(NsfwFilterEngine.isNsfwText("Interstellar"))
@@ -427,6 +437,7 @@ class NsfwFilterEngineTest {
         assertTrue(NsfwFilterEngine.isNsfwUrl("https://static.hanime.tv/posters/cover123.jpg"))
         assertTrue(NsfwFilterEngine.isNsfwUrl("https://t.nhentai.net/galleries/123/cover.jpg"))
         assertTrue(NsfwFilterEngine.isNsfwUrl("https://cdn.hentaicity.com/images/poster.png"))
+        assertTrue(NsfwFilterEngine.isNsfwUrl("https://cdn.doujindesu.tv/covers/1.jpg"))
         assertFalse(NsfwFilterEngine.isNsfwUrl("https://image.tmdb.org/t/p/w500/8UlWHLM29295Q9CzENR9Z.jpg"))
         assertFalse(NsfwFilterEngine.isNsfwUrl("https://m.media-amazon.com/images/M/MV5BMDFkYTc0MGEt.jpg"))
     }

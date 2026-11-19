@@ -82,6 +82,33 @@ const HARDCORE_ADULT_TOKENS: &[&str] = &[
     "supjav",
     "javhd",
     "rule34",
+    "doujindesu",
+    "hentaimama",
+    "manhwa18",
+    "18comic",
+    "simply-hentai",
+    "hentaihaven",
+    "asmhentai",
+    "pururin",
+    "hentaifox",
+    "e-hentai",
+    "exhentai",
+    "luscious",
+    "hentai2read",
+    "imhentai",
+    "toonily",
+    "readhentai",
+    "manga18fx",
+    "javdoe",
+    "javmost",
+    "javlibrary",
+    "javfinder",
+    "javstream",
+    "hentaicity",
+    "erocool",
+    "maryjane",
+    "milky",
+    "shoikaku",
 ];
 
 /// Suggestive, Ecchi, Swimsuit & Anatomy Tokens (Active in ALL levels - LOW hardened to Moderate).
@@ -445,6 +472,33 @@ const HARDCORE_STEMS: &[&str] = &[
     "missav",
     "supjav",
     "javhd",
+    "doujindesu",
+    "hentaimama",
+    "manhwa18",
+    "18comic",
+    "simply-hentai",
+    "hentaihaven",
+    "asmhentai",
+    "pururin",
+    "hentaifox",
+    "e-hentai",
+    "exhentai",
+    "luscious",
+    "hentai2read",
+    "imhentai",
+    "toonily",
+    "readhentai",
+    "manga18fx",
+    "javdoe",
+    "javmost",
+    "javlibrary",
+    "javfinder",
+    "javstream",
+    "hentaicity",
+    "erocool",
+    "maryjane",
+    "milky",
+    "shoikaku",
 ];
 
 /// Suggestive & Ecchi Substring Stems (Active in ALL levels - LOW hardened to Moderate).
@@ -557,12 +611,10 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
             return true;
         }
     }
-    // Suggestive CJK stems active in MODERATE & EXTREME
-    if level >= LEVEL_MODERATE {
-        for &stem in CJK_SUGGESTIVE_STEMS {
-            if text.contains(stem) {
-                return true;
-            }
+    // Suggestive CJK stems active across ALL levels
+    for &stem in CJK_SUGGESTIVE_STEMS {
+        if text.contains(stem) {
+            return true;
         }
     }
     // Extreme CJK stems active ONLY in EXTREME
@@ -587,12 +639,10 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
             return true;
         }
     }
-    // Suggestive phrases active in MODERATE & EXTREME
-    if level >= LEVEL_MODERATE {
-        for &phrase in SUGGESTIVE_ECCHI_PHRASES {
-            if lower.contains(phrase) {
-                return true;
-            }
+    // Suggestive phrases active across ALL levels
+    for &phrase in SUGGESTIVE_ECCHI_PHRASES {
+        if lower.contains(phrase) {
+            return true;
         }
     }
     // Extreme & Super Extreme phrases active ONLY in EXTREME
@@ -615,12 +665,10 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
             return true;
         }
     }
-    // Suggestive stems active in MODERATE & EXTREME
-    if level >= LEVEL_MODERATE {
-        for &stem in SUGGESTIVE_STEMS {
-            if lower.contains(stem) {
-                return true;
-            }
+    // Suggestive stems active across ALL levels
+    for &stem in SUGGESTIVE_STEMS {
+        if lower.contains(stem) {
+            return true;
         }
     }
     // Extreme & Super Extreme stems active ONLY in EXTREME
@@ -669,12 +717,10 @@ fn is_text_nsfw_single(text: &str, level: u8) -> bool {
                 return true;
             }
         }
-        // Suggestive tokens active in MODERATE & EXTREME
-        if level >= LEVEL_MODERATE {
-            for &suggestive_token in SUGGESTIVE_ECCHI_TOKENS {
-                if clean_token == suggestive_token {
-                    return true;
-                }
+        // Suggestive tokens active across ALL levels
+        for &suggestive_token in SUGGESTIVE_ECCHI_TOKENS {
+            if clean_token == suggestive_token {
+                return true;
             }
         }
         // Extreme & Super Extreme tokens active ONLY in EXTREME

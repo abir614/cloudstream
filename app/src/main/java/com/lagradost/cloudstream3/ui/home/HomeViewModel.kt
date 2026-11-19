@@ -814,6 +814,11 @@ class HomeViewModel : ViewModel() {
     }
 
     private fun load(api: MainAPI, forceReload: Boolean = false): Job = ioSafe {
+        val nsfwEnabled = context?.isNsfwEnabled() ?: false
+        if (!nsfwEnabled && NsfwFilterEngine.isNsfwProvider(api)) {
+            loadAndCancel(noneApi, forceReload)
+            return@ioSafe
+        }
         repo = APIRepository(api)
 
         _apiName.postValue(repo?.name)

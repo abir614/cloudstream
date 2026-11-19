@@ -2695,12 +2695,7 @@ class ResultViewModel2 : ViewModel() {
                     val rawResponse = data.value
                     if (!nsfwEnabled) {
                         val filterLevel = NsfwFilterEngine.getFilterLevel(context)
-                        val isNsfw = NsfwFilterEngine.isNsfwText(
-                            rawResponse.name,
-                            validUrl,
-                            rawResponse.tags?.joinToString(" ") ?: "",
-                            filterLevel
-                        ) || (rawResponse.posterUrl?.let { NsfwFilterEngine.isNsfwUrl(it, filterLevel) } == true)
+                        val isNsfw = NsfwFilterEngine.isNsfw(rawResponse, filterLevel)
                         if (isNsfw) {
                             _page.postValue(
                                 Resource.Failure(

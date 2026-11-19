@@ -561,7 +561,11 @@ object NsfwFilterEngine {
         "penthouse", "orgy", "rance", "kuroinu", "taimanin", "mankitsu", "overflow", "euphoria", "futabu",
         "shoujoramune", "otomedori", "resortboin", "onichichi", "seikatsushuukan", "bunnywalker", "pinkpineapple",
         "queenbee", "poros", "greenbunny", "whitebear", "naturalhigh", "nhentai", "tsumino", "fakku", "pornhub",
-        "xvideos", "xnxx", "spankbang", "eporner", "missav", "supjav", "javhd", "rule34", "hitomi"
+        "xvideos", "xnxx", "spankbang", "eporner", "missav", "supjav", "javhd", "rule34", "hitomi",
+        "doujindesu", "hentaimama", "manhwa18", "18comic", "simply-hentai", "hentaihaven", "asmhentai",
+        "pururin", "hentaifox", "e-hentai", "exhentai", "luscious", "hentai2read", "imhentai", "toonily",
+        "readhentai", "manga18fx", "javdoe", "javmost", "javlibrary", "javfinder", "javstream", "hentaicity",
+        "erocool", "maryjane", "milky", "shoikaku", "poppy", "arms"
     )
 
     private val SUGGESTIVE_KEYWORDS = hashSetOf(
@@ -597,7 +601,11 @@ object NsfwFilterEngine {
         "cuckold", "cunnilingus", "pegging", "gangbang", "incest", "stepmom", "stepmother",
         "stepsister", "stepdaughter", "stepson", "stepbrother", "nude", "nudity", "topless",
         "uncensor", "decensor", "rule34", "onlyfans", "fansly", "striptease", "stripper", "camgirl",
-        "playboy", "playmate", "nhentai", "tsumino", "spankbang", "eporner", "missav", "supjav"
+        "playboy", "playmate", "nhentai", "tsumino", "spankbang", "eporner", "missav", "supjav", "javhd",
+        "doujindesu", "hentaimama", "manhwa18", "18comic", "simply-hentai", "hentaihaven", "asmhentai",
+        "pururin", "hentaifox", "e-hentai", "exhentai", "luscious", "hentai2read", "imhentai", "toonily",
+        "readhentai", "manga18fx", "javdoe", "javmost", "javlibrary", "javfinder", "javstream", "hentaicity",
+        "erocool", "maryjane", "milky", "shoikaku", "poppy", "arms"
     )
 
     private val SUGGESTIVE_STEMS = arrayOf(
@@ -745,15 +753,12 @@ object NsfwFilterEngine {
         val spacedNormalized = spaced.replace(DELIM_REGEX, " ")
 
         // 2. Multi-word phrases
-        // Hardcore phrases active in ALL levels
+        // Hardcore & Suggestive phrases active in ALL levels
         for (phrase in HARDCORE_PHRASES) {
             if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
         }
-        // Suggestive phrases active in MODERATE & EXTREME
-        if (level >= NsfwFilterLevel.MODERATE) {
-            for (phrase in SUGGESTIVE_PHRASES) {
-                if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
-            }
+        for (phrase in SUGGESTIVE_PHRASES) {
+            if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
         }
         // Extreme & Super Extreme phrases active ONLY in EXTREME
         if (level >= NsfwFilterLevel.EXTREME) {
@@ -766,15 +771,12 @@ object NsfwFilterEngine {
         }
 
         // 3. Substring stem checks (catches compound words without spaces)
-        // Hardcore stems active in ALL levels
+        // Hardcore & Suggestive stems active in ALL levels
         for (stem in HARDCORE_STEMS) {
             if (lower.contains(stem) || spaced.contains(stem)) return true
         }
-        // Suggestive stems active in MODERATE & EXTREME
-        if (level >= NsfwFilterLevel.MODERATE) {
-            for (stem in SUGGESTIVE_STEMS) {
-                if (lower.contains(stem) || spaced.contains(stem)) return true
-            }
+        for (stem in SUGGESTIVE_STEMS) {
+            if (lower.contains(stem) || spaced.contains(stem)) return true
         }
         // Extreme & Super Extreme stems active ONLY in EXTREME
         if (level >= NsfwFilterLevel.EXTREME) {
@@ -797,7 +799,7 @@ object NsfwFilterEngine {
             while (end < len && combined[end] != ' ') end++
             val token = combined.substring(start, end)
             if (HARDCORE_KEYWORDS.contains(token) ||
-                (level >= NsfwFilterLevel.MODERATE && SUGGESTIVE_KEYWORDS.contains(token)) ||
+                SUGGESTIVE_KEYWORDS.contains(token) ||
                 (level >= NsfwFilterLevel.EXTREME && (EXTREME_KEYWORDS.contains(token) || SUPER_EXTREME_KEYWORDS.contains(token)))
             ) {
                 return true
@@ -915,6 +917,10 @@ object NsfwFilterEngine {
     fun isNsfwProvider(api: MainAPI): Boolean {
         if (api.supportedTypes.contains(TvType.NSFW) || api.supportedTypes == setOf(TvType.NSFW)) return true
         if (isNsfwText(api.name, api.mainUrl, null, NsfwFilterLevel.LOW)) return true
+        val lowerName = api.name.lowercase()
+        val lowerUrl = api.mainUrl.lowercase()
+        if (HARDCORE_KEYWORDS.any { lowerName.contains(it) || lowerUrl.contains(it) }) return true
+        if (SUGGESTIVE_KEYWORDS.any { lowerName.contains(it) || lowerUrl.contains(it) }) return true
         return false
     }
 
