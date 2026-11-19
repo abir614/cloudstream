@@ -32,10 +32,10 @@ class TheIntroDBSkip : SkipAPI() {
                 ?: return null
 
         val url = if (data.isMovie()) {
-            "$mainUrl/v2/media?$idSuffix"
+            "$mainUrl/v4/media?$idSuffix"
         } else {
             val season = episode.season ?: return null
-            "$mainUrl/v2/media?$idSuffix&season=$season&episode=${episode.episode}"
+            "$mainUrl/v4/media?$idSuffix&season=$season&episode=${episode.episode}"
         }
         val root = app.get(url).parsed<Root>()
         return arrayOf(
@@ -43,7 +43,7 @@ class TheIntroDBSkip : SkipAPI() {
             root.credits to SkipType.Credits,
             root.recap to SkipType.Recap,
             root.preview to SkipType.Preview
-        ).map { (list, type) ->
+        ).flatMap { (list, type) ->
             list.map { stamp ->
                 SkipStamp(
                     type,
@@ -51,7 +51,7 @@ class TheIntroDBSkip : SkipAPI() {
                     stamp.endMs ?: episodeDurationMs
                 )
             }
-        }.flatten()
+        }
     }
 
     @Serializable

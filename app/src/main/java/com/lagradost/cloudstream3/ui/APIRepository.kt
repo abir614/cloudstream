@@ -311,6 +311,17 @@ class APIRepository(val api: MainAPI) {
         )
 
         private val cache = atomicListOf<SavedLoadResponse>()
+
+        init {
+            afterPluginsLoadedEvent += { forceReload ->
+                if (forceReload) {
+                    cache.clear()
+                    mainPageCache.clear()
+                    MainPageDiskCache.clear()
+                }
+            }
+        }
+
         private var cacheIndex: Int = 0
         const val CACHE_SIZE = 20
 
@@ -340,18 +351,6 @@ class APIRepository(val api: MainAPI) {
             mainPageCache.clear()
             MainPageDiskCache.clear()
         }
-    }
-
-    private fun afterPluginsLoaded(forceReload: Boolean) {
-        if (forceReload) {
-            cache.clear()
-            mainPageCache.clear()
-            MainPageDiskCache.clear()
-        }
-    }
-
-    init {
-        afterPluginsLoadedEvent += ::afterPluginsLoaded
     }
 
     val hasMainPage = api.hasMainPage
