@@ -42,4 +42,22 @@ object Colors {
             selectedLeadingIconColor = MaterialTheme.colorScheme.background,
             selectedTrailingIconColor = MaterialTheme.colorScheme.background,
         )
+    internal val whiteChipFocused
+        @Composable @ReadOnlyComposable get() = SelectableChipColors(
+            containerColor = Color.Transparent,
+            labelColor = MaterialTheme.colorScheme.onBackground,
+            leadingIconColor = MaterialTheme.colorScheme.onBackground,
+            trailingIconColor = MaterialTheme.colorScheme.onBackground,
+
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledSelectedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+
+            selectedContainerColor = MaterialTheme.colorScheme.onBackground,
+            selectedLabelColor = MaterialTheme.colorScheme.background,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.background,
+            selectedTrailingIconColor = MaterialTheme.colorScheme.background,
+        )
 }

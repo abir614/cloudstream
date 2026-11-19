@@ -203,7 +203,7 @@ object RepositoryManager {
         if (!isSafeRepositoryUrl(url)) return null
         return safeAsync {
             // Take manifestVersion and such into account later
-            val res = app.get(convertRawGitUrl(url), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
+            val res = app.get(convertRawGitUrl(url), cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
             if (!res.isSuccessful) {
                 res.okhttpResponse.close()
                 return@safeAsync null
@@ -229,7 +229,7 @@ object RepositoryManager {
     suspend fun parseMultiRepositories(url: String): List<RepositoryData> {
         if (!isSafeRepositoryUrl(url)) return emptyList()
         return safeAsync {
-            val res = app.get(convertRawGitUrl(url), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
+            val res = app.get(convertRawGitUrl(url), cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
             if (!res.isSuccessful) {
                 res.okhttpResponse.close()
                 return@safeAsync emptyList()
@@ -275,7 +275,7 @@ object RepositoryManager {
         if (!isSafeRepositoryUrl(pluginUrls)) return emptyList()
         // Take manifestVersion and such into account later
         return try {
-            val res = app.get(convertRawGitUrl(pluginUrls), cacheTime = 5, cacheUnit = TimeUnit.MINUTES)
+            val res = app.get(convertRawGitUrl(pluginUrls), cacheTime = 15, cacheUnit = TimeUnit.MINUTES)
             if (!res.isSuccessful) {
                 res.okhttpResponse.close()
                 return emptyList()
@@ -418,9 +418,16 @@ object RepositoryManager {
     suspend fun addRepository(repository: RepositoryData) {
         if (!isSafeRepositoryUrl(repository.url)) return
         repoLock.withLock {
-            val currentRepos = getRepositories()
-            // No duplicates
-            setKey(REPOSITORIES_KEY, (currentRepos + repository).distinctBy { it.url })
+            // No duplicates, but we want the new repository instead of the old one
+            var currentRepos = getRepositories()
+            val index = currentRepos.indexOfFirst { it.url == repository.url }
+            if (index == -1) {
+                currentRepos += repository
+            } else {
+                /** We want to keep the ordering here, as that is the addition order */
+                currentRepos[index] = repository
+            }
+            setKey(REPOSITORIES_KEY, currentRepos)
         }
         main {
             MainActivity.afterRepositoryLoadedEvent.invoke(true)

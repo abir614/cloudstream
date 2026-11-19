@@ -185,14 +185,14 @@ object SettingsUpdatesScreen : SearchableSettings {
                         preference = settings.plugins.autoUpdate,
                     ),
 
-                    Preference.PreferenceItem.ListPreference(
+                    /*Preference.PreferenceItem.ListPreference(
                         title = stringResource(R.string.automatic_plugin_download),
                         subtitle = "%s\n" + stringResource(R.string.automatic_plugin_download_summary),
                         icon = painterResource(R.drawable.extention_renew2),
                         entries = AutoDownloadMode.entries.map { it.value }.sorted()
                             .zip(stringArrayResource((R.array.auto_download_plugin))).toMap(),
                         preference = settings.plugins.autoDownload
-                    ),
+                    ),*/
                     Preference.PreferenceItem.TextPreference(
                         title = stringResource(R.string.update_plugins),
                         subtitle = stringResource(R.string.update_plugins_manually),

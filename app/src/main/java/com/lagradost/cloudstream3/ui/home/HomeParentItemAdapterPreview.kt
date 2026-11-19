@@ -306,6 +306,9 @@ class HomeParentItemAdapterPreview(
         private val previewViewpager: ViewPager2 =
             itemView.findViewById(R.id.home_preview_viewpager)
 
+        private val homePreviewShimmer: com.facebook.shimmer.ShimmerFrameLayout? =
+            itemView.findViewById(R.id.home_preview_shimmer)
+
         private val previewViewpagerText: ViewGroup =
             itemView.findViewById(R.id.home_preview_viewpager_text)
 
@@ -655,6 +658,8 @@ class HomeParentItemAdapterPreview(
 
             when (preview) {
                 is Resource.Success -> {
+                    homePreviewShimmer?.stopShimmer()
+                    homePreviewShimmer?.isGone = true
                     previewAdapter.submitList(preview.value.second)
                     previewAdapter.hasMoreItems = preview.value.first
                     /*if (!.setItems(
@@ -686,7 +691,16 @@ class HomeParentItemAdapterPreview(
                     }
                 }
 
+                is Resource.Loading -> {
+                    previewViewpager.isGone = true
+                    previewViewpagerText.isGone = true
+                    homePreviewShimmer?.isVisible = true
+                    homePreviewShimmer?.startShimmer()
+                }
+
                 else -> {
+                    homePreviewShimmer?.stopShimmer()
+                    homePreviewShimmer?.isGone = true
                     if (previewAdapter.itemCount > 0) {
                         return
                     }

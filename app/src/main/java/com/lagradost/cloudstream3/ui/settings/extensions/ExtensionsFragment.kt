@@ -304,7 +304,7 @@ class ExtensionsFragment : BaseFragment<FragmentExtensionsBinding>(
                         val toAdd = mutableListOf<RepositoryData>()
                         if (repository != null) {
                             val fixedName = if (!name.isNullOrBlank()) name else repository.name
-                            toAdd.add(RepositoryData(repository.iconUrl, fixedName, url))
+                            toAdd.add(RepositoryData(repository.iconUrl, fixedName, url, repository.description))
                             toAdd.addAll(repository.repositories)
                         }
                         toAdd.addAll(multiRepos)

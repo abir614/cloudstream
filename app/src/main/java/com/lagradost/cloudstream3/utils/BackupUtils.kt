@@ -21,6 +21,7 @@ import com.lagradost.cloudstream3.syncproviders.AccountManager
 import com.lagradost.cloudstream3.syncproviders.providers.AniListApi.Companion.ANILIST_CACHED_LIST
 import com.lagradost.cloudstream3.syncproviders.providers.MALApi.Companion.MAL_CACHED_LIST
 import com.lagradost.cloudstream3.syncproviders.providers.KitsuApi.Companion.KITSU_CACHED_LIST
+import com.lagradost.cloudstream3.ui.settings.SettingsFragmentScreen.launchSafe
 import com.lagradost.cloudstream3.services.NativeCoreBridge
 import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.AppUtils.toJson
@@ -345,25 +346,20 @@ object BackupUtils {
 
     fun Activity.restorePrompt() {
         runOnUiThread {
-            try {
-                restoreFileSelector?.launch(
-                    arrayOf(
-                        "*/*",
-                        "application/gzip",
-                        "application/x-gzip",
-                        "application/octet-stream",
-                        "text/plain",
-                        "text/str",
-                        "text/x-unknown",
-                        "application/json",
-                        "unknown/unknown",
-                        "content/unknown",
-                    )
+            restoreFileSelector?.launchSafe(
+                arrayOf(
+                    "*/*",
+                    "application/gzip",
+                    "application/x-gzip",
+                    "application/octet-stream",
+                    "text/plain",
+                    "text/str",
+                    "text/x-unknown",
+                    "application/json",
+                    "unknown/unknown",
+                    "content/unknown",
                 )
-            } catch (e: Exception) {
-                showToast(e.message)
-                logError(e)
-            }
+            )
         }
     }
 

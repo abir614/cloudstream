@@ -382,7 +382,7 @@ object AppContextUtils {
 
             val toAdd = mutableListOf<RepositoryData>()
             if (repo != null) {
-                toAdd.add(RepositoryData(repo.iconUrl ?: "", repo.name, url))
+                toAdd.add(RepositoryData(repo.iconUrl ?: "", repo.name, url, repo.description))
                 toAdd.addAll(repo.repositories)
             }
             toAdd.addAll(multiRepos)
