@@ -1169,14 +1169,23 @@ class CS3IPlayer : IPlayer {
                         context.getString(R.string.software_decoding_key),
                         -1
                     )
+                    val hasBrokenGpu = DeviceProfile.hasBrokenHardwareGpu()
+                    val isLowEnd = DeviceProfile.isLowEnd(context)
+
+                    val isAudioOnly = current == 3 || current == 4
                     val (isSoftwareDecodingEnabled, isSoftwareDecodingPreferred) = when (current) {
                         0 -> true to false // HW+SW, aka on but prefer hw
                         2 -> true to true // SW+HW, aka on but prefer sw
                         1 -> false to false // HW, aka off
+                        3 -> true to true // HW+ but prefer sw audio
+                        4 -> true to false // HW+ but prefer hw audio
                         // -1 = automatic
-                        // We do not want tv to have software decoding, because of crashes
-                        else -> isLayout(PHONE or EMULATOR) to false
+                        // Protect TV, low-end devices, and broken GPUs from software video decoding crashes
+                        else -> (isLayout(PHONE or EMULATOR) && !isLowEnd && !hasBrokenGpu) to false
                     }
+
+                    // Guardrail: Prohibit software video decoding on broken GPUs (Mali-G31) and low-end devices
+                    val allowSoftwareVideo = !hasBrokenGpu && !isLowEnd
 
                     // Only create the compressor when the setting is actually enabled.
                     // When it's off, `compressor` stays null and nothing about the audio
@@ -1187,7 +1196,20 @@ class CS3IPlayer : IPlayer {
                     )
                     compressor = if (isCompressorEnabled) DynamicRangeCompressor() else null
 
-                    val factory = if (isSoftwareDecodingEnabled) {
+                    val factory = if (isAudioOnly || (isSoftwareDecodingEnabled && !allowSoftwareVideo)) {
+                        // HW+ (audio-only software decoding) or fallback when hardware cannot safely handle software video
+                        FixedNextRenderersFactoryWithoutVideo(context, compressor).apply {
+                            setEnableDecoderFallback(true)
+                            setAllowedVideoJoiningTimeMs(5000L)
+                            forceEnableMediaCodecAsynchronousQueueing()
+                            setExtensionRendererMode(
+                                if (isSoftwareDecodingPreferred)
+                                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                                else
+                                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+                            )
+                        }
+                    } else if (isSoftwareDecodingEnabled) {
                         FixedNextRenderersFactory(context, compressor).apply {
                             setEnableDecoderFallback(true)
                             setAllowedVideoJoiningTimeMs(5000L)

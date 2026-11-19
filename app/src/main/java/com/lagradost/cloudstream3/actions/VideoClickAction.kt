@@ -13,6 +13,7 @@ import com.lagradost.cloudstream3.ErrorLoadingException
 import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.actions.temp.CopyClipboardAction
+import com.lagradost.cloudstream3.actions.temp.KodiPackage
 import com.lagradost.cloudstream3.actions.temp.PlayInBrowserAction
 import com.lagradost.cloudstream3.actions.temp.PlayMirrorAction
 import com.lagradost.cloudstream3.actions.temp.ViewM3U8Action
@@ -35,6 +36,7 @@ object VideoClickActionHolder {
         CopyClipboardAction(),
         ViewM3U8Action(),
         PlayInBrowserAction(),
+        KodiPackage,
         AlwaysAskAction(),
     )
 
