@@ -44,6 +44,7 @@ import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.updateTv
 import com.lagradost.cloudstream3.utils.AppContextUtils.isRtl
+import com.lagradost.cloudstream3.utils.BiometricAuthenticator.isAuthEnabled
 import com.lagradost.cloudstream3.utils.Event
 import com.lagradost.cloudstream3.utils.UIHelper.showInputMethod
 import com.lagradost.cloudstream3.utils.UIHelper.toPx
@@ -259,7 +260,9 @@ object CommonActivity {
             }
 
         // Ask for notification permissions on Android 13
+        // Not while biometric locked, the dialog cancels the biometric prompt
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !isAuthEnabled(componentActivity) &&
             ContextCompat.checkSelfPermission(
                 componentActivity,
                 Manifest.permission.POST_NOTIFICATIONS
