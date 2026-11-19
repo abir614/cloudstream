@@ -4,11 +4,19 @@ import androidx.compose.runtime.Immutable
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.network.UpdateNetworkClient
 import com.lagradost.cloudstream3.utils.InAppUpdater
+import com.lagradost.cloudstream4.viewmodels.GithubFile
+import com.lagradost.cloudstream4.viewmodels.GithubRepository
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.io.FileNotFoundException
 import kotlin.jvm.Throws
 
-object GithubReleases {
+object GithubReleases : GithubRepository {
+    const val APK_USERNAME = "abir614"
+    const val APK_REPOSITORY = "cloudstream"
+    const val APK_PRERELEASE = "pre-release"
+    const val APK_CONTENT_TYPE = "application/vnd.android.package-archive"
+
     @Serializable
     private data class GithubAsset(
         @JsonProperty("name") @SerialName("name") val name: String,
@@ -40,25 +48,6 @@ object GithubReleases {
     private data class GithubTag(
         //@JsonProperty("node_id") @SerialName("node_id") val nodeId: String,
         @JsonProperty("object") @SerialName("object") val githubObject: GithubObject,
-    )
-
-    /** GitHub file update package */
-    @Immutable
-    data class GithubFile(
-        /** File digest, sha:xxx */
-        val digest: String?,
-        /** File url for download */
-        val downloadUrl: String,
-        /** Filename without the extension */
-        val displayName: String,
-        /** Changelog, aka the commit message */
-        val changeLog: String,
-        /** Name of the tag, aka unique release name like vX.X.X or pre-release */
-        val tagName: String,
-        /** Unique node id */
-        val nodeId: String,
-        /** Git commit SHA or branch target from GitHub release */
-        val targetCommitish: String? = null,
     )
 
     private val defaultHeaders = mapOf("Accept" to "application/vnd.github.v3+json")
@@ -212,7 +201,32 @@ object GithubReleases {
             changeLog = latestRelease.body,
             tagName = latestRelease.tagName,
             nodeId = latestRelease.nodeId,
-            targetCommitish = latestRelease.targetCommitish
         )
+    }
+
+    @Throws
+    override suspend fun getSha(
+        userName: String,
+        repository: String,
+        tag: String,
+    ): String {
+        return getShaFromTag(userName, repository, tag) ?: throw FileNotFoundException("Tag SHA not found")
+    }
+
+    @Throws
+    override suspend fun getRelease(
+        userName: String,
+        repository: String,
+        prerelease: Boolean,
+        prereleaseTag: String,
+        contentType: String,
+    ): GithubFile {
+        return getLatestReleaseFile(
+            userName = userName,
+            repository = repository,
+            prerelease = prerelease,
+            prereleaseTag = prereleaseTag,
+            contentType = contentType,
+        ) ?: throw FileNotFoundException("Release file not found")
     }
 }
