@@ -753,12 +753,15 @@ object NsfwFilterEngine {
         val spacedNormalized = spaced.replace(DELIM_REGEX, " ")
 
         // 2. Multi-word phrases
-        // Hardcore & Suggestive phrases active in ALL levels
+        // Hardcore phrases active in ALL levels
         for (phrase in HARDCORE_PHRASES) {
             if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
         }
-        for (phrase in SUGGESTIVE_PHRASES) {
-            if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
+        // Suggestive phrases active in MODERATE & EXTREME
+        if (level >= NsfwFilterLevel.MODERATE) {
+            for (phrase in SUGGESTIVE_PHRASES) {
+                if (lower.contains(phrase) || normalized.contains(phrase) || spaced.contains(phrase) || spacedNormalized.contains(phrase)) return true
+            }
         }
         // Extreme & Super Extreme phrases active ONLY in EXTREME
         if (level >= NsfwFilterLevel.EXTREME) {
@@ -771,12 +774,15 @@ object NsfwFilterEngine {
         }
 
         // 3. Substring stem checks (catches compound words without spaces)
-        // Hardcore & Suggestive stems active in ALL levels
+        // Hardcore stems active in ALL levels
         for (stem in HARDCORE_STEMS) {
             if (lower.contains(stem) || spaced.contains(stem)) return true
         }
-        for (stem in SUGGESTIVE_STEMS) {
-            if (lower.contains(stem) || spaced.contains(stem)) return true
+        // Suggestive stems active in MODERATE & EXTREME
+        if (level >= NsfwFilterLevel.MODERATE) {
+            for (stem in SUGGESTIVE_STEMS) {
+                if (lower.contains(stem) || spaced.contains(stem)) return true
+            }
         }
         // Extreme & Super Extreme stems active ONLY in EXTREME
         if (level >= NsfwFilterLevel.EXTREME) {
@@ -799,7 +805,7 @@ object NsfwFilterEngine {
             while (end < len && combined[end] != ' ') end++
             val token = combined.substring(start, end)
             if (HARDCORE_KEYWORDS.contains(token) ||
-                SUGGESTIVE_KEYWORDS.contains(token) ||
+                (level >= NsfwFilterLevel.MODERATE && SUGGESTIVE_KEYWORDS.contains(token)) ||
                 (level >= NsfwFilterLevel.EXTREME && (EXTREME_KEYWORDS.contains(token) || SUPER_EXTREME_KEYWORDS.contains(token)))
             ) {
                 return true
