@@ -2,7 +2,7 @@
 # https://docs.gradle.org/current/userguide/dependency_versions.html#sec:strict-version
 [versions]
 activity = "1.13.0"
-androidGradlePlugin = "9.5.0"
+androidGradlePlugin = "9.5.2"
 animeDb = "1.0.2"
 annotation = "1.11.0"
 appcompat = "1.8.0"
@@ -15,10 +15,10 @@ constraintlayout = "2.2.2"
 coreKtx = "1.19.1"
 cryptography = "0.6.0"
 desugar_jdk_libs_nio = "2.1.5"
-dokkaGradlePlugin = "2.2.0"
+dokkaGradlePlugin = "2.3.0"
 espressoCore = "3.7.0"
 fragmentKtx = "1.9.1"
-guava = "33.7.2-android"
+guava = "33.8.0-android"
 instancioCore = "6.2.1"
 jacksonModuleKotlin = { strictly = "2.13.5" } # Last 2.13.x patch supporting minSdk <26 (Android TV & FireSticks)
 json = "20260814"

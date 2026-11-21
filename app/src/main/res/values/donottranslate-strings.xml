@@ -176,6 +176,12 @@
     <string name="skip_outro_mode_key">skip_outro_mode_key</string>
     <string name="skip_recap_mode_key">skip_recap_mode_key</string>
 
+    <!-- About CloudStream & Adult Content Filtering Keys -->
+    <string name="about_cloudstream_key">about_cloudstream_key</string>
+    <string name="about_nsfw_shield_key">about_nsfw_shield_key</string>
+    <string name="about_hardware_adaptive_key">about_hardware_adaptive_key</string>
+    <string name="about_telemetry_key">about_telemetry_key</string>
+
     <plurals name="episodes">
         <item quantity="one">@string/episode</item>
         <item quantity="other">@string/episodes</item>

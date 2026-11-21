@@ -891,4 +891,17 @@
     <string name="skip_outro_des">How the player handles ending and credits sequences</string>
     <string name="skip_recap">Skip Recap</string>
     <string name="skip_recap_des">How the player handles recap sequences</string>
+
+    <!-- About CloudStream & Adult Content Filtering -->
+    <string name="about_cloudstream">About CloudStream</string>
+    <string name="about_cloudstream_summary">Hardened, hardware-adaptive multimedia platform with on-device AI content filtering</string>
+    <string name="about_nsfw_shield_title">On-Device Adult Content Filter &amp; Neural Shield</string>
+    <string name="about_nsfw_shield_summary">Zero-leak protection powered by on-device TensorFlow Lite computer vision and comprehensive keyword shielding. Actively censors and blocks explicit posters with zero cloud telemetry.</string>
+    <string name="about_hardware_adaptive_title">Universal Hardware Adaptability</string>
+    <string name="about_hardware_adaptive_summary">Defensively engineered for all Android devices from ultra-low-memory TV boxes (Allwinner H313, 500MB RAM) to flagship phones.</string>
+    <string name="about_telemetry_title">Telemetry &amp; Privacy Transparency</string>
+    <string name="about_telemetry_summary">Zero PII collected. Builds v220 &amp; lower are 100% telemetry-less. Real-time diagnostic logs observable at t.me/cloudstreamdata.</string>
+    <string name="about_dialog_copy_info">Copy Build Info</string>
+    <string name="about_nsfw_shield_dialog_text">CloudStream Hardened Edition features an industry-first, privacy-preserving On-Device Adult Content Filter and Neural Shield.\n\n• On-device TensorFlow Lite computer vision scans and scores posters locally in microseconds with 0% data leakage.\n• Deep textual vocabulary and token analysis blocks explicit titles, descriptions, and tags across all search and catalog rails.\n• Enabled by default in Moderate sensitivity (0.20 threshold) to eliminate adult and ecchi content out of the box.\n• Configurable in Settings → General → Content &amp; Family Safety.</string>
+    <string name="about_cloudstream_dialog_text">CloudStream (Hardened &amp; Hardware-Adaptive Edition)\n\n• 🛡️ Built-in On-Device Adult Content Filter &amp; Neural Shield\n• ⚡ Universal Hardware Adaptability (Allwinner H313, 500MB RAM TV boxes to flagship phones)\n• 🔒 Shielded In-Process Extension Sandboxing &amp; TOFU integrity\n• 🌐 Privacy-First Resilient DNS &amp; Anti-SSRF gates\n• 📡 Diagnostic Telemetry: Zero PII. Builds v220 &amp; less are 100% telemetry-less.</string>
 </resources>

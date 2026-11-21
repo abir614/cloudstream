@@ -134,7 +134,9 @@ jobs:
             if [ -f "$apk" ]; then
               abi=$(echo "$apk" | sed -E 's/app-stable-(.*)-release\.apk/\1/')
               tagged="CloudStream-${TAG}-${abi}.apk"
+              canonical="CloudStream-${abi}.apk"
               mv "$apk" "$tagged"
+              cp "$tagged" "$canonical"
             fi
           done
           sha256sum *.apk > SHA256SUMS

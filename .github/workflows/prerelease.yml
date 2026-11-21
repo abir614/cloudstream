@@ -4,8 +4,7 @@ on:
   push:
     branches: [ master, main ]
     paths-ignore:
-      - '*.md'
-      - '*.json'
+      - 'release.json'
       - '**/wcokey.txt'
   workflow_dispatch:
 
@@ -113,7 +112,9 @@ jobs:
           if [ -f "$apk" ]; then
             abi=$(echo "$apk" | sed -E 's/app-prerelease-(.*)-release\.apk/\1/')
             tagged="CSB-prerelease-${TAG}-${abi}.apk"
+            canonical="CSB-prerelease-${abi}.apk"
             mv "$apk" "$tagged"
+            cp "$tagged" "$canonical"
           fi
         done
         sha256sum *.apk > SHA256SUMS

@@ -149,4 +149,26 @@
         </Preference>
 
     </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/about_cloudstream">
+
+        <Preference
+            android:icon="@drawable/ic_outline_remove_red_eye_24"
+            android:key="@string/about_nsfw_shield_key"
+            android:summary="@string/about_nsfw_shield_summary"
+            android:title="@string/about_nsfw_shield_title" />
+
+        <Preference
+            android:icon="@drawable/memory_24px"
+            android:key="@string/about_hardware_adaptive_key"
+            android:summary="@string/about_hardware_adaptive_summary"
+            android:title="@string/about_hardware_adaptive_title" />
+
+        <Preference
+            android:icon="@drawable/ic_outline_info_24"
+            android:key="@string/about_telemetry_key"
+            android:summary="@string/about_telemetry_summary"
+            android:title="@string/about_telemetry_title" />
+
+    </PreferenceCategory>
 </PreferenceScreen>

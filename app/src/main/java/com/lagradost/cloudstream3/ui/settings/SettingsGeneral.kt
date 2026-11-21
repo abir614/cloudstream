@@ -341,6 +341,33 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
             return@setOnPreferenceClickListener true
         }
 
+        getPref(R.string.about_nsfw_shield_key)?.setOnPreferenceClickListener {
+            val builder = AlertDialog.Builder(it.context, R.style.AlertDialogCustom)
+            builder.setTitle(R.string.about_nsfw_shield_title)
+            builder.setMessage(R.string.about_nsfw_shield_dialog_text)
+            builder.setPositiveButton(android.R.string.ok, null)
+            builder.show()
+            return@setOnPreferenceClickListener true
+        }
+
+        getPref(R.string.about_hardware_adaptive_key)?.setOnPreferenceClickListener {
+            val builder = AlertDialog.Builder(it.context, R.style.AlertDialogCustom)
+            builder.setTitle(R.string.about_hardware_adaptive_title)
+            builder.setMessage(R.string.about_hardware_adaptive_summary)
+            builder.setPositiveButton(android.R.string.ok, null)
+            builder.show()
+            return@setOnPreferenceClickListener true
+        }
+
+        getPref(R.string.about_telemetry_key)?.setOnPreferenceClickListener {
+            val builder = AlertDialog.Builder(it.context, R.style.AlertDialogCustom)
+            builder.setTitle(R.string.about_telemetry_title)
+            builder.setMessage(R.string.about_telemetry_summary)
+            builder.setPositiveButton(android.R.string.ok, null)
+            builder.show()
+            return@setOnPreferenceClickListener true
+        }
+
         getPref(R.string.dns_key)?.setOnPreferenceClickListener {
             val prefNames = resources.getStringArray(R.array.dns_pref)
             val prefValues = resources.getIntArray(R.array.dns_pref_values)

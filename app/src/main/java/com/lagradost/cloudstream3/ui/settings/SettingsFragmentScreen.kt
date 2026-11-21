@@ -120,6 +120,8 @@ object SettingsFragmentScreen : Screen {
             subtitle = persistentListOf(
                 R.string.extension_language,
                 R.string.title_downloads,
+                R.string.pref_category_content_safety,
+                R.string.about_cloudstream,
                 R.string.pref_category_bypass,
                 R.string.pref_category_links
             )
@@ -465,10 +467,22 @@ object SettingsFragmentScreen : Screen {
                 .height(50.dp)
                 .focusOutline()
                 .clickable {
-                    clipboardHelper(
-                        txt(R.string.extension_version),
-                        "${BuildConfig.VERSION_NAME} $commitHash $buildTimestamp"
-                    )
+                    val buildInfo = "${BuildConfig.VERSION_NAME} $commitHash $buildTimestamp"
+                    activity?.let { act ->
+                        androidx.appcompat.app.AlertDialog.Builder(act, R.style.AlertDialogCustom)
+                            .setTitle(R.string.about_cloudstream)
+                            .setMessage(
+                                act.getString(R.string.about_cloudstream_dialog_text) +
+                                    "\n\nVersion: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\nCommit: $commitHash\nBuilt: $buildTimestamp"
+                            )
+                            .setPositiveButton(android.R.string.ok, null)
+                            .setNeutralButton(R.string.about_dialog_copy_info) { _, _ ->
+                                clipboardHelper(txt(R.string.extension_version), buildInfo)
+                            }
+                            .show()
+                    } ?: run {
+                        clipboardHelper(txt(R.string.extension_version), buildInfo)
+                    }
                 },
         ) {
             ProvideTextStyle(MaterialTheme.typography.bodyMedium) {

@@ -942,6 +942,23 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Synchronized translation updates across 20+ languages and Fastlane Store descriptions.
   - Removed deprecated `@Prerelease` extractor annotations, bumped base version to `4.9.1` (`versionCode = "69"`), and updated binary compatibility validator signatures.
 
+### 16.46 README & Settings About Expansion, Telemetry Notice & Dependency Bumps
+- **Download Buttons & Architecture Links ([`README.md`](README.md))**:
+  - Added high-visibility, modern download buttons for both **Stable** (`v375`) and **Pre-release** (`pre-release`) channels.
+  - Provided direct architecture links for Universal APK, ARM64 (64-bit phones & TVs), and ARMeabi-v7a (32-bit budget TV boxes).
+- **Telemetry-Less Version Specification ([`README.md`](README.md))**:
+  - Explicitly documented that releases up to and including **v220** (`v220 & less`) are completely telemetry-less, with permanent direct links to Release v220.
+  - Re-clarified that newer builds feature privacy-first, zero-PII edge diagnostics that can be toggled off at any time in Settings.
+- **Adult Content Filtering & On-Device Neural Shield Highlighting ([`README.md`](README.md), [`SettingsGeneralScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsGeneralScreen.kt), [`SettingsGeneral.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsGeneral.kt), [`settings_general.xml`](app/src/main/res/xml/settings_general.xml), [`SettingsFragmentScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsFragmentScreen.kt))**:
+  - Prominently advertised the built-in, privacy-preserving On-Device Adult Content Filter & Neural Shield in `README.md` and the in-app "About" sections.
+  - Added "About CloudStream" preference group and interactive information dialogs in `SettingsGeneralScreen`, `SettingsGeneral` (Leanback XML), and `SettingsFragmentScreen` (accessible via BuildStamp and navigation subtitle).
+  - Clarified on-device TFLite computer vision operation, multi-lingual token analysis, zero cloud data leakage, and three-tier sensitivity protection.
+- **Dependency Version Bumps from Pull Requests ([`gradle/libs.versions.toml`](gradle/libs.versions.toml), [`rust-core/Cargo.toml`](rust-core/Cargo.toml))**:
+  - Bumped `com.google.guava:guava` from `33.7.2-android` to `33.8.0-android` (PR #46).
+  - Bumped `org.jetbrains.dokka:dokka-gradle-plugin` from `2.2.0` to `2.3.0` (PR #45).
+  - Bumped `androidGradlePlugin` from `9.5.0` to `9.5.2` (PR #44).
+  - Bumped `wasmi` from `0.36.0` to `1.1.0` in `/rust-core` (PR #43).
+
 
 
 

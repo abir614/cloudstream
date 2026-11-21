@@ -5,6 +5,41 @@
 [![Security Audit, Fuzzing & Dependency Scan](https://github.com/abir614/cloudstream/actions/workflows/security_audit_fuzz.yml/badge.svg)](https://github.com/abir614/cloudstream/actions/workflows/security_audit_fuzz.yml)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
+<div align="center">
+
+### 📥 Download CloudStream (Hardened Edition)
+
+| Release Channel | Universal APK (Recommended) | Architecture Builds | Release Details |
+| :--- | :--- | :--- | :--- |
+| **Stable Release** (Latest) | [![Download Stable](https://img.shields.io/badge/Download_Stable-Universal_APK-00c853?style=for-the-badge&logo=android&logoColor=white)](https://github.com/abir614/cloudstream/releases/latest/download/CloudStream-universal.apk) | [ARM64 (64-bit Phones/TVs)](https://github.com/abir614/cloudstream/releases/latest/download/CloudStream-arm64-v8a.apk)<br>[ARMeabi-v7a (32-bit TV Boxes)](https://github.com/abir614/cloudstream/releases/latest/download/CloudStream-armeabi-v7a.apk) | [Latest Stable Notes](https://github.com/abir614/cloudstream/releases/latest) |
+| **Pre-release** (Latest) | [![Download Pre-release](https://img.shields.io/badge/Download_Pre--release-Universal_APK-2979ff?style=for-the-badge&logo=android&logoColor=white)](https://github.com/abir614/cloudstream/releases/download/pre-release/CSB-prerelease-universal.apk) | [ARM64 (64-bit Phones/TVs)](https://github.com/abir614/cloudstream/releases/download/pre-release/CSB-prerelease-arm64-v8a.apk)<br>[ARMeabi-v7a (32-bit TV Boxes)](https://github.com/abir614/cloudstream/releases/download/pre-release/CSB-prerelease-armeabi-v7a.apk) | [Pre-release Notes](https://github.com/abir614/cloudstream/releases/tag/pre-release) |
+
+> [!IMPORTANT]
+> **Telemetry-less Version Notice**: The telemetry-less version of CloudStream is **v220 & less** (all releases up to and including `v220` contain zero telemetry or crash dispatch code). If you require an entirely telemetry-free build, download [CloudStream Release v220](https://github.com/abir614/cloudstream/releases/tag/v220). For newer releases (v221+), diagnostic telemetry is privacy-hardened (zero PII, edge-proxied, zero static API secrets) and can be fully disabled at any time in **Settings $\rightarrow$ Updates $\rightarrow$ Anonymous Crash Reporting**.
+
+</div>
+
+---
+
+## About CloudStream & Core Highlights
+
+CloudStream Hardened Edition is an open-source, hardware-adaptive multimedia platform engineered for defense-in-depth security, strict memory efficiency on low-tier hardware, and advanced family privacy protection.
+
+### 🛡️ Privacy-Preserving On-Device Adult Content Filter & Neural Shield
+CloudStream incorporates an industry-first, **On-Device Artificial Intelligence Neural Shield** that actively protects users and families from adult and ecchi content out of the box with **zero cloud inference, zero external queries, and zero data leakage**:
+- **On-Device TensorFlow Lite Computer Vision**: Evaluates poster images directly on the hardware in microseconds. Posters exceeding sensitive exposure thresholds are automatically blocked or blurred before rendering.
+- **Deep Multilingual Keyword & Token Analysis**: Scans media titles, descriptions, and extension catalogs across English, Japanese, and CJK adult terminology in real time.
+- **Calibrated Three-Tier Sensitivity Protection**:
+  - **Moderate (Default / Zero-Leak)**: Active out of the box, strictly filtering explicit and provocative adult content so the app is immediately family-friendly.
+  - **Extreme (Ultra-Strict)**: Maximum sensitivity shield rejecting all suggestive or high-exposure artwork.
+  - **Low**: Permissive setting tailored for mature users while continuing to block hardcore pornography.
+- **Zero Privacy Compromise**: 100% of classification happens locally inside the process—no poster images, URLs, or browsing data are ever sent over the network for content moderation. Configurable anytime under **Settings $\rightarrow$ General $\rightarrow$ Content & Family Safety**.
+
+### ⚡ Universal Hardware Adaptability
+- **Engineered for Low-End Devices & TV Boxes**: Deeply optimized for ultra-budget hardware such as Allwinner H313, H616, Rockchip, and Amlogic SoCs with $\le 500$ MB physical RAM and Mali-G31/Mali-400 GPUs.
+- **Adaptive Memory Management**: Low-memory devices execute full upfront preloading and hardware-level bitmap downsampling to prevent Out-Of-Memory (OOM) aborts and Low-Memory-Killer (LMK) eviction.
+- **Seamless D-Pad & Leanback Remote Control**: Fully navigatable on Android TV boxes, streaming sticks, and Google TV devices without requiring a touchscreen or mouse pointer.
+
 > [!NOTE]
 > **Fork Information**: This project is a production-hardened edition of [recloudstream/cloudstream](https://github.com/recloudstream/cloudstream) focused on defense-in-depth security, hardware-adaptive performance for any device tier (from low-end ARMv7/ARMv8 TV sticks with 500MB RAM to high-end flagship devices), guarded in-process extension sandboxing, and native Rust acceleration.
 

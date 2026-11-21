@@ -396,6 +396,53 @@ object SettingsGeneralScreen : SearchableSettings {
                 },
                 icon = painterResource(R.drawable.benene),
             ),
+            Preference.PreferenceGroup(
+                title = stringResource(R.string.about_cloudstream),
+                preferenceItems = persistentListOf(
+                    Preference.PreferenceItem.TextPreference(
+                        title = stringResource(R.string.about_nsfw_shield_title),
+                        subtitle = stringResource(R.string.about_nsfw_shield_summary),
+                        icon = painterResource(R.drawable.ic_outline_remove_red_eye_24),
+                        onClick = {
+                            activity?.let { act ->
+                                androidx.appcompat.app.AlertDialog.Builder(act, R.style.AlertDialogCustom)
+                                    .setTitle(R.string.about_nsfw_shield_title)
+                                    .setMessage(R.string.about_nsfw_shield_dialog_text)
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show()
+                            }
+                        }
+                    ),
+                    Preference.PreferenceItem.TextPreference(
+                        title = stringResource(R.string.about_hardware_adaptive_title),
+                        subtitle = stringResource(R.string.about_hardware_adaptive_summary),
+                        icon = painterResource(R.drawable.memory_24px),
+                        onClick = {
+                            activity?.let { act ->
+                                androidx.appcompat.app.AlertDialog.Builder(act, R.style.AlertDialogCustom)
+                                    .setTitle(R.string.about_hardware_adaptive_title)
+                                    .setMessage(R.string.about_hardware_adaptive_summary)
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show()
+                            }
+                        }
+                    ),
+                    Preference.PreferenceItem.TextPreference(
+                        title = stringResource(R.string.about_telemetry_title),
+                        subtitle = stringResource(R.string.about_telemetry_summary),
+                        icon = painterResource(R.drawable.ic_outline_info_24),
+                        onClick = {
+                            activity?.let { act ->
+                                androidx.appcompat.app.AlertDialog.Builder(act, R.style.AlertDialogCustom)
+                                    .setTitle(R.string.about_telemetry_title)
+                                    .setMessage(R.string.about_telemetry_summary)
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show()
+                            }
+                        }
+                    )
+                )
+            ),
             Preference.PreferenceItem.InfoPreference(title = stringResource(R.string.legal_notice_text)),
         )
     }
