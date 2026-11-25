@@ -311,13 +311,13 @@ object DeviceProfile {
                 cpuCores = cores,
                 isLowMemory = true,
                 isLowEnd = true,
-                viewportPreloadCount = 6,
-                preloaderConcurrency = 4,
-                pacingDelayMs = 0L,
+                viewportPreloadCount = 4,
+                preloaderConcurrency = 1,
+                pacingDelayMs = 30L,
                 useRgb565 = true,
                 allowHardwareBitmaps = false
             )
-            // Tier 2: Low-end / potato hardware (e.g. Allwinner H313, 1GB RAM, Android TV sticks)
+            // Tier 2: Low-end / potato hardware (e.g. Allwinner H313 512MB-1GB RAM, Android TV sticks)
             isLowEnd -> DynamicResourceBudget(
                 availRamMb = availMb,
                 totalRamMb = totalMb,
@@ -325,9 +325,9 @@ object DeviceProfile {
                 cpuCores = cores,
                 isLowMemory = false,
                 isLowEnd = true,
-                viewportPreloadCount = 8,
-                preloaderConcurrency = cores.coerceIn(4, 6),
-                pacingDelayMs = 0L,
+                viewportPreloadCount = if (isPotato) 4 else 6,
+                preloaderConcurrency = 2,
+                pacingDelayMs = if (isPotato) 20L else 10L,
                 useRgb565 = true,
                 allowHardwareBitmaps = false
             )
@@ -561,7 +561,7 @@ object DeviceProfile {
             "rk3128", "rk3229", "rk3328", "rk3528", "rk30board",
             "s805", "s905w", "s905w2", "s905l", "meson-gxl",
             "hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box",
-            "x96", "tanix", "t95", "hk1", "h96", "mxq", "v88", "tx3", "tx6", "a95x"
+            "x96", "tanix", "t95", "hk1", "h96", "mxq", "v88", "tx3", "tx6", "tx20", "a95x"
         )
         val target = "$hardware $board $manufacturer $soc $model"
         val tokens = target.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()

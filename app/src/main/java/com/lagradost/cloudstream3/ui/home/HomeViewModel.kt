@@ -529,50 +529,26 @@ class HomeViewModel : ViewModel() {
                     }
                 }
 
-                // 2. Hardware-Adaptive Workload Partitioning:
-                // LOW-END ONLY: load EVERY poster during the loading screen to eliminate post-render crashes.
-                // On warm start (subsequent opens), offscreen posters that are ALREADY cached on disk and ALREADY scored
-                // do not need re-decoding, making warm load virtually instantaneous (~30-50ms)!
-                // MID & FLAGSHIP: ONLY preload a few posters (initial visible viewport: banners + first 4-8 rail posters).
-                // Rest of them are loaded in lazy loading / on demand via Coil as the user scrolls!
+                // 2. Viewport-First Hardware-Adaptive Preload:
+                // Only preload the initial visible viewport (banners + first 4-8 rail posters) across ALL
+                // device tiers so Home opens quickly without blocking 40-180s on 512MB/H313 devices.
+                // Remaining offscreen posters are already metadata-checked above and classify lazily on scroll.
                 val initialLimit = budget.viewportPreloadCount.coerceIn(4, 8)
                 val initialVisibleTargets = (bannerItems + allRailItems.take(initialLimit)).distinctBy { it.posterUrl }
-                val initialVisibleUrls = initialVisibleTargets.mapTo(HashSet()) { it.posterUrl }
 
-                val itemsToLoad = if (isLowEnd) {
-                    allTargets.filter { target ->
-                        val isDiskCached = try {
-                            val snapshot = imageLoader.diskCache?.openSnapshot(target.posterUrl)
-                            val exists = snapshot != null
-                            try { snapshot?.close() } catch (_: Throwable) {}
-                            exists
-                        } catch (_: Throwable) { false }
-                        val isScored = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.getCachedScore(target.posterUrl, preloaderContext) != null || NsfwFilterEngine.isCleanTitleAllowed(target.name)
-                        val isVisible = initialVisibleUrls.contains(target.posterUrl)
-
-                        if (isVisible) {
-                            val isMemCached = try {
-                                imageLoader.memoryCache?.get(coil3.memory.MemoryCache.Key(target.posterUrl)) != null
-                            } catch (_: Throwable) { false }
-                            !isMemCached || !isDiskCached || (shouldFilter && !isScored)
-                        } else {
-                            !isDiskCached || (shouldFilter && !isScored)
-                        }
-                    }
-                } else {
-                    initialVisibleTargets.filter { target ->
-                        val isMemCached = try {
-                            imageLoader.memoryCache?.get(coil3.memory.MemoryCache.Key(target.posterUrl)) != null
-                        } catch (_: Throwable) { false }
-                        val isScored = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.getCachedScore(target.posterUrl, preloaderContext) != null || NsfwFilterEngine.isCleanTitleAllowed(target.name)
-                        !isMemCached || (shouldFilter && !isScored)
-                    }
+                val itemsToLoad = initialVisibleTargets.filter { target ->
+                    val isMemCached = try {
+                        imageLoader.memoryCache?.get(coil3.memory.MemoryCache.Key(target.posterUrl)) != null
+                    } catch (_: Throwable) { false }
+                    val isScored = com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.getCachedScore(target.posterUrl, preloaderContext) != null || NsfwFilterEngine.isCleanTitleAllowed(target.name)
+                    !isMemCached || (shouldFilter && !isScored)
                 }
 
                 if (itemsToLoad.isNotEmpty()) {
                     val totalPosters = itemsToLoad.size
                     val posterMsg = preloaderContext.getString(R.string.loading_posters)
-                    val maxConcurrency = if (isLowEnd) budget.preloaderConcurrency.coerceIn(2, 4) else budget.preloaderConcurrency
+                    val maxConcurrency = if (isLowEnd) budget.preloaderConcurrency.coerceIn(1, 2) else budget.preloaderConcurrency
+                    val pacingDelayMs = budget.pacingDelayMs
 
                     // True proportional progress tracking: Phase 2 covers the remaining 80% (20% -> 100%)
                     if (!isBackgroundUpdate && totalPosters > 1) {
@@ -597,7 +573,7 @@ class HomeViewModel : ViewModel() {
                             async(Dispatchers.IO) {
                                 for (item in channel) {
                                     try {
-                                        val timeoutMs = if (isLowEnd) 3000L else 2000L
+                                        val timeoutMs = if (isLowEnd) 2500L else 2000L
                                         withTimeoutOrNull(timeoutMs) {
                                             val request = ImageRequest.Builder(preloaderContext)
                                                 .data(item.posterUrl)
@@ -631,6 +607,9 @@ class HomeViewModel : ViewModel() {
                                                 }
                                             }
                                         }
+                                        if (pacingDelayMs > 0L) {
+                                            delay(pacingDelayMs)
+                                        }
                                     } catch (_: Throwable) {
                                         // Do not falsely mark failed/timed-out images as clean
                                     }
@@ -656,11 +635,7 @@ class HomeViewModel : ViewModel() {
                                 }
                             }
                         }
-                        val overallTimeoutMs = if (isLowEnd) {
-                            (totalPosters * 3000L).coerceIn(40000L, 180000L)
-                        } else {
-                            10000L
-                        }
+                        val overallTimeoutMs = if (isLowEnd) 6000L else 10000L
                         withTimeoutOrNull(overallTimeoutMs) {
                             workers.awaitAll()
                         }

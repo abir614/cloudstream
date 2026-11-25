@@ -149,14 +149,15 @@ object OnDeviceNsfwClassifier {
 
         return when {
             // Tier 1: Severe resource starvation (critical low memory < 180MB, tight heap < 20MB, or <= 2 cores)
+            // Keep concurrency=1, XNNPACK off (avoids extra workspace RAM), and gentle 30ms pacing.
             isLowMem || availMb < 180L || freeHeapMb < 20L || cores <= 2 -> {
                 NsfwExecutionConfig(
-                    preloaderConcurrency = 4,
+                    preloaderConcurrency = 1,
                     maxSessions = 1,
                     interpreterThreads = 1,
-                    useXnnpack = useXnnpack,
-                    coroutineDelayMs = 0L,
-                    cpuPacingSleepMs = 0L
+                    useXnnpack = false,
+                    coroutineDelayMs = 30L,
+                    cpuPacingSleepMs = 30L
                 )
             }
             // Tier 2: Low-end / potato with healthy resource headroom (>= 350MB free RAM, >= 4 cores, >= 28MB heap)
@@ -167,7 +168,7 @@ object OnDeviceNsfwClassifier {
                 NsfwExecutionConfig(
                     preloaderConcurrency = 2,
                     maxSessions = 1,
-                    interpreterThreads = cores.coerceIn(2, 2),
+                    interpreterThreads = 2,
                     useXnnpack = useXnnpack,
                     coroutineDelayMs = 15L,
                     cpuPacingSleepMs = 15L
@@ -745,12 +746,45 @@ object OnDeviceNsfwClassifier {
 
         override fun run() {
             try {
+                // Skip recycled views immediately before spending CPU/TFLite cycles
+                val preCheckView = weakImageView.get() ?: return
+                val preCheckTag = try {
+                    preCheckView.getTag(R.id.coil_image_url_tag)
+                } catch (_: Throwable) {
+                    null
+                }
+                if (preCheckTag != null && preCheckTag != imageKey) {
+                    return
+                }
+
                 val drawable = targetDrawable
+                val resolvedHash = dHash ?: analyzeFastMetrics(drawable, appContext)?.dHash
+
+                if (resolvedHash != null) {
+                    val dHashHit = dHashCache.get(resolvedHash)
+                    if (dHashHit != null) {
+                        recordScore(imageKey, dHashHit, appContext, resolvedHash)
+                        val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
+                        mainHandler.post {
+                            val activeView = weakImageView.get() ?: return@post
+                            val checkTag = try {
+                                activeView.getTag(R.id.coil_image_url_tag)
+                            } catch (_: Throwable) {
+                                null
+                            }
+                            if (checkTag == imageKey) {
+                                val animate = DeviceProfile.tier(activeView.context) != DeviceTier.LOW
+                                applyVisualFilterResult(activeView, imageKey, drawable, dHashHit, activeThreshold, appContext, animate)
+                            }
+                        }
+                        return
+                    }
+                }
 
                 // If device is under active severe memory pressure or model unavailable, use safe fallback
                 if (isDeviceUnderMemoryPressure(appContext) || isModelPermanentlyUnavailable) {
                     val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(drawable, appContext) else maxOf(classifyPotatoFastScore(drawable, appContext), 1.0f)
-                    recordScore(imageKey, score, appContext, dHash)
+                    recordScore(imageKey, score, appContext, resolvedHash)
                     val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
                     mainHandler.post {
                         val activeView = weakImageView.get() ?: return@post
@@ -767,9 +801,13 @@ object OnDeviceNsfwClassifier {
                 }
 
                 val score = classifyDrawableScore(appContext, drawable)
-                recordScore(imageKey, score, appContext, dHash)
+                recordScore(imageKey, score, appContext, resolvedHash)
 
-                // Direct unthrottled scoring for maximum throughput
+                // Cooperative yield on low-end / potato SoCs so TFLite background work doesn't starve TV RenderThread
+                val pacingMs = getNsfwExecutionConfig(appContext).cpuPacingSleepMs
+                if (pacingMs > 0L) {
+                    try { Thread.sleep(pacingMs) } catch (_: InterruptedException) {}
+                }
 
                 val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
                 mainHandler.post {
@@ -1406,35 +1444,20 @@ object OnDeviceNsfwClassifier {
             return
         }
 
-        // 2. Instant fast visual metric sample (< 0.03 ms)
-        val fast = analyzeFastMetrics(drawable, appContext)
-        if (fast != null) {
-            // 2a. Perceptual dHash cache hit across mirror CDNs (< 0.005 ms)
-            val dHashHit = dHashCache.get(fast.dHash)
-            if (dHashHit != null) {
-                recordScore(imageKey, dHashHit, appContext, fast.dHash)
-                val animate = DeviceProfile.tier(imageView.context) != DeviceTier.LOW
-                applyVisualFilterResult(imageView, imageKey, drawable, dHashHit, threshold, appContext, animate)
-                return
+        // 2. Active critical memory pressure or model unavailable -> run lightweight fallback immediately
+        if (isDeviceUnderMemoryPressure(appContext) || isModelPermanentlyUnavailable) {
+            val fast = analyzeFastMetrics(drawable, appContext)
+            val score = if (appContext.isNsfwEnabled()) {
+                fast?.potatoScore ?: classifyPotatoFastScore(drawable, appContext)
+            } else {
+                maxOf(fast?.potatoScore ?: classifyPotatoFastScore(drawable, appContext), 1.0f)
             }
-
-            // 2b. Active critical memory pressure -> apply safe fallback score
-            if (isDeviceUnderMemoryPressure(appContext) || isModelPermanentlyUnavailable) {
-                val score = if (appContext.isNsfwEnabled()) fast.potatoScore else maxOf(fast.potatoScore, 1.0f)
-                recordScore(imageKey, score, appContext, fast.dHash)
-                applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
-                return
-            }
-        } else {
-            if (isDeviceUnderMemoryPressure(appContext) || isModelPermanentlyUnavailable) {
-                val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(drawable, appContext) else 1.0f
-                recordScore(imageKey, score, appContext)
-                applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
-                return
-            }
+            recordScore(imageKey, score, appContext, fast?.dHash)
+            applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
+            return
         }
 
-        // 3. Offload TFLite INT8 inference to worker pool
+        // 3. Offload pixel sampling, dHash deduplication, and TFLite INT8 inference strictly off the UI thread
         val weakImageView = WeakReference(imageView)
         try {
             workerExecutor.execute(
@@ -1443,13 +1466,13 @@ object OnDeviceNsfwClassifier {
                     imageKey = imageKey,
                     targetDrawable = drawable,
                     appContext = appContext,
-                    dHash = fast?.dHash
+                    dHash = null
                 )
             )
         } catch (_: Throwable) {
-            // If submission fails due to executor rejection, safely run fallback immediately
-            val score = if (appContext.isNsfwEnabled()) (fast?.potatoScore ?: classifyPotatoFastScore(drawable, appContext)) else 1.0f
-            recordScore(imageKey, score, appContext, fast?.dHash)
+            // If submission fails due to executor rejection, safely run lightweight fallback immediately
+            val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(drawable, appContext) else 1.0f
+            recordScore(imageKey, score, appContext)
             applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
         }
     }

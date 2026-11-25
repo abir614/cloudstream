@@ -180,10 +180,10 @@ object ImageLoader {
         val isPotato = DeviceProfile.isUltraPotato(context)
         val config = DeviceProfile.getCoilConfig(context)
         val httpClient = getImageHttpClient(context)
-        val coilDispatcher = if (isPotato || tier == DeviceTier.LOW) {
-            Dispatchers.IO.limitedParallelism(3)
-        } else {
-            Dispatchers.IO.limitedParallelism(8)
+        val coilDispatcher = when {
+            isPotato -> Dispatchers.IO.limitedParallelism(2)
+            tier == DeviceTier.LOW -> Dispatchers.IO.limitedParallelism(3)
+            else -> Dispatchers.IO.limitedParallelism(8)
         }
 
         return ImageLoader.Builder(context)
@@ -347,6 +347,12 @@ object ImageLoader {
         this.load(imageData, SingletonImageLoader.get(context)) {
             this.diskCacheKey(imageKey)
             this.memoryCacheKey(imageKey)
+            if (isPotato || tier == DeviceTier.LOW) {
+                val lp = this@loadImageInternal.layoutParams
+                if (this@loadImageInternal.width <= 0 && (lp == null || lp.width <= 0)) {
+                    this.size(480, 640)
+                }
+            }
             if (config.useRgb565) {
                 this.bitmapConfig(Bitmap.Config.RGB_565)
             }
