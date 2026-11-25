@@ -22,6 +22,7 @@ import com.lagradost.cloudstream3.isMovieType
 import com.lagradost.cloudstream3.syncproviders.SyncAPI
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
+import com.lagradost.cloudstream3.ui.home.HomeChildItemAdapter
 import com.lagradost.cloudstream3.utils.AppContextUtils.getShortSeasonText
 import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.utils.DataStoreHelper.fixVisual
@@ -233,7 +234,10 @@ object SearchResultBuilder {
         if (shouldCensor) {
             applyCensoredPoster(cardView, card.posterUrl)
         } else if (!card.posterUrl.isNullOrEmpty()) {
+            val targetW = bg.layoutParams?.width?.takeIf { it > 0 } ?: HomeChildItemAdapter.minPosterSize
+            val targetH = bg.layoutParams?.height?.takeIf { it > 0 } ?: HomeChildItemAdapter.maxPosterSize
             cardView.loadImage(card.posterUrl, card.posterHeaders) {
+                size(targetW, targetH)
                 placeholder { getImageFromDrawable(itemView.context, R.drawable.default_cover) }
                 error { getImageFromDrawable(itemView.context, R.drawable.default_cover) }
             }

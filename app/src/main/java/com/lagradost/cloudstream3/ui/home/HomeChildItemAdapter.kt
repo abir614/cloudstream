@@ -171,10 +171,9 @@ open class HomeChildItemAdapter(
     }
 
     companion object {
-        // The vast majority of the lag comes from creating the view
-        // This simply shares the views between all HomeChildItemAdapter
+        // Share views cleanly across HomeChildItemAdapters without forcing frequent re-creation on scroll
         val sharedPool =
-            newSharedPool { setMaxRecycledViews(CONTENT, 32) }
+            newSharedPool { setMaxRecycledViews(CONTENT, 64) }
 
         var minPosterSize: Int = 114.toPx
         var maxPosterSize: Int = 180.toPx
@@ -184,8 +183,26 @@ open class HomeChildItemAdapter(
                 ?.getInt(context.getString(R.string.poster_size_key), 0) ?: 0
             // Scale by +10% per step
             val mul = 1.0f + scale * 0.1f
-            minPosterSize = (114.toPx.toFloat() * mul).toInt()
-            maxPosterSize = (180.toPx.toFloat() * mul).toInt()
+            if (isLayout(TV)) {
+                // Size posters on TV so 6 cards fit across each section row comfortably and legibly
+                val dm = context.resources.displayMetrics
+                val screenWidthPx = dm.widthPixels
+                val navRailWidthPx = try {
+                    context.resources.getDimensionPixelSize(R.dimen.nav_rail_view_width)
+                } catch (_: Throwable) {
+                    62.toPx
+                }
+                val rowPaddingPx = 13.toPx // homepage_parent_tv paddingStart (8dp) + paddingEnd (5dp)
+                val cardMarginsPx = 6 * 4.toPx // 6 cards * 2dp horizontal margin each side
+                val usableWidthPx = (screenWidthPx - navRailWidthPx - rowPaddingPx - cardMarginsPx)
+                    .coerceAtLeast(6 * 114.toPx)
+                val baseTvWidth = usableWidthPx / 6f
+                minPosterSize = (baseTvWidth * mul).toInt()
+                maxPosterSize = (baseTvWidth * (180f / 114f) * mul).toInt()
+            } else {
+                minPosterSize = (114.toPx.toFloat() * mul).toInt()
+                maxPosterSize = (180.toPx.toFloat() * mul).toInt()
+            }
         }
 
         fun updateLayoutParms(layout: FrameLayout, width: Int, height: Int) {

@@ -256,21 +256,21 @@ object DeviceProfile {
         val isPotato = isUltraPotato(ctx)
         return when (tier(ctx)) {
             DeviceTier.LOW -> CoilTierConfig(
-                memoryCachePercent = if (isPotato) 0.05 else 0.10, // 5% RAM for 500MB devices
+                memoryCachePercent = if (isPotato) 0.15 else 0.20, // Holds full scrollback posters cleanly in RGB_565
                 diskCacheMaxBytes = 128L * 1024 * 1024,
                 crossfadeMs = 0, // crossfade off on LOW
                 allowHardwareBitmaps = false,
                 useRgb565 = true // RGB_565 saves 50% bitmap memory on LOW devices
             )
             DeviceTier.MID -> CoilTierConfig(
-                memoryCachePercent = 0.20, // ~20% of app memory
+                memoryCachePercent = 0.25, // ~25% of app memory
                 diskCacheMaxBytes = 512L * 1024 * 1024,
                 crossfadeMs = 150,
                 allowHardwareBitmaps = true,
                 useRgb565 = false
             )
             DeviceTier.HIGH -> CoilTierConfig(
-                memoryCachePercent = 0.25, // ~25% of app memory
+                memoryCachePercent = 0.30, // ~30% of app memory
                 diskCacheMaxBytes = 1024L * 1024 * 1024,
                 crossfadeMs = 150,
                 allowHardwareBitmaps = true,
@@ -909,9 +909,9 @@ object DeviceProfile {
     fun getItemViewCacheSize(ctx: Context): Int {
         val isPotato = isUltraPotato(ctx)
         return when (tier(ctx)) {
-            DeviceTier.HIGH -> 8
-            DeviceTier.MID -> 4
-            DeviceTier.LOW -> if (isPotato) 2 else 3
+            DeviceTier.HIGH -> 12
+            DeviceTier.MID -> 8
+            DeviceTier.LOW -> if (isPotato) 4 else 6
         }
     }
 

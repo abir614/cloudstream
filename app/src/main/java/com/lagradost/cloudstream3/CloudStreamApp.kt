@@ -294,38 +294,55 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                 level >= TRIM_MEMORY_COMPLETE -> {
                     memCache?.clear()
                     thread(start = true, isDaemon = true, name = "TrimMemoryCritical") {
-                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this@CloudStreamApp, force = true)
+                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(
+                            this@CloudStreamApp,
+                            force = true,
+                            trimImageCache = true
+                        )
                     }
                 }
                 level >= TRIM_MEMORY_MODERATE -> {
-                    memCache?.trimToSize((memCache.size / 4).coerceAtLeast(0L))
+                    memCache?.trimToSize((memCache.size / 2).coerceAtLeast(0L))
                     thread(start = true, isDaemon = true, name = "TrimMemoryModerate") {
-                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this@CloudStreamApp, force = false)
+                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(
+                            this@CloudStreamApp,
+                            force = false,
+                            trimImageCache = false
+                        )
                     }
                 }
                 level >= TRIM_MEMORY_BACKGROUND -> {
-                    memCache?.trimToSize((memCache.size / 2).coerceAtLeast(0L))
+                    thread(start = true, isDaemon = true, name = "BackgroundScoreFlush") {
+                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(this)
+                    }
                 }
                 level >= TRIM_MEMORY_UI_HIDDEN -> {
                     thread(start = true, isDaemon = true, name = "BackgroundScoreFlush") {
                         com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(this)
                     }
                 }
-                // Foreground running levels (values 5..15, strictly below TRIM_MEMORY_UI_HIDDEN = 20)
+                // Foreground running levels (values 5..15): keep cached posters intact during normal scrolling!
                 level >= TRIM_MEMORY_RUNNING_CRITICAL -> {
-                    memCache?.clear()
+                    memCache?.trimToSize((memCache.size / 2).coerceAtLeast(0L))
                     thread(start = true, isDaemon = true, name = "TrimMemoryRunningCritical") {
-                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this@CloudStreamApp, force = true)
+                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(
+                            this@CloudStreamApp,
+                            force = false,
+                            trimImageCache = false
+                        )
                     }
                 }
                 level >= TRIM_MEMORY_RUNNING_LOW -> {
-                    memCache?.trimToSize((memCache.size / 4).coerceAtLeast(0L))
                     thread(start = true, isDaemon = true, name = "TrimMemoryRunningLow") {
-                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this@CloudStreamApp, force = false)
+                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(
+                            this@CloudStreamApp,
+                            force = false,
+                            trimImageCache = false
+                        )
                     }
                 }
                 level >= TRIM_MEMORY_RUNNING_MODERATE -> {
-                    memCache?.trimToSize((memCache.size / 2).coerceAtLeast(0L))
+                    // Preserve active poster memory cache while scrolling in foreground
                 }
             }
         } catch (_: Throwable) {
@@ -343,7 +360,11 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             )
             SingletonImageLoader.get(this).memoryCache?.clear()
             thread(start = true, isDaemon = true, name = "LowMemoryCleanup") {
-                com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this@CloudStreamApp, force = true)
+                com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(
+                    this@CloudStreamApp,
+                    force = true,
+                    trimImageCache = true
+                )
             }
         } catch (_: Throwable) {
         }

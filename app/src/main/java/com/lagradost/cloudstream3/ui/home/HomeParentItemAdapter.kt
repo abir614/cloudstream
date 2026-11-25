@@ -49,7 +49,7 @@ open class ParentItemAdapter(
 ) {
     companion object {
         val sharedPool =
-            newSharedPool { setMaxRecycledViews(CONTENT, 4) }
+            newSharedPool { setMaxRecycledViews(CONTENT, 8) }
     }
 
     data class ParentItemHolder(val binding: ViewBinding) : ViewHolderState<Bundle>(binding) {
@@ -127,7 +127,7 @@ open class ParentItemAdapter(
                     this.clickCallback = this@ParentItemAdapter.clickCallback
                     nextFocusUp = homeChildRecyclerview.nextFocusUpId
                     nextFocusDown = homeChildRecyclerview.nextFocusDownId
-                    submitIncomparableList(item.list.list)
+                    submitList(item.list.list)
                 }
             }
 

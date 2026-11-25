@@ -164,20 +164,27 @@ object GithubReleases : GithubRepository {
             return null
         }
 
-        // Intelligently select best matching APK for running device architecture
+        // Intelligently select best matching APK for running device architecture in priority order
         val supportedAbis = android.os.Build.SUPPORTED_ABIS?.toList() ?: emptyList()
-        val foundAsset = when {
-            supportedAbis.any { it.contains("arm64") } ->
-                apkAssets.firstOrNull { it.name.contains("arm64-v8a") }
-            supportedAbis.any { it.contains("armeabi") } ->
-                apkAssets.firstOrNull { it.name.contains("armeabi-v7a") }
-            supportedAbis.any { it.contains("x86_64") } ->
-                apkAssets.firstOrNull { it.name.contains("x86_64") }
-            supportedAbis.any { it.contains("x86") } ->
-                apkAssets.firstOrNull { it.name.contains("x86") }
-            else -> null
-        } ?: apkAssets.firstOrNull { it.name.contains("universal") }
-          ?: apkAssets.firstOrNull() ?: return null
+        var foundAsset: GithubAsset? = null
+        for (abi in supportedAbis) {
+            val match = when {
+                abi.contains("arm64") -> apkAssets.firstOrNull { it.name.contains("arm64-v8a") }
+                abi.contains("armeabi") -> apkAssets.firstOrNull { it.name.contains("armeabi-v7a") }
+                abi == "x86_64" -> apkAssets.firstOrNull { it.name.contains("x86_64") }
+                abi == "x86" -> apkAssets.firstOrNull { it.name.contains("-x86.") || it.name.contains("-x86-") }
+                else -> null
+            }
+            if (match != null) {
+                foundAsset = match
+                break
+            }
+        }
+        if (foundAsset == null) {
+            foundAsset = apkAssets.firstOrNull { it.name.contains("universal") }
+                ?: apkAssets.firstOrNull()
+                ?: return null
+        }
 
         val sumsAsset = latestRelease.assets.firstOrNull {
             it.name.equals("SHA256SUMS", ignoreCase = true) || it.name.equals("SHA256SUMS.txt", ignoreCase = true)
@@ -186,8 +193,9 @@ object GithubReleases : GithubRepository {
             try {
                 val sumsText = github.get(asset.browserDownloadUrl).text
                 val hash = sumsText.lines().firstOrNull { line ->
-                    line.contains(foundAsset.name)
-                }?.split("""\s+""".toRegex())?.firstOrNull()?.trim()?.lowercase()
+                    val parts = line.trim().split("""\s+""".toRegex())
+                    parts.size >= 2 && parts.last().removePrefix("*") == foundAsset.name
+                }?.trim()?.split("""\s+""".toRegex())?.firstOrNull()?.lowercase()
                 if (!hash.isNullOrBlank()) "sha256:$hash" else null
             } catch (_: Throwable) {
                 null

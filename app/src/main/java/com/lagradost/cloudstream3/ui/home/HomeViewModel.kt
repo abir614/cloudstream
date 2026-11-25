@@ -491,8 +491,9 @@ class HomeViewModel : ViewModel() {
             val budget = preloaderContext?.let { DeviceProfile.getDynamicResourceBudget(it) }
             val imageLoader = preloaderContext?.let { SingletonImageLoader.get(it) }
             val threshold = preloaderContext?.let { NsfwFilterEngine.getVisualThreshold(it) } ?: NsfwFilterLevel.MODERATE.defaultVisualThreshold
-            val posterWidthPx = 114.toPx
-            val posterHeightPx = 180.toPx
+            preloaderContext?.let { HomeChildItemAdapter.updatePosterSize(it) }
+            val posterWidthPx = HomeChildItemAdapter.minPosterSize.takeIf { it > 0 } ?: 114.toPx
+            val posterHeightPx = HomeChildItemAdapter.maxPosterSize.takeIf { it > 0 } ?: 180.toPx
             val isLowEnd = budget?.isLowEnd == true || (preloaderContext != null && (DeviceProfile.isLowEnd(preloaderContext) || DeviceProfile.isUltraPotato(preloaderContext)))
 
             if (preloaderContext != null && budget != null && imageLoader != null && (newExpandable.isNotEmpty() || initialPreviews.isNotEmpty())) {
@@ -575,18 +576,22 @@ class HomeViewModel : ViewModel() {
                                     try {
                                         val timeoutMs = if (isLowEnd) 2500L else 2000L
                                         withTimeoutOrNull(timeoutMs) {
+                                            val needsSoftwareForFilter = shouldFilter &&
+                                                com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.getCachedScore(item.posterUrl, preloaderContext) == null &&
+                                                !NsfwFilterEngine.isCleanTitleAllowed(item.name)
                                             val request = ImageRequest.Builder(preloaderContext)
                                                 .data(item.posterUrl)
                                                 .memoryCacheKey(item.posterUrl)
                                                 .diskCacheKey(item.posterUrl)
                                                 .size(width = posterWidthPx, height = posterHeightPx)
+                                                .precision(coil3.size.Precision.INEXACT)
                                                 .httpHeaders(NetworkHeaders.Builder().also { headerBuilder ->
                                                     headerBuilder["User-Agent"] = USER_AGENT
                                                     item.posterHeaders?.forEach { (key, value) ->
                                                         headerBuilder[key] = value
                                                     }
                                                 }.build())
-                                                .allowHardware(if (isLowEnd) false else budget.allowHardwareBitmaps)
+                                                .allowHardware(if (isLowEnd || needsSoftwareForFilter) false else budget.allowHardwareBitmaps)
                                                 .bitmapConfig(if (isLowEnd || budget.useRgb565) Bitmap.Config.RGB_565 else Bitmap.Config.ARGB_8888)
                                                 .diskCachePolicy(CachePolicy.ENABLED)
                                                 .memoryCachePolicy(CachePolicy.ENABLED)

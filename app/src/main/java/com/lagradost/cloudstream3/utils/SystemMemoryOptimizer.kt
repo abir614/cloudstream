@@ -22,7 +22,7 @@ object SystemMemoryOptimizer {
     /**
      * Trims internal CloudStream caches safely when under low-end constraints or memory pressure.
      */
-    fun reclaimBackgroundMemory(context: Context, force: Boolean = false) {
+    fun reclaimBackgroundMemory(context: Context, force: Boolean = false, trimImageCache: Boolean = false) {
         val now = System.currentTimeMillis()
         if (!force && now - lastOptimizationTimestamp < COOLDOWN_MS) {
             return
@@ -31,16 +31,18 @@ object SystemMemoryOptimizer {
 
         try {
             val appCtx = context.applicationContext ?: context
-            try {
-                val memCache = SingletonImageLoader.get(appCtx).memoryCache
-                if (force) {
-                    memCache?.clear()
-                } else {
-                    memCache?.let { cache ->
-                        cache.trimToSize(cache.size / 2)
+            if (force || trimImageCache) {
+                try {
+                    val memCache = SingletonImageLoader.get(appCtx).memoryCache
+                    if (force) {
+                        memCache?.clear()
+                    } else {
+                        memCache?.let { cache ->
+                            cache.trimToSize(cache.size / 2)
+                        }
                     }
+                } catch (_: Throwable) {
                 }
-            } catch (_: Throwable) {
             }
 
             try {

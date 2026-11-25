@@ -40,7 +40,7 @@ class WindowSizeCoordinatorTest {
             isHorizontalItem = false,
             isTv = true
         )
-        assertEquals(7, tvPosterSpan)
+        assertEquals(6, tvPosterSpan)
 
         // TV banners
         val tvBannerSpan = WindowSizeCoordinator.calculateGridSpanCount(

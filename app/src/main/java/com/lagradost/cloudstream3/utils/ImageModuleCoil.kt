@@ -27,7 +27,9 @@ import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.request.bitmapConfig
 import coil3.request.crossfade
+import coil3.request.precision
 import coil3.request.target
+import coil3.size.Precision
 import coil3.util.DebugLogger
 import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.BuildConfig
@@ -150,6 +152,7 @@ object ImageLoader {
                     response.newBuilder()
                         .removeHeader("Pragma")
                         .removeHeader("Vary")
+                        .removeHeader("Expires")
                         .header("Cache-Control", "public, max-age=2592000")
                         .build()
                 } else {
@@ -347,11 +350,10 @@ object ImageLoader {
         this.load(imageData, SingletonImageLoader.get(context)) {
             this.diskCacheKey(imageKey)
             this.memoryCacheKey(imageKey)
-            if (isPotato || tier == DeviceTier.LOW) {
-                val lp = this@loadImageInternal.layoutParams
-                if (this@loadImageInternal.width <= 0 && (lp == null || lp.width <= 0)) {
-                    this.size(480, 640)
-                }
+            this.precision(Precision.INEXACT)
+            val lp = this@loadImageInternal.layoutParams
+            if (this@loadImageInternal.width <= 0 && (lp == null || lp.width <= 0)) {
+                this.size(480, 640)
             }
             if (config.useRgb565) {
                 this.bitmapConfig(Bitmap.Config.RGB_565)
