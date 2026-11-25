@@ -1,6 +1,7 @@
 package com.lagradost.cloudstream3.ui.settings
 
 import android.app.Activity
+import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
