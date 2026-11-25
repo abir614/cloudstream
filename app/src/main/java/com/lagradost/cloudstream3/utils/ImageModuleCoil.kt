@@ -27,7 +27,6 @@ import coil3.request.ImageRequest
 import coil3.request.allowHardware
 import coil3.request.bitmapConfig
 import coil3.request.crossfade
-import coil3.request.precision
 import coil3.request.target
 import coil3.size.Precision
 import coil3.util.DebugLogger
