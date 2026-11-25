@@ -14,7 +14,8 @@ crate-type = ["cdylib", "rlib"]
 wasmi = { version = "1.1.0", optional = true }
 
 # URL parsing & Anti-SSRF validation
-url = "2.5.4"
+# Pinned to >=2.5.9 to fix RUSTSEC-2026-0592: stack overflow in Url::origin() on nested blob: URLs
+url = "2.5.9"
 
 # Serialization & Zero-copy parsing
 serde = { version = "1.0.217", features = ["derive"] }

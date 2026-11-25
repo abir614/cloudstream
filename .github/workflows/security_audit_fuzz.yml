@@ -35,6 +35,15 @@ jobs:
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
 
+      - name: Update Cargo.lock to patched dependency versions
+        run: |
+          cd rust-core
+          # Force-update known vulnerable crates to their patched versions before audit.
+          # url: RUSTSEC-2026-0592 (stack overflow in Url::origin on nested blob: URLs) — fix: >=2.5.9
+          # rustix: RUSTSEC-2026-0486 (xattr uninitialized bytes) — fix: >=1.1.6
+          cargo update -p url --precise 2.5.9
+          cargo update -p rustix --precise 1.1.6
+
       - name: Run Cargo Audit
         run: |
           cd rust-core
