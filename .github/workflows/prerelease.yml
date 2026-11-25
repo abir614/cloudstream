@@ -227,37 +227,97 @@ jobs:
         git push origin -f pre-release || true
 
         # Clean old APK and checksum assets from pre-release so builds don't pile up
-        RELEASE_ID=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+        RELEASE_ID=$(curl -sS --retry 3 --retry-delay 2 -H "Authorization: token $GITHUB_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
           "https://api.github.com/repos/${{ github.repository }}/releases/tags/pre-release" | python3 -c "import sys, json; d = json.load(sys.stdin); print(d.get('id', '') if isinstance(d, dict) else '')" || true)
         if [ -n "$RELEASE_ID" ] && [ "$RELEASE_ID" != "null" ]; then
           echo "Found existing pre-release ID: $RELEASE_ID. Purging older assets..."
-          ASSET_IDS=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          ASSET_IDS=$(curl -sS --retry 3 --retry-delay 2 -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets" | python3 -c "import sys, json; d = json.load(sys.stdin); print('\n'.join(str(a['id']) for a in d if isinstance(a, dict) and 'id' in a)) if isinstance(d, list) else None" || true)
+            "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID/assets?per_page=100" | python3 -c "import sys, json; d = json.load(sys.stdin); print('\n'.join(str(a['id']) for a in d if isinstance(a, dict) and 'id' in a)) if isinstance(d, list) else None" || true)
           for aid in $ASSET_IDS; do
             echo "Deleting asset $aid..."
-            curl -s -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/assets/$aid" || true
+            for attempt in 1 2 3 4; do
+              STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+                -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github.v3+json" \
+                "https://api.github.com/repos/${{ github.repository }}/releases/assets/$aid" || echo "000")
+              if [ "$STATUS" = "204" ] || [ "$STATUS" = "404" ]; then
+                break
+              fi
+              echo "Asset $aid delete returned HTTP $STATUS (attempt $attempt/4), retrying..."
+              sleep $((attempt * 2))
+            done
           done
         fi
 
     - name: Create Pre-release
-      uses: softprops/action-gh-release@v3
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        tag_name: "pre-release"
-        target_commitish: ${{ github.sha }}
-        name: "Pre-release Build #${{ steps.build_count.outputs.count }}"
-        body_path: release_body.md
-        prerelease: true
-        generate_release_notes: false
-        make_latest: false
-        fail_on_unmatched_files: false
-        files: |
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -euo pipefail
+        retry() {
+          local max_attempts=5
+          local attempt=1
+          until "$@"; do
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "Command failed after $attempt attempts: $*"
+              return 1
+            fi
+            local delay=$((attempt * 3))
+            echo "Attempt $attempt/$max_attempts failed for: $* — retrying in ${delay}s..."
+            sleep "$delay"
+            attempt=$((attempt + 1))
+          done
+        }
+
+        TITLE="Pre-release Build #${{ steps.build_count.outputs.count }}"
+        REL_STATUS="000"
+        for attempt in 1 2 3 4 5; do
+          REL_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/pre-release" || echo "000")
+          if [ "$REL_STATUS" = "200" ] || [ "$REL_STATUS" = "404" ]; then
+            break
+          fi
+          echo "Release lookup returned HTTP $REL_STATUS (attempt $attempt/5), retrying..."
+          sleep $((attempt * 3))
+        done
+
+        if [ "$REL_STATUS" = "200" ]; then
+          retry gh release edit pre-release \
+            --repo "${{ github.repository }}" \
+            --title "$TITLE" \
+            --notes-file release_body.md \
+            --target "${{ github.sha }}" \
+            --prerelease
+        elif [ "$REL_STATUS" = "404" ]; then
+          retry gh release create pre-release \
+            --repo "${{ github.repository }}" \
+            --title "$TITLE" \
+            --notes-file release_body.md \
+            --target "${{ github.sha }}" \
+            --prerelease
+        else
+          echo "Failed to query pre-release tag status (HTTP $REL_STATUS)"
+          exit 1
+        fi
+
+        shopt -s nullglob
+        FILES=(
           app/build/outputs/apk/prerelease/release/*.apk
           app/build/outputs/apk/prerelease/release/SHA256SUMS*
           app/build/outputs/apk/prerelease/release/release.json
           app/build/libs/classes.jar
           app/build/libs/app-sources.jar
+        )
+        if [ ${#FILES[@]} -eq 0 ]; then
+          echo "No release artifacts found to upload."
+          exit 1
+        fi
+        for file in "${FILES[@]}"; do
+          echo "Uploading $file..."
+          retry gh release upload pre-release "$file" --repo "${{ github.repository }}" --clobber
+          echo "Uploaded $file"
+        done
