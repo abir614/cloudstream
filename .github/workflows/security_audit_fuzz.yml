@@ -80,6 +80,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Update Cargo.lock to patched dependency versions
+        run: |
+          cd rust-core
+          cargo update -p url -p rustix
+
       - name: Run Trivy Vulnerability Scanner
         uses: aquasecurity/trivy-action@v0.36.0
         with:

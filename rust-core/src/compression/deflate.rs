@@ -1,5 +1,7 @@
 use miniz_oxide::deflate::{compress_to_vec, compress_to_vec_zlib};
-use miniz_oxide::inflate::{decompress_to_vec, decompress_to_vec_zlib};
+use miniz_oxide::inflate::{
+    decompress_to_vec_with_limit, decompress_to_vec_zlib_with_limit, DecompressError, TINFLStatus,
+};
 use thiserror::Error;
 
 /// Maximum allowed decompressed output size: 50 MB.
@@ -12,8 +14,18 @@ pub enum CompressionError {
     Decompress(String),
     #[error("Decompressed bytes are not valid UTF-8: {0}")]
     Utf8(#[from] std::string::FromUtf8Error),
-    #[error("Decompression bomb rejected: output would exceed {MAX_DECOMPRESSED_BYTES} bytes")]
+    #[error("Decompression bomb rejected: output exceeds 50 MB limit")]
     SizeLimit,
+}
+
+fn map_decompress_result(result: Result<Vec<u8>, DecompressError>) -> Result<Vec<u8>, CompressionError> {
+    result.map_err(|e| {
+        if e.status == TINFLStatus::HasMoreOutput {
+            CompressionError::SizeLimit
+        } else {
+            CompressionError::Decompress(format!("{e:?}"))
+        }
+    })
 }
 
 /// Compresses a raw byte buffer using raw DEFLATE (level 6).
@@ -24,16 +36,10 @@ pub fn compress_deflate(input: &[u8]) -> Vec<u8> {
 /// Decompresses raw DEFLATE bytes into an uncompressed buffer.
 /// Returns [CompressionError::SizeLimit] if output would exceed [MAX_DECOMPRESSED_BYTES].
 pub fn decompress_deflate(input: &[u8]) -> Result<Vec<u8>, CompressionError> {
-    // Pre-flight: reject inputs with a suspiciously high theoretical expansion ratio.
-    // Raw DEFLATE max expansion is ~1032x; practical safe compressed sizes are ≤48 KB for 50 MB output.
     if input.len() > MAX_DECOMPRESSED_BYTES {
         return Err(CompressionError::SizeLimit);
     }
-    let output = decompress_to_vec(input).map_err(|e| CompressionError::Decompress(format!("{e:?}")))?;
-    if output.len() > MAX_DECOMPRESSED_BYTES {
-        return Err(CompressionError::SizeLimit);
-    }
-    Ok(output)
+    map_decompress_result(decompress_to_vec_with_limit(input, MAX_DECOMPRESSED_BYTES))
 }
 
 /// Compresses raw bytes using zlib-wrapped DEFLATE.
@@ -47,11 +53,7 @@ pub fn decompress_zlib(input: &[u8]) -> Result<Vec<u8>, CompressionError> {
     if input.len() > MAX_DECOMPRESSED_BYTES {
         return Err(CompressionError::SizeLimit);
     }
-    let output = decompress_to_vec_zlib(input).map_err(|e| CompressionError::Decompress(format!("{e:?}")))?;
-    if output.len() > MAX_DECOMPRESSED_BYTES {
-        return Err(CompressionError::SizeLimit);
-    }
-    Ok(output)
+    map_decompress_result(decompress_to_vec_zlib_with_limit(input, MAX_DECOMPRESSED_BYTES))
 }
 
 /// Compresses a UTF-8 string into raw DEFLATE bytes.
@@ -96,5 +98,14 @@ mod tests {
         let compressed = compress_zlib(original);
         let decompressed = decompress_zlib(&compressed).expect("zlib decompression must succeed");
         assert_eq!(&decompressed[..], &original[..]);
+    }
+
+    #[test]
+    fn test_decompression_size_limit_error() {
+        let err = CompressionError::SizeLimit;
+        assert!(err.to_string().contains("50 MB"));
+        let oversized = vec![0u8; MAX_DECOMPRESSED_BYTES + 1];
+        assert!(matches!(decompress_deflate(&oversized), Err(CompressionError::SizeLimit)));
+        assert!(matches!(decompress_zlib(&oversized), Err(CompressionError::SizeLimit)));
     }
 }
