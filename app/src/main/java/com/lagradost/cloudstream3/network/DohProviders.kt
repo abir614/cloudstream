@@ -11,16 +11,20 @@ import java.io.DataOutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
 
+private val DNS_TXID_RANDOM = SecureRandom()
+
 /**
- * Builds a standard RFC-1035 UDP DNS A-record query packet.
+ * Builds a standard RFC-1035 UDP DNS A-record query packet and returns `(txId, packetBytes)`.
  */
-private fun buildDnsQueryPacket(hostname: String): ByteArray {
+private fun buildDnsQueryPacket(hostname: String): Pair<Int, ByteArray> {
+    val txId = DNS_TXID_RANDOM.nextInt(65535) + 1
     val baos = ByteArrayOutputStream()
     val dos = DataOutputStream(baos)
-    // Transaction ID (random 16-bit integer)
-    dos.writeShort((1..65535).random())
+    // Cryptographically random 16-bit transaction ID to harden against UDP spoofing
+    dos.writeShort(txId)
     // Flags: standard query, recursion desired (0x0100)
     dos.writeShort(0x0100)
     // QDCOUNT: 1 question
@@ -41,18 +45,19 @@ private fun buildDnsQueryPacket(hostname: String): ByteArray {
     dos.writeShort(1)
     // QCLASS: IN (1)
     dos.writeShort(1)
-    return baos.toByteArray()
+    return txId to baos.toByteArray()
 }
 
 /**
  * Parses an RFC-1035 DNS response packet and extracts IPv4 addresses.
  */
-private fun parseDnsResponse(buffer: ByteArray, length: Int, hostname: String): List<InetAddress>? {
+private fun parseDnsResponse(buffer: ByteArray, length: Int, hostname: String, expectedTxId: Int): List<InetAddress>? {
     if (length < 12) return null
     return try {
         val bais = ByteArrayInputStream(buffer, 0, length)
         val dis = DataInputStream(bais)
-        dis.readUnsignedShort() // TXID
+        val responseTxId = dis.readUnsignedShort()
+        if (responseTxId != expectedTxId) return null // Reject spoofed/mismatched TXID
         val flags = dis.readUnsignedShort()
         val rcode = flags and 0x000F
         if (rcode != 0) return null // DNS error
@@ -112,7 +117,7 @@ fun queryUdpDns(hostname: String, dnsServerIp: String, timeoutMs: Int = 1500): L
     return try {
         socket = DatagramSocket()
         socket.soTimeout = timeoutMs
-        val query = buildDnsQueryPacket(hostname)
+        val (txId, query) = buildDnsQueryPacket(hostname)
         val serverAddr = InetAddress.getByName(dnsServerIp)
         val packet = DatagramPacket(query, query.size, serverAddr, 53)
         socket.send(packet)
@@ -120,7 +125,7 @@ fun queryUdpDns(hostname: String, dnsServerIp: String, timeoutMs: Int = 1500): L
         val buffer = ByteArray(512)
         val response = DatagramPacket(buffer, buffer.size)
         socket.receive(response)
-        parseDnsResponse(buffer, response.length, hostname)
+        parseDnsResponse(buffer, response.length, hostname, txId)
     } catch (_: Throwable) {
         null
     } finally {

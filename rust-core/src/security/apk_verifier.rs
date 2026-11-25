@@ -228,9 +228,6 @@ pub fn verify_apk_identity(
     // 3. Signing Certificate SHA-256 Fingerprint Matching
     let norm_expected_cert = expected_cert_sha256.to_lowercase().replace(':', "");
     let norm_actual_cert = actual_cert_sha256.to_lowercase().replace(':', "");
-    // NOTE: is_permanent_cert is used ONLY for the repo identity header proof below (step 4).
-    // It must NOT bypass the expected-vs-actual cert fingerprint check.
-    let is_permanent_cert = norm_actual_cert == PERMANENT_REPO_CERT_SHA256;
 
     if norm_expected_cert != norm_actual_cert {
         return ApkVerificationResult {

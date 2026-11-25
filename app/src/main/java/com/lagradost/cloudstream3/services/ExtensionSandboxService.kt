@@ -49,7 +49,8 @@ class ExtensionSandboxService : Service() {
                     val isSafe = if (NativeCoreBridge.isNativeReady()) {
                         NativeCoreBridge.validateUrlSafety(url)
                     } else {
-                        SafeDns.isUrlSafe(url)
+                        // Isolated process lacks socket permissions, so avoid DNS syscalls here
+                        SafeDns.isUrlSafe(url, resolveDns = false)
                     }
                     reply.what = RESP_URL_RESULT
                     reply.data = Bundle().apply {

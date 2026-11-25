@@ -4,23 +4,29 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 
 @Composable
 fun LazyGridState.IsScrolling(up : Runnable, down : Runnable) {
-    LaunchedEffect(lastScrolledBackward) {
-        if(lastScrolledBackward) up.run()
-    }
-    LaunchedEffect(lastScrolledForward) {
-        if(lastScrolledForward) down.run()
+    LaunchedEffect(this) {
+        snapshotFlow { lastScrolledBackward to lastScrolledForward }
+            .distinctUntilChanged()
+            .collect { (backward, forward) ->
+                if (backward) up.run()
+                if (forward) down.run()
+            }
     }
 }
-@Suppress("FrequentlyChangingValue")
+
 @Composable
 fun LazyListState.IsScrolling(up : Runnable, down : Runnable) {
-    LaunchedEffect(firstVisibleItemIndex) {
-        if(lastScrolledBackward) up.run()
-    }
-    LaunchedEffect(firstVisibleItemIndex) {
-        if(lastScrolledForward) down.run()
+    LaunchedEffect(this) {
+        snapshotFlow { firstVisibleItemIndex to (lastScrolledBackward to lastScrolledForward) }
+            .distinctUntilChanged()
+            .collect { (_, dirs) ->
+                if (dirs.first) up.run()
+                if (dirs.second) down.run()
+            }
     }
 }

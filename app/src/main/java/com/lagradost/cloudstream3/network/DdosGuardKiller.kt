@@ -36,12 +36,20 @@ class DdosGuardKiller(private val alwaysBypass: Boolean) : Interceptor {
             app.get(
                 "https://check.ddos-guard.net/check.js"
             ).text
-        )?.groupValues?.getOrNull(1)
+        )?.groupValues?.getOrNull(1)?.takeIf { candidate ->
+            // Prevent authority/userinfo injection (e.g. "//evil.com", "@evil.com")
+            candidate.startsWith("/") && !candidate.startsWith("//") &&
+                !candidate.contains("@") && !candidate.contains("..") &&
+                candidate.none { it.isWhitespace() }
+        }
+
+        val safeBypassPath = ddosBypassPath
+            ?: throw java.io.IOException("Blocked unsafe or missing DDoS-Guard bypass path")
 
         val cookies =
             savedCookiesMap[request.url.host]
                 // If no cookies are found fetch and save em.
-                ?: (request.url.scheme + "://" + request.url.host + (ddosBypassPath ?: "")).let { bypassUrl ->
+                ?: (request.url.scheme + "://" + request.url.host + safeBypassPath).let { bypassUrl ->
                     // Use main app client (SafeDns-protected) instead of raw Requests() to prevent SSRF
                     app.get(bypassUrl).cookies.also { cookies ->
                         savedCookiesMap[request.url.host] = cookies

@@ -32,7 +32,9 @@ class SandboxedContextWrapper(
 ) : ContextWrapper(hostContext) {
 
     private val sanitizedName: String = pluginName
-        .replace(Regex("[^a-zA-Z0-9._-]"), "_")
+        .replace(Regex("[^a-zA-Z0-9_-]"), "_")
+        .trim('_')
+        .ifEmpty { "plugin" }
         .take(64)
 
     private val sandboxDir: File by lazy {

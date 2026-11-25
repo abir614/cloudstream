@@ -54,7 +54,7 @@ class TelemetryService(
 
     // Regex patterns for automatic privacy redaction
     private val tokenRegex = Regex(
-        """(?i)(^|[?&;\s"'(\[{])(access_token|refresh_token|api[-_]?key|secret[-_]?key|client[-_]?secret|bearer[-_]?token|auth[-_]?token|bot[-_]?token|private[-_]?key|session[-_]?token|password|passwd|signature|\btoken\b|\bsecret\b|\bbearer\b)([:=]|\s*=\s*)([^&\s"'<>]+)"""
+        """(?i)(^|[?&;\s"'(\[{])(access_token|refresh_token|api[-_]?key|secret[-_]?key|client[-_]?secret|bearer[-_]?token|auth[-_]?token|bot[-_]?token|private[-_]?key|session[-_]?token|password|passwd|signature|authorization|cookie|set-cookie|x[-_]?api[-_]?key|x[-_]?auth[-_]?token|x[-_]?stream[-_]?auth|\btoken\b|\bsecret\b|\bbearer\b)([:=]\s*|\s*=\s*)((?:(?:bearer|basic|token)\s+)?[^&\s"'<>]+)"""
     )
     private val ipRegex = Regex(
         """(?<![\w/.-])(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])(?![\w/.-])"""

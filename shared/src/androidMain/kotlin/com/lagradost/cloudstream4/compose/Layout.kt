@@ -19,7 +19,7 @@ value class DeviceLayout(private val value: Int) {
     internal infix fun and(other: DeviceLayout) = (value and other.value) != 0
 
     companion object {
-        val LocalLayout: ProvidableCompositionLocal<DeviceLayout> = staticCompositionLocalOf { DeviceLayout(-1) }
+        val LocalLayout: ProvidableCompositionLocal<DeviceLayout> = staticCompositionLocalOf { DeviceLayout(0) }
         fun isAutoTv(context: Context): Boolean {
             val uiModeManager = context.getSystemService(Context.UI_MODE_SERVICE) as UiModeManager?
             // AFT = Fire TV

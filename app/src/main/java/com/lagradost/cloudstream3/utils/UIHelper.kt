@@ -698,6 +698,12 @@ object UIHelper {
     ) {
         if (!isLayout(com.lagradost.cloudstream3.ui.settings.Globals.TV)) return
 
+        val lowEndGpu = DeviceProfile.hasBrokenHardwareGpu() || DeviceProfile.isUltraPotato(this.context)
+        val effectiveScale = if (lowEndGpu) scale.coerceAtMost(1.12f) else scale
+        val effectiveElevation = if (lowEndGpu) elevation.coerceAtMost(8f) else elevation
+        val effectiveDuration = if (lowEndGpu) duration.coerceAtMost(120L) else duration
+        val maxParentDepth = if (lowEndGpu) 3 else 8
+
         // Prevent all ancestor containers from clipping the enlarged/hovering card,
         // and find ancestor containers (enclosing row and horizontal list) to hoist their
         // translationZ above adjacent rows during vertical D-pad navigation.
@@ -706,7 +712,7 @@ object UIHelper {
         var horizontalContainer: View? = null
         var rowContainer: View? = null
 
-        while (currentParent != null && depth < 8) {
+        while (currentParent != null && depth < maxParentDepth) {
             currentParent.clipChildren = false
             currentParent.clipToPadding = false
 
@@ -733,7 +739,7 @@ object UIHelper {
         // Hoist the entire parent row and horizontal rail above adjacent rows so that
         // vertical jumps (upper <-> down) never paint the adjacent line over the zoomed card.
         if (hasFocus) {
-            val rowTargetZ = (elevation * 0.7f).coerceAtLeast(16f)
+            val rowTargetZ = if (lowEndGpu) effectiveElevation else (effectiveElevation * 0.7f).coerceAtLeast(16f)
             horizontalContainer?.animate()?.cancel()
             horizontalContainer?.translationZ = rowTargetZ
 
@@ -748,20 +754,20 @@ object UIHelper {
                 if (!hasAnyFocus) {
                     targetContainer?.animate()
                         ?.translationZ(0f)
-                        ?.setDuration(duration)
+                        ?.setDuration(effectiveDuration)
                         ?.setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
                         ?.start()
                     targetHorizontal?.animate()
                         ?.translationZ(0f)
-                        ?.setDuration(duration)
+                        ?.setDuration(effectiveDuration)
                         ?.setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
                         ?.start()
                 }
             }
         }
 
-        val targetScale = if (hasFocus) scale else 1.0f
-        val targetZ = if (hasFocus) elevation else 0f
+        val targetScale = if (hasFocus) effectiveScale else 1.0f
+        val targetZ = if (hasFocus) effectiveElevation else 0f
         this.setTag(R.id.tv_card_scale_tag, targetScale)
 
         if (hasFocus) {
@@ -800,7 +806,7 @@ object UIHelper {
             .scaleX(targetScale)
             .scaleY(targetScale)
             .translationZ(targetZ)
-            .setDuration(duration)
+            .setDuration(effectiveDuration)
             .setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
             .start()
     }

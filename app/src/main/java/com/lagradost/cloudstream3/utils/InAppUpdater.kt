@@ -126,8 +126,9 @@ object InAppUpdater {
             }
 
             sumsText.lines().firstOrNull { line ->
-                line.contains(targetAssetFileName)
-            }?.split("""\s+""".toRegex())?.firstOrNull()?.trim()?.lowercase()
+                val parts = line.trim().split("""\s+""".toRegex())
+                parts.size >= 2 && parts.last().removePrefix("*") == targetAssetFileName
+            }?.trim()?.split("""\s+""".toRegex())?.firstOrNull()?.lowercase()
         } catch (e: Throwable) {
             if (e is java.net.SocketTimeoutException || e is java.net.UnknownHostException || e is java.io.IOException) {
                 Log.d(LOG_TAG, "Transient network timeout checking SHA256SUMS: $e")
@@ -171,6 +172,21 @@ object InAppUpdater {
         if (count != null) return count
         val intMatch = Regex("""(\d+)""").find(fileName)?.value
         return intMatch ?: fileName
+    }
+
+    private fun selectBestApkAsset(assets: List<GithubAsset>): GithubAsset? {
+        val supportedAbis = android.os.Build.SUPPORTED_ABIS?.toList() ?: emptyList()
+        for (abi in supportedAbis) {
+            val match = when {
+                abi.contains("arm64") -> assets.firstOrNull { it.name.contains("arm64-v8a") }
+                abi.contains("armeabi") -> assets.firstOrNull { it.name.contains("armeabi-v7a") }
+                abi == "x86_64" -> assets.firstOrNull { it.name.contains("x86_64") }
+                abi == "x86" -> assets.firstOrNull { it.name.contains("-x86.") || it.name.contains("-x86-") }
+                else -> null
+            }
+            if (match != null) return match
+        }
+        return assets.firstOrNull { it.name.contains("universal") } ?: assets.firstOrNull()
     }
 
     private suspend fun Activity.getReleaseUpdate(): Update {
@@ -238,15 +254,8 @@ object InAppUpdater {
             return Update(false, null, null, null, null)
         }
 
-        val supportedAbis = android.os.Build.SUPPORTED_ABIS?.toList() ?: emptyList()
-        val foundAsset = when {
-            supportedAbis.any { it.contains("arm64") } ->
-                apkAssets.firstOrNull { it.name.contains("arm64-v8a") }
-            supportedAbis.any { it.contains("armeabi") } ->
-                apkAssets.firstOrNull { it.name.contains("armeabi-v7a") }
-            else -> null
-        } ?: apkAssets.firstOrNull { it.name.contains("universal") }
-          ?: apkAssets.firstOrNull() ?: return Update(false, null, null, null, null)
+        val foundAsset = selectBestApkAsset(apkAssets)
+            ?: return Update(false, null, null, null, null)
 
         val remoteVersionStr = if (parseVersionScore(found.tagName) > 0L) {
             found.tagName
@@ -336,15 +345,8 @@ object InAppUpdater {
         }
 
         // Intelligently select best matching APK for running device architecture
-        val supportedAbis = android.os.Build.SUPPORTED_ABIS?.toList() ?: emptyList()
-        val foundAsset = when {
-            supportedAbis.any { it.contains("arm64") } ->
-                apkAssets.firstOrNull { it.name.contains("arm64-v8a") }
-            supportedAbis.any { it.contains("armeabi") } ->
-                apkAssets.firstOrNull { it.name.contains("armeabi-v7a") }
-            else -> null
-        } ?: apkAssets.firstOrNull { it.name.contains("universal") }
-          ?: apkAssets.firstOrNull() ?: return Update(false, null, null, null, null)
+        val foundAsset = selectBestApkAsset(apkAssets)
+            ?: return Update(false, null, null, null, null)
 
         val releaseCommitSha = if (found.targetCommitish.matches(Regex("^[0-9a-fA-F]{7,40}$"))) {
             found.targetCommitish.trim().take(7)

@@ -104,7 +104,7 @@ object ExtensionSandboxClient {
             return@withContext if (NativeCoreBridge.isNativeReady()) {
                 NativeCoreBridge.validateUrlSafety(url)
             } else {
-                !url.contains("127.0.0.1") && !url.contains("localhost") && !url.contains("169.254.169.254")
+                com.lagradost.cloudstream3.network.SafeDns.isUrlSafe(url)
             }
         }
 
@@ -132,8 +132,11 @@ object ExtensionSandboxClient {
             messenger.send(req)
             withTimeoutOrNull(IPC_TIMEOUT_MS) { deferred.await() } ?: false
         } catch (t: Throwable) {
+            serviceMessenger = null
+            isBound.set(false)
+            isConnecting.set(false)
             Log.w(TAG, "IPC URL validation failed: ${t.message}, falling back to local")
-            if (NativeCoreBridge.isNativeReady()) NativeCoreBridge.validateUrlSafety(url) else false
+            if (NativeCoreBridge.isNativeReady()) NativeCoreBridge.validateUrlSafety(url) else com.lagradost.cloudstream3.network.SafeDns.isUrlSafe(url)
         }
     }
 
@@ -181,6 +184,9 @@ object ExtensionSandboxClient {
             withTimeoutOrNull(IPC_TIMEOUT_MS) { deferred.await() }
                 ?: NativeCoreBridge.WasmExecutionResult(false, emptyList(), "IPC timeout after ${IPC_TIMEOUT_MS}ms")
         } catch (t: Throwable) {
+            serviceMessenger = null
+            isBound.set(false)
+            isConnecting.set(false)
             Log.w(TAG, "IPC WASM execution failed: ${t.message}")
             NativeCoreBridge.WasmExecutionResult(false, emptyList(), "Sandbox IPC error: ${t.message}")
         }

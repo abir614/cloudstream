@@ -1,5 +1,6 @@
 package com.lagradost.cloudstream3.ui
 
+import android.net.Uri
 import android.net.http.SslError
 import android.os.Bundle
 import android.view.View
@@ -23,8 +24,15 @@ class WebviewFragment : BaseFragment<FragmentWebviewBinding>(
     override fun fixLayout(view: View) = Unit
 
     override fun onBindingCreated(binding: FragmentWebviewBinding) {
-        val url = arguments?.getString(WEBVIEW_URL) ?: "".also {
+        val url = arguments?.getString(WEBVIEW_URL)?.takeIf { it.isNotBlank() } ?: run {
             findNavController().popBackStack()
+            return
+        }
+
+        val initialScheme = Uri.parse(url)?.scheme?.lowercase()
+        if (initialScheme != "http" && initialScheme != "https") {
+            findNavController().popBackStack()
+            return
         }
 
         binding.webView.webViewClient = object : WebViewClient() {
@@ -67,23 +75,24 @@ class WebviewFragment : BaseFragment<FragmentWebviewBinding>(
             settings.allowFileAccess = false
             settings.allowContentAccess = false
 
-            // Only load http/https URLs; reject file://, javascript: etc.
-            val parsedScheme = url.substringBefore("://").lowercase()
-            if (parsedScheme == "http" || parsedScheme == "https") {
-                loadUrl(url)
-            } else {
-                findNavController().popBackStack()
-            }
+            loadUrl(url)
         }
     }
 
     override fun onDestroyView() {
-        binding?.webView?.apply {
-            stopLoading()
-            loadUrl("about:blank")
-            clearHistory()
-            removeAllViews()
-            destroy()
+        binding?.webView?.let { webView ->
+            try {
+                webView.stopLoading()
+                webView.loadUrl("about:blank")
+                webView.clearHistory()
+                webView.removeAllViews()
+            } catch (_: Throwable) {
+            } finally {
+                try {
+                    webView.destroy()
+                } catch (_: Throwable) {
+                }
+            }
         }
         super.onDestroyView()
     }

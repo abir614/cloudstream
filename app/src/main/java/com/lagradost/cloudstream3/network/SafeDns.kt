@@ -87,20 +87,41 @@ class SafeDns(
          * Interleaves and randomizes address selection across disparate subnets to prevent
          * single-node CDN throttling, ISP DPI tracking, and network fingerprinting.
          */
+        private val IPV4_LITERAL_REGEX = Regex("^[0-9]{1,3}(\\.[0-9]{1,3}){3}$")
+
         /**
-         * Validates that a URL's resolved host does not map to a blocked (private/loopback/CGNAT) address.
-         * Used by [com.lagradost.cloudstream3.services.ExtensionSandboxService] as a lightweight
-         * URL-level SSRF guard before dispatching plugin requests.
+         * Validates that a URL's scheme, host, and address do not target a blocked
+         * (private/loopback/CGNAT/link-local) network endpoint.
          *
-         * Returns false if the URL is malformed, the host resolves to a blocked address,
-         * or DNS resolution fails.
+         * @param resolveDns When true (default, host process), performs DNS resolution on domain
+         *   hosts and rejects any domain that resolves to a private/loopback IP or fails resolution.
+         *   When false (e.g. inside `isolatedProcess` services without socket permissions),
+         *   performs scheme, localhost hostname, and literal IPv4/IPv6 checks without network sockets.
          */
-        fun isUrlSafe(url: String): Boolean {
+        fun isUrlSafe(url: String, resolveDns: Boolean = true): Boolean {
             return try {
                 val parsed = java.net.URL(url)
-                val host = parsed.host?.takeIf { it.isNotBlank() } ?: return false
+                val host = parsed.host?.trim()?.takeIf { it.isNotBlank() } ?: return false
                 val scheme = parsed.protocol?.lowercase()
                 if (scheme != "http" && scheme != "https") return false
+
+                val lowerHost = host.lowercase()
+                if (lowerHost == "localhost" || lowerHost.endsWith(".localhost") || lowerHost.endsWith(".local")) {
+                    return false
+                }
+
+                // Check literal IPv4/IPv6 hosts synchronously without network syscalls
+                val unbracketed = lowerHost.removePrefix("[").removeSuffix("]")
+                val isLiteralIp = unbracketed.contains(':') || IPV4_LITERAL_REGEX.matches(unbracketed)
+                if (isLiteralIp) {
+                    val addr = InetAddress.getByName(unbracketed)
+                    return !addr.isBlocked()
+                }
+
+                if (!resolveDns) {
+                    return true
+                }
+
                 val addrs = okhttp3.Dns.SYSTEM.lookup(host)
                 addrs.isNotEmpty() && addrs.none { it.isBlocked() }
             } catch (_: Throwable) {

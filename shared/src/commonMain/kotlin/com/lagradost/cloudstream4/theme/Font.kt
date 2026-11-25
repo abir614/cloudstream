@@ -2,6 +2,7 @@ package com.lagradost.cloudstream4.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -42,8 +43,9 @@ object AppFont {
         Font(Res.font.productsans_blackitalic, weight = FontWeight.W900, style = FontStyle.Italic))
 
     private val defaultTypography = androidx.compose.material3.Typography()
-    val typography @Composable get() =
-        googleSans.let { fontFamily ->
+    val typography @Composable get(): Typography {
+        val fontFamily = googleSans
+        return remember(fontFamily) {
             val lineHeight = 1.3.em
             Typography(
                 displayLarge = defaultTypography.displayLarge.copy(fontFamily = fontFamily, lineHeight = lineHeight),
@@ -67,5 +69,6 @@ object AppFont {
                 labelSmall = defaultTypography.labelSmall.copy(fontFamily = fontFamily, lineHeight = lineHeight)
             )
         }
+    }
 }
 
