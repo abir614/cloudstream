@@ -4,12 +4,14 @@ import android.app.Service
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.os.Message
 import android.os.Messenger
 import android.os.Process
 import android.util.Log
+import com.lagradost.cloudstream3.network.SafeDns
 
 /**
  * Isolated Extension Execution Service.
@@ -23,9 +25,10 @@ import android.util.Log
  */
 class ExtensionSandboxService : Service() {
 
+    private var workerThread: HandlerThread? = null
     private lateinit var incomingMessenger: Messenger
 
-    class IncomingHandler : Handler(Looper.getMainLooper()) {
+    class IncomingHandler(looper: Looper) : Handler(looper) {
         override fun handleMessage(msg: Message) {
             val replyMessenger = msg.replyTo
             val reply = Message.obtain()
@@ -46,8 +49,7 @@ class ExtensionSandboxService : Service() {
                     val isSafe = if (NativeCoreBridge.isNativeReady()) {
                         NativeCoreBridge.validateUrlSafety(url)
                     } else {
-                        // Fallback check
-                        !url.contains("127.0.0.1") && !url.contains("localhost") && !url.contains("169.254.169.254")
+                        SafeDns.isUrlSafe(url)
                     }
                     reply.what = RESP_URL_RESULT
                     reply.data = Bundle().apply {
@@ -86,8 +88,18 @@ class ExtensionSandboxService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        incomingMessenger = Messenger(IncomingHandler())
+        val thread = HandlerThread("SandboxWorkerThread", Process.THREAD_PRIORITY_BACKGROUND).apply {
+            start()
+        }
+        workerThread = thread
+        incomingMessenger = Messenger(IncomingHandler(thread.looper))
         Log.i(TAG, "ExtensionSandboxService started in isolated UID: ${Process.myUid()}, PID: ${Process.myPid()}")
+    }
+
+    override fun onDestroy() {
+        workerThread?.quitSafely()
+        workerThread = null
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder {

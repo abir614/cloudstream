@@ -7,6 +7,7 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.os.Process
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import coil3.ImageLoader
@@ -104,9 +105,26 @@ class ExceptionHandler(
 
 class CloudStreamApp : Application(), SingletonImageLoader.Factory {
 
+    private fun isMainAppProcess(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            if (Process.isIsolated()) return false
+            return getProcessName() == packageName
+        }
+        return try {
+            val cmdline = File("/proc/self/cmdline").readText().trim('\u0000', ' ', '\n', '\r')
+            cmdline.isEmpty() || cmdline == packageName
+        } catch (_: Throwable) {
+            true
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         appContext = this
+        // Never run host UI, SQLite, preferences, telemetry, or sandbox-client init inside :plugin_sandbox or isolated processes
+        if (!isMainAppProcess()) {
+            return
+        }
         com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.init(this)
 
         // Bridge all caught exceptions from library & extractors into Telemetry
@@ -121,10 +139,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
 
         // Start background auto-logcat monitor for real-time warning/error detection
         try {
-            val isMainProc = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                getProcessName() == packageName
-            } else true
-            if (isMainProc && com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.isTelemetryEnabled(this)) {
+            if (com.lagradost.cloudstream3.utils.telemetry.RemoteCrashReporter.isTelemetryEnabled(this)) {
                 com.lagradost.cloudstream3.utils.telemetry.AutoLogcatMonitor.start(this)
             }
         } catch (_: Throwable) {
@@ -248,15 +263,6 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             }
         } catch (_: Throwable) {
         }
-
-        try {
-            if (com.lagradost.cloudstream3.utils.DeviceProfile.isLowEnd(this)) {
-                thread(start = true, isDaemon = true, name = "StartupMemoryReclaimer") {
-                    com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this)
-                }
-            }
-        } catch (_: Throwable) {
-        }
     }
 
     private var prefChangeListener: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
@@ -275,6 +281,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
     @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
+        if (!isMainAppProcess()) return
         try {
             com.lagradost.cloudstream3.di.ServiceLocator.telemetry.recordBreadcrumb(
                 "Memory",
@@ -283,60 +290,26 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             )
             val memCache = SingletonImageLoader.get(this).memoryCache
             when {
-                // Background LRU levels (ordered from most severe to least)
-                level >= TRIM_MEMORY_COMPLETE -> {
+                // Critical/moderate pressure: clear memory cache immediately and offload heavy IO/native teardown off main thread
+                level >= TRIM_MEMORY_COMPLETE || level >= TRIM_MEMORY_RUNNING_CRITICAL -> {
                     memCache?.clear()
-                    try {
-                        com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
-                        com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
-                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
-                        com.lagradost.cloudstream3.utils.videoskip.SkipAPI.clearCache()
-                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
-                    } catch (_: Throwable) {
-                    }
-                    System.gc()
-                }
-                level >= TRIM_MEMORY_MODERATE -> {
-                    memCache?.clear()
-                    try {
-                        com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
-                        com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
-                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
-                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
-                    } catch (_: Throwable) {
+                    thread(start = true, isDaemon = true, name = "TrimMemoryCritical") {
+                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this@CloudStreamApp, force = true)
                     }
                 }
-                level >= TRIM_MEMORY_BACKGROUND -> {
-                    memCache?.trimToSize(memCache.size / 2)
+                level >= TRIM_MEMORY_MODERATE || level >= TRIM_MEMORY_RUNNING_LOW -> {
+                    memCache?.trimToSize((memCache.size / 4).coerceAtLeast(0))
+                    thread(start = true, isDaemon = true, name = "TrimMemoryModerate") {
+                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this@CloudStreamApp, force = false)
+                    }
+                }
+                level >= TRIM_MEMORY_BACKGROUND || level >= TRIM_MEMORY_RUNNING_MODERATE -> {
+                    memCache?.trimToSize((memCache.size / 2).coerceAtLeast(0))
                 }
                 level >= TRIM_MEMORY_UI_HIDDEN -> {
                     thread(start = true, isDaemon = true, name = "BackgroundScoreFlush") {
                         com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.flushScoresToDisk(this)
                     }
-                }
-                // Foreground/Running levels (ordered from most severe to least)
-                level >= TRIM_MEMORY_RUNNING_CRITICAL -> {
-                    memCache?.clear()
-                    try {
-                        com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
-                        com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
-                        com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
-                        com.lagradost.cloudstream3.utils.videoskip.SkipAPI.clearCache()
-                        com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
-                    } catch (_: Throwable) {
-                    }
-                    System.gc()
-                }
-                level >= TRIM_MEMORY_RUNNING_LOW -> {
-                    memCache?.clear()
-                    try {
-                        com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
-                        com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
-                    } catch (_: Throwable) {
-                    }
-                }
-                level >= TRIM_MEMORY_RUNNING_MODERATE -> {
-                    memCache?.trimToSize(memCache.size / 2)
                 }
             }
         } catch (_: Throwable) {
@@ -345,6 +318,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
 
     override fun onLowMemory() {
         super.onLowMemory()
+        if (!isMainAppProcess()) return
         try {
             com.lagradost.cloudstream3.di.ServiceLocator.telemetry.recordBreadcrumb(
                 "Memory",
@@ -352,15 +326,9 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
                 com.lagradost.cloudstream3.utils.telemetry.TelemetryService.Level.FATAL
             )
             SingletonImageLoader.get(this).memoryCache?.clear()
-            try {
-                com.lagradost.cloudstream3.app.baseClient.connectionPool.evictAll()
-                com.lagradost.cloudstream3.utils.ImageLoader.evictConnections()
-                com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.release()
-                com.lagradost.cloudstream3.utils.videoskip.SkipAPI.clearCache()
-                com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this, force = true)
-            } catch (_: Throwable) {
+            thread(start = true, isDaemon = true, name = "LowMemoryCleanup") {
+                com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(this@CloudStreamApp, force = true)
             }
-            System.gc()
         } catch (_: Throwable) {
         }
     }
@@ -372,7 +340,10 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
         tailrec fun Context.getActivity(): Activity? {
             return when (this) {
                 is Activity -> this
-                is ContextWrapper -> baseContext.getActivity()
+                is ContextWrapper -> {
+                    val base = baseContext
+                    if (base === this || base == null) null else base.getActivity()
+                }
                 else -> null
             }
         }

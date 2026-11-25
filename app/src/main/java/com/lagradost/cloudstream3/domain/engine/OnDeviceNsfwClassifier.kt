@@ -160,25 +160,28 @@ object OnDeviceNsfwClassifier {
                 )
             }
             // Tier 2: Low-end / potato with healthy resource headroom (>= 350MB free RAM, >= 4 cores, >= 28MB heap)
+            // Cap at 2 sessions / 2 threads even with headroom — Android TV SoCs like Allwinner H313
+            // (TX20, x96 devices, 4-core Cortex-A53) share cores with the display pipeline and
+            // video decoder. Using more than 2 ML threads causes frame drops and ANR on these SoCs.
             isLowEnd && availMb >= 350L && cores >= 4 && freeHeapMb >= 28L -> {
                 NsfwExecutionConfig(
-                    preloaderConcurrency = 6,
-                    maxSessions = 2,
-                    interpreterThreads = cores.coerceIn(2, 4),
+                    preloaderConcurrency = 2,
+                    maxSessions = 1,
+                    interpreterThreads = cores.coerceIn(2, 2),
                     useXnnpack = useXnnpack,
-                    coroutineDelayMs = 0L,
-                    cpuPacingSleepMs = 0L
+                    coroutineDelayMs = 15L,
+                    cpuPacingSleepMs = 15L
                 )
             }
             // Tier 3: Standard low-end (e.g. 180MB - 349MB free RAM)
             isLowEnd -> {
                 NsfwExecutionConfig(
-                    preloaderConcurrency = 6,
-                    maxSessions = 2,
-                    interpreterThreads = cores.coerceIn(1, 2),
-                    useXnnpack = useXnnpack,
-                    coroutineDelayMs = 0L,
-                    cpuPacingSleepMs = 0L
+                    preloaderConcurrency = 1,
+                    maxSessions = 1,
+                    interpreterThreads = 1,
+                    useXnnpack = false, // Disable XNNPACK at this memory level to avoid XNNPACK workspace allocation
+                    coroutineDelayMs = 30L,
+                    cpuPacingSleepMs = 30L
                 )
             }
             // Tier 4: High-end device

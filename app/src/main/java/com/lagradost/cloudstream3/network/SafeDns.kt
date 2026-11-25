@@ -87,6 +87,27 @@ class SafeDns(
          * Interleaves and randomizes address selection across disparate subnets to prevent
          * single-node CDN throttling, ISP DPI tracking, and network fingerprinting.
          */
+        /**
+         * Validates that a URL's resolved host does not map to a blocked (private/loopback/CGNAT) address.
+         * Used by [com.lagradost.cloudstream3.services.ExtensionSandboxService] as a lightweight
+         * URL-level SSRF guard before dispatching plugin requests.
+         *
+         * Returns false if the URL is malformed, the host resolves to a blocked address,
+         * or DNS resolution fails.
+         */
+        fun isUrlSafe(url: String): Boolean {
+            return try {
+                val parsed = java.net.URL(url)
+                val host = parsed.host?.takeIf { it.isNotBlank() } ?: return false
+                val scheme = parsed.protocol?.lowercase()
+                if (scheme != "http" && scheme != "https") return false
+                val addrs = okhttp3.Dns.SYSTEM.lookup(host)
+                addrs.isNotEmpty() && addrs.none { it.isBlocked() }
+            } catch (_: Throwable) {
+                false
+            }
+        }
+
         fun mazeSubnetRotate(addresses: List<InetAddress>): List<InetAddress> {
             if (addresses.size <= 1) return addresses
 

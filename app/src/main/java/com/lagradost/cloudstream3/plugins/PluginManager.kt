@@ -702,7 +702,6 @@ object PluginManager {
             }
             synchronized(classLoaders) {
                 classLoaders[loader] = pluginInstance
-                classLoaders[loader.dexLoader] = pluginInstance
             }
             synchronized(urlPlugins) {
                 urlPlugins[data.url ?: filePath] = pluginInstance

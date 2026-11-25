@@ -131,6 +131,9 @@ object AutoLogcatMonitor {
             message.contains("TripleFinger", ignoreCase = true) ||
             message.contains("ThreeFinger", ignoreCase = true) ||
             message.contains("avc:  denied") || message.contains("avc: denied") ||
+            message.contains("avc:  granted") || message.contains("avc: granted") ||
+            message.contains("BufferQueueProducer", ignoreCase = true) ||
+            message.contains("eglSwapBuffers", ignoreCase = true) ||
             message.contains("READ_DEVICE_CONFIG", ignoreCase = true) ||
             message.contains("resources.arsc in APK", ignoreCase = true) ||
             message.contains("Accessing hidden method", ignoreCase = true) ||

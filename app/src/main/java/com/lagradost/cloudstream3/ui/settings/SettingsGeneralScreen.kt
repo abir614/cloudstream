@@ -277,10 +277,12 @@ object SettingsGeneralScreen : SearchableSettings {
                             val act = (context as? Activity)
                                 ?: com.lagradost.cloudstream3.CommonActivity.activity
                                 ?: run {
-                                    var c = context
+                                    var c: Context? = context
                                     while (c is ContextWrapper) {
                                         if (c is Activity) return@run c
-                                        c = c.baseContext
+                                        val next = c.baseContext
+                                        if (next === c) break
+                                        c = next
                                     }
                                     null
                                 }

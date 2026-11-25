@@ -82,48 +82,23 @@ object UpdateNetworkClient {
         .add("*.githubusercontent.com",  "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=")
         .build()
 
-    /** Strict system-anchored fallback client used only if certificate pinning fails due to host root rotation. */
-    val systemTrustClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-            // SSRF protection: DNS-layer inspection blocks private/loopback addresses
-            .dns(SafeDns(okhttp3.Dns.SYSTEM, allowLan = { false }))
-            .build()
-    }
-
-    /** Pinned OkHttp client with transparent system CA fallback for all GitHub update-related network calls. */
+    /** Pinned OkHttp client for all GitHub update-related network calls.
+     *
+     * No fallback: if certificate pinning fails (e.g. pin rotation), we fail fast and require
+     * a CloudStream update with new pins rather than silently downgrading to unverified trust.
+     * Pin rotation is intentionally a hard failure to prevent supply-chain MITM attacks.
+     */
     val okHttpClient: OkHttpClient by lazy {
-        val pinned = OkHttpClient.Builder()
+        OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(15, TimeUnit.SECONDS)
             // SSRF protection: DNS-layer inspection blocks private/loopback addresses
             .dns(SafeDns(okhttp3.Dns.SYSTEM, allowLan = { false }))
-            // Certificate pinning: reject any certificate chain not matching GitHub's known CAs
+            // Certificate pinning: reject any certificate chain not matching GitHub's known CAs.
+            // Hard-fail: no fallback to system trust store. If pins are stale after a GitHub
+            // certificate rotation, the user must update the app.
             .certificatePinner(GITHUB_PINS)
-            .build()
-
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-            .dns(SafeDns(okhttp3.Dns.SYSTEM, allowLan = { false }))
-            .addInterceptor { chain ->
-                val request = chain.request()
-                try {
-                    pinned.newCall(request).execute()
-                } catch (e: javax.net.ssl.SSLPeerUnverifiedException) {
-                    android.util.Log.w(
-                        "UpdateNetworkClient",
-                        "Certificate pinning validation failed for ${request.url.host} (possible upstream certificate rotation). " +
-                        "Falling back to system-anchored CA with mandatory Ed25519 cryptographic signature gate.",
-                        e
-                    )
-                    systemTrustClient.newCall(request).execute()
-                }
-            }
             .build()
     }
 

@@ -13,7 +13,7 @@ object Globals {
     const val PHONE: Int = 0b00001
     const val TV: Int = 0b00010
     const val EMULATOR: Int = 0b00100
-    private const val INVALID = -1
+    private const val INVALID = 0
     private var layoutId = INVALID
 
     private fun Context.getLayoutInt(): Int {

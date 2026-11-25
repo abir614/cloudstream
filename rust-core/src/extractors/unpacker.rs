@@ -167,6 +167,11 @@ fn encode_radix(mut num: u32, radix: u32) -> String {
     if num == 0 {
         return "0".to_string();
     }
+    // Guard: radix must be in [2, 62] to avoid division-by-zero (radix=0) or
+    // infinite loop (radix=1 since num % 1 = 0 and num /= 1 = num forever).
+    if radix < 2 {
+        return "0".to_string();
+    }
     const CHARS: &[u8] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let r = radix.min(62) as usize;
     let mut result = Vec::new();
@@ -174,7 +179,7 @@ fn encode_radix(mut num: u32, radix: u32) -> String {
     while num > 0 {
         let rem = (num as usize) % r;
         result.push(CHARS[rem] as char);
-        num /= radix;
+        num /= r as u32;
     }
 
     result.reverse();

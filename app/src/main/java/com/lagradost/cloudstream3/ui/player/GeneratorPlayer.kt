@@ -1895,17 +1895,20 @@ class GeneratorPlayer : FullScreenPlayer() {
 
         val currentUrl =
             currentSelectedLink?.let { it.first?.url ?: it.second?.uri?.toString() } ?: "unknown"
-        val headers = currentSelectedLink?.first?.headers?.toString() ?: "none"
-        val referer = currentSelectedLink?.first?.referer ?: "none"
+        // Redact credential values: only log header names (keys), not values
+        val headerKeys = currentSelectedLink?.first?.headers?.keys?.joinToString(",") ?: "none"
+        // Redact referer if it contains query parameters (may contain tokens)
+        val safeReferer = currentSelectedLink?.first?.referer
+            ?.let { ref -> if (ref.contains('?')) ref.substringBefore('?') + "?[REDACTED]" else ref }
+            ?: "none"
         val lastPos = player.getPosition()?.takeIf { it > 0L } ?: getPos()
         savedResumePosition = lastPos
         flushCurrentPositionToDisk()
         Log.e(
             TAG,
-            "playerError: $currentSelectedLink, " +
-                    "type=${exception::class.qualifiedName}, " +
-                    "message=${exception.message}, url=$currentUrl, headers=$headers, " +
-                    "referer=$referer, position=$lastPos, " +
+            "playerError: type=${exception::class.qualifiedName}, " +
+                    "message=${exception.message}, headerKeys=[$headerKeys], " +
+                    "referer=$safeReferer, position=$lastPos, " +
                     "duration=${player.getDuration() ?: "unknown"}, " +
                     "isPlaying=${player.getIsPlaying()}", exception
         )

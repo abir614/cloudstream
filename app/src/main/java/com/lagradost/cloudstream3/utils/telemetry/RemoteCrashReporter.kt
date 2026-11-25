@@ -472,7 +472,7 @@ object RemoteCrashReporter {
     // Specifically matches sensitive credential parameters with delimiter boundaries
     // to strictly prevent cropping benign keys (e.g. cache_key=path/to/file.jpg, item_key=anime/sub.json)
     private val TOKEN_REGEX = Regex(
-        """(?i)(^|[?&;\s"'(\[{])(access_token|refresh_token|api[-_]?key|secret[-_]?key|client[-_]?secret|bearer[-_]?token|auth[-_]?token|bot[-_]?token|private[-_]?key|session[-_]?token|password|passwd|signature|\btoken\b|\bsecret\b|\bbearer\b)([:=]|\s*=\s*)([^&\s"'<>]+)"""
+        """(?i)(^|[?&;\s"'(\[{])(access_token|refresh_token|api[-_]?key|secret[-_]?key|client[-_]?secret|bearer[-_]?token|auth[-_]?token|bot[-_]?token|private[-_]?key|session[-_]?token|password|passwd|signature|authorization|cookie|set-cookie|x[-_]?api[-_]?key|x[-_]?auth[-_]?token|x[-_]?stream[-_]?auth|\btoken\b|\bsecret\b|\bbearer\b)([:=]|\s*=\s*)([^&\s"'<>]+)"""
     )
     private val URL_API_KEY_REGEX = Regex(
         """(?i)([?&]key=)([a-zA-Z0-9_-]{16,})(?![^&\s]*\.(?:m3u8|mp4|ts|mkv|avi|webm|jpg|jpeg|png|webp|json|html|xml|css|js))"""

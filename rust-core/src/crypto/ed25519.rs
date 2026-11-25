@@ -1,4 +1,4 @@
-use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use ed25519_dalek::{Signature, VerifyingKey};
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -41,7 +41,9 @@ pub fn verify_ed25519_signature(
 
     let signature = Signature::from_bytes(&sig_array);
 
-    match verifying_key.verify(message, &signature) {
+    // Use verify_strict to reject non-canonical (malleable) signatures.
+    // ed25519-dalek 2.0+ supports verify_strict for strict RFC 8032 conformance.
+    match verifying_key.verify_strict(message, &signature) {
         Ok(()) => Ok(true),
         Err(_) => Ok(false),
     }

@@ -18,6 +18,8 @@ object DownloadFileManagement {
         for (c in RESERVED_CHARS) {
             tempName = tempName.replace(c, ' ')
         }
+        // Block path traversal sequences — reject ".." components even after normalization
+        tempName = tempName.replace("..", " ")
         if (removeSpaces) tempName = tempName.replace(" ", "")
         return tempName.replace("  ", " ").trim(' ')
     }

@@ -1,8 +1,10 @@
 package com.lagradost.cloudstream3.ui
 
+import android.net.http.SslError
 import android.os.Bundle
 import android.view.View
 import android.webkit.JavascriptInterface
+import android.webkit.SslErrorHandler
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -31,6 +33,11 @@ class WebviewFragment : BaseFragment<FragmentWebviewBinding>(
                 request: WebResourceRequest?
             ): Boolean {
                 val requestUrl = request?.url.toString()
+                // Only allow http/https navigation; block file://, javascript:, data: etc.
+                val scheme = request?.url?.scheme?.lowercase()
+                if (scheme != "http" && scheme != "https") {
+                    return true // block non-http(s) navigation silently
+                }
                 val performedAction = MainActivity.handleAppIntentUrl(activity, requestUrl, true)
                 if (performedAction) {
                     findNavController().popBackStack()
@@ -38,6 +45,15 @@ class WebviewFragment : BaseFragment<FragmentWebviewBinding>(
                 }
 
                 return super.shouldOverrideUrlLoading(view, request)
+            }
+
+            override fun onReceivedSslError(
+                view: WebView?,
+                handler: android.webkit.SslErrorHandler?,
+                error: android.net.http.SslError?
+            ) {
+                // Cancel SSL errors — do NOT proceed with broken certificate chains
+                handler?.cancel()
             }
         }
 
@@ -51,7 +67,13 @@ class WebviewFragment : BaseFragment<FragmentWebviewBinding>(
             settings.allowFileAccess = false
             settings.allowContentAccess = false
 
-            loadUrl(url)
+            // Only load http/https URLs; reject file://, javascript: etc.
+            val parsedScheme = url.substringBefore("://").lowercase()
+            if (parsedScheme == "http" || parsedScheme == "https") {
+                loadUrl(url)
+            } else {
+                findNavController().popBackStack()
+            }
         }
     }
 

@@ -5,7 +5,6 @@ import com.lagradost.cloudstream3.BuildConfig
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ConcurrentLinkedQueue
@@ -40,8 +39,8 @@ class TelemetryService(
         val message: String,
         val data: Map<String, String> = emptyMap()
     ) {
-        fun format(dateFormat: SimpleDateFormat): String {
-            val dateStr = dateFormat.format(Date(timestamp))
+        fun format(dateFormat: ThreadLocal<java.text.SimpleDateFormat>): String {
+            val dateStr = dateFormat.get()!!.format(Date(timestamp))
             val extra = if (data.isNotEmpty()) " | data=$data" else ""
             return "[$dateStr] [${level.name}] [$tag] $message$extra"
         }
@@ -49,7 +48,9 @@ class TelemetryService(
 
     private val breadcrumbs = ConcurrentLinkedQueue<Breadcrumb>()
     private val isEnabled = AtomicBoolean(true)
-    private val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+    private val dateFormat = ThreadLocal.withInitial<java.text.SimpleDateFormat> {
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
+    }
 
     // Regex patterns for automatic privacy redaction
     private val tokenRegex = Regex(
@@ -154,16 +155,14 @@ class TelemetryService(
 
         pw.println("================================================================================")
         pw.println("CLOUDSTREAM ENTERPRISE CRASH FORENSIC DUMP")
-        pw.println("Timestamp: ${dateFormat.format(Date())}")
+        pw.println("Timestamp: ${dateFormat.get()!!.format(Date())}")
         pw.println("Exception: ${error.javaClass.name}: ${error.message}")
         pw.println("================================================================================")
         pw.println("\n--- RECENT BREADCRUMBS (${breadcrumbs.size}) ---")
 
-        synchronized(dateFormat) {
-            breadcrumbs.forEach { bc ->
+        breadcrumbs.forEach { bc ->
                 pw.println(bc.format(dateFormat))
             }
-        }
 
         pw.println("\n--- STACK TRACE ---")
         error.printStackTrace(pw)

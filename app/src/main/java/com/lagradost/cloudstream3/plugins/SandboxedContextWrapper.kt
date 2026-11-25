@@ -104,7 +104,12 @@ class SandboxedContextWrapper(
     private fun assertInsideSandbox(target: File, boundary: File) {
         val canonicalTarget = try { target.canonicalPath } catch (_: Throwable) { target.absolutePath }
         val canonicalBoundary = try { boundary.canonicalPath } catch (_: Throwable) { boundary.absolutePath }
-        if (!canonicalTarget.startsWith(canonicalBoundary)) {
+        val boundaryWithSep = if (canonicalBoundary.endsWith(File.separator)) {
+            canonicalBoundary
+        } else {
+            canonicalBoundary + File.separator
+        }
+        if (canonicalTarget != canonicalBoundary && !canonicalTarget.startsWith(boundaryWithSep)) {
             throw SecurityException("Sandbox boundary violation: '$canonicalTarget' escapes '$canonicalBoundary'")
         }
     }
