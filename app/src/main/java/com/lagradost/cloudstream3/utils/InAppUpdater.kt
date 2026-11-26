@@ -765,7 +765,7 @@ object InAppUpdater {
             runOnUiThread {
                 try {
                     if (progressDialog?.isShowing == true) {
-                        progressDialog?.dismiss()
+                        progressDialog.dismiss()
                     }
                 } catch (_: Throwable) {}
             }
