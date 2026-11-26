@@ -373,6 +373,10 @@ object DeviceProfile {
     )
 
     internal fun matchesChip(pattern: String, socIdentifier: String, socTokens: Set<String>, isAllwinnerPlatform: Boolean): Boolean {
+        if (pattern.startsWith("allwinner ") && pattern.length > 10) {
+            val subChip = pattern.removePrefix("allwinner ")
+            return socIdentifier.contains(pattern) || (isAllwinnerPlatform && subChip in socTokens)
+        }
         if (pattern in ALLWINNER_A_CHIPS || pattern in ALLWINNER_H_CHIPS) {
             return socIdentifier.contains("allwinner $pattern") || (isAllwinnerPlatform && pattern in socTokens)
         }
@@ -393,7 +397,7 @@ object DeviceProfile {
         "h313", "h616", "h618", "h700", "h713", "h728", "h6", "h3", "h5", "h2", "h2+",
         "a133", "a133p", "a100", "a50", "a33", "a23", "a64", "a31", "a20", "a10",
         "t507", "t527",
-        "dolphin", "petrel", "cheetah", "eagle", "tulip",
+        "allwinner dolphin", "allwinner petrel", "allwinner cheetah", "allwinner eagle", "allwinner tulip",
         // Rockchip Budget / TV / Tablets
         "rk3528", "rk3328", "rk3229", "rk3228a", "rk3228b", "rk3128", "rk3188", "rk3066", "rk3026", "rk3368", "rk30board", "rk312x",
         // Amlogic Budget / TV / Sticks
@@ -421,7 +425,7 @@ object DeviceProfile {
         // Broadcom TV / IPTV
         "bcm7252", "bcm7252s", "bcm7260", "bcm7268", "bcm7271", "bcm72180", "bcm7445",
         // Synaptics TV
-        "vs680", "vs640", "bg4ct", "bg5ct", "berlin",
+        "vs680", "vs640", "bg4ct", "bg5ct", "synaptics berlin", "marvell berlin",
         // Known Problematic GPUs & Budget TV Box Clones / Brands
         "mali-g31", "mali-400", "mali-450", "mali-t720", "mali-t820", "ge8300", "ge8320", "ge8100",
         "hy320", "hy300", "hy350", "a10plus", "magcubic", "sinoy", "android tv box",
@@ -437,30 +441,31 @@ object DeviceProfile {
     )
 
     internal val KNOWN_FLAGSHIP_CHIPS = listOf(
-        // Qualcomm Flagships (800 series, 8 Gen 1/2/3/4/Elite, 7+ Gen 2/3, Handhelds, XR)
-        "sm8750", "sm8650", "sm8550", "sm8475", "sm8450", "sm8350", "sm8250", "sm8150", "sdm845",
-        "sm7675", "sm7475",
+        // Qualcomm Flagships (800 series, 8 Gen 1/2/3/Elite/Gen 5, 8s Gen 3/4, 7+ Gen 2/3/4, Handhelds, XR)
+        "sm8850", "sm8845", "sm8750", "sm8735", "sm8650", "sm8635", "sm8550", "sm8475", "sm8450", "sm8350", "sm8250", "sm8150", "sdm845",
+        "sm7775", "sm7675", "sm7475",
         "qcs8550", "sg4150p", "sm8350au", "xr2",
         "sun", "pineapple", "kalama", "cape", "taro", "lahaina", "kona", "msmnile",
-        "snapdragon 8 elite", "snapdragon 8 gen 4", "snapdragon 8 gen 3", "snapdragon 8 gen 2",
+        "snapdragon 8 elite", "snapdragon 8 gen 5", "snapdragon 8 gen 4", "snapdragon 8 gen 3", "snapdragon 8 gen 2",
+        "snapdragon 8s gen 4", "snapdragon 8s gen 3",
         "snapdragon 8+ gen 1", "snapdragon 8 gen 1", "snapdragon 888", "snapdragon 870", "snapdragon 865", "snapdragon 855",
-        "snapdragon 7+ gen 3", "snapdragon 7+ gen 2", "snapdragon 7+",
+        "snapdragon 7+ gen 4", "snapdragon 7+ gen 3", "snapdragon 7+ gen 2", "snapdragon 7+",
         // MediaTek Dimensity Flagships & Upper-tier
-        "dimensity 9400", "dimensity 9300", "dimensity 9200", "dimensity 9000",
-        "dimensity 8300", "dimensity 8200", "dimensity 8100", "dimensity 8050", "dimensity 8020", "dimensity 8000",
+        "dimensity 9500", "dimensity 9400", "dimensity 9300", "dimensity 9200", "dimensity 9000",
+        "dimensity 8450", "dimensity 8400", "dimensity 8350", "dimensity 8300", "dimensity 8200", "dimensity 8100", "dimensity 8050", "dimensity 8020", "dimensity 8000",
         "dimensity 1300", "dimensity 1200", "dimensity 1100", "dimensity 1000",
-        "mt6991", "mt6989", "mt6985", "mt6983", "mt6897", "mt6896", "mt6895", "mt6893", "mt6891", "mt6889",
-        // Google Tensor (Pixel 6 through Pixel 9 Pro Fold)
-        "tensor g4", "tensor g3", "tensor g2", "tensor",
-        "gs101", "gs201", "zuma", "zumapro", "whitechapel", "cloudripper",
+        "mt6993", "mt6991", "mt6989", "mt6985", "mt6983", "mt6899", "mt6897", "mt6896", "mt6895", "mt6893", "mt6891", "mt6889",
+        // Google Tensor (Pixel 6 through Pixel 10 series)
+        "tensor g5", "tensor g4", "tensor g3", "tensor g2", "tensor",
+        "gs101", "gs201", "zuma", "zumapro", "laguna", "whitechapel", "cloudripper",
         "caiman", "komodo", "tokay", "shiba", "husky", "akita",
         "cheetah", "panther", "lynx", "felix", "tangorpro",
         "oriole", "raven", "bluejay",
         // Samsung Exynos Flagships
-        "exynos 2500", "exynos 2400", "exynos 2200", "exynos 2100", "exynos 990", "exynos 9825", "exynos 9820", "exynos 9810",
-        "s5e9945", "s5e9925", "s5e9840", "s5e9830", "s5e9825", "s5e9820", "s5e9810",
+        "exynos 2600", "exynos 2500", "exynos 2400", "exynos 2200", "exynos 2100", "exynos 990", "exynos 9825", "exynos 9820", "exynos 9810",
+        "s5e9965", "s5e9955", "s5e9945", "s5e9925", "s5e9840", "s5e9830", "s5e9825", "s5e9820", "s5e9810",
         // HiSilicon Kirin Flagships
-        "kirin 9010", "kirin 9000s", "kirin 9000", "kirin 9000e", "kirin 990", "kirin 985", "kirin 980",
+        "kirin 9020", "kirin 9010", "kirin 9000s", "kirin 9000", "kirin 9000e", "kirin 990", "kirin 985", "kirin 980",
         "hi36a0", "hi3690", "hi3680",
         // Nvidia Tegra (Shield TV / Shield TV Pro)
         "tegra", "tegra210", "tegra210b01", "foster", "darcy", "mdarcy",
@@ -469,39 +474,40 @@ object DeviceProfile {
     )
 
     internal val KNOWN_MID_CHIPS = listOf(
-        // MediaTek Helio G series (including Helio G100 Ultimate)
+        // MediaTek Helio G series (including Helio G100 Ultimate / G200)
+        "helio g200", "helio-g200", "g200",
         "g100 ultimate", "g100-ultimate", "helio g100", "helio-g100", "g100",
         "g99 ultimate", "g99-ultimate", "g99 ultra", "helio g99", "helio-g99", "g99",
         "helio g96", "helio g95", "helio g90t", "helio g90", "helio g88", "helio g85", "helio g80", "helio g70",
         "helio p95", "helio p90", "helio p70", "helio p65", "helio p60",
         "mt6789", "mt6789v", "mt6785", "mt6781", "mt6769", "mt6769t", "mt6769z", "mt6768", "mt6779", "mt6771",
         // MediaTek Dimensity Midrange
-        "dimensity 7300", "dimensity 7200", "dimensity 7050", "dimensity 7025", "dimensity 7020", "dimensity 7000",
-        "dimensity 6300", "dimensity 6100", "dimensity 6080", "dimensity 6020",
+        "dimensity 7400", "dimensity 7360", "dimensity 7300", "dimensity 7200", "dimensity 7060", "dimensity 7050", "dimensity 7025", "dimensity 7020", "dimensity 7000",
+        "dimensity 6400", "dimensity 6300", "dimensity 6100", "dimensity 6080", "dimensity 6020",
         "dimensity 1080", "dimensity 930", "dimensity 920", "dimensity 900", "dimensity 810", "dimensity 800", "dimensity 720", "dimensity 700",
-        "mt6878", "mt6886", "mt6877", "mt6877v", "mt6855", "mt6835", "mt6833", "mt6833p", "mt6853", "mt6873",
+        "mt6879", "mt6878", "mt6886", "mt6877", "mt6877v", "mt6855", "mt6835", "mt6833", "mt6833p", "mt6853", "mt6873",
         // MediaTek Tablets / Kompanio / Smart TV
         "kompanio", "mt8788", "mt8781", "mt8183", "mt8188", "mt8768",
-        "mt8696", "mt8696t", "pentonic", "mt9972", "mt9638", "mt9653", "mt5895", "mt5896",
+        "mt8696", "mt8696t", "pentonic", "mt9972", "mt9679", "mt9638", "mt9653", "mt9632", "m7632", "mt5895", "mt5896",
         // Qualcomm Snapdragon 7 series
-        "snapdragon 7 gen 3", "snapdragon 7s gen 3", "snapdragon 7s gen 2", "snapdragon 7 gen 1",
+        "snapdragon 7 gen 4", "snapdragon 7 gen 3", "snapdragon 7s gen 3", "snapdragon 7s gen 2", "snapdragon 7 gen 1",
         "snapdragon 782g", "snapdragon 780g", "snapdragon 778g", "snapdragon 768g", "snapdragon 765g", "snapdragon 750g", "snapdragon 732g", "snapdragon 730g", "snapdragon 720g",
-        "sm7550", "sm7635", "sm7435", "sm7450", "sm7325", "sm7350", "sm7250", "sm7225", "sm7150", "sm7125", "sdm710",
+        "sm7750", "sm7550", "sm7635", "sm7435", "sm7450", "sm7325", "sm7350", "sm7250", "sm7225", "sm7150", "sm7125", "sdm710",
         // Qualcomm Snapdragon 6 series
-        "snapdragon 6 gen 3", "snapdragon 6s gen 3", "snapdragon 6 gen 1",
-        "snapdragon 695", "snapdragon 685", "snapdragon 680", "snapdragon 678", "snapdragon 675", "snapdragon 670", "snapdragon 665", "snapdragon 662", "snapdragon 660",
-        "sm6650", "volcano", "sm6475", "sm6450", "sm6375", "sm6225", "sm6150", "sm6125", "sm6115", "sdm660", "sdm636", "bengal", "yupik", "lito",
+        "snapdragon 6 gen 4", "snapdragon 6 gen 3", "snapdragon 6s gen 3", "snapdragon 6 gen 1",
+        "snapdragon 695", "snapdragon 690", "snapdragon 685", "snapdragon 680", "snapdragon 678", "snapdragon 675", "snapdragon 670", "snapdragon 665", "snapdragon 662", "snapdragon 660",
+        "sm6650", "volcano", "sm6475", "sm6450", "sm6425", "sm6375", "sm6350", "sm6225", "sm6150", "sm6125", "sm6115", "sdm660", "sdm636", "bengal", "yupik", "lito",
         // Qualcomm Snapdragon 4 series (Modern 5G)
         "snapdragon 4 gen 2", "snapdragon 4s gen 2", "snapdragon 4 gen 1", "snapdragon 480",
         "sm4450", "sm4375", "sm4350", "holi",
         // Samsung Exynos Midrange
-        "exynos 1580", "exynos 1480", "exynos 1380", "exynos 1330", "exynos 1280", "exynos 1080", "exynos 980", "exynos 880",
+        "exynos 1680", "exynos 1580", "exynos 1480", "exynos 1430", "exynos 1380", "exynos 1330", "exynos 1280", "exynos 1080", "exynos 980", "exynos 880",
         "s5e8855", "s5e8845", "s5e8835", "s5e8825", "s5e8535", "s5e8830", "s5e9630", "s5e8805",
         // Unisoc Modern Midrange
-        "unisoc t820", "unisoc t770", "unisoc t760", "unisoc t750",
+        "unisoc t820", "unisoc t770", "unisoc t765", "unisoc t760", "unisoc t750",
         "unisoc t619", "unisoc t618", "unisoc t616", "unisoc t612", "unisoc t610", "unisoc t606",
-        "t820", "t770", "t760", "t750", "t619", "t618", "t616", "t612", "t610", "t606",
-        "ums9620", "ums9230", "ums512",
+        "t820", "t770", "t765", "t760", "t750", "t619", "t618", "t616", "t612", "t610", "t606",
+        "ums9621", "ums9620", "ums9230", "ums512",
         // HiSilicon Kirin Midrange
         "kirin 820", "kirin 810", "hi6280",
         // Rockchip Midrange / Upper TV
@@ -564,7 +570,7 @@ object DeviceProfile {
     }
 
     fun hasBrokenHardwareGpu(): Boolean {
-        val (target, tokens, _) = buildSocDescriptor()
+        val (target, tokens, isAllwinnerPlatform) = buildSocDescriptor()
 
         val brokenGpuPatterns = listOf(
             "mali-g31", "mali-400", "mali-450", "mali-t720", "ge8300", "ge8320", "ge8100",
@@ -575,11 +581,7 @@ object DeviceProfile {
             "x96", "tanix", "t95", "hk1", "h96", "mxq", "v88", "tx3", "tx6", "tx20", "a95x"
         )
         return brokenGpuPatterns.any { pattern ->
-            if (pattern.length <= 3) {
-                pattern in tokens
-            } else {
-                pattern in target
-            }
+            matchesChip(pattern, target, tokens, isAllwinnerPlatform)
         }
     }
 
@@ -1048,8 +1050,8 @@ object DeviceProfile {
             val isDesktopOrEmulated = socIdentifier.contains("intel") || socIdentifier.contains("amd") || socIdentifier.contains("ryzen") || socIdentifier.contains("apple")
 
             val qualifiesForPerformance = when {
-                // High RAM modern devices (>= 7.5GB RAM and 8+ cores)
-                totalMb >= 7500 && cores >= 8 -> true
+                // High RAM modern devices (>= 7.0 GiB / 8GB physical RAM after carveouts, and 8+ cores)
+                totalMb >= 7168 && cores >= 8 -> true
                 // Flagship SoCs with sufficient RAM (>= 3.5GB RAM, or Shield TV / PC)
                 isFlagshipChip && (totalMb >= 3500 || isShieldTv || isDesktopOrEmulated) -> true
                 // Capable Mid-range SoCs with >= 3.5GB RAM when user enables Unrestricted Battery

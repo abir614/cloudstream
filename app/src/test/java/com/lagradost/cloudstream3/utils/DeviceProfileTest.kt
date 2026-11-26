@@ -242,4 +242,40 @@ class DeviceProfileTest {
         val sdm845Tokens = sdm845Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
         assertTrue(DeviceProfile.KNOWN_FLAGSHIP_CHIPS.any { DeviceProfile.matchesChip(it, sdm845Id, sdm845Tokens, false) })
     }
+
+    @Test
+    fun `test flagship and mid phones do not false-positive on Allwinner or Synaptics TV codenames`() {
+        // Google Pixel 7 Pro (cheetah) must match flagship, NOT Allwinner low cheetah
+        val pixel7ProId = "google gs201 cheetah pixel 7 pro tensor g2"
+        val pixel7ProTokens = pixel7ProId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertFalse(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, pixel7ProId, pixel7ProTokens, false) })
+        assertTrue(DeviceProfile.KNOWN_FLAGSHIP_CHIPS.any { DeviceProfile.matchesChip(it, pixel7ProId, pixel7ProTokens, false) })
+
+        // Actual Allwinner Cheetah tablet still matches LOW
+        val allwinnerCheetahId = "sun50iw6p1 cheetah allwinner tablet"
+        val allwinnerCheetahTokens = allwinnerCheetahId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertTrue(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, allwinnerCheetahId, allwinnerCheetahTokens, true) })
+
+        // Xiaomi Redmi Note 6 Pro (tulip, sdm636) must match mid, NOT low
+        val tulipId = "qcom sdm636 xiaomi redmi note 6 pro tulip"
+        val tulipTokens = tulipId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertFalse(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, tulipId, tulipTokens, false) })
+        assertTrue(DeviceProfile.KNOWN_MID_CHIPS.any { DeviceProfile.matchesChip(it, tulipId, tulipTokens, false) })
+
+        // Motorola Edge 20 (berlin, sm7325) must match mid, NOT Synaptics TV low
+        val berlinId = "qcom sm7325 motorola edge 20 berlin"
+        val berlinTokens = berlinId.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertFalse(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, berlinId, berlinTokens, false) })
+        assertTrue(DeviceProfile.KNOWN_MID_CHIPS.any { DeviceProfile.matchesChip(it, berlinId, berlinTokens, false) })
+
+        // Modern HONOR BKQ-N49 (SM8850) must match flagship
+        val sm8850Id = "qcom bkq honor bkq-n49 sm8850"
+        val sm8850Tokens = sm8850Id.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        assertFalse(DeviceProfile.KNOWN_LOW_CHIPS.any { DeviceProfile.matchesChip(it, sm8850Id, sm8850Tokens, false) })
+        assertTrue(DeviceProfile.KNOWN_FLAGSHIP_CHIPS.any { DeviceProfile.matchesChip(it, sm8850Id, sm8850Tokens, false) })
+
+        // No unintended overlap between KNOWN_LOW_CHIPS and KNOWN_FLAGSHIP_CHIPS / KNOWN_MID_CHIPS
+        assertTrue((DeviceProfile.KNOWN_LOW_CHIPS.toSet() intersect DeviceProfile.KNOWN_FLAGSHIP_CHIPS.toSet()).isEmpty())
+        assertTrue((DeviceProfile.KNOWN_LOW_CHIPS.toSet() intersect DeviceProfile.KNOWN_MID_CHIPS.toSet()).isEmpty())
+    }
 }

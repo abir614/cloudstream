@@ -383,7 +383,9 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
                 {}) {
                 settingsManager.edit { putInt(getString(R.string.dns_key), prefValues[it]) }
                 (context ?: CloudStreamApp.context)?.let { ctx ->
-                    app.initClient(ctx)
+                    app.initClient(ctx, ignoreSSL = false)
+                    @OptIn(UnsafeSSL::class)
+                    insecureApp.initClient(ctx, ignoreSSL = true)
                     com.lagradost.cloudstream3.utils.ImageLoader.resetImageClient()
                 }
             }

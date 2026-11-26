@@ -13,6 +13,7 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 private val DNS_TXID_RANDOM = SecureRandom()
 
@@ -162,46 +163,63 @@ private fun parseNumericAddress(hostname: String): List<InetAddress>? {
 class ResilientFallbackDns(
     bootstrapClient: OkHttpClient
 ) : Dns {
+    // Fast-fail timeouts prevent blackholed DoH servers from stalling the 2s cascade budget.
+    private val fastDohClient = bootstrapClient.newBuilder()
+        .cache(null)
+        .connectTimeout(2500L, TimeUnit.MILLISECONDS)
+        .readTimeout(2500L, TimeUnit.MILLISECONDS)
+        .writeTimeout(2500L, TimeUnit.MILLISECONDS)
+        .callTimeout(3000L, TimeUnit.MILLISECONDS)
+        .build()
+
     private val mozillaCloudflareDoh by lazy {
         DnsOverHttps.Builder()
-            .client(bootstrapClient)
+            .client(fastDohClient)
             .url("https://mozilla.cloudflare-dns.com/dns-query".toHttpUrl())
             .bootstrapDnsHosts(listOf(
                 InetAddress.getByName("1.1.1.1"),
-                InetAddress.getByName("1.0.0.1")
+                InetAddress.getByName("1.0.0.1"),
+                InetAddress.getByName("2606:4700:4700::1111"),
+                InetAddress.getByName("2606:4700:4700::1001")
             ))
             .build()
     }
 
     private val quad9Doh by lazy {
         DnsOverHttps.Builder()
-            .client(bootstrapClient)
+            .client(fastDohClient)
             .url("https://dns10.quad9.net/dns-query".toHttpUrl())
             .bootstrapDnsHosts(listOf(
                 InetAddress.getByName("9.9.9.10"),
-                InetAddress.getByName("149.112.112.10")
+                InetAddress.getByName("149.112.112.10"),
+                InetAddress.getByName("2620:fe::10"),
+                InetAddress.getByName("2620:fe::fe:10")
             ))
             .build()
     }
 
     private val cloudflareDoh by lazy {
         DnsOverHttps.Builder()
-            .client(bootstrapClient)
+            .client(fastDohClient)
             .url("https://cloudflare-dns.com/dns-query".toHttpUrl())
             .bootstrapDnsHosts(listOf(
                 InetAddress.getByName("1.1.1.1"),
-                InetAddress.getByName("1.0.0.1")
+                InetAddress.getByName("1.0.0.1"),
+                InetAddress.getByName("2606:4700:4700::1111"),
+                InetAddress.getByName("2606:4700:4700::1001")
             ))
             .build()
     }
 
     private val googleDoh by lazy {
         DnsOverHttps.Builder()
-            .client(bootstrapClient)
+            .client(fastDohClient)
             .url("https://dns.google/dns-query".toHttpUrl())
             .bootstrapDnsHosts(listOf(
                 InetAddress.getByName("8.8.8.8"),
-                InetAddress.getByName("8.8.4.4")
+                InetAddress.getByName("8.8.4.4"),
+                InetAddress.getByName("2001:4860:4860::8888"),
+                InetAddress.getByName("2001:4860:4860::8844")
             ))
             .build()
     }
@@ -212,30 +230,34 @@ class ResilientFallbackDns(
     override fun lookup(hostname: String): List<InetAddress> {
         parseNumericAddress(hostname)?.let { return it }
 
-        val deadline = System.currentTimeMillis() + 2000L
+        val deadline = System.currentTimeMillis() + 3000L
 
         // 1. Primary Privacy DoH: Mozilla Cloudflare -> Quad9 (Zero-logging, strictly confidential)
         try {
             return mozillaCloudflareDoh.lookup(hostname)
         } catch (_: Throwable) {}
-        try {
-            return quad9Doh.lookup(hostname)
-        } catch (_: Throwable) {}
+        if (System.currentTimeMillis() < deadline) {
+            try {
+                return quad9Doh.lookup(hostname)
+            } catch (_: Throwable) {}
+        }
 
         if (System.currentTimeMillis() < deadline) {
             // 2. Secondary High-Speed Edge DoH: Cloudflare -> Google
             try {
                 return cloudflareDoh.lookup(hostname)
             } catch (_: Throwable) {}
-            try {
-                return googleDoh.lookup(hostname)
-            } catch (_: Throwable) {}
+            if (System.currentTimeMillis() < deadline) {
+                try {
+                    return googleDoh.lookup(hostname)
+                } catch (_: Throwable) {}
+            }
         }
 
         if (System.currentTimeMillis() < deadline) {
             // 3. Primary Plain DNS (UDP 53): Quad9 -> Cloudflare
             for (ip in primaryPlainIps) {
-                val res = queryUdpDns(hostname, ip)
+                val res = queryUdpDns(hostname, ip, timeoutMs = 1000)
                 if (!res.isNullOrEmpty()) return res
                 if (System.currentTimeMillis() >= deadline) break
             }
@@ -244,7 +266,7 @@ class ResilientFallbackDns(
         if (System.currentTimeMillis() < deadline) {
             // 4. Secondary Plain DNS (UDP 53): Google -> AdGuard
             for (ip in secondaryPlainIps) {
-                val res = queryUdpDns(hostname, ip)
+                val res = queryUdpDns(hostname, ip, timeoutMs = 1000)
                 if (!res.isNullOrEmpty()) return res
                 if (System.currentTimeMillis() >= deadline) break
             }
@@ -301,7 +323,13 @@ fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>) = dns(
         CachedDns(
             object : Dns {
                 private val doh by lazy {
-                    val client = this@addGenericDns.build().newBuilder().cache(null).build()
+                    val client = this@addGenericDns.build().newBuilder()
+                        .cache(null)
+                        .connectTimeout(2500L, TimeUnit.MILLISECONDS)
+                        .readTimeout(2500L, TimeUnit.MILLISECONDS)
+                        .writeTimeout(2500L, TimeUnit.MILLISECONDS)
+                        .callTimeout(3000L, TimeUnit.MILLISECONDS)
+                        .build()
                     DnsOverHttps
                         .Builder()
                         .client(client)
@@ -313,7 +341,7 @@ fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>) = dns(
                 override fun lookup(hostname: String): List<InetAddress> {
                     parseNumericAddress(hostname)?.let { return it }
 
-                    val deadline = System.currentTimeMillis() + 2000L
+                    val deadline = System.currentTimeMillis() + 3000L
                     try {
                         return doh.lookup(hostname)
                     } catch (_: Throwable) {}
@@ -321,7 +349,7 @@ fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>) = dns(
                     if (System.currentTimeMillis() < deadline) {
                         // Plain DNS fallback using the provider's bootstrap IPs (IPv4 only for UDP port 53 A-record queries)
                         for (ip in ips.filterNot { it.contains(':') }) {
-                            val res = queryUdpDns(hostname, ip)
+                            val res = queryUdpDns(hostname, ip, timeoutMs = 1000)
                             if (!res.isNullOrEmpty()) return res
                             if (System.currentTimeMillis() >= deadline) break
                         }
