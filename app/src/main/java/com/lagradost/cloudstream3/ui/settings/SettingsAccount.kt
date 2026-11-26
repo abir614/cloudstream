@@ -201,15 +201,6 @@ class SettingsAccount : BasePreferenceFragmentCompat(), BiometricCallback {
                     return@ioSafe
                 }
 
-                /*val logoBytes = ContextCompat.getDrawable(
-                    activity,
-                    R.drawable.cloud_2_solid
-                )?.toBitmapOrNull()?.let { bitmap ->
-                    val csLogo = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, csLogo)
-                    csLogo.toByteArray()
-                }*/
-
                 val qrCodeImage = QRCode.ofRoundedSquares()
                     .withColor(activity.colorFromAttribute(R.attr.textColor))
                     .withBackgroundColor(activity.colorFromAttribute(R.attr.primaryBlackBackground))

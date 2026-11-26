@@ -346,60 +346,6 @@ fun SelectItem(
     }
 }
 
-/*
-@Composable
-fun TriStateItem(
-    label: String,
-    state: TriState,
-    enabled: Boolean = true,
-    onClick: ((TriState) -> Unit)?,
-) {
-    Row(
-        modifier = Modifier
-            .clickable(
-                enabled = enabled && onClick != null,
-                onClick = {
-                    when (state) {
-                        TriState.DISABLED -> onClick?.invoke(TriState.ENABLED_IS)
-                        TriState.ENABLED_IS -> onClick?.invoke(TriState.ENABLED_NOT)
-                        TriState.ENABLED_NOT -> onClick?.invoke(TriState.DISABLED)
-                    }
-                },
-            )
-            .fillMaxWidth()
-            .padding(
-                horizontal = SettingsItemsPaddings.Horizontal,
-                vertical = SettingsItemsPaddings.Vertical,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.padding.large),
-    ) {
-        val stateAlpha = if (enabled && onClick != null) 1f else DISABLED_ALPHA
-
-        Icon(
-            imageVector = when (state) {
-                TriState.DISABLED -> MaterialSymbols.Rounded.CheckBoxOutlineBlank
-                TriState.ENABLED_IS -> MaterialSymbols.RoundedFilled.CheckBox
-                TriState.ENABLED_NOT -> MaterialSymbols.RoundedFilled.DisabledByDefault
-            },
-            contentDescription = null,
-            tint = if (!enabled || state == TriState.DISABLED) {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = stateAlpha)
-            } else {
-                when (onClick) {
-                    null -> MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_ALPHA)
-                    else -> MaterialTheme.colorScheme.primary
-                }
-            },
-        )
-        Text(
-            text = label,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = stateAlpha),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}*/
-
 @Composable
 fun TextItem(label: String, value: String, onChange: (String) -> Unit) {
     OutlinedTextField(

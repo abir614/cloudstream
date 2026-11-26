@@ -826,24 +826,24 @@ object NsfwFilterEngine {
      * Checks if a SearchResponse item is classified as adult/NSFW.
      * Evaluates item type, provider declaration, cached AI poster classification, and metadata.
      */
+    private fun hasInvalidExtremePoster(poster: String?, level: NsfwFilterLevel): Boolean {
+        if (level != NsfwFilterLevel.EXTREME) return false
+        return poster.isNullOrBlank() ||
+            poster == "null" ||
+            (!poster.startsWith("http://") && !poster.startsWith("https://") && !poster.startsWith("/"))
+    }
+
+    private fun isProviderOrNameNsfw(apiName: String, level: NsfwFilterLevel): Boolean {
+        if (isTextNsfwSingle(apiName, level)) return true
+        val provider = APIHolder.getApiFromNameNull(apiName) ?: return false
+        return isNsfwProvider(provider)
+    }
+
     fun isNsfw(item: SearchResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
         if (isCleanTitleAllowed(item.name)) return false
-
-        // In EXTREME filter level, contents with empty/missing/blank posters are strictly filtered out
-        // Permits valid relative paths (e.g. /images/poster.jpg)
-        if (level == NsfwFilterLevel.EXTREME) {
-            val poster = item.posterUrl
-            if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://") && !poster.startsWith("/"))) {
-                return true
-            }
-        }
-
-        // Check if provider itself has an adult name or is declared as an adult/NSFW provider
-        if (isTextNsfwSingle(item.apiName, level)) return true
-        APIHolder.getApiFromNameNull(item.apiName)?.let { provider ->
-            if (isNsfwProvider(provider)) return true
-        }
+        if (hasInvalidExtremePoster(item.posterUrl, level)) return true
+        if (isProviderOrNameNsfw(item.apiName, level)) return true
 
         // Check AI model visual cache if poster URL has already been evaluated as NSFW
         item.posterUrl?.let { url ->
@@ -851,11 +851,7 @@ object NsfwFilterEngine {
         }
 
         // Multi-vector text check on title, item URL, and poster URL across all levels
-        if (isNsfwText(item.name, item.url, item.posterUrl, level)) {
-            return true
-        }
-
-        return false
+        return isNsfwText(item.name, item.url, item.posterUrl, level)
     }
 
     /**
@@ -864,21 +860,8 @@ object NsfwFilterEngine {
     fun isNsfw(item: LoadResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
         if (isCleanTitleAllowed(item.name)) return false
-
-        // In EXTREME filter level, contents with empty/missing/blank posters are strictly filtered out
-        // Permits valid relative paths
-        if (level == NsfwFilterLevel.EXTREME) {
-            val poster = item.posterUrl ?: item.backgroundPosterUrl
-            if (poster.isNullOrBlank() || poster == "null" || (!poster.startsWith("http://") && !poster.startsWith("https://") && !poster.startsWith("/"))) {
-                return true
-            }
-        }
-
-        // Check provider name and declaration
-        if (isTextNsfwSingle(item.apiName, level)) return true
-        APIHolder.getApiFromNameNull(item.apiName)?.let { provider ->
-            if (isNsfwProvider(provider)) return true
-        }
+        if (hasInvalidExtremePoster(item.posterUrl ?: item.backgroundPosterUrl, level)) return true
+        if (isProviderOrNameNsfw(item.apiName, level)) return true
 
         // Check content rating
         item.contentRating?.let { rating ->

@@ -132,14 +132,6 @@ object PlayerPipHelper {
                 CSPlayerEvent.PlayAsAudio
             )
         )
-        /*actions.add(
-            getRemoteAction(
-                activity,
-                R.drawable.go_back_30,
-                R.string.go_back_30,
-                CSPlayerEvent.SeekBack
-            )
-        )*/
 
         if (status == CSPlayerLoading.IsPlaying) {
             actions.add(

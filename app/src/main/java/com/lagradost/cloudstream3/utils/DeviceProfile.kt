@@ -546,14 +546,25 @@ object DeviceProfile {
         return info
     }
 
-    fun hasBrokenHardwareGpu(): Boolean {
+    private fun buildSocDescriptor(): Triple<String, Set<String>, Boolean> {
         val hardware = Build.HARDWARE?.lowercase() ?: ""
         val board = Build.BOARD?.lowercase() ?: ""
         val model = Build.MODEL?.lowercase() ?: ""
         val manufacturer = Build.MANUFACTURER?.lowercase() ?: ""
+        val product = Build.PRODUCT?.lowercase() ?: ""
+        val device = Build.DEVICE?.lowercase() ?: ""
         val soc = if (Build.VERSION.SDK_INT >= 31) {
-            Build.SOC_MODEL?.lowercase() ?: ""
+            "${Build.SOC_MODEL.lowercase()} ${Build.SOC_MANUFACTURER.lowercase()}"
         } else ""
+        val cpuInfo = getCpuInfoString().lowercase()
+        val socIdentifier = "$hardware $board $model $manufacturer $product $device $soc $cpuInfo"
+        val socTokens = socIdentifier.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
+        val isAllwinner = socTokens.contains("allwinner") || socTokens.contains("sunxi") || socTokens.any { it.startsWith("sun") && it.length > 3 }
+        return Triple(socIdentifier, socTokens, isAllwinner)
+    }
+
+    fun hasBrokenHardwareGpu(): Boolean {
+        val (target, tokens, _) = buildSocDescriptor()
 
         val brokenGpuPatterns = listOf(
             "mali-g31", "mali-400", "mali-450", "mali-t720", "ge8300", "ge8320", "ge8100",
@@ -563,8 +574,6 @@ object DeviceProfile {
             "hy320", "hy300", "a10plus", "magcubic", "sinoy", "android tv box",
             "x96", "tanix", "t95", "hk1", "h96", "mxq", "v88", "tx3", "tx6", "tx20", "a95x"
         )
-        val target = "$hardware $board $manufacturer $soc $model"
-        val tokens = target.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
         return brokenGpuPatterns.any { pattern ->
             if (pattern.length <= 3) {
                 pattern in tokens
@@ -689,7 +698,7 @@ object DeviceProfile {
         }
 
         val cpu = try {
-            val abis = Build.SUPPORTED_ABIS?.toList() ?: listOf(Build.CPU_ABI ?: "armeabi-v7a")
+            val abis = (Build.SUPPORTED_ABIS?.toList() ?: emptyList()).ifEmpty { listOf("armeabi-v7a") }
             val primary = abis.firstOrNull() ?: "armeabi-v7a"
             val cores = Runtime.getRuntime().availableProcessors()
             val is64 = Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() ?: false
@@ -863,19 +872,7 @@ object DeviceProfile {
         val cores = Runtime.getRuntime().availableProcessors()
         val has64Bit = try { Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() ?: true } catch (_: Throwable) { true }
 
-        val hardware = Build.HARDWARE?.lowercase() ?: ""
-        val board = Build.BOARD?.lowercase() ?: ""
-        val model = Build.MODEL?.lowercase() ?: ""
-        val manufacturer = Build.MANUFACTURER?.lowercase() ?: ""
-        val product = Build.PRODUCT?.lowercase() ?: ""
-        val device = Build.DEVICE?.lowercase() ?: ""
-        val soc = if (Build.VERSION.SDK_INT >= 31) {
-            "${Build.SOC_MODEL?.lowercase() ?: ""} ${Build.SOC_MANUFACTURER?.lowercase() ?: ""}"
-        } else ""
-        val cpuInfo = getCpuInfoString().lowercase()
-        val socIdentifier = "$hardware $board $model $manufacturer $product $device $soc $cpuInfo"
-        val socTokens = socIdentifier.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
-        val isAllwinnerPlatform = socTokens.contains("allwinner") || socTokens.contains("sunxi") || socTokens.any { it.startsWith("sun") && it.length > 3 }
+        val (socIdentifier, socTokens, isAllwinnerPlatform) = buildSocDescriptor()
 
         val isCapableSoC = KNOWN_FLAGSHIP_CHIPS.any { pattern ->
             matchesChip(pattern, socIdentifier, socTokens, isAllwinnerPlatform)
@@ -1017,21 +1014,7 @@ object DeviceProfile {
         }
 
         return try {
-            val hardware = Build.HARDWARE?.lowercase() ?: ""
-            val board = Build.BOARD?.lowercase() ?: ""
-            val model = Build.MODEL?.lowercase() ?: ""
-            val manufacturer = Build.MANUFACTURER?.lowercase() ?: ""
-            val product = Build.PRODUCT?.lowercase() ?: ""
-            val device = Build.DEVICE?.lowercase() ?: ""
-            val soc = if (Build.VERSION.SDK_INT >= 31) {
-                "${Build.SOC_MODEL?.lowercase() ?: ""} ${Build.SOC_MANUFACTURER?.lowercase() ?: ""}"
-            } else ""
-            val cpuInfo = getCpuInfoString().lowercase()
-
-            val socIdentifier = "$hardware $board $model $manufacturer $product $device $soc $cpuInfo"
-            val socTokens = socIdentifier.split(Regex("[^a-zA-Z0-9+]")).filter { it.isNotEmpty() }.toSet()
-
-            val isAllwinnerPlatform = socTokens.contains("allwinner") || socTokens.contains("sunxi") || socTokens.any { it.startsWith("sun") && it.length > 3 }
+            val (socIdentifier, socTokens, isAllwinnerPlatform) = buildSocDescriptor()
 
             val isLowChip = KNOWN_LOW_CHIPS.any { pattern ->
                 matchesChip(pattern, socIdentifier, socTokens, isAllwinnerPlatform)

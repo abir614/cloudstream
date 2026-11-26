@@ -221,7 +221,7 @@ object OnDeviceNsfwClassifier {
      * Inlined at bytecode level for zero function-call overhead in tight pixel loops.
      */
     @JvmStatic
-    inline fun isSkinTone(r: Int, g: Int, b: Int): Boolean {
+    fun isSkinTone(r: Int, g: Int, b: Int): Boolean {
         val y = (77 * r + 150 * g + 29 * b) shr 8
         val cb = ((-43 * r - 85 * g + 128 * b) shr 8) + 128
         val cr = ((128 * r - 107 * g - 21 * b) shr 8) + 128
@@ -718,28 +718,39 @@ object OnDeviceNsfwClassifier {
         val appContext: Context,
         val dHash: Long? = null
     ) : Runnable {
-        fun onEvicted() {
-            // Task was evicted from queue during rapid scrolling.
-            val view = weakImageView.get() ?: return
-            val currentTag = try {
+        private fun isKeyStillBound(view: ImageView?): Boolean {
+            if (view == null) return false
+            val tag = try {
                 view.getTag(R.id.coil_image_url_tag)
             } catch (_: Throwable) {
                 null
             }
-            if (currentTag == imageKey) {
-                mainHandler.post {
-                    val activeView = weakImageView.get() ?: return@post
-                    val checkTag = try {
-                        activeView.getTag(R.id.coil_image_url_tag)
-                    } catch (_: Throwable) {
-                        null
-                    }
-                    if (checkTag == imageKey) {
-                        val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(targetDrawable, appContext) else 1.0f
-                        recordScore(imageKey, score, appContext, dHash)
-                        val threshold = NsfwFilterEngine.getVisualThreshold(appContext)
-                        applyVisualFilterResult(activeView, imageKey, targetDrawable, score, threshold, appContext, false)
-                    }
+            return tag == imageKey
+        }
+
+        private fun postWhenBound(action: (ImageView) -> Unit) {
+            mainHandler.post {
+                val activeView = weakImageView.get() ?: return@post
+                if (isKeyStillBound(activeView)) {
+                    action(activeView)
+                }
+            }
+        }
+
+        private fun postScoreResult(score: Float, threshold: Float, animate: Boolean) {
+            postWhenBound { activeView ->
+                applyVisualFilterResult(activeView, imageKey, targetDrawable, score, threshold, appContext, animate)
+            }
+        }
+
+        fun onEvicted() {
+            // Task was evicted from queue during rapid scrolling.
+            if (isKeyStillBound(weakImageView.get())) {
+                postWhenBound { activeView ->
+                    val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(targetDrawable, appContext) else 1.0f
+                    recordScore(imageKey, score, appContext, dHash)
+                    val threshold = NsfwFilterEngine.getVisualThreshold(appContext)
+                    applyVisualFilterResult(activeView, imageKey, targetDrawable, score, threshold, appContext, false)
                 }
             }
         }
@@ -765,17 +776,9 @@ object OnDeviceNsfwClassifier {
                     if (dHashHit != null) {
                         recordScore(imageKey, dHashHit, appContext, resolvedHash)
                         val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
-                        mainHandler.post {
-                            val activeView = weakImageView.get() ?: return@post
-                            val checkTag = try {
-                                activeView.getTag(R.id.coil_image_url_tag)
-                            } catch (_: Throwable) {
-                                null
-                            }
-                            if (checkTag == imageKey) {
-                                val animate = DeviceProfile.tier(activeView.context) != DeviceTier.LOW
-                                applyVisualFilterResult(activeView, imageKey, drawable, dHashHit, activeThreshold, appContext, animate)
-                            }
+                        postWhenBound { activeView ->
+                            val animate = DeviceProfile.tier(activeView.context) != DeviceTier.LOW
+                            applyVisualFilterResult(activeView, imageKey, drawable, dHashHit, activeThreshold, appContext, animate)
                         }
                         return
                     }
@@ -786,17 +789,7 @@ object OnDeviceNsfwClassifier {
                     val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(drawable, appContext) else maxOf(classifyPotatoFastScore(drawable, appContext), 1.0f)
                     recordScore(imageKey, score, appContext, resolvedHash)
                     val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
-                    mainHandler.post {
-                        val activeView = weakImageView.get() ?: return@post
-                        val checkTag = try {
-                            activeView.getTag(R.id.coil_image_url_tag)
-                        } catch (_: Throwable) {
-                            null
-                        }
-                        if (checkTag == imageKey) {
-                            applyVisualFilterResult(activeView, imageKey, drawable, score, activeThreshold, appContext, false)
-                        }
-                    }
+                    postScoreResult(score, activeThreshold, animate = false)
                     return
                 }
 
@@ -810,36 +803,20 @@ object OnDeviceNsfwClassifier {
                 }
 
                 val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
-                mainHandler.post {
-                    val activeView = weakImageView.get() ?: return@post
-                    val checkTag = try {
-                        activeView.getTag(R.id.coil_image_url_tag)
-                    } catch (_: Throwable) {
-                        null
-                    }
-                    if (checkTag == imageKey) {
-                        val animate = DeviceProfile.tier(activeView.context) != DeviceTier.LOW
-                        applyVisualFilterResult(activeView, imageKey, drawable, score, activeThreshold, appContext, animate)
-                    }
+                postWhenBound { activeView ->
+                    val animate = DeviceProfile.tier(activeView.context) != DeviceTier.LOW
+                    applyVisualFilterResult(activeView, imageKey, drawable, score, activeThreshold, appContext, animate)
                 }
             } catch (t: Throwable) {
                 Log.w(TAG, "Background poster classification error: ${t.message}")
-                mainHandler.post {
-                    val activeView = weakImageView.get() ?: return@post
-                    val checkTag = try {
-                        activeView.getTag(R.id.coil_image_url_tag)
-                    } catch (_: Throwable) {
-                        null
-                    }
-                    if (checkTag == imageKey) {
-                        if (!appContext.isNsfwEnabled()) {
-                            activeView.setImageResource(R.drawable.default_cover)
-                            activeView.setTag(R.id.coil_image_loaded_tag, null)
-                        } else if (shouldCensorPosters(appContext)) {
-                            ImageLoader.applyCensoredPoster(activeView, imageKey)
-                        } else {
-                            setSmoothPosterDrawable(activeView, imageKey, targetDrawable, false)
-                        }
+                postWhenBound { activeView ->
+                    if (!appContext.isNsfwEnabled()) {
+                        activeView.setImageResource(R.drawable.default_cover)
+                        activeView.setTag(R.id.coil_image_loaded_tag, null)
+                    } else if (shouldCensorPosters(appContext)) {
+                        ImageLoader.applyCensoredPoster(activeView, imageKey)
+                    } else {
+                        setSmoothPosterDrawable(activeView, imageKey, targetDrawable, false)
                     }
                 }
             }
@@ -1292,18 +1269,9 @@ object OnDeviceNsfwClassifier {
     ): Bitmap? {
         if (data.isEmpty() || length <= 0) return null
         return try {
-            val options = BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
+            decodeWithSampleSize(reqWidth, reqHeight) { options ->
+                BitmapFactory.decodeByteArray(data, offset, length, options)
             }
-            BitmapFactory.decodeByteArray(data, offset, length, options)
-            if (options.outWidth <= 0 || options.outHeight <= 0) return null
-
-            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
-            options.inJustDecodeBounds = false
-            options.inPreferredConfig = Bitmap.Config.RGB_565
-            options.inDither = true
-
-            BitmapFactory.decodeByteArray(data, offset, length, options)
         } catch (t: Throwable) {
             Log.w(TAG, "decodeSampledBitmap from ByteArray failed: ${t.message}")
             null
@@ -1320,18 +1288,9 @@ object OnDeviceNsfwClassifier {
     ): Bitmap? {
         if (!fileDescriptor.valid()) return null
         return try {
-            val options = BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
+            decodeWithSampleSize(reqWidth, reqHeight) { options ->
+                BitmapFactory.decodeFileDescriptor(fileDescriptor, null, options)
             }
-            BitmapFactory.decodeFileDescriptor(fileDescriptor, null, options)
-            if (options.outWidth <= 0 || options.outHeight <= 0) return null
-
-            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
-            options.inJustDecodeBounds = false
-            options.inPreferredConfig = Bitmap.Config.RGB_565
-            options.inDither = true
-
-            BitmapFactory.decodeFileDescriptor(fileDescriptor, null, options)
         } catch (t: Throwable) {
             Log.w(TAG, "decodeSampledBitmap from FileDescriptor failed: ${t.message}")
             null
@@ -1348,22 +1307,27 @@ object OnDeviceNsfwClassifier {
     ): Bitmap? {
         if (path.isBlank() || !File(path).exists()) return null
         return try {
-            val options = BitmapFactory.Options().apply {
-                inJustDecodeBounds = true
+            decodeWithSampleSize(reqWidth, reqHeight) { options ->
+                BitmapFactory.decodeFile(path, options)
             }
-            BitmapFactory.decodeFile(path, options)
-            if (options.outWidth <= 0 || options.outHeight <= 0) return null
-
-            options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
-            options.inJustDecodeBounds = false
-            options.inPreferredConfig = Bitmap.Config.RGB_565
-            options.inDither = true
-
-            BitmapFactory.decodeFile(path, options)
         } catch (t: Throwable) {
             Log.w(TAG, "decodeSampledBitmap from path failed: ${t.message}")
             null
         }
+    }
+
+    private inline fun decodeWithSampleSize(
+        reqWidth: Int,
+        reqHeight: Int,
+        decode: (BitmapFactory.Options) -> Bitmap?
+    ): Bitmap? {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        decode(options)
+        if (options.outWidth <= 0 || options.outHeight <= 0) return null
+        options.inSampleSize = calculateInSampleSize(options, reqWidth, reqHeight)
+        options.inJustDecodeBounds = false
+        options.inPreferredConfig = Bitmap.Config.RGB_565
+        return decode(options)
     }
 
     /**

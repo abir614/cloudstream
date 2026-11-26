@@ -257,11 +257,6 @@ class SyncViewModel : ViewModel() {
                     _metaResponse.postValue(Resource.Success(resultValue))
                     return@ioSafe
                 } else if (resultError != null) {
-
-                    /*Log.e(
-                        TAG,
-                        "updateMetadata error $id at ${repo.idPrefix} ${result.errorString}"
-                    )*/
                     lastError = throwAbleToResource(resultError)
                 }
             }

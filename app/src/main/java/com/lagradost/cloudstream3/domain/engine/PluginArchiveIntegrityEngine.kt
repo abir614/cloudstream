@@ -52,46 +52,21 @@ class PluginArchiveIntegrityEngine(
                 return null
             }
 
-            val (algo, hashPart) = when {
-                trimmed.startsWith("sha256-", ignoreCase = true) -> "SHA-256" to trimmed.substring(7)
-                trimmed.startsWith("sha256:", ignoreCase = true) -> "SHA-256" to trimmed.substring(7)
-                trimmed.startsWith("sha-256-", ignoreCase = true) -> "SHA-256" to trimmed.substring(8)
-                trimmed.startsWith("sha-256:", ignoreCase = true) -> "SHA-256" to trimmed.substring(8)
-                trimmed.startsWith("sha512-", ignoreCase = true) -> "SHA-512" to trimmed.substring(7)
-                trimmed.startsWith("sha512:", ignoreCase = true) -> "SHA-512" to trimmed.substring(7)
-                trimmed.startsWith("sha-512-", ignoreCase = true) -> "SHA-512" to trimmed.substring(8)
-                trimmed.startsWith("sha-512:", ignoreCase = true) -> "SHA-512" to trimmed.substring(8)
-                trimmed.startsWith("sha384-", ignoreCase = true) -> "SHA-384" to trimmed.substring(7)
-                trimmed.startsWith("sha384:", ignoreCase = true) -> "SHA-384" to trimmed.substring(7)
-                trimmed.startsWith("sha1-", ignoreCase = true) -> "SHA-1" to trimmed.substring(5)
-                trimmed.startsWith("sha1:", ignoreCase = true) -> "SHA-1" to trimmed.substring(5)
-                trimmed.startsWith("md5-", ignoreCase = true) -> "MD5" to trimmed.substring(4)
-                trimmed.startsWith("md5:", ignoreCase = true) -> "MD5" to trimmed.substring(4)
-                trimmed.contains(':') -> {
-                    val prefix = trimmed.substringBefore(':').uppercase()
-                    val algoCandidate = when (prefix) {
-                        "SHA-256", "SHA256" -> "SHA-256"
-                        "SHA-512", "SHA512" -> "SHA-512"
-                        "SHA-384", "SHA384" -> "SHA-384"
-                        "SHA-1", "SHA1" -> "SHA-1"
-                        "MD5" -> "MD5"
-                        else -> null
-                    }
-                    if (algoCandidate != null) algoCandidate to trimmed.substringAfter(':') else null to trimmed
+            val algoPrefixMatch = Regex("^(sha-?(?:256|384|512|1)|md5)[:\\-](.+)$", RegexOption.IGNORE_CASE)
+                .matchEntire(trimmed)
+            val (algo, hashPart) = if (algoPrefixMatch != null) {
+                val rawAlgo = algoPrefixMatch.groupValues[1].uppercase().replace("-", "")
+                val normalizedAlgo = when (rawAlgo) {
+                    "SHA256" -> "SHA-256"
+                    "SHA512" -> "SHA-512"
+                    "SHA384" -> "SHA-384"
+                    "SHA1" -> "SHA-1"
+                    "MD5" -> "MD5"
+                    else -> null
                 }
-                trimmed.contains('-') && (trimmed.startsWith("sha", ignoreCase = true) || trimmed.startsWith("md", ignoreCase = true)) -> {
-                    val prefix = trimmed.substringBefore('-').uppercase()
-                    val algoCandidate = when (prefix) {
-                        "SHA-256", "SHA256" -> "SHA-256"
-                        "SHA-512", "SHA512" -> "SHA-512"
-                        "SHA-384", "SHA384" -> "SHA-384"
-                        "SHA-1", "SHA1" -> "SHA-1"
-                        "MD5" -> "MD5"
-                        else -> null
-                    }
-                    if (algoCandidate != null) algoCandidate to trimmed.substringAfter('-') else null to trimmed
-                }
-                else -> null to trimmed
+                normalizedAlgo to algoPrefixMatch.groupValues[2]
+            } else {
+                null to trimmed
             }
 
             val cleanHash = hashPart.trim().lowercase()

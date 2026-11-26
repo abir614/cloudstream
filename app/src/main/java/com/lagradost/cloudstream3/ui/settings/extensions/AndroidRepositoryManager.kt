@@ -16,6 +16,7 @@ import com.lagradost.cloudstream3.plugins.PluginManager.getPluginPath
 import com.lagradost.cloudstream3.plugins.PluginManager.unloadPlugin
 import com.lagradost.cloudstream3.plugins.RepositoryManager.PREBUILT_REPOSITORIES
 import com.lagradost.cloudstream3.plugins.RepositoryManager.addRepository
+import com.lagradost.cloudstream3.plugins.RepositoryManager.atomicMoveReplace
 import com.lagradost.cloudstream3.plugins.RepositoryManager.convertRawGitUrl
 import com.lagradost.cloudstream3.plugins.RepositoryManager.parseRepoUrl
 import com.lagradost.cloudstream3.plugins.RepositoryManager.removeRepository
@@ -35,9 +36,6 @@ import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
 import kotlin.uuid.Uuid
 
@@ -218,20 +216,7 @@ object AndroidRepositoryManager : RepositoryManager {
         file.delete() // delete if we somehow already have this downloaded?
         file.parentFile?.mkdirs() // make the directories as Files.move needs this to work
 
-        try {
-            Files.move(
-                tempFile.toPath(),
-                file.toPath(),
-                StandardCopyOption.REPLACE_EXISTING,
-                StandardCopyOption.ATOMIC_MOVE
-            )
-        } catch (_: AtomicMoveNotSupportedException) {
-            Files.move(
-                tempFile.toPath(),
-                file.toPath(),
-                StandardCopyOption.REPLACE_EXISTING
-            )
-        }
+        atomicMoveReplace(tempFile, file)
 
         // Pin updated cryptographic fingerprint upon verified download
         try {

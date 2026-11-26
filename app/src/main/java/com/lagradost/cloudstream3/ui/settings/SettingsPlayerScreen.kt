@@ -377,18 +377,6 @@ object SettingsPlayerScreen : SearchableSettings {
                         title = stringResource(R.string.resolution),
                         icon = painterResource(R.drawable.high_res_24px),
                     ),
-
-                    // Unsure if we want to have MultiSelectListPreference or boolean
-                    /*Preference.PreferenceItem.MultiSelectListPreference(
-                        preference = settings.player.showPlayerInfo,
-                        title = stringResource(R.string.limit_title_rez),
-                        icon = painterResource(R.drawable.ic_baseline_text_format_24),
-                        entries = persistentMapOf(
-                            ShowPlayerInfo.Name to stringResource(R.string.source_name),
-                            ShowPlayerInfo.Resolution to stringResource(R.string.resolution),
-                            ShowPlayerInfo.VideoInfo to stringResource(R.string.video_info),
-                        )
-                    ), */
                 )
             ),
             Preference.PreferenceGroup(

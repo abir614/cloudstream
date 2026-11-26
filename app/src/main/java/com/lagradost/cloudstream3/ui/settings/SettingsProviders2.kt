@@ -4,4 +4,5 @@ import com.mihon.presentation.settings.SearchableSettings
 
 /** Empty glue code to connect the old navigation graph to Compose */
 @Deprecated("This setting was merged into other places")
+@Suppress("DEPRECATION")
 class SettingsProviders2 : BaseComposeFragment(), SearchableSettings by SettingsProvidersScreen

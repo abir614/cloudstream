@@ -40,19 +40,9 @@ import com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.utils.AppContextUtils.shouldCensorPosters
 import kotlinx.coroutines.Dispatchers
-import com.lagradost.cloudstream3.network.SafeDns
-import com.lagradost.cloudstream3.network.addAdGuardDns
-import com.lagradost.cloudstream3.network.addCanadianShieldDns
-import com.lagradost.cloudstream3.network.addCloudFlareDns
-import com.lagradost.cloudstream3.network.addDNSWatchDns
-import com.lagradost.cloudstream3.network.addDnsSbDns
-import com.lagradost.cloudstream3.network.addGoogleDns
-import com.lagradost.cloudstream3.network.addMozillaCloudflareDns
-import com.lagradost.cloudstream3.network.addQuad9Dns
-import com.lagradost.cloudstream3.network.addResilientMultiTierDns
+import com.lagradost.cloudstream3.network.applyDnsPreference
 import okhttp3.ConnectionPool
 import okhttp3.Dispatcher
-import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okio.Path.Companion.toOkioPath
@@ -82,6 +72,7 @@ object ImageLoader {
         }
     }
 
+    @OptIn(coil3.annotation.DelicateCoilApi::class)
     internal fun reconfigure(context: PlatformContext) {
         resetImageClient()
         evictConnections()
@@ -158,21 +149,7 @@ object ImageLoader {
                     response
                 }
             }
-            .apply {
-                when (dns) {
-                    0 -> dns(SafeDns(Dns.SYSTEM))
-                    1 -> addGoogleDns()
-                    2 -> addCloudFlareDns()
-                    4 -> addAdGuardDns()
-                    5 -> addDNSWatchDns()
-                    6 -> addQuad9Dns()
-                    7 -> addDnsSbDns()
-                    8 -> addCanadianShieldDns()
-                    9 -> addMozillaCloudflareDns()
-                    10 -> addResilientMultiTierDns()
-                    else -> dns(SafeDns(Dns.SYSTEM))
-                }
-            }
+            .applyDnsPreference(dns)
             .build()
     }
 

@@ -1,6 +1,5 @@
 package com.lagradost.cloudstream3.ui.settings
 
-import androidx.compose.runtime.Immutable
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.network.UpdateNetworkClient
 import com.lagradost.cloudstream3.utils.InAppUpdater

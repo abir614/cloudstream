@@ -28,10 +28,10 @@ class LocalList : SyncAPI() {
 
     override suspend fun library(auth : AuthData?): SyncAPI.LibraryMetadata? {
         val watchStatusIds = ioWork {
-            getAllWatchStateIds()?.map { id ->
+            getAllWatchStateIds().map { id ->
                 Pair(id, getResultWatchState(id))
-            } ?: emptyList()
-        }?.distinctBy { it.first } ?: emptyList()
+            }
+        }.distinctBy { it.first }
 
         val list = ioWork {
             val isTrueTv = isLayout(TV)

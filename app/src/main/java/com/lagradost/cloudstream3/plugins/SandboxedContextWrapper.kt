@@ -6,6 +6,7 @@ import android.content.SharedPreferences
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteDatabase.CursorFactory
 import android.database.DatabaseErrorHandler
+import android.os.Build
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -68,20 +69,24 @@ class SandboxedContextWrapper(
          * are permitted. All sensitive hardware, telephony, clipboard, location, notification, account,
          * and sensor services are strictly blocked by default.
          */
-        val PERMITTED_SYSTEM_SERVICES = setOf(
-            Context.CONNECTIVITY_SERVICE,
-            Context.LAYOUT_INFLATER_SERVICE,
-            Context.WINDOW_SERVICE,
-            Context.POWER_SERVICE,
-            Context.AUDIO_SERVICE,
-            Context.INPUT_METHOD_SERVICE,
-            Context.UI_MODE_SERVICE,
-            Context.VIBRATOR_SERVICE,
-            Context.CAPTIONING_SERVICE,
-            Context.DISPLAY_SERVICE,
-            Context.ACCESSIBILITY_SERVICE,
-            Context.ACTIVITY_SERVICE
-        )
+        @Suppress("DEPRECATION")
+        val PERMITTED_SYSTEM_SERVICES = buildSet {
+            add(Context.CONNECTIVITY_SERVICE)
+            add(Context.LAYOUT_INFLATER_SERVICE)
+            add(Context.WINDOW_SERVICE)
+            add(Context.POWER_SERVICE)
+            add(Context.AUDIO_SERVICE)
+            add(Context.INPUT_METHOD_SERVICE)
+            add(Context.UI_MODE_SERVICE)
+            add(Context.VIBRATOR_SERVICE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(Context.VIBRATOR_MANAGER_SERVICE)
+            }
+            add(Context.CAPTIONING_SERVICE)
+            add(Context.DISPLAY_SERVICE)
+            add(Context.ACCESSIBILITY_SERVICE)
+            add(Context.ACTIVITY_SERVICE)
+        }
     }
 
     override fun getSystemService(name: String): Any? {

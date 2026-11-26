@@ -30,7 +30,6 @@ import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.insecureApp
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.network.initClient
-import com.lagradost.cloudstream3.ui.settings.SettingsProvidersScreen.toStringRes
 import com.lagradost.cloudstream3.utils.BatteryOptimizationChecker.isAppRestricted
 import com.lagradost.cloudstream3.utils.BatteryOptimizationChecker.showRequestIgnoreBatteryOptDialog
 import com.lagradost.cloudstream3.utils.DeviceProfile
@@ -168,7 +167,7 @@ object SettingsGeneralScreen : SearchableSettings {
                         it.ordinal.toString() to stringResource(it.toStringRes())
                     }
                         // Ok this looks strange af, but we do this to avoid double movie
-                        .toPersistentMap().remove(TvType.AnimeMovie.ordinal.toString()), onValueChanged = { diff ->
+                        .minus(TvType.AnimeMovie.ordinal.toString()).toPersistentMap(), onValueChanged = { diff ->
                         if(diff.contains(TvType.Movie.ordinal.toString())) {
                             settings.provider.preferredMedia.set(diff + TvType.AnimeMovie.ordinal.toString())
                         } else {

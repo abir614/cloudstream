@@ -1932,11 +1932,6 @@ object HlsPlaylistParser {
                                 name
                             )
                         )
-                    } else {
-                        /*Log.w(
-                            LOG_TAG,
-                            "EXT-X-MEDIA tag with missing mandatory URI attribute: skipping"
-                        )*/
                     }
                 }
 

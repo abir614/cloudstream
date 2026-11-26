@@ -305,11 +305,6 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
                         searchClickCallback.card,
                         load = false
                     )
-                    /*activity?.showPluginSelectionDialog(
-                            syncId,
-                            syncName,
-                            searchClickCallback.card.apiName
-                        )*/
                 }
 
                 SEARCH_ACTION_LOAD -> {
@@ -372,12 +367,6 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
                             tag = "tv_no_focus_tag"
                             //isFocusable = false
                         }
-
-                        // Using notifyItemRangeChanged keeps the animations when sorting
-                        /*viewpager.adapter?.notifyItemRangeChanged(
-                            0,
-                            viewpager.adapter?.itemCount ?: 0
-                        )*/
 
                         libraryViewModel.currentPage.value?.let { page ->
                             binding.viewpager.setCurrentItem(page, false)

@@ -28,8 +28,6 @@ import com.lagradost.cloudstream3.utils.DataStore.removeKeys
 import com.lagradost.cloudstream3.utils.DataStore.setKey
 import com.lagradost.cloudstream3.utils.ImageLoader.buildImageLoader
 import java.io.File
-import java.io.FileNotFoundException
-import java.io.PrintStream
 import java.lang.ref.WeakReference
 import kotlin.concurrent.thread
 import kotlin.system.exitProcess

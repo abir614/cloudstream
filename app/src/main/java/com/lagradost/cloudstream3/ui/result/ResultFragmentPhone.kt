@@ -512,25 +512,6 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                 nextLeft = FOCUS_SELF,
                 nextRight = FOCUS_SELF
             )
-            /*resultCastItems.layoutManager = object : LinearListLayout(view.context) {
-                override fun onRequestChildFocus(
-                    parent: RecyclerView,
-                    state: RecyclerView.State,
-                    child: View,
-                    focused: View?
-                ): Boolean {
-                    // Make the cast always focus the first visible item when focused
-                    // from somewhere else. Otherwise, it jumps to the last item.
-                    return if (parent.focusedChild == null) {
-                        scrollToPosition(this.findFirstCompletelyVisibleItemPosition())
-                        true
-                    } else {
-                        super.onRequestChildFocus(parent, state, child, focused)
-                    }
-                }
-            }.apply {
-                this.orientation = RecyclerView.HORIZONTAL
-            }*/
             resultCastItems.setRecycledViewPool(ActorAdaptor.sharedPool)
             resultCastItems.adapter = ActorAdaptor()
             resultEpisodes.setRecycledViewPool(EpisodeAdapter.sharedPool)
@@ -612,18 +593,6 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
                 } else resultOverlappingPanels.closePanels()
             }
 
-            /*
-            resultMiniSync.setRecycledViewPool(ImageAdapter.sharedPool)
-            resultMiniSync.adapter = ImageAdapter(
-                nextFocusDown = R.id.result_sync_set_score,
-                clickCallback = { action ->
-                    if (action == IMAGE_CLICK || action == IMAGE_LONG_CLICK) {
-                        if (resultOverlappingPanels.getSelectedPanel().ordinal == 1) {
-                            resultOverlappingPanels.openStartPanel()
-                        } else resultOverlappingPanels.closePanels()
-                    }
-                })
-            */
             resultSubscribe.setOnClickListener {
                 viewModel.toggleSubscriptionStatus(context) { newStatus: Boolean? ->
                     if (newStatus == null) return@toggleSubscriptionStatus
@@ -718,17 +687,6 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
             }
         }
 
-
-        /*
-        result_bookmark_button?.setOnClickListener {
-            it.popupMenuNoIcons(
-                items = WatchType.values()
-                    .map { watchType -> Pair(watchType.internalId, watchType.stringRes) },
-                //.map { watchType -> Triple(watchType.internalId, watchType.iconRes, watchType.stringRes) },
-            ) {
-                viewModel.updateWatchStatus(WatchType.fromInternalId(this.itemId))
-            }
-        }*/
 
         observeNullable(viewModel.resumeWatching) { resume ->
             resultBinding?.apply {

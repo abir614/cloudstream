@@ -300,7 +300,15 @@ object SecureAuthStore {
                 if (secretKey != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                     val factory = javax.crypto.SecretKeyFactory.getInstance(secretKey.algorithm, ANDROID_KEYSTORE)
                     val keyInfo = factory.getKeySpec(secretKey, android.security.keystore.KeyInfo::class.java) as? android.security.keystore.KeyInfo
-                    keyInfo?.isInsideSecureHardware == true
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val level = keyInfo?.securityLevel
+                        level == KeyProperties.SECURITY_LEVEL_TRUSTED_ENVIRONMENT ||
+                            level == KeyProperties.SECURITY_LEVEL_STRONGBOX ||
+                            level == KeyProperties.SECURITY_LEVEL_UNKNOWN_SECURE
+                    } else {
+                        @Suppress("DEPRECATION")
+                        keyInfo?.isInsideSecureHardware == true
+                    }
                 } else {
                     false
                 }

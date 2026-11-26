@@ -19,16 +19,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/*
-@Composable
-fun Modifier.ripple(
-    interactionSource: MutableInteractionSource,
-    bounded: Boolean = true,
-): Modifier = indication(
-    interactionSource = interactionSource,
-    indication = ripple(bounded = bounded, color = MaterialTheme.colorScheme.onBackground),
-)*/
-
 // no dimens.xml allowed in compose :/
 fun RoundedShape() = RoundedCornerShape(10.dp)
 

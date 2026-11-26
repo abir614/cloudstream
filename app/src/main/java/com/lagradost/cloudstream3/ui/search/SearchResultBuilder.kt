@@ -399,24 +399,24 @@ object SearchResultBuilder {
         when (badgeCount) {
             1 -> {
                 when {
-                    dubVis -> textIsDub?.setBackgroundResource(R.drawable.bg_color_both)
-                    subVis -> textIsSub?.setBackgroundResource(R.drawable.bg_color_both)
-                    ratingVis -> rating?.setBackgroundResource(R.drawable.bg_color_both)
+                    dubVis -> textIsDub.setBackgroundResource(R.drawable.bg_color_both)
+                    subVis -> textIsSub.setBackgroundResource(R.drawable.bg_color_both)
+                    ratingVis -> rating.setBackgroundResource(R.drawable.bg_color_both)
                 }
             }
             2 -> {
                 when {
                     dubVis && subVis -> {
-                        textIsDub?.setBackgroundResource(R.drawable.bg_color_top)
-                        textIsSub?.setBackgroundResource(R.drawable.bg_color_bottom)
+                        textIsDub.setBackgroundResource(R.drawable.bg_color_top)
+                        textIsSub.setBackgroundResource(R.drawable.bg_color_bottom)
                     }
                     dubVis && ratingVis -> {
-                        textIsDub?.setBackgroundResource(R.drawable.bg_color_top)
-                        rating?.setBackgroundResource(R.drawable.bg_color_bottom)
+                        textIsDub.setBackgroundResource(R.drawable.bg_color_top)
+                        rating.setBackgroundResource(R.drawable.bg_color_bottom)
                     }
                     subVis && ratingVis -> {
-                        textIsSub?.setBackgroundResource(R.drawable.bg_color_top)
-                        rating?.setBackgroundResource(R.drawable.bg_color_bottom)
+                        textIsSub.setBackgroundResource(R.drawable.bg_color_top)
+                        rating.setBackgroundResource(R.drawable.bg_color_bottom)
                     }
                 }
             }

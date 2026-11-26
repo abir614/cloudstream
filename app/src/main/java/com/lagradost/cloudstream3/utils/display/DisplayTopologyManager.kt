@@ -128,6 +128,7 @@ object DisplayTopologyManager {
 
     fun extractHdmiPluggedState(intent: Intent?): Boolean {
         if (intent == null) return false
+        @Suppress("DEPRECATION")
         val extra = try {
             intent.extras?.get("state")
         } catch (_: Throwable) {
@@ -342,16 +343,27 @@ object DisplayTopologyManager {
         val isUltraWide = rawRatio >= 2.1f
         val is4KOrHigher = (physWidth >= 3840 || physHeight >= 2160)
 
-        val (isHdr, hdrTypes) = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try {
-                val caps = display.hdrCapabilities
-                val types = caps?.supportedHdrTypes?.toList() ?: emptyList()
-                (types.isNotEmpty()) to types
-            } catch (_: Throwable) {
-                false to emptyList()
+        val (isHdr, hdrTypes) = when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> {
+                try {
+                    val types = display.mode?.supportedHdrTypes?.toList() ?: emptyList()
+                    (types.isNotEmpty()) to types
+                } catch (_: Throwable) {
+                    false to emptyList()
+                }
             }
-        } else {
-            false to emptyList()
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
+                try {
+                    @Suppress("DEPRECATION")
+                    val caps = display.hdrCapabilities
+                    @Suppress("DEPRECATION")
+                    val types = caps?.supportedHdrTypes?.toList() ?: emptyList()
+                    (types.isNotEmpty()) to types
+                } catch (_: Throwable) {
+                    false to emptyList()
+                }
+            }
+            else -> false to emptyList()
         }
 
         val isWideGamut = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

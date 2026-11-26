@@ -96,9 +96,9 @@ class HomeViewModel : ViewModel() {
     companion object {
         suspend fun getResumeWatching(): List<DataStoreHelper.ResumeWatchingResult>? {
             val resumeWatching = withContext(Dispatchers.IO) {
-                getAllResumeStateIds()?.mapNotNull { id ->
+                getAllResumeStateIds().mapNotNull { id ->
                     getLastWatched(id)
-                }?.sortedBy { -it.updateTime }
+                }.sortedBy { -it.updateTime }
             }
             val resumeWatchingResult = withContext(Dispatchers.IO) {
                 resumeWatching?.mapNotNull { resume ->
@@ -191,10 +191,10 @@ class HomeViewModel : ViewModel() {
 
     fun loadStoredData(preferredWatchStatus: Set<WatchType>?) = viewModelScope.launchSafe {
         val watchStatusIds = withContext(Dispatchers.IO) {
-            getAllWatchStateIds()?.map { id ->
+            getAllWatchStateIds().map { id ->
                 Pair(id, getResultWatchState(id))
             }
-        }?.distinctBy { it.first } ?: return@launchSafe
+        }.distinctBy { it.first }
 
         val length = WatchType.entries.size
         val currentWatchTypes = mutableSetOf<WatchType>()
@@ -816,9 +816,9 @@ class HomeViewModel : ViewModel() {
         } else null
 
         val hasCached = cachedData != null && cachedData.any { it != null }
-        if (hasCached) {
+        if (hasCached && cachedData != null) {
             rawHomeData = cachedData
-            populateHomeFromData(cachedData!!)
+            populateHomeFromData(cachedData)
         } else {
             _page.postValue(Resource.Loading())
             _preview.postValue(Resource.Loading())

@@ -27,7 +27,6 @@ import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.CommonActivity.showToast
 import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.R
-import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.network.UpdateNetworkClient
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.mvvm.safe
@@ -723,7 +722,7 @@ object InAppUpdater {
                 runOnUiThread {
                     try {
                         if (progressDialog?.isShowing == true) {
-                            progressDialog?.dismiss()
+                            progressDialog.dismiss()
                         }
                     } catch (_: Throwable) {}
                 }

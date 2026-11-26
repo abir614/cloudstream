@@ -83,38 +83,3 @@ fun Modifier.showSoftKeyboard(show: Boolean): Modifier {
     }
     return this.focusRequester(focusRequester)
 }
-
-/*
-/**
- * For TextField, this modifier will clear focus when soft
- * keyboard is hidden.
- */
-@Composable
-fun Modifier.clearFocusOnSoftKeyboardHide(
-    onFocusCleared: (() -> Unit)? = null,
-): Modifier {
-    var isFocused by remember { mutableStateOf(false) }
-    var keyboardShowedSinceFocused by remember { mutableStateOf(false) }
-    if (isFocused) {
-        val imeVisible = WindowInsets.isImeVisible
-        val focusManager = LocalFocusManager.current
-        LaunchedEffect(imeVisible) {
-            if (imeVisible) {
-                keyboardShowedSinceFocused = true
-            } else if (keyboardShowedSinceFocused) {
-                focusManager.clearFocus()
-                onFocusCleared?.invoke()
-            }
-        }
-    }
-
-    return this.onFocusChanged {
-        if (isFocused != it.isFocused) {
-            if (isFocused) {
-                keyboardShowedSinceFocused = false
-            }
-            isFocused = it.isFocused
-        }
-    }
-}
-*/

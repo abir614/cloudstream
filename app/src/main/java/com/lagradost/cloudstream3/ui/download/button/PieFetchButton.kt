@@ -148,23 +148,6 @@ open class PieFetchButton(context: Context, attributeSet: AttributeSet) :
     }
 
     private var currentStatus: DownloadStatusTell? = null
-    /*private fun getActivity(): Activity? {
-        var context = context
-        while (context is ContextWrapper) {
-            if (context is Activity) {
-                return context
-            }
-            context = context.baseContext
-        }
-        return null
-    }
-
-    fun callback(event : DownloadClickEvent) {
-        handleDownloadClick(
-            getActivity(),
-            event
-        )
-    }*/
 
     protected fun setDefaultClickListener(
         view: View, textView: TextView?, card: DownloadObjects.DownloadEpisodeCached,
@@ -235,34 +218,6 @@ open class PieFetchButton(context: Context, attributeSet: AttributeSet) :
     ) {
         setDefaultClickListener(this, textView, card, callback)
     }
-
-    /* open fun setDefaultClickListener(requestGetter: suspend BaseFetchButton.() -> List<UriRequest>) {
-        this.setOnClickListener {
-            when (this.currentStatus) {
-                null -> {
-                    setStatus(DownloadStatusTell.IsPending)
-                    ioThread {
-                        val request = requestGetter.invoke(this)
-                        if (request.size == 1) {
-                            performDownload(request.first())
-                        } else if (request.isNotEmpty()) {
-                            performFailQueueDownload(request)
-                        }
-                    }
-                }
-                DownloadStatusTell.Paused -> {
-                    resumeDownload()
-                }
-                DownloadStatusTell.Active -> {
-                    pauseDownload()
-                }
-                DownloadStatusTell.Error -> {
-                    redownload()
-                }
-                else -> {}
-            }
-        }
-    } */
 
     @MainThread
     private fun setStatusInternal(status: DownloadStatusTell?) {

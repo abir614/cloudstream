@@ -178,27 +178,10 @@ class SubtitlesFragment : BaseDialogFragment<SubtitleSettingsBinding>(
             val size = data.fixedTextSize ?: 25.0f
             view.setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, size)
             view.setBottomPaddingFraction(0.0f)
-            /*if (size != null) {
-                view.setFixedTextSize(TypedValue.COMPLEX_UNIT_SP, size)
-            } else {
-                view.setUserDefaultTextSize()
-            }*/
         }
 
         fun Cue.Builder.applyStyle(style: SaveCaptionStyle): Cue.Builder {
             val edgeSize = style.edgeSize ?: 0.0f
-
-            /*
-            This is old code for only applying on non null
-
-            val fixedFontSize = style.fixedTextSize
-            val absoluteFontSize =
-                fixedFontSize?.let { getPixels(TypedValue.COMPLEX_UNIT_SP, it).toFloat() }
-
-            // 1. apply override size
-            if (absoluteFontSize != null) {
-                setTextSize(absoluteFontSize, Cue.TEXT_SIZE_TYPE_ABSOLUTE)
-            }*/
 
             // 1. remove any subtitle size set by the subtitle file (like ass)
             // instead we use the inherit size of the subtitle view

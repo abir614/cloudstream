@@ -104,7 +104,7 @@ import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.plugins.PluginManager
 import com.lagradost.cloudstream3.ui.settings.SettingsFragmentScreen
-import com.lagradost.cloudstream3.ui.settings.SettingsProvidersScreen.toStringRes
+import com.lagradost.cloudstream3.ui.settings.toStringRes
 import com.lagradost.cloudstream3.ui.settings.extensions.RepoAdapter.Companion.SHAREABLE_REPO_SEPARATOR
 import com.lagradost.cloudstream3.utils.SubtitleHelper.fromTagToLanguageName
 import com.lagradost.cloudstream3.utils.SubtitleHelper.getNameNextToFlagEmoji
@@ -195,12 +195,6 @@ fun Preview() {
         val uuid3 = Uuid.random()
         ExtensionsScreen.Content(
             state = ExtensionsState(
-                //addDialog = AddRepositoryDialog(error = Throwable()),
-                /*updateAllPluginsDialog = PluginsUpdatingDialog(
-                    total = 5,
-                    downloaded = 4,
-                    failed = 0
-                ),*/
                 repositories = SearchableData.from(
                     data = persistentMapOf(
                         uuid1 to Repository(
@@ -1870,12 +1864,6 @@ object ExtensionsScreen : Screen {
                                 painter = painterResource(R.drawable.delete_24px),
                                 contentDescription = null
                             )
-                            /*CircularProgressIndicator(
-                                modifier = Modifier
-                                    .size(IconButtonDefaults.smallContainerSize())
-                                    .padding(MaterialTheme.padding.small),
-                                color = MaterialTheme.colorScheme.onBackground,
-                            )*/
                         }
                     }
                 }

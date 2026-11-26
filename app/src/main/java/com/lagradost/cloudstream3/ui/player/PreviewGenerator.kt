@@ -276,15 +276,6 @@ private class M3u8PreviewGenerator(override var params: ImageParams) : IPreviewG
             }
             return images.getOrNull(bestIdx)
         }
-        /*
-        val targetIndex = prefixSum.binarySearch(target)
-        var ret = images[targetIndex]
-        if (ret != null) {
-            return ret
-        }
-        for (i in 0..images.size) {
-            ret = images.getOrNull(i+targetIndex) ?:
-        }*/
     }
 
     private fun clear() {

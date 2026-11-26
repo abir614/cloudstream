@@ -355,11 +355,7 @@ object RepositoryManager {
                     return@safeAsync null
                 }
 
-                val body = response.okhttpResponse.body ?: run {
-                    tempFile.delete()
-                    response.okhttpResponse.close()
-                    return@safeAsync null
-                }
+                val body = response.okhttpResponse.body
 
                 body.byteStream().use { stream ->
                     tempFile.outputStream().use { fileStream ->
@@ -384,27 +380,30 @@ object RepositoryManager {
                     }
                 }
 
-                // We prefer the operation to be atomic
-                try {
-                    Files.move(
-                        tempFile.toPath(),
-                        file.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING,
-                        StandardCopyOption.ATOMIC_MOVE
-                    )
-                } catch (_: AtomicMoveNotSupportedException) {
-                    Files.move(
-                        tempFile.toPath(),
-                        file.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING
-                    )
-                }
+                atomicMoveReplace(tempFile, file)
 
                 file
             } catch (t: Throwable) {
                 tempFile.delete()
                 throw t
             }
+        }
+    }
+
+    internal fun atomicMoveReplace(source: File, target: File) {
+        try {
+            Files.move(
+                source.toPath(),
+                target.toPath(),
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(
+                source.toPath(),
+                target.toPath(),
+                StandardCopyOption.REPLACE_EXISTING
+            )
         }
     }
 

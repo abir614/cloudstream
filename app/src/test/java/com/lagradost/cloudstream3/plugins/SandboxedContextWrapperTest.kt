@@ -50,7 +50,8 @@ class SandboxedContextWrapperTest {
             private val data = mutableMapOf<String, Any?>()
             override fun getAll(): Map<String, *> = data
             override fun getString(key: String?, defValue: String?): String? = (data[key] as? String) ?: defValue
-            override fun getStringSet(key: String?, defValues: Set<String>?): Set<String>? = (data[key] as? Set<String>) ?: defValues
+            override fun getStringSet(key: String?, defValues: Set<String>?): Set<String>? =
+                (data[key] as? Set<*>)?.mapNotNull { it as? String }?.toSet() ?: defValues
             override fun getInt(key: String?, defValue: Int): Int = (data[key] as? Int) ?: defValue
             override fun getLong(key: String?, defValue: Long): Long = (data[key] as? Long) ?: defValue
             override fun getFloat(key: String?, defValue: Float): Float = (data[key] as? Float) ?: defValue
@@ -195,6 +196,7 @@ class SandboxedContextWrapperTest {
             Context.AUDIO_SERVICE,
             Context.INPUT_METHOD_SERVICE,
             Context.UI_MODE_SERVICE,
+            @Suppress("DEPRECATION")
             Context.VIBRATOR_SERVICE,
             Context.CAPTIONING_SERVICE,
             Context.DISPLAY_SERVICE,

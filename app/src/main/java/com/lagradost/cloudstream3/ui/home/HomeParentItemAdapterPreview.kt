@@ -254,53 +254,6 @@ class HomeParentItemAdapterPreview(
                 callback.card,
                 load = false
             )
-            /*
-            callback.view.context?.getActivity()?.showOptionSelectStringRes(
-                callback.view,
-                callback.card.posterUrl,
-                listOf(
-                    R.string.action_open_watching,
-                    R.string.action_remove_from_bookmarks,
-                ),
-                listOf(
-                    R.string.action_open_play,
-                    R.string.action_open_watching,
-                    R.string.action_remove_from_bookmarks
-                )
-            ) { (isTv, actionId) ->
-                when (actionId + if (isTv) 0 else 1) { // play
-                    0 -> {
-                        viewModel.click(
-                            SearchClickCallback(
-                                START_ACTION_RESUME_LATEST,
-                                callback.view,
-                                -1,
-                                callback.card
-                            )
-                        )
-                    }
-
-                    1 -> { // info
-                        viewModel.click(
-                            SearchClickCallback(
-                                SEARCH_ACTION_LOAD,
-                                callback.view,
-                                -1,
-                                callback.card
-                            )
-                        )
-                    }
-
-                    2 -> { // remove
-                        DataStoreHelper.setResultWatchState(
-                            callback.card.id,
-                            WatchType.NONE.internalId
-                        )
-                        viewModel.reloadStored()
-                    }
-                }
-            }
-            */
         }
 
         private val previewViewpager: ViewPager2 =
@@ -579,25 +532,6 @@ class HomeParentItemAdapterPreview(
             }
 
             (binding as? FragmentHomeHeadTvBinding)?.apply {
-                /*homePreviewChangeApi.setOnClickListener { view ->
-                    view.context.selectHomepage(viewModel.repo?.name) { api ->
-                        viewModel.loadAndCancel(api, forceReload = true, fromUI = true)
-                    }
-                }
-                homePreviewReloadProvider.setOnClickListener {
-                    viewModel.loadAndCancel(
-                        viewModel.apiName.value ?: noneApi.name,
-                        forceReload = true,
-                        fromUI = true
-                    )
-                    showToast(R.string.action_reload, Toast.LENGTH_SHORT)
-                    true
-                }
-                homePreviewSearchButton.setOnClickListener { _ ->
-                    // Open blank screen.
-                    viewModel.queryTextSubmit("")
-                }*/
-
                 // A workaround to the focus problem of always centering the view on focus
                 // as that causes higher android versions to stretch the ui when switching between shows
                 var lastFocusTimeoutMs = 0L
@@ -662,20 +596,6 @@ class HomeParentItemAdapterPreview(
                     homePreviewShimmer?.isGone = true
                     previewAdapter.submitList(preview.value.second)
                     previewAdapter.hasMoreItems = preview.value.first
-                    /*if (!.setItems(
-                            preview.value.second,
-                            preview.value.first
-                        )
-                    ) {
-                        // this might seam weird and useless, however this prevents a very weird andrid bug were the viewpager is not rendered properly
-                        // I have no idea why that happens, but this is my ducktape solution
-                        previewViewpager.setCurrentItem(0, false)
-                        previewViewpager.beginFakeDrag()
-                        previewViewpager.fakeDragBy(1f)
-                        previewViewpager.endFakeDrag()
-                        previewCallback.onPageSelected(0)
-                        //previewHeader.isVisible = true
-                    }*/
 
                     previewViewpager.isVisible = true
                     previewViewpagerText.isVisible = true
@@ -787,12 +707,6 @@ class HomeParentItemAdapterPreview(
                 observe(viewModel.preview) {
                     updatePreview(it)
                 }
-                /*if (binding is FragmentHomeHeadTvBinding) {
-                    observe(viewModel.apiName) { name ->
-                        binding.homePreviewChangeApi.text = name
-                        binding.homePreviewReloadProvider.isGone = (name == noneApi.name)
-                    }
-                }*/
                 observe(viewModel.resumeWatching) {
                     updateResume(it)
                 }

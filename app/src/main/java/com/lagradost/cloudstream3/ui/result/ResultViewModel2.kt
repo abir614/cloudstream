@@ -691,44 +691,6 @@ class ResultViewModel2 : ViewModel() {
                     currentMax = Int.MIN_VALUE
                 }
 
-                /*var currentMin = Int.MAX_VALUE
-                var currentMax = Int.MIN_VALUE
-                var currentStartIndex = 0
-                var currentLength = 0
-                for (ep in episodes) {
-                    val episodeNumber = ep.episode
-                    if (episodeNumber < currentMin) {
-                        currentMin = episodeNumber
-                    } else if (episodeNumber > currentMax) {
-                        currentMax = episodeNumber
-                    }
-
-                    if (++currentLength >= EPISODE_RANGE_SIZE) {
-                        list.add(
-                            EpisodeRange(
-                                currentStartIndex,
-                                currentLength,
-                                currentMin,
-                                currentMax
-                            )
-                        )
-                        currentMin = Int.MAX_VALUE
-                        currentMax = Int.MIN_VALUE
-                        currentStartIndex += currentLength
-                        currentLength = 0
-                    }
-                }
-                if (currentLength > 0) {
-                    list.add(
-                        EpisodeRange(
-                            currentStartIndex,
-                            currentLength,
-                            currentMin,
-                            currentMax
-                        )
-                    )
-                }*/
-
                 index to list
             }.toMap()
         }
@@ -1239,12 +1201,7 @@ class ResultViewModel2 : ViewModel() {
         loadLinks(result, isVisible = true, sourceTypes, isCasting = isCasting) { links ->
             postPopup(
                 text,
-                links.links.map { txt("${it.name} ${Qualities.getStringByInt(it.quality)}") }
-                /*.amap {
-                val size =
-                    it.getVideoSize()?.let { size -> " " + formatFileSize(context, size) } ?: ""
-                txt("${it.name} ${Qualities.getStringByInt(it.quality)}$size")
-                }*/) {
+                links.links.map { txt("${it.name} ${Qualities.getStringByInt(it.quality)}") }) {
                 callback.invoke(links to (it ?: return@postPopup))
             }
         }
@@ -1442,13 +1399,6 @@ class ResultViewModel2 : ViewModel() {
             ACTION_SHOW_DESCRIPTION -> {
                 _episodeSynopsis.postValue(click.data.description)
             }
-
-            /* not implemented, not used
-            ACTION_DOWNLOAD_EPISODE_SUBTITLE -> {
-                loadLinks(click.data, isVisible =  false, isCasting = false) { links ->
-                    downloadSubtitle(activity,links.subs,)
-                }
-            }*/
             ACTION_DOWNLOAD_EPISODE_SUBTITLE_MIRROR -> {
                 val response = currentResponse ?: return
 

@@ -407,15 +407,6 @@ object CommonActivity {
         }
         return null
     }
-    /*var currentLook: View = view
-    while (true) {
-        val tmpNext = currentLook.findViewById<View?>(nextId)
-        if (tmpNext != null) {
-            next = tmpNext
-            break
-        }
-        currentLook = currentLook.parent as? View ?: break
-    }*/
 
     private fun View.hasContent(): Boolean {
         return isShown && when (this) {

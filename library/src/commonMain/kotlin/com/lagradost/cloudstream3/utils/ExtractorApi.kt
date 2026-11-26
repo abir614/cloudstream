@@ -517,11 +517,6 @@ suspend fun newExtractorLink(
     return builder
 }
 
-// Deprecate after next stable
-/* @Deprecated(
-    message = "Use Kotlin Uuid (kotlin.uuid.Uuid) instead of Java UUID.",
-    level = DeprecationLevel.WARNING,
-) */
 suspend fun newDrmExtractorLink(
     source: String,
     name: String,
@@ -1110,11 +1105,6 @@ val extractorApis: AtomicMutableList<ExtractorApi> = atomicListOf(
     Userload(),
     Supervideo(),
     Streamcash(),
-
-    // StreamSB.kt works
-    //  SBPlay(),
-    //  SBPlay1(),
-    //  SBPlay2(),
 
     PlayerVoxzer(),
 

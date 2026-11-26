@@ -14,8 +14,6 @@ import com.lagradost.cloudstream3.databinding.FragmentLibraryBinding
 import com.lagradost.cloudstream3.databinding.FragmentLibraryTvBinding
 import com.lagradost.cloudstream3.databinding.FragmentPlayerBinding
 import com.lagradost.cloudstream3.databinding.FragmentPlayerTvBinding
-import com.lagradost.cloudstream3.databinding.FragmentResultBinding
-import com.lagradost.cloudstream3.databinding.FragmentResultTvBinding
 import com.lagradost.cloudstream3.databinding.FragmentSearchBinding
 import com.lagradost.cloudstream3.databinding.FragmentSearchTvBinding
 import com.lagradost.cloudstream3.databinding.HomeResultGridBinding
@@ -77,11 +75,6 @@ class ExampleInstrumentedTest {
                 // FragmentHomeHeadBinding and FragmentHomeHeadTvBinding CANT be the same
                 //testAllLayouts<FragmentHomeHeadBinding>(activity, R.layout.fragment_home_head, R.layout.fragment_home_head_tv)
                 //testAllLayouts<FragmentHomeHeadTvBinding>(activity, R.layout.fragment_home_head, R.layout.fragment_home_head_tv)
-
-                // main cant be tested
-               // testAllLayouts<ActivityMainTvBinding>(activity,R.layout.activity_main, R.layout.activity_main_tv)
-               // testAllLayouts<ActivityMainBinding>(activity,R.layout.activity_main, R.layout.activity_main_tv)
-                //testAllLayouts<ActivityMainBinding>(activity, R.layout.activity_main_tv)
 
                 testAllLayouts<BottomResultviewPreviewBinding>(activity, R.layout.bottom_resultview_preview,R.layout.bottom_resultview_preview_tv)
 

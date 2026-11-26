@@ -181,9 +181,9 @@ class DownloadViewModel : ViewModel() {
         ioSafe {
            // Do not remove headers used by resume watching
             val resumeWatchingIds =
-                getAllResumeStateIds()?.mapNotNull { id ->
+                getAllResumeStateIds().mapNotNull { id ->
                     getLastWatched(id)?.parentId
-                }?.toSet() ?: emptySet()
+                }.toSet()
 
             settingsManager.edit {
                 cached.forEach { header ->

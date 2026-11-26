@@ -2,7 +2,6 @@ package com.lagradost.cloudstream3.utils.downloader
 
 import android.content.Context
 import android.net.Uri
-import androidx.core.net.toUri
 import androidx.preference.PreferenceManager
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.TvType

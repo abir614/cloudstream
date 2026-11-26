@@ -327,9 +327,6 @@ object PluginManager {
         main {
             val uitext = txt(R.string.plugins_updated, updatedPlugins.size)
             createNotification(activity, uitext, updatedPlugins)
-            /*val navBadge = (activity as MainActivity).binding?.navRailView?.getOrCreateBadge(R.id.navigation_settings)
-            navBadge?.isVisible = true
-            navBadge?.number = 5*/
         }
 
         // ioSafe {

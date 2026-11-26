@@ -13,7 +13,6 @@ import androidx.compose.ui.res.integerArrayResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
-import com.lagradost.cloudstream3.AutoDownloadMode
 import com.lagradost.cloudstream3.BuildConfig
 import com.lagradost.cloudstream3.CloudStreamApp
 import com.lagradost.cloudstream3.CommonActivity.activity
@@ -93,16 +92,6 @@ object SettingsUpdatesScreen : SearchableSettings {
                         icon = painterResource(R.drawable.mobile_arrow_down_24px),
                         onClick = {
                             githubViewModel?.onAction(GithubAction.SearchForUpdate)
-                            /*ioSafe {
-                                if (activity?.runAutoUpdate(false) == false) {
-                                    activity?.runOnUiThread {
-                                        showToast(
-                                            R.string.no_update_found,
-                                            Toast.LENGTH_SHORT
-                                        )
-                                    }
-                                }
-                            }*/
                         }
                     ),
                     Preference.PreferenceItem.TextPreference(
@@ -185,15 +174,6 @@ object SettingsUpdatesScreen : SearchableSettings {
                         icon = painterResource(R.drawable.extension_24px),
                         preference = settings.plugins.autoUpdate,
                     ),
-
-                    /*Preference.PreferenceItem.ListPreference(
-                        title = stringResource(R.string.automatic_plugin_download),
-                        subtitle = "%s\n" + stringResource(R.string.automatic_plugin_download_summary),
-                        icon = painterResource(R.drawable.extention_renew2),
-                        entries = AutoDownloadMode.entries.map { it.value }.sorted()
-                            .zip(stringArrayResource((R.array.auto_download_plugin))).toMap(),
-                        preference = settings.plugins.autoDownload
-                    ),*/
                     Preference.PreferenceItem.TextPreference(
                         title = stringResource(R.string.update_plugins),
                         subtitle = stringResource(R.string.update_plugins_manually),

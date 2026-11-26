@@ -1,11 +1,9 @@
 package com.lagradost.cloudstream4.compose
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -197,93 +195,6 @@ fun <T> SingleSelectDialog(
         }
     )
 }
-
-/*
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun <T> SinglePairSelectDialog(
-    modifier: Modifier = Modifier,
-    shape: Shape = AlertDialogDefaults.shape,
-    containerColor: Color = colors.background,
-    iconContentColor: Color = AlertDialogDefaults.iconContentColor,
-    tonalElevation: Dp = AlertDialogDefaults.TonalElevation,
-    icon: @Composable (() -> Unit)? = null,
-    title: String? = null,
-    properties: DialogProperties = DialogProperties(),
-    /* key - visual */
-    entries: Map<Pair<T, T>, String>,
-    /* Selected keys used in entries */
-    selectedKey: T,
-    confirmText: String? = null,
-    dismissText: String? = null,
-    dismiss: () -> Unit,
-    confirm: (T) -> Unit,
-    iconProvider: (@Composable (key: T, value: String) -> Unit)? = null
-) {
-    val selected = remember { mutableStateOf(selectedKey) }
-
-    AlertDialog(
-        properties = properties,
-        tonalElevation = tonalElevation,
-        modifier = modifier,
-        icon = icon,
-        shape = shape,
-        iconContentColor = iconContentColor,
-        containerColor = containerColor,
-        onDismissRequest = dismiss,
-        title = title?.let { { Text(text = it) } },
-        text = {
-            LazyColumn {
-                entries.forEach { (keyPair, value) ->
-                    item(key = keyPair) {
-                        val (a, b) = keyPair
-                        val isSelected = selected.value == a || selected.value == b
-
-                        val painter = if (a == b)  {
-                            R.drawable.ic_baseline_check_24_listview
-                        } else if(selected.value == a) {
-                            R.drawable.ic_baseline_arrow_downward_24
-                        } else {
-                            R.drawable.ic_baseline_arrow_upward_24
-                        }
-
-                        val nextKey = if (selected.value != a) a else b
-                        SingleSelectionItem(
-                            isSelected = isSelected,
-                            key = nextKey,
-                            text = value,
-                            iconProvider = iconProvider,
-                            selectIcon = painter
-                        ) {
-                            if (confirmText == null) {
-                                confirm(nextKey)
-                            } else {
-                                selected.value = nextKey
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            if (confirmText != null) {
-                Button(
-                    onClick = {
-                        confirm(selected.value)
-                    },
-                    colors = Colors.whiteButton
-                ) { Text(text = confirmText) }
-            }
-        },
-        dismissButton = {
-            if (dismissText != null) {
-                Button(
-                    onClick = dismiss, colors = Colors.blackButton
-                ) { Text(text = dismissText) }
-            }
-        }
-    )
-}*/
 
 @Composable
 fun <T> SingleSelectionItem(

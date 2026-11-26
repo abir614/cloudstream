@@ -162,12 +162,8 @@ object NativeCoreBridge {
     external fun nativeCompressZlib(data: ByteArray): ByteArray?
     external fun nativeDecompressZlib(data: ByteArray): ByteArray?
 
-    fun compressDeflate(data: ByteArray): ByteArray {
-        if (isLoaded) {
-            val res = nativeCompressDeflate(data)
-            if (res != null) return res
-        }
-        val deflater = java.util.zip.Deflater(java.util.zip.Deflater.DEFAULT_COMPRESSION, true)
+    private fun deflateWithJava(data: ByteArray, nowrap: Boolean): ByteArray {
+        val deflater = java.util.zip.Deflater(java.util.zip.Deflater.DEFAULT_COMPRESSION, nowrap)
         return try {
             deflater.setInput(data)
             deflater.finish()
@@ -181,69 +177,51 @@ object NativeCoreBridge {
         } finally {
             deflater.end()
         }
+    }
+
+    private fun inflateWithJava(data: ByteArray, nowrap: Boolean): ByteArray {
+        val inflater = java.util.zip.Inflater(nowrap)
+        return try {
+            inflater.setInput(data)
+            val bos = java.io.ByteArrayOutputStream(data.size * 2)
+            val buf = ByteArray(1024)
+            while (!inflater.finished()) {
+                val count = inflater.inflate(buf)
+                if (count == 0 && inflater.needsInput()) break
+                bos.write(buf, 0, count)
+            }
+            bos.toByteArray()
+        } finally {
+            inflater.end()
+        }
+    }
+
+    fun compressDeflate(data: ByteArray): ByteArray {
+        if (isLoaded) {
+            nativeCompressDeflate(data)?.let { return it }
+        }
+        return deflateWithJava(data, nowrap = true)
     }
 
     fun decompressDeflate(data: ByteArray): ByteArray {
         if (isLoaded) {
-            val res = nativeDecompressDeflate(data)
-            if (res != null) return res
+            nativeDecompressDeflate(data)?.let { return it }
         }
-        val inflater = java.util.zip.Inflater(true)
-        return try {
-            inflater.setInput(data)
-            val bos = java.io.ByteArrayOutputStream(data.size * 2)
-            val buf = ByteArray(1024)
-            while (!inflater.finished()) {
-                val count = inflater.inflate(buf)
-                if (count == 0 && inflater.needsInput()) break
-                bos.write(buf, 0, count)
-            }
-            bos.toByteArray()
-        } finally {
-            inflater.end()
-        }
+        return inflateWithJava(data, nowrap = true)
     }
 
     fun compressZlib(data: ByteArray): ByteArray {
         if (isLoaded) {
-            val res = nativeCompressZlib(data)
-            if (res != null) return res
+            nativeCompressZlib(data)?.let { return it }
         }
-        val deflater = java.util.zip.Deflater()
-        return try {
-            deflater.setInput(data)
-            deflater.finish()
-            val bos = java.io.ByteArrayOutputStream(data.size / 2)
-            val buf = ByteArray(1024)
-            while (!deflater.finished()) {
-                val count = deflater.deflate(buf)
-                bos.write(buf, 0, count)
-            }
-            bos.toByteArray()
-        } finally {
-            deflater.end()
-        }
+        return deflateWithJava(data, nowrap = false)
     }
 
     fun decompressZlib(data: ByteArray): ByteArray {
         if (isLoaded) {
-            val res = nativeDecompressZlib(data)
-            if (res != null) return res
+            nativeDecompressZlib(data)?.let { return it }
         }
-        val inflater = java.util.zip.Inflater()
-        return try {
-            inflater.setInput(data)
-            val bos = java.io.ByteArrayOutputStream(data.size * 2)
-            val buf = ByteArray(1024)
-            while (!inflater.finished()) {
-                val count = inflater.inflate(buf)
-                if (count == 0 && inflater.needsInput()) break
-                bos.write(buf, 0, count)
-            }
-            bos.toByteArray()
-        } finally {
-            inflater.end()
-        }
+        return inflateWithJava(data, nowrap = false)
     }
 
     // --- Native Accelerated M3U8, Fuzzy Matching & JS Unpacker ---

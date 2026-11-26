@@ -199,7 +199,7 @@ class NetworkCompressionTest {
         val response = interceptor.intercept(fakeChain)
         assertTrue(response.header("Content-Encoding") == null)
         assertTrue(response.header("Content-Length") == null)
-        val decodedText = response.body?.string()
+        val decodedText = response.body.string()
         assertEquals(originalText, decodedText)
     }
 
@@ -243,7 +243,7 @@ class NetworkCompressionTest {
 
         val response = interceptor.intercept(fakeChain)
         assertTrue(response.header("Content-Encoding") == null)
-        val decodedText = response.body?.string()
+        val decodedText = response.body.string()
         assertEquals(originalText, decodedText)
     }
 }

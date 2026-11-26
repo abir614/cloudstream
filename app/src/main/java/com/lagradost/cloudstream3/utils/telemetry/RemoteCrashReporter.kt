@@ -276,9 +276,9 @@ object RemoteCrashReporter {
                 return null
             }
 
-            val responseBody = response.body?.string()
+            val responseBody = response.body.string()
             response.close()
-            if (responseBody.isNullOrBlank()) return null
+            if (responseBody.isBlank()) return null
 
             val resJson = JSONObject(responseBody)
             val serverPubB64 = resJson.getString("server_pub")
@@ -506,6 +506,62 @@ object RemoteCrashReporter {
 
     // --- Structured Telemetry Payload Construction ---
 
+    private fun populateDeviceTelemetry(payload: JSONObject, context: Context?) {
+        val manufacturer = Build.MANUFACTURER ?: "Unknown"
+        val model = Build.MODEL ?: "Unknown"
+        val product = Build.PRODUCT ?: ""
+        val device = Build.DEVICE ?: ""
+        payload.put("device", sanitizeTelemetryText("$manufacturer $model ($product, $device)"))
+
+        val hardware = Build.HARDWARE ?: ""
+        val board = Build.BOARD ?: ""
+        val socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else ""
+        val socMfr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MANUFACTURER else ""
+        val cpuCores = Runtime.getRuntime().availableProcessors()
+        val has64Bit = try {
+            Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() == true
+        } catch (_: Throwable) {
+            true
+        }
+        val arch = if (has64Bit) "64-bit" else "32-bit"
+        val socDetails = buildString {
+            if (socModel.isNotBlank()) append(socModel).append(" ")
+            if (socMfr.isNotBlank()) append("($socMfr) ")
+            append(hardware)
+            if (board.isNotBlank() && board != hardware) append(" / ").append(board)
+            append(" • ").append(cpuCores).append(" Cores (").append(arch).append(")")
+        }
+        payload.put("soc", sanitizeTelemetryText(socDetails.trim()))
+
+        val totalRamMb = context?.let { DeviceProfile.getTotalRamMb(it) } ?: 0L
+        val zramSwapMb = DeviceProfile.getZramSwapMb()
+        val isLowRamDevice = try {
+            val am = context?.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            am?.isLowRamDevice == true
+        } catch (_: Throwable) {
+            false
+        }
+        val ramDetails = buildString {
+            append(totalRamMb).append(" MB RAM")
+            if (zramSwapMb > 0) append(" • ").append(zramSwapMb).append(" MB zRAM")
+            if (isLowRamDevice) append(" [Android Go Low-RAM]")
+        }
+        payload.put("ram", ramDetails)
+
+        val tier = context?.let { DeviceProfile.tier(it).name } ?: "STANDARD"
+        val isUltraPotato = context?.let { DeviceProfile.isUltraPotato(it) } ?: false
+        payload.put("tier", if (isUltraPotato) "$tier (Ultra-Potato Mode)" else tier)
+
+        val osRelease = Build.VERSION.RELEASE ?: "Unknown"
+        payload.put("os", "Android $osRelease (API ${Build.VERSION.SDK_INT})")
+        payload.put("kernel", DeviceProfile.getKernelVersion())
+
+        val appVersion = try { "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})" } catch (_: Throwable) { "CloudStream" }
+        payload.put("version", appVersion)
+        val currentPlugin = try { PluginManager.currentlyLoading ?: "None" } catch (_: Throwable) { "None" }
+        payload.put("plugin", currentPlugin)
+    }
+
     /**
      * Constructs a structured JSON payload containing SoC, RAM, Device Tier, and Stack Trace metrics.
      */
@@ -526,80 +582,16 @@ object RemoteCrashReporter {
             payload.put("tag", sanitizeTelemetryText(tag))
             payload.put("message", sanitizeTelemetryText(message))
             payload.put("timestamp", System.currentTimeMillis())
+            populateDeviceTelemetry(payload, context)
 
-            // 1. Device Hardware & Model
-            val manufacturer = Build.MANUFACTURER ?: "Unknown"
-            val model = Build.MODEL ?: "Unknown"
-            val product = Build.PRODUCT ?: ""
-            val device = Build.DEVICE ?: ""
-            payload.put("device", sanitizeTelemetryText("$manufacturer $model ($product, $device)"))
-
-            // 2. Comprehensive SoC & Processor Architecture
-            val hardware = Build.HARDWARE ?: ""
-            val board = Build.BOARD ?: ""
-            val socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Build.SOC_MODEL ?: ""
-            } else ""
-            val socMfr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                Build.SOC_MANUFACTURER ?: ""
-            } else ""
-            val cpuCores = Runtime.getRuntime().availableProcessors()
-            val has64Bit = try {
-                Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() == true
-            } catch (_: Throwable) {
-                true
-            }
-            val arch = if (has64Bit) "64-bit" else "32-bit"
-            val socDetails = buildString {
-                if (socModel.isNotBlank()) append(socModel).append(" ")
-                if (socMfr.isNotBlank()) append("($socMfr) ")
-                append(hardware)
-                if (board.isNotBlank() && board != hardware) append(" / ").append(board)
-                append(" • ").append(cpuCores).append(" Cores (").append(arch).append(")")
-            }
-            payload.put("soc", sanitizeTelemetryText(socDetails.trim()))
-
-            // 3. System RAM & zRAM Metrics
-            val totalRamMb = context?.let { DeviceProfile.getTotalRamMb(it) } ?: 0L
-            val zramSwapMb = DeviceProfile.getZramSwapMb()
-            val isLowRamDevice = try {
-                val am = context?.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                am?.isLowRamDevice == true
-            } catch (_: Throwable) {
-                false
-            }
-            val ramDetails = buildString {
-                append(totalRamMb).append(" MB RAM")
-                if (zramSwapMb > 0) append(" • ").append(zramSwapMb).append(" MB zRAM")
-                if (isLowRamDevice) append(" [Android Go Low-RAM]")
-            }
-            payload.put("ram", ramDetails)
-
-            // 4. Hardware Capability Tier
-            val tier = context?.let { DeviceProfile.tier(it).name } ?: "STANDARD"
-            val isUltraPotato = context?.let { DeviceProfile.isUltraPotato(it) } ?: false
-            payload.put("tier", if (isUltraPotato) "$tier (Ultra-Potato Mode)" else tier)
-
-            // 5. Operating System & Kernel
-            val osRelease = Build.VERSION.RELEASE ?: "Unknown"
-            val osSdk = Build.VERSION.SDK_INT
-            payload.put("os", "Android $osRelease (API $osSdk)")
-            payload.put("kernel", DeviceProfile.getKernelVersion())
-
-            // 6. Application Version & Environment
-            val appVersion = try { "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})" } catch (_: Throwable) { "CloudStream" }
-            payload.put("version", appVersion)
-            val currentPlugin = try { PluginManager.currentlyLoading ?: "None" } catch (_: Throwable) { "None" }
-            payload.put("plugin", currentPlugin)
-
-            // 7. Exception & Thread Diagnostics
+            // Exception & Thread Diagnostics
             val threadName = thread?.name ?: Thread.currentThread().name
             val exceptionName = error?.javaClass?.name ?: if (level == "FATAL") "FatalException" else "DiagnosticEvent"
             val exceptionMsg = error?.message ?: message
             payload.put("thread", threadName)
             payload.put("exception", sanitizeTelemetryText("$exceptionName: $exceptionMsg"))
 
-            // 8. Stack Trace & Breadcrumb Telemetry
+            // Stack Trace & Breadcrumb Telemetry
             val stackTraceStr = when {
                 error != null -> {
                     val sw = StringWriter()
@@ -640,54 +632,7 @@ object RemoteCrashReporter {
             payload.put("type", "BATCH")
             payload.put("timestamp", System.currentTimeMillis())
             payload.put("count", events.size)
-
-            val manufacturer = Build.MANUFACTURER ?: "Unknown"
-            val model = Build.MODEL ?: "Unknown"
-            val product = Build.PRODUCT ?: ""
-            val device = Build.DEVICE ?: ""
-            payload.put("device", sanitizeTelemetryText("$manufacturer $model ($product, $device)"))
-
-            val hardware = Build.HARDWARE ?: ""
-            val board = Build.BOARD ?: ""
-            val socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL ?: "" else ""
-            val socMfr = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MANUFACTURER ?: "" else ""
-            val cpuCores = Runtime.getRuntime().availableProcessors()
-            val has64Bit = try { Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() == true } catch (_: Throwable) { true }
-            val arch = if (has64Bit) "64-bit" else "32-bit"
-            val socDetails = buildString {
-                if (socModel.isNotBlank()) append(socModel).append(" ")
-                if (socMfr.isNotBlank()) append("($socMfr) ")
-                append(hardware)
-                if (board.isNotBlank() && board != hardware) append(" / ").append(board)
-                append(" • ").append(cpuCores).append(" Cores (").append(arch).append(")")
-            }
-            payload.put("soc", sanitizeTelemetryText(socDetails.trim()))
-
-            val totalRamMb = context?.let { DeviceProfile.getTotalRamMb(it) } ?: 0L
-            val zramSwapMb = DeviceProfile.getZramSwapMb()
-            val isLowRamDevice = try {
-                val am = context?.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
-                am?.isLowRamDevice == true
-            } catch (_: Throwable) { false }
-            val ramDetails = buildString {
-                append(totalRamMb).append(" MB RAM")
-                if (zramSwapMb > 0) append(" • ").append(zramSwapMb).append(" MB zRAM")
-                if (isLowRamDevice) append(" [Android Go Low-RAM]")
-            }
-            payload.put("ram", ramDetails)
-
-            val tier = context?.let { DeviceProfile.tier(it).name } ?: "STANDARD"
-            val isUltraPotato = context?.let { DeviceProfile.isUltraPotato(it) } ?: false
-            payload.put("tier", if (isUltraPotato) "$tier (Ultra-Potato Mode)" else tier)
-
-            val osRelease = Build.VERSION.RELEASE ?: "Unknown"
-            val osSdk = Build.VERSION.SDK_INT
-            payload.put("os", "Android $osRelease (API $osSdk)")
-            payload.put("kernel", DeviceProfile.getKernelVersion())
-            val appVersion = try { "${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})" } catch (_: Throwable) { "CloudStream" }
-            payload.put("version", appVersion)
-            val currentPlugin = try { PluginManager.currentlyLoading ?: "None" } catch (_: Throwable) { "None" }
-            payload.put("plugin", currentPlugin)
+            populateDeviceTelemetry(payload, context)
 
             val eventsArray = org.json.JSONArray()
             for (ev in events) {

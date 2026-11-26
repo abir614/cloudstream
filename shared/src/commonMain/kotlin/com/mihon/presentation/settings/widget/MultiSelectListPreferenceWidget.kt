@@ -49,49 +49,5 @@ fun <T> MultiSelectListPreferenceWidget(
             },
             selectedKeys = values,
         )
-
-        /*
-        AlertDialog(
-            onDismissRequest = { isDialogShown = false },
-            title = { Text(text = title) },
-            text = {
-                LazyColumn {
-                    entries.forEach { current ->
-                        item {
-                            val isSelected = selected.contains(current.key)
-                            LabeledCheckbox(
-                                label = current.value,
-                                checked = isSelected,
-                                onCheckedChange = {
-                                    if (it) {
-                                        selected.add(current.key)
-                                    } else {
-                                        selected.remove(current.key)
-                                    }
-                                },
-                            )
-                        }
-                    }
-                }
-            },
-            properties = DialogProperties(
-                usePlatformDefaultWidth = true,
-            ),
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onValuesChange(selected.toMutableSet())
-                        isDialogShown = false
-                    },
-                ) {
-                    Text(text = stringResource(Res.string.ok))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { isDialogShown = false }) {
-                    Text(text = stringResource(Res.string.cancel))
-                }
-            },
-        )*/
     }
 }

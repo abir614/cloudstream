@@ -103,28 +103,6 @@ fun parseMarkdown(markdownText: String): AnnotatedString {
                     )
                     textMarkDown(content, resultBuilder, fontSize = 14.sp)
                 }
-                // Ordered list item: Extracting content, applying bold style, appending number and period, and appending to resultBuilder
-                /*line.matches(lineNumberRegex) -> {
-                    val startIndex = lineNumberRegex.find(line)?.range?.first ?: 0
-                    val currentStyle = SpanStyle(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp
-                    )
-                    val annotatedString = buildAnnotatedString {
-                        if (startIndex > 0) {
-                            append(line.substring(0, startIndex))
-                        }
-                        withStyle(currentStyle) {
-                            append(line.substring(startIndex, startIndex + 2))
-                        }
-                    }
-                    resultBuilder.append(annotatedString)
-                    textMarkDown(
-                        inputText = line.substring(startIndex + 2, line.length),
-                        resultBuilder = resultBuilder,
-                        fontSize = 14.sp
-                    )
-                }*/
                 // Remaining Text
                 else -> {
                     textMarkDown(line, resultBuilder, fontSize = 14.sp)

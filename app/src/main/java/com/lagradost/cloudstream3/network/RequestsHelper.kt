@@ -102,23 +102,32 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
         ).apply {
             when (dns) {
                 0 -> dns(SafeDns(Dns.SYSTEM))
-                1 -> addGoogleDns()
-                2 -> addCloudFlareDns()
-//                3 -> addOpenDns()
-                4 -> addAdGuardDns()
-                5 -> addDNSWatchDns()
-                6 -> addQuad9Dns()
-                7 -> addDnsSbDns()
-                8 -> addCanadianShieldDns()
-                9 -> addMozillaCloudflareDns()
-                10 -> addResilientMultiTierDns()
-                else -> dns(SafeDns(Dns.SYSTEM))
+                else -> applyDnsPreference(dns)
             }
         }
 
         // Needs to be build as otherwise the other builders will change this object
         .build()
     return baseClient
+}
+
+/**
+ * Configures DoH / SafeDns resolver on an [OkHttpClient.Builder] matching [R.string.dns_key] preference.
+ */
+fun OkHttpClient.Builder.applyDnsPreference(dns: Int): OkHttpClient.Builder = apply {
+    when (dns) {
+        0 -> dns(SafeDns(Dns.SYSTEM))
+        1 -> addGoogleDns()
+        2 -> addCloudFlareDns()
+        4 -> addAdGuardDns()
+        5 -> addDNSWatchDns()
+        6 -> addQuad9Dns()
+        7 -> addDnsSbDns()
+        8 -> addCanadianShieldDns()
+        9 -> addMozillaCloudflareDns()
+        10 -> addResilientMultiTierDns()
+        else -> dns(SafeDns(Dns.SYSTEM))
+    }
 }
 
 private val DEFAULT_HEADERS = mapOf("user-agent" to USER_AGENT)
@@ -161,7 +170,7 @@ class NetworkCompressionInterceptor : Interceptor {
         }
 
         val response = chain.proceed(outgoingRequest)
-        val body = response.body ?: return response
+        val body = response.body
 
         if (isMediaStream || response.code == 204 || response.code == 304 || request.method.equals("HEAD", ignoreCase = true)) {
             return response

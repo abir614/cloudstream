@@ -567,7 +567,7 @@ object DataStoreHelper {
         )
         // Clean bounded cache: Keep up to 50 most recent items to prevent storage bloat on low-end devices
         try {
-            val allIds = getAllResumeStateIds() ?: emptyList()
+            val allIds = getAllResumeStateIds()
             if (allIds.size > 50) {
                 val oldest = allIds.mapNotNull { id ->
                     getLastWatched(id)?.let { id to it.updateTime }

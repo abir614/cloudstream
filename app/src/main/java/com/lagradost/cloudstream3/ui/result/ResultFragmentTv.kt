@@ -390,11 +390,6 @@ class ResultFragmentTv : BaseFragment<FragmentResultTvBinding>(
                 nextDown = FOCUS_SELF,
             )
 
-            /*.layoutManager =
-                LinearListLayout(resultEpisodes.context, resultEpisodes.isRtl()).apply {
-                    setVertical()
-                }*/
-
             resultReloadConnectionerror.setOnClickListener {
                 viewModel.load(
                     activity,
