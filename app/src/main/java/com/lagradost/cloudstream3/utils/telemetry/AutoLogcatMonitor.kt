@@ -109,7 +109,10 @@ object AutoLogcatMonitor {
         "ServiceManagerCppClient",
         "OplusBracketLog",
         "OplusPredictiveBackController",
-        "OplusViewMirrorManager"
+        "OplusViewMirrorManager",
+        "cr_AwContents",
+        "RenderInspector",
+        "FilePhenotypeFlags"
     )
 
     private fun isNoiseMessage(message: String): Boolean {
@@ -210,7 +213,10 @@ object AutoLogcatMonitor {
             message.contains("primary.prof", ignoreCase = true) ||
             message.contains("READ_DEVICE_CONFIG", ignoreCase = true) ||
             message.contains("Failed to resolve or verify SHA256SUMS", ignoreCase = true) ||
-            message.contains("uahInit enter", ignoreCase = true)
+            message.contains("uahInit enter", ignoreCase = true) ||
+            message.contains("Unsupported class loader", ignoreCase = true) ||
+            message.contains("DequeueBuffer time out", ignoreCase = true) ||
+            message.contains("QueueBuffer time out", ignoreCase = true)
     }
 
     private fun isNoiseTag(tag: String): Boolean {
