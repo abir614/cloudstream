@@ -270,14 +270,12 @@ object RemoteCrashReporter {
                 .post(reqJson.toString().toRequestBody(jsonMediaType))
                 .build()
 
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                response.close()
-                return null
+            val responseBody = httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    return null
+                }
+                response.body.string()
             }
-
-            val responseBody = response.body.string()
-            response.close()
             if (responseBody.isBlank()) return null
 
             val resJson = JSONObject(responseBody)
@@ -458,10 +456,9 @@ object RemoteCrashReporter {
                 .post(encryptedBody.toString().toRequestBody(jsonMediaType))
                 .build()
 
-            val response = httpClient.newCall(request).execute()
-            val successful = response.isSuccessful
-            response.close()
-            successful
+            httpClient.newCall(request).execute().use { response ->
+                response.isSuccessful
+            }
         } catch (t: Throwable) {
             Log.d(TAG, "Encrypted dispatch error: ${t.message}")
             false

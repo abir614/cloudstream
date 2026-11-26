@@ -112,7 +112,13 @@ object AutoLogcatMonitor {
         "OplusViewMirrorManager",
         "cr_AwContents",
         "RenderInspector",
-        "FilePhenotypeFlags"
+        "FilePhenotypeFlags",
+        "TurboSchedMonitor",
+        "MI-PreRender",
+        "OplusDisplayModeManager",
+        "AudioTrackExtImpl",
+        "FrameInsert",
+        "LB"
     )
 
     private fun isNoiseMessage(message: String): Boolean {
@@ -216,7 +222,11 @@ object AutoLogcatMonitor {
             message.contains("uahInit enter", ignoreCase = true) ||
             message.contains("Unsupported class loader", ignoreCase = true) ||
             message.contains("DequeueBuffer time out", ignoreCase = true) ||
-            message.contains("QueueBuffer time out", ignoreCase = true)
+            message.contains("QueueBuffer time out", ignoreCase = true) ||
+            message.contains("init cloud whiteList failed", ignoreCase = true) ||
+            message.contains("get fade type, but return null", ignoreCase = true) ||
+            message.contains("FrameInsert open fail", ignoreCase = true) ||
+            message.contains("setSchedAffinity method", ignoreCase = true)
     }
 
     private fun isNoiseTag(tag: String): Boolean {

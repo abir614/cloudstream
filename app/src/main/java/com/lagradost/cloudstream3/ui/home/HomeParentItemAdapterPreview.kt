@@ -459,9 +459,15 @@ class HomeParentItemAdapterPreview(
         init {
             previewViewpager.setPageTransformer(HomeScrollTransformer())
 
+            val cacheSize = com.lagradost.cloudstream3.utils.DeviceProfile.getItemViewCacheSize(itemView.context)
             previewViewpager.adapter = previewAdapter
+            resumeRecyclerView.setRecycledViewPool(HomeChildItemAdapter.sharedPool)
+            resumeRecyclerView.setHasFixedSize(true)
+            resumeRecyclerView.setItemViewCacheSize(cacheSize)
             resumeRecyclerView.adapter = resumeAdapter
             bookmarkRecyclerView.setRecycledViewPool(HomeChildItemAdapter.sharedPool)
+            bookmarkRecyclerView.setHasFixedSize(true)
+            bookmarkRecyclerView.setItemViewCacheSize(cacheSize)
             bookmarkRecyclerView.adapter = bookmarkAdapter
 
             resumeRecyclerView.setLinearListLayout(

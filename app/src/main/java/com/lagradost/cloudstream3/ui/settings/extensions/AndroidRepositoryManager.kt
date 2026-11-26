@@ -192,6 +192,10 @@ object AndroidRepositoryManager : RepositoryManager {
          * Because if the file digest is correct, then why do we need to do a network connection?
          * */
         if (isFileDigest(file, source.digest)) {
+            try {
+                val actualSha = com.lagradost.cloudstream3.domain.engine.PluginArchiveIntegrityEngine().computeFileSha256(file)
+                com.lagradost.cloudstream3.plugins.PluginFingerprintStore.pinFingerprint(source.internalName, actualSha, source.pluginUrl)
+            } catch (_: Throwable) {}
             return@withContext file.absolutePath
         }
 

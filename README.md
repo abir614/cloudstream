@@ -37,8 +37,8 @@ CloudStream incorporates an industry-first, **On-Device Artificial Intelligence 
 
 ### ⚡ Universal Hardware Adaptability
 - **Engineered for Low-End Devices & TV Boxes**: Deeply optimized for ultra-budget hardware such as Allwinner H313, H616, Rockchip, and Amlogic SoCs with $\le 500$ MB physical RAM and Mali-G31/Mali-400 GPUs.
-- **Adaptive Memory Management**: Low-memory devices execute full upfront preloading and hardware-level bitmap downsampling to prevent Out-Of-Memory (OOM) aborts and Low-Memory-Killer (LMK) eviction.
-- **Seamless D-Pad & Leanback Remote Control**: Fully navigatable on Android TV boxes, streaming sticks, and Google TV devices without requiring a touchscreen or mouse pointer.
+- **Adaptive Memory Management & Instant Poster Scroll Cache**: Budget/potato devices run viewport-first preloading (`4–8` visible items with cooperative pacing), `RGB_565` bitmaps (`50%` RAM savings), and scaled Coil memory caches (`15%–30%` of app memory + shared `RecyclerView` pools) for glitch-free scrolling back and forth on any phone or TV.
+- **Seamless D-Pad & Leanback Remote Control**: 6-poster TV card sizing with `1.5x` 3D hover-up animation and fully navigatable D-Pad / Leanback remote focus across Android TV boxes, streaming sticks, and Google TV devices.
 
 > [!NOTE]
 > **Fork Information**: This project is a production-hardened edition of [recloudstream/cloudstream](https://github.com/recloudstream/cloudstream) focused on defense-in-depth security, hardware-adaptive performance for any device tier (from low-end ARMv7/ARMv8 TV sticks with 500MB RAM to high-end flagship devices), guarded in-process extension sandboxing, and native Rust acceleration.
@@ -77,12 +77,13 @@ CloudStream incorporates an industry-first, **On-Device Artificial Intelligence 
 
 ### 3. Universal Hardware-Adaptive Profile Engine
 - **Hardware & Memory Profiling ([`DeviceProfile.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/DeviceProfile.kt))**:
-  - Dynamic profiling based on total system RAM, CPU cores, 64-bit ABI support, Android Go low-RAM status, and exhaustive SoC platform identifiers (Amlogic, Rockchip, Allwinner, Realtek, Broadcom, Synaptics, Nvidia Tegra, MediaTek TV/Mobile, Qualcomm Snapdragon, Samsung Exynos, Google Tensor, and HiSilicon Kirin).
-  - Whole-token matching with zero false-positives: eliminates short codename collisions (Snapdragon 8 Elite `"sun"` vs Allwinner `"sun50iw9"` / Redmi `"sunny"`, S905X4 vs S905), safely isolates Allwinner A/H series from phone models, and correctly profiles mid-tier octa-core chips like Unisoc T606.
+  - Dynamic profiling based on total system RAM, CPU cores, 64-bit ABI support, Android Go low-RAM status, zRAM swap, and `592` SoC / board identifiers plus `45` GPU patterns across Amlogic, Rockchip, Allwinner, Realtek, Broadcom, Synaptics, Nvidia Tegra, MediaTek TV/Mobile, Qualcomm Snapdragon (including SM8850), Samsung Exynos, Google Tensor, and HiSilicon Kirin.
+  - Collision-safe token & vendor gating: eliminates codename false positives (Snapdragon 8 Elite `"sun"` vs Allwinner `"sun50iw9"`, Pixel 7 Pro `"cheetah"` vs Allwinner `"cheetah"`, `"cph2729"` vs Allwinner `"h2"`, `"tulip"`, `"berlin"`, S905X4 vs S905) and catches fake-RAM firmware spoofing.
 - **Battery-Adaptive Performance Scaling**:
-  - **Unrestricted Battery Mode ("Disable Battery Optimization" enabled)**: Automatically boosts capable devices to the **HIGH / Boosted** tier (96 concurrent HTTP connections, 128 MB player buffer, hardware bitmap decoding).
-  - **Standard Battery Mode**: Operates in **Balanced (MID)** tier to preserve battery life while maintaining smooth playback.
-  - **Settings Override**: User can manually select between **Auto**, **Balanced (Standard)**, and **Boosted (High Performance)** in Settings.
+  - **Performance (`HIGH`)**: Flagship SoCs, $\ge 7.0\text{ GiB}$ RAM 8-core devices, or capable mid-range hardware when battery optimization is set to Unrestricted (`96` max HTTP requests, `128 MB` player buffer, hardware bitmap decoding).
+  - **Balanced (`MID`)**: Standard everyday mobile/TV hardware (`64` max HTTP requests, `48 MB` player buffer).
+  - **Power Safe (`LOW` / Ultra-Potato)**: Legacy, $\le 2\text{ GB}$ RAM, or low-end TV boxes (`16–32` max HTTP requests, `6–12 MB` player buffer, `RGB_565` bitmaps).
+  - **Settings Override**: User can manually select between **Automatic**, **Performance**, **Balanced**, and **Power Safe** in Settings.
 
 ### 4. Playback & Video Streaming
 - **Resume Video Playback by Default**:
@@ -110,14 +111,14 @@ CloudStream incorporates an industry-first, **On-Device Artificial Intelligence 
   - Enforces address validation at the DNS resolution layer for all network calls and HTTP redirect hops.
   - Blocks loopback (`127.0.0.0/8`, `::1`), RFC-1918 private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Carrier-Grade NAT (`100.64.0.0/10`), link-local / cloud metadata (`169.254.169.254`), and IPv6 ULA (`fc00::/7`).
   - Opt-in LAN toggle available for local media servers (Jellyfin, Kodi, local NAS).
-- **Privacy-First Multi-Tier DNS Fallback ([`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt))**:
-  - **Tier 1 (Privacy DoH)**: Queries zero-logging encrypted resolvers **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) $\rightarrow$ **Quad9 DoH** (`https://dns10.quad9.net/dns-query`) first. Bootstrap client is uncoupled from disk cache to eliminate lock contention on slow eMMC storage.
-  - **Tier 2 (High-Speed Edge DoH)**: Queries **Cloudflare DoH** $\rightarrow$ **Google DoH** if Tier 1 times out or is blocked.
-  - **Tier 3 (Primary Plain DNS)**: Direct UDP 53 Anycast to Quad9 (`9.9.9.10`, `149.112.112.10`) & Cloudflare (`1.1.1.1`, `1.0.0.1`) if DoH is blocked by hostile network firewalls.
+- **Privacy-First Multi-Tier DNS Fallback & Subnet Transfer Maze ([`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt))**:
+  - **Tier 1 (Privacy DoH)**: Queries zero-logging encrypted resolvers **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) $\rightarrow$ **Quad9 DoH** (`https://dns10.quad9.net/dns-query`) with dual-stack IPv4/IPv6 bootstrap hosts and cache-uncoupled fast-fail (`2500ms` connect/read, `3000ms` call).
+  - **Tier 2 (High-Speed Edge DoH)**: Queries **Cloudflare DoH** $\rightarrow$ **Google DoH** within the remaining cascade budget.
+  - **Tier 3 (Primary Plain DNS)**: Direct UDP 53 Anycast to Quad9 (`9.9.9.10`, `149.112.112.10`) & Cloudflare (`1.1.1.1`, `1.0.0.1`) if DoH is blocked by hostile firewalls.
   - **Tier 4 (Edge Plain DNS)**: Direct UDP 53 Anycast to Google & AdGuard.
   - **Tier 5 (System Fallback)**: Transparent Android `Dns.SYSTEM` fallback.
-  - Bounded by a hard 2000ms deadline per hostname to eliminate latency cascades.
-  - **ExoPlayer / Media3 DNS Alignment**: When DoH is enabled (`dns != 0`), Cronet is automatically bypassed in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt) to ensure video segment fetching always uses the encrypted resolver, preventing ISP DNS surveillance leaks.
+  - Bounded by `3000ms` cascade deadlines, `CachedDns` (5-minute TTL / 512-host LRU cache), and **Subnet Data Transfer Maze (`SafeDns.mazeSubnetRotate`)** which interleaves `/24` IPv4 and `/48` IPv6 edge IPs across connections.
+  - **ExoPlayer / Media3 & Coil Alignment**: When DoH is enabled (`dns != 0`), Cronet is automatically bypassed in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt) and Coil uses the same resolver in [`ImageModuleCoil.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/ImageModuleCoil.kt) so streams and artwork avoid ISP DNS surveillance leaks.
 - **Transparent Network-Level Travel Compression ([`RequestsHelper.kt`](app/src/main/java/com/lagradost/cloudstream3/network/RequestsHelper.kt))**:
   - Automatically negotiates and decompresses HTTP payloads (`gzip`, `deflate`) for scraper manifests, repository indexes, JSON APIs, and subtitle files via a zero-allocation streaming interceptor.
   - Media bitstream preservation: Video segments (`.ts`, `.m4s`, `.mp4`, images) and HTTP Range requests strictly bypass compression negotiation, eliminating CPU/battery waste on low-power devices.
@@ -152,9 +153,9 @@ CloudStream incorporates an industry-first, **On-Device Artificial Intelligence 
     - **ARM NEON SIMD Vector Acceleration (XNNPACK)**: Enabled across all 64-bit platforms (`useXnnpack = has64Bit`), accelerating INT8 tensor convolutions by **4x to 8x** with reduced thermals.
     - **Linux Kernel Virtual Memory Pre-Faulting (`MADV_WILLNEED`)**: Calls `buffer.load()` (`madvise(MADV_WILLNEED)`) during initialization, pre-faulting model weight pages into DRAM page cache upfront to eliminate flash storage I/O stalls during inference.
     - **Hot-Loop Optimization**: Unrolled normalization loop eliminates 14,784 redundant branch checks per poster.
-  - **100% Full-Feed Upfront Preloading on Low-End Devices**: Low-end and potato devices preload and filter 100% of posters across all rails upfront during the loading screen, keeping active UI scrolling completely offline from Coil decoding and TFLite inference to prevent scroll stutters and low-memory crashes. Standard and high-tier devices utilize viewport-bounded preloading (capped at 16) to avoid CDN rate-limiting while maintaining instant loading times.
-  - **Perceptual dHash Deduplication & Skin Pre-Filter Cascade**: Computes a 64-bit difference hash (`computeDHash64`) directly from the 48x48 sample in < 0.002ms, caching scores across mirror CDNs in O(1). Fast 48x48 skin ratio scan immediately marks posters with < 4% body skin as SFW (0.0f) in < 0.03ms, bypassing TFLite for over 65% of media posters (scenery, vehicles, robots, typography, winter portraits).
-  - **Fail-Safe Critical Memory Pressure Fallback**: Automatically switches to the ultra-fast zero-native-allocation skin chrominance heuristic (< 0.05ms, 0 MB native RAM) if available system RAM drops below 30MB, JVM remaining heap drops below 16MB, or the OS flags `lowMemory`.
+  - **Viewport-First Hardware-Adaptive Preloading & Scroll Verification**: All device tiers preload initial visible viewport targets (`4–8` posters with `6s`/`10s` bounds and cooperative `15–30ms` pacing on low-end/potato hardware) so Home launches quickly without 40–180s stalls, while offscreen posters are metadata-screened upfront and verified lazily on scroll with persistent O(1) disk/memory score caches.
+  - **Perceptual dHash Deduplication**: Computes a 64-bit difference hash (`computeDHash64`) directly from a 48x48 sample in < 0.002ms, caching scores across mirror CDNs in O(1).
+  - **Fail-Safe Critical Memory Pressure Fallback**: Dynamically throttles to 1 non-XNNPACK worker below `180 MB` avail RAM / `20 MB` free heap, and switches to the zero-native-allocation skin chrominance heuristic (< 0.05ms, 0 MB native RAM) if available physical RAM drops below `25 MB`, JVM remaining heap drops below `8 MB`, or the OS flags `lowMemory`.
   - **Calibrated Zero-Leakage Visual Sensitivity Scale**:
     - **Moderate / Mid (0.20)**: Default zero-leakage threshold completely eliminating visual content leakage for provocative, ecchi, and suggestive posters.
     - **Extreme / High (0.10)**: Super-strict shield blocking all provocative, ecchi, and high-exposure art.
@@ -195,13 +196,7 @@ CloudStream incorporates an industry-first, **On-Device Artificial Intelligence 
 - **Stable Builds**: Package ID `com.lagradost.cloudstream3.stable`, App Name **`CloudStream`**.
 - *Side-by-Side Coexistence*: Both flavors can be installed simultaneously alongside official upstream releases without signature collisions.
 
-Each CI release generates exactly 6 organized artifacts with zero duplicate files:
-* `CSB-prerelease-v<BUILD>-arm64-v8a.apk`: Optimized for modern 64-bit ARM devices.
-* `CSB-prerelease-v<BUILD>-armeabi-v7a.apk`: For older 32-bit devices and budget Android TV sticks.
-* `CSB-prerelease-v<BUILD>-universal.apk`: All-in-one universal binary.
-* `SHA256SUMS`: Cryptographic integrity manifest for offline attestation.
-* `classes.jar`: API stub for provider and plugin developers.
-* `app-sources.jar`: API source documentation for extensions.
+Each Pre-release CI run publishes organized APKs (both versioned `CSB-prerelease-v<BUILD>-*` and stable-download-link `CSB-prerelease-*` aliases for `arm64-v8a`, `armeabi-v7a`, and `universal`), `release.json`, `SHA256SUMS`, `classes.jar`, and `app-sources.jar` (while Stable Release builds attach `CloudStream-*` APKs, `SHA256SUMS`, `classes.jar`, and `app-sources.jar`).
 
 ---
 

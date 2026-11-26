@@ -215,9 +215,9 @@ class GeneralPreferences(preferences: PreferenceStore) {
     val enableNsfw = preferences.getBoolean("enable_nsfw_on_providers_key", false)
     val nsfwFilterLevel = preferences.getString("nsfw_filter_level_key", "moderate")
     val censorNsfwPosters = preferences.getBoolean("censor_nsfw_posters_key", true)
-    val visualThresholdExtreme = preferences.getFloat("nsfw_visual_threshold_extreme_key", 0.15f)
-    val visualThresholdModerate = preferences.getFloat("nsfw_visual_threshold_moderate_key", 0.30f)
-    val visualThresholdLow = preferences.getFloat("nsfw_visual_threshold_low_key", 0.55f)
+    val visualThresholdExtreme = preferences.getFloat("nsfw_visual_threshold_extreme_key", 0.10f)
+    val visualThresholdModerate = preferences.getFloat("nsfw_visual_threshold_moderate_key", 0.20f)
+    val visualThresholdLow = preferences.getFloat("nsfw_visual_threshold_low_key", 0.40f)
 
     /** Default is 10 (Resilient Multi-Tier DoH) **/
     val dns = preferences.getInt("dns_key", 10)

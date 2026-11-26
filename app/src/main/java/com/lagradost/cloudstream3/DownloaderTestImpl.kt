@@ -35,18 +35,17 @@ class DownloaderTestImpl private constructor(builder: OkHttpClient.Builder) : Do
                 requestBuilder.header(headerName, headerValueList[0])
             }
         }
-        val response = client.newCall(requestBuilder.build()).execute()
-        if (response.code == 429) {
-            response.close()
-            throw ReCaptchaException("reCaptcha Challenge requested", url)
+        return client.newCall(requestBuilder.build()).execute().use { response ->
+            if (response.code == 429) {
+                throw ReCaptchaException("reCaptcha Challenge requested", url)
+            }
+            val responseBodyToReturn: String = response.body.string()
+            val latestUrl = response.request.url.toString()
+            Response(
+                response.code, response.message, response.headers.toMultimap(),
+                responseBodyToReturn, latestUrl
+            )
         }
-        val body = response.body
-        val responseBodyToReturn: String = body.string()
-        val latestUrl = response.request.url.toString()
-        return Response(
-            response.code, response.message, response.headers.toMultimap(),
-            responseBodyToReturn, latestUrl
-        )
     }
 
     companion object {

@@ -866,7 +866,10 @@ object PluginManager {
         return try {
             if (File(file.absolutePath).delete()) {
                 unloadPlugin(file.absolutePath)
-                list.forEach { deletePluginData(it) }
+                list.forEach {
+                    deletePluginData(it)
+                    removeKey("plugin_tofu_${it.internalName}")
+                }
                 return true
             }
             false
@@ -926,7 +929,9 @@ object PluginManager {
                         true
                     )
                 ) {
-                    updatedPlugins.add(pluginData.onlineData.plugin.name)
+                    synchronized(updatedPlugins) {
+                        updatedPlugins.add(pluginData.onlineData.plugin.name)
+                    }
                 }
             }
         }.also {

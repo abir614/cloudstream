@@ -230,7 +230,7 @@ class DownloadFragment : BaseFragment<FragmentDownloadsBinding>(
 
         binding.downloadList.apply {
             setHasFixedSize(true)
-            setItemViewCacheSize(20)
+            setItemViewCacheSize(com.lagradost.cloudstream3.utils.DeviceProfile.getItemViewCacheSize(context))
             this.adapter = adapter
             setLinearListLayout(
                 isHorizontal = false,

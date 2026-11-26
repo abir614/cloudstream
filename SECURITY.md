@@ -4,7 +4,8 @@
 
 | Version | Supported          | Description                                  |
 | ------- | ------------------ | -------------------------------------------- |
-| 4.8.x   | :white_check_mark: | Hardened Edition (Guarded In-Process Sandboxing & SSRF Gate) |
+| 4.9.x   | :white_check_mark: | Hardened Edition (Guarded In-Process Sandboxing, TOFU & SSRF Gate) |
+| 4.8.x   | :white_check_mark: | Previous Hardened Release Branch             |
 | < 4.8.0 | :x:                | Legacy CloudStream releases                  |
 
 ## Defense-in-Depth Architecture & Threat Model

@@ -59,9 +59,10 @@ object BackupUtils {
         MAL_CACHED_LIST,
         KITSU_CACHED_LIST,
 
-        // The plugins themselves are not backed up
+        // The plugins and their local TOFU binary pins are bound per device
         PLUGINS_KEY,
         PLUGINS_KEY_LOCAL,
+        "plugin_tofu_",
 
         AccountManager.ACCOUNT_TOKEN,
         AccountManager.ACCOUNT_IDS,
