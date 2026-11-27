@@ -277,22 +277,22 @@ object SettingsFragmentScreen : Screen {
 
     @Composable
     @NonRestartableComposable
-    fun generateSearchItems(): PersistentList<SettingsData> {
-        val showSecurityTab = shouldShowSecurityTab()
-        return screens.mapNotNull { item ->
-            if (item.screen === SettingsAccountScreen && !showSecurityTab) {
-                null
-            } else {
-                item.screen?.getPreferences()?.let { contents ->
-                    SettingsData(
-                        title = stringResource(item.title),
-                        navigation = item.navigation,
-                        contents = contents
-                    )
+    fun generateSearchItems() =
+        shouldShowSecurityTab().let { showSecurityTab ->
+            screens.mapNotNull { item ->
+                if (item.screen === SettingsAccountScreen && !showSecurityTab) {
+                    null
+                } else {
+                    item.screen?.getPreferences()?.let { contents ->
+                        SettingsData(
+                            title = stringResource(item.title),
+                            navigation = item.navigation,
+                            contents = contents
+                        )
+                    }
                 }
-            }
-        }.toPersistentList()
-    }
+            }.toPersistentList()
+        }
 
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
     @Composable
