@@ -108,7 +108,8 @@ object OnDeviceNsfwClassifier {
     @Volatile private var isModelPermanentlyUnavailable = false
     private val modelBufferLock = Any()
     private val sessionPool = ConcurrentLinkedQueue<InferenceSession>()
-    private val sessionPoolLock = java.lang.Object()
+    private val sessionPoolLock = java.util.concurrent.locks.ReentrantLock()
+    private val sessionAvailable = sessionPoolLock.newCondition()
     private val activeSessionCount = AtomicInteger(0)
 
     private data class StaticHwCapabilities(
@@ -1221,19 +1222,22 @@ object OnDeviceNsfwClassifier {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             return sessionPool.poll()
         }
-        // If all sessions are currently checked out, wait on sessionPoolLock until one returns (up to 1500ms)
+        // If all sessions are currently checked out, await sessionAvailable signal until one returns (up to 1500ms)
         val deadline = System.currentTimeMillis() + 1500L
-        synchronized(sessionPoolLock) {
+        sessionPoolLock.lock()
+        try {
             while (true) {
                 sessionPool.poll()?.let { return it }
                 val remaining = deadline - System.currentTimeMillis()
                 if (remaining <= 0L) break
                 try {
-                    sessionPoolLock.wait(remaining)
+                    sessionAvailable.await(remaining, TimeUnit.MILLISECONDS)
                 } catch (_: InterruptedException) {
                     break
                 }
             }
+        } finally {
+            sessionPoolLock.unlock()
         }
         return sessionPool.poll()
     }
@@ -1247,8 +1251,11 @@ object OnDeviceNsfwClassifier {
             activeSessionCount.decrementAndGet()
         } else {
             sessionPool.offer(session)
-            synchronized(sessionPoolLock) {
-                sessionPoolLock.notify()
+            sessionPoolLock.lock()
+            try {
+                sessionAvailable.signal()
+            } finally {
+                sessionPoolLock.unlock()
             }
         }
     }
