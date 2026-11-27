@@ -353,7 +353,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                 BottomSheetDialog(this)
 
             builder.behavior.state = BottomSheetBehavior.STATE_EXPANDED
-            builder.behavior.isSkipCollapsed = true
+            builder.behavior.setSkipCollapsed(true)
             val binding: HomeSelectMainpageBinding = HomeSelectMainpageBinding.inflate(
                 builder.layoutInflater,
                 null,

@@ -266,13 +266,12 @@ object SettingsFragmentScreen : Screen {
     @Composable
     private fun shouldShowSecurityTab(): Boolean {
         val context = LocalContext.current
-        return isLayout(PHONE) && remember(context) {
-            try {
-                deviceHasPasswordPinLock(context)
-            } catch (_: Throwable) {
-                false
-            }
+        val hasSecurity = try {
+            deviceHasPasswordPinLock(context)
+        } catch (_: Throwable) {
+            false
         }
+        return isLayout(PHONE) && hasSecurity
     }
 
     @Composable

@@ -380,7 +380,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                     BottomSheetDialog(ctx)
 
                 builder.behavior.state = BottomSheetBehavior.STATE_EXPANDED
-                builder.behavior.isSkipCollapsed = true
+                builder.behavior.setSkipCollapsed(true)
 
                 val selectMainpageBinding: HomeSelectMainpageBinding =
                     HomeSelectMainpageBinding.inflate(
