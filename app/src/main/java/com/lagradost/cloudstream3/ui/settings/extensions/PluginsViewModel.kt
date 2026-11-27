@@ -326,7 +326,11 @@ class PluginsViewModel : ViewModel() {
         val downloadedPlugins = (PluginManager.getPluginsOnline() + PluginManager.getPluginsLocal())
             .distinctBy { it.filePath }
             .filter { sitePlugin ->
-                nsfwEnabled || !NsfwFilterEngine.isNsfwText(sitePlugin.name, sitePlugin.url)
+                nsfwEnabled || !NsfwFilterEngine.isNsfwText(
+                    title = sitePlugin.internalName,
+                    url = sitePlugin.url.orEmpty(),
+                    tags = sitePlugin.filePath
+                )
             }
             .map {
                 PluginViewData(PluginWrapper.getLocalPluginWrapper(it.toSitePlugin()), true)
