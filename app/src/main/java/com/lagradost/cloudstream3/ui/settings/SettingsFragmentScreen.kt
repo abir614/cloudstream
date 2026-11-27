@@ -75,10 +75,12 @@ import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.utils.DataStoreHelper
 import com.lagradost.cloudstream3.utils.DataStoreHelper.profileImages
+import com.lagradost.cloudstream3.utils.BiometricAuthenticator.deviceHasPasswordPinLock
 import com.lagradost.cloudstream3.utils.GitInfo.currentCommitHash
 import com.lagradost.cloudstream3.utils.UIHelper.clipboardHelper
 import com.lagradost.cloudstream3.utils.UIHelper.navigate
 import com.lagradost.cloudstream3.utils.txt
+import com.lagradost.cloudstream4.compose.PHONE
 import com.lagradost.cloudstream4.compose.Screen
 import com.lagradost.cloudstream4.compose.TV
 import com.lagradost.cloudstream4.compose.circleBorder
@@ -243,11 +245,15 @@ object SettingsFragmentScreen : Screen {
                         SearchableSettings.highlightKey = item.highlightKey
                         activity?.navigate(item.navigation)
                     }, empty = {
+                        val showSecurityTab = shouldShowSecurityTab()
                         Column(
                             modifier = Modifier
                                 .nestedScroll(parentFirstScrollConnection)
                         ) {
                             screens.forEach { settingsTab ->
+                                if (settingsTab.screen === SettingsAccountScreen && !showSecurityTab) {
+                                    return@forEach
+                                }
                                 SettingsTab(settingsTab)
                             }
                             BuildStamp()
@@ -259,9 +265,25 @@ object SettingsFragmentScreen : Screen {
     }
 
     @Composable
+    private fun shouldShowSecurityTab(): Boolean {
+        val context = LocalContext.current
+        return isLayout(PHONE) && remember(context) {
+            try {
+                deviceHasPasswordPinLock(context)
+            } catch (_: Throwable) {
+                false
+            }
+        }
+    }
+
+    @Composable
     @NonRestartableComposable
-    fun generateSearchItems() =
-        screens.mapNotNull { item ->
+    fun generateSearchItems(): PersistentList<SettingsData> {
+        val showSecurityTab = shouldShowSecurityTab()
+        return screens.mapNotNull { item ->
+            if (item.screen === SettingsAccountScreen && !showSecurityTab) {
+                return@mapNotNull null
+            }
             val contents = item.screen?.getPreferences() ?: return@mapNotNull null
             SettingsData(
                 title = stringResource(item.title),
@@ -269,6 +291,7 @@ object SettingsFragmentScreen : Screen {
                 contents = contents
             )
         }.toPersistentList()
+    }
 
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
     @Composable

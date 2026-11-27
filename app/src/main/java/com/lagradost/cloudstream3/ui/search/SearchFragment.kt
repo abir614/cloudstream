@@ -380,6 +380,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                     BottomSheetDialog(ctx)
 
                 builder.behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                builder.behavior.skipCollapsed = true
 
                 val selectMainpageBinding: HomeSelectMainpageBinding =
                     HomeSelectMainpageBinding.inflate(
@@ -406,9 +407,9 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                     listView?.choiceMode = AbsListView.CHOICE_MODE_MULTIPLE
 
                     fun updateAvailableCategories() {
-                        val availableTypes = getAvailableTypesForSources(currentSelectedApis, validAPIs)
-                        validateChips(selectMainpageBinding.tvtypesChipsScroll.tvtypesChips, availableTypes)
-                        val invalidTypes = selectedSearchTypes.filterNot { availableTypes.contains(it) }
+                        val dialogTypes = getAvailableTypesForSources(emptySet(), validAPIs)
+                        validateChips(selectMainpageBinding.tvtypesChipsScroll.tvtypesChips, dialogTypes)
+                        val invalidTypes = selectedSearchTypes.filterNot { dialogTypes.contains(it) }
                         if (invalidTypes.isNotEmpty()) {
                             selectedSearchTypes.removeAll(invalidTypes.toSet())
                             updateChips(selectMainpageBinding.tvtypesChipsScroll.tvtypesChips, selectedSearchTypes)
@@ -433,11 +434,15 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                         DataStoreHelper.searchPreferenceTags = types
 
                         arrayAdapter.clear()
-                        currentValidApis = validAPIs.filter { api ->
-                            api.supportedTypes.any {
-                                types.contains(it)
-                            }
-                        }.sortedBy { it.name.lowercase() }
+                        currentValidApis = (if (types.isEmpty()) {
+                            validAPIs
+                        } else {
+                            validAPIs.filter { api ->
+                                api.supportedTypes.any {
+                                    types.contains(it)
+                                }
+                            }.ifEmpty { validAPIs }
+                        }).sortedBy { it.name.lowercase() }
 
                         val names = currentValidApis.map {
                             if (isMultiLang) "${
@@ -454,7 +459,9 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                         arrayAdapter.notifyDataSetChanged()
                     }
 
-                    val initialAvailableTypes = getAvailableTypesForSources(currentSelectedApis, validAPIs)
+                    // Show media types across all valid sources in the dialog so users are never trapped
+                    // unable to switch back from a single-type provider selection.
+                    val initialAvailableTypes = getAvailableTypesForSources(emptySet(), validAPIs)
                     bindChips(
                         selectMainpageBinding.tvtypesChipsScroll.tvtypesChips,
                         selectedSearchTypes,
