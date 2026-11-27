@@ -92,7 +92,8 @@ import com.lagradost.cloudstream3.utils.UIHelper.fixSystemBarsPadding
 import com.lagradost.cloudstream3.utils.UIHelper.getSpanCount
 import com.lagradost.cloudstream3.utils.UIHelper.hideKeyboard
 import java.util.Locale
-import java.util.concurrent.locks.ReentrantLock
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class SearchFragment : BaseFragment<FragmentSearchBinding>(
     BaseFragment.BindingCreator.Bind(FragmentSearchBinding::bind)
@@ -159,7 +160,8 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             binding?.searchSuggestionsRecycler?.adapter = null
         } catch (_: Throwable) {
         }
-        bottomSheetDialog?.ownHide()
+        bottomSheetDialog?.dismissSafe(activity)
+        bottomSheetDialog = null
         activity?.detachBackPressedCallback("SearchFragment")
         super.onDestroyView()
     }
@@ -610,45 +612,43 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
             }
         }
 
-        val listLock = ReentrantLock()
+        val listLock = Mutex()
         observe(searchViewModel.currentSearch) { list ->
             viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Default) {
                 try {
-                    listLock.lock()
+                    listLock.withLock {
+                        val pinnedOrder = DataStoreHelper.pinnedProviders.reversedArray()
 
-                    val pinnedOrder = DataStoreHelper.pinnedProviders.reversedArray()
+                        val sortedList = list.toList().sortedWith(compareBy { (providerName, _) ->
+                            val index = pinnedOrder.indexOf(providerName)
+                            if (index == -1) Int.MAX_VALUE else index
+                        })
 
-                    val sortedList = list.toList().sortedWith(compareBy { (providerName, _) ->
-                        val index = pinnedOrder.indexOf(providerName)
-                        if (index == -1) Int.MAX_VALUE else index
-                    })
+                        val newItems = sortedList.mapNotNull { (providerName, providerData) ->
+                            val dataList = providerData.list
+                            val dataListFiltered = filterSearchResults(
+                                context?.filterSearchResultByFilmQuality(dataList) ?: dataList
+                            )
+                            if (dataListFiltered.isEmpty()) return@mapNotNull null
 
-                    val newItems = sortedList.mapNotNull { (providerName, providerData) ->
-                        val dataList = providerData.list
-                        val dataListFiltered = filterSearchResults(
-                            context?.filterSearchResultByFilmQuality(dataList) ?: dataList
-                        )
-                        if (dataListFiltered.isEmpty()) return@mapNotNull null
+                            val homePageList = HomePageList(
+                                providerName,
+                                dataListFiltered
+                            )
 
-                        val homePageList = HomePageList(
-                            providerName,
-                            dataListFiltered
-                        )
+                            HomeViewModel.ExpandableHomepageList(
+                                homePageList,
+                                providerData.currentPage,
+                                providerData.hasNext
+                            )
+                        }
 
-                        HomeViewModel.ExpandableHomepageList(
-                            homePageList,
-                            providerData.currentPage,
-                            providerData.hasNext
-                        )
-                    }
-
-                    withContext(Dispatchers.Main) {
-                        (binding.searchMasterRecycler.adapter as? ParentItemAdapter)?.submitList(newItems)
+                        withContext(Dispatchers.Main) {
+                            (binding.searchMasterRecycler.adapter as? ParentItemAdapter)?.submitList(newItems)
+                        }
                     }
                 } catch (e: Exception) {
                     logError(e)
-                } finally {
-                    try { listLock.unlock() } catch (_: Throwable) {}
                 }
             }
         }

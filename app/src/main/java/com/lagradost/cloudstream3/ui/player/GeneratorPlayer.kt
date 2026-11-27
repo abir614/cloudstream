@@ -1786,7 +1786,7 @@ class GeneratorPlayer : FullScreenPlayer() {
 
                 trackDialog.setOnDismissListener {
                     dismiss()
-                    // selectTracksDialog = null
+                    selectTracksDialog = null
                 }
 
                 var audioIndexStart = currentAudioTracks.indexOfFirst { track ->

@@ -788,6 +788,11 @@ object PluginManager {
 
         synchronized(plugins) {
             plugins.remove(absolutePath)
+            plugins.remove(canonical)
+            plugin.filename?.let {
+                plugins.remove(it)
+                plugins.remove(normalizePluginPath(it))
+            }
         }
 
         synchronized(urlPlugins) {

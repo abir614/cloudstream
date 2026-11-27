@@ -702,6 +702,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         afterPluginsLoadedEvent -= ::onAllPluginsLoaded
         detachBackPressedCallback("MainActivityDefault")
         com.lagradost.cloudstream3.utils.display.DisplayTopologyManager.removeListener(displayTopologyListener)
+        mSessionManager = null
         super.onDestroy()
     }
 

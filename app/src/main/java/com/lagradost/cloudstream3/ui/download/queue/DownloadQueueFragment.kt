@@ -69,6 +69,14 @@ class DownloadQueueFragment :
         }
     }
     
+    override fun onDestroyView() {
+        try {
+            binding?.downloadQueueList?.adapter = null
+        } catch (_: Throwable) {
+        }
+        super.onDestroyView()
+    }
+
     override fun fixLayout(view: View) {
         fixSystemBarsPadding(
             view,

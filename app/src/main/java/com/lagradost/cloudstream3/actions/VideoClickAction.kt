@@ -28,6 +28,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
 
 object VideoClickActionHolder {
     val allVideoClickActions = atomicListOf(
@@ -96,7 +97,7 @@ abstract class VideoClickAction {
         }
         CommonActivity.activity?.runOnUiThread(future) ?: throw ErrorLoadingException("No UI Activity, this should never happened")
         val result = withContext(Dispatchers.IO) {
-            return@withContext future.get()
+            return@withContext future.get(15, TimeUnit.SECONDS)
         }
         return result.getOrThrow()
     }

@@ -809,15 +809,7 @@ class PlayerView @JvmOverloads constructor(
                 position = event.toMs,
                 duration = event.durationMs
             )
-            is VideoEndedEvent -> {
-                // Only play next episode if autoplay is on (default).
-                val ctx = context
-                if (PreferenceManager.getDefaultSharedPreferences(ctx)
-                        ?.getBoolean(ctx.getString(R.string.autoplay_next_key), true) == true
-                ) {
-                    player.handleEvent(CSPlayerEvent.NextEpisode, source = PlayerEventSource.Player)
-                }
-            }
+            is VideoEndedEvent -> Unit // Autoplay NextEpisode is handled in CS3IPlayer.onPlaybackStateChanged(STATE_ENDED)
             is PauseEvent -> Unit
             is PlayEvent -> Unit
         }

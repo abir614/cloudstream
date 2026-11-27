@@ -930,53 +930,59 @@ object VideoDownloadManager {
         require(chuckSize > 1000)
 
         val headRequest = app.head(url = url, headers = headers, referer = referer, verify = false)
-        var contentLength = headRequest.size
-        if (contentLength != null && contentLength <= 0) contentLength = null
+        var contentLength: Long?
+        val hasRangeSupport: Boolean
+        headRequest.okhttpResponse.use {
+            contentLength = headRequest.size
+            if (contentLength != null && contentLength!! <= 0) contentLength = null
 
-        val hasRangeSupport = when (headRequest.headers["Accept-Ranges"]?.lowercase()?.trim()) {
-            // server has stated it has no support
-            "none" -> false
-            // server has stated it has support
-            "bytes" -> true
-            // if null or undefined (as bytes is the only range unit formally defined)
-            // If the get request returns partial content we support range
-            else -> {
-                headRequest.headers["Accept-Ranges"]?.let { range ->
-                    Log.v(TAG, "Unknown Accept-Ranges tag: $range")
-                }
-                // as we don't poll the body this should be fine
-                val getRequest = app.get(
-                    url,
-                    headers = headers + mapOf(
-                        "Range" to "bytes=0-${
-                            // we don't want to request more than the actual file
-                            // but also more than 0 bytes
-                            contentLength?.let { max ->
-                                minOf(maxOf(max - 1L, 3L), 1023L)
-                            } ?: 1023L
-                        }"
-                    ),
-                    referer = referer,
-                    verify = false
-                )
-                // if head request did not work then we can just look for the size here too
-                // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Range
-                if (contentLength == null) {
-                    contentLength =
-                        getRequest.headers["Content-Range"]?.trim()?.lowercase()?.let { range ->
-                            // we only support "bytes" unit
-                            if (range.startsWith("bytes")) {
-                                // may be '*' if unknown
-                                range.substringAfter("/").toLongOrNull()
-                            } else {
-                                Log.v(TAG, "Unknown Content-Range unit: $range")
-                                null
-                            }
+            hasRangeSupport = when (headRequest.headers["Accept-Ranges"]?.lowercase()?.trim()) {
+                // server has stated it has no support
+                "none" -> false
+                // server has stated it has support
+                "bytes" -> true
+                // if null or undefined (as bytes is the only range unit formally defined)
+                // If the get request returns partial content we support range
+                else -> {
+                    headRequest.headers["Accept-Ranges"]?.let { range ->
+                        Log.v(TAG, "Unknown Accept-Ranges tag: $range")
+                    }
+                    // as we don't poll the body this should be fine
+                    val getRequest = app.get(
+                        url,
+                        headers = headers + mapOf(
+                            "Range" to "bytes=0-${
+                                // we don't want to request more than the actual file
+                                // but also more than 0 bytes
+                                contentLength?.let { max ->
+                                    minOf(maxOf(max - 1L, 3L), 1023L)
+                                } ?: 1023L
+                            }"
+                        ),
+                        referer = referer,
+                        verify = false
+                    )
+                    getRequest.okhttpResponse.use {
+                        // if head request did not work then we can just look for the size here too
+                        // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Range
+                        if (contentLength == null) {
+                            contentLength =
+                                getRequest.headers["Content-Range"]?.trim()?.lowercase()?.let { range ->
+                                    // we only support "bytes" unit
+                                    if (range.startsWith("bytes")) {
+                                        // may be '*' if unknown
+                                        range.substringAfter("/").toLongOrNull()
+                                    } else {
+                                        Log.v(TAG, "Unknown Content-Range unit: $range")
+                                        null
+                                    }
+                                }
                         }
-                }
 
-                // supports range if status is partial content https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/206
-                getRequest.code == 206
+                        // supports range if status is partial content https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/206
+                        getRequest.code == 206
+                    }
+                }
             }
         }
 

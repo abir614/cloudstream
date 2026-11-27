@@ -533,31 +533,6 @@
             app:popExitAnim="@anim/exit_anim" />
     </fragment>
 
-    <!--<fragment
-        android:id="@+id/navigation_results"
-        android:name="com.lagradost.cloudstream3.ui.result.ResultFragment"
-        android:layout_height="match_parent"
-        app:enterAnim="@anim/enter_anim"
-        app:exitAnim="@anim/exit_anim"
-        app:popEnterAnim="@anim/enter_anim"
-        app:popExitAnim="@anim/exit_anim"
-        tools:layout="@layout/fragment_result_swipe">
-        <action
-            android:id="@+id/action_navigation_results_to_navigation_quick_search"
-            app:destination="@id/navigation_quick_search"
-            app:enterAnim="@anim/enter_anim"
-            app:exitAnim="@anim/exit_anim"
-            app:popEnterAnim="@anim/enter_anim"
-            app:popExitAnim="@anim/exit_anim" />
-        <action
-            android:id="@+id/action_navigation_results_to_navigation_player"
-            app:destination="@id/navigation_player"
-            app:enterAnim="@anim/enter_anim"
-            app:exitAnim="@anim/exit_anim"
-            app:popEnterAnim="@anim/enter_anim"
-            app:popExitAnim="@anim/exit_anim" />
-    </fragment>-->
-
     <fragment
         android:id="@+id/navigation_player"
         android:name="com.lagradost.cloudstream3.ui.player.GeneratorPlayer"

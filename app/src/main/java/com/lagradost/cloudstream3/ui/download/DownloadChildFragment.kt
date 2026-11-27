@@ -42,6 +42,10 @@ class DownloadChildFragment : BaseFragment<FragmentChildDownloadsBinding>(
 
     override fun onDestroyView() {
         activity?.detachBackPressedCallback("Downloads")
+        try {
+            binding?.downloadChildList?.adapter = null
+        } catch (_: Throwable) {
+        }
         downloadViewModel.clearChildren()
         super.onDestroyView()
     }

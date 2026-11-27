@@ -83,38 +83,40 @@ class PackageInstallerService : Service() {
                     ApkInstaller.InstallProgressStatus.Downloading
                 )
 
-                val body = app.get(url).body
-                val totalSize = body.contentLength()
-                var currentSize = 0L
-                var lastUpdateMs = 0L
+                app.get(url).okhttpResponse.use { httpResponse ->
+                    val body = httpResponse.body
+                    val totalSize = body.contentLength()
+                    var currentSize = 0L
+                    var lastUpdateMs = 0L
 
-                stagedFile.outputStream().use { fileOut ->
-                    body.byteStream().use { netIn ->
-                        val buf = ByteArray(64 * 1024)
-                        var read: Int
-                        while (netIn.read(buf).also { read = it } != -1) {
-                            fileOut.write(buf, 0, read)
-                            currentSize += read
+                    stagedFile.outputStream().use { fileOut ->
+                        body.byteStream().use { netIn ->
+                            val buf = ByteArray(64 * 1024)
+                            var read: Int
+                            while (netIn.read(buf).also { read = it } != -1) {
+                                fileOut.write(buf, 0, read)
+                                currentSize += read
 
-                            val now = System.currentTimeMillis()
-                            if (now - lastUpdateMs >= 120 || (totalSize > 0 && currentSize == totalSize)) {
-                                lastUpdateMs = now
-                                val percentage = if (totalSize > 0) currentSize / totalSize.toFloat() else 0f
-                                val downloadedMb = currentSize.toDouble() / (1024.0 * 1024.0)
-                                val totalMb = totalSize.toDouble() / (1024.0 * 1024.0)
-                                val progressText = if (totalSize > 0) {
-                                    String.format(Locale.ROOT, "%.1f MB / %.1f MB (%d%%)", downloadedMb, totalMb, (percentage * 100).toInt())
-                                } else {
-                                    String.format(Locale.ROOT, "%.1f MB", downloadedMb)
+                                val now = System.currentTimeMillis()
+                                if (now - lastUpdateMs >= 120 || (totalSize > 0 && currentSize == totalSize)) {
+                                    lastUpdateMs = now
+                                    val percentage = if (totalSize > 0) currentSize / totalSize.toFloat() else 0f
+                                    val downloadedMb = currentSize.toDouble() / (1024.0 * 1024.0)
+                                    val totalMb = totalSize.toDouble() / (1024.0 * 1024.0)
+                                    val progressText = if (totalSize > 0) {
+                                        String.format(Locale.ROOT, "%.1f MB / %.1f MB (%d%%)", downloadedMb, totalMb, (percentage * 100).toInt())
+                                    } else {
+                                        String.format(Locale.ROOT, "%.1f MB", downloadedMb)
+                                    }
+                                    updateNotificationProgress(
+                                        percentage,
+                                        ApkInstaller.InstallProgressStatus.Downloading,
+                                        progressText
+                                    )
                                 }
-                                updateNotificationProgress(
-                                    percentage,
-                                    ApkInstaller.InstallProgressStatus.Downloading,
-                                    progressText
-                                )
                             }
+                            fileOut.flush()
                         }
-                        fileOut.flush()
                     }
                 }
 

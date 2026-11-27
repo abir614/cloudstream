@@ -428,6 +428,8 @@ object AutoLogcatMonitor {
                     }
                 } finally {
                     try { reader?.close() } catch (_: Throwable) {}
+                    try { process?.outputStream?.close() } catch (_: Throwable) {}
+                    try { process?.errorStream?.close() } catch (_: Throwable) {}
                     try { process?.destroy() } catch (_: Throwable) {}
                 }
             }

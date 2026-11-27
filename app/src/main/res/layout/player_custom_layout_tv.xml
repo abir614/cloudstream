@@ -770,7 +770,6 @@
                         android:layout_gravity="center"
 
                         android:background="@drawable/video_tap_button_skip"
-                        android:nextFocusRight="@id/player_rew"
                         android:nextFocusUp="@id/player_go_back"
                         android:nextFocusDown="@id/player_pause_play"
                         android:padding="10dp"

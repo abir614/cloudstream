@@ -98,44 +98,48 @@ class ApkInstaller(private val service: PackageInstallerService) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 installParams.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
             }
-
-            activeSession = packageInstaller.createSession(installParams)
             installParams.setSize(size)
 
+            activeSession = packageInstaller.createSession(installParams)
+
             val session = packageInstaller.openSession(activeSession)
-            installProgressStatus.invoke(InstallProgressStatus.Downloading)
+            try {
+                installProgressStatus.invoke(InstallProgressStatus.Downloading)
 
-            session.openWrite(context.packageName, 0, size)
-                .use { outputStream ->
-                    val buffer = ByteArray(4 * 1024)
-                    var bytesRead = inputStream.read(buffer)
+                session.openWrite(context.packageName, 0, size)
+                    .use { outputStream ->
+                        val buffer = ByteArray(4 * 1024)
+                        var bytesRead = inputStream.read(buffer)
 
-                    while (bytesRead >= 0) {
-                        outputStream.write(buffer, 0, bytesRead)
-                        bytesRead = inputStream.read(buffer)
-                        installProgress.invoke(bytesRead)
+                        while (bytesRead >= 0) {
+                            outputStream.write(buffer, 0, bytesRead)
+                            bytesRead = inputStream.read(buffer)
+                            installProgress.invoke(bytesRead)
+                        }
+
+                        session.fsync(outputStream)
+                        inputStream.close()
                     }
 
-                    session.fsync(outputStream)
-                    inputStream.close()
+                val installIntent = Intent(INSTALL_ACTION).apply {
+                    setPackage(service.packageName)
                 }
 
-            val installIntent = Intent(INSTALL_ACTION).apply {
-                setPackage(service.packageName)
+                val installFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    PendingIntent.FLAG_MUTABLE
+                } else {
+                    0
+                }
+
+                val intentSender = PendingIntent.getBroadcast(
+                    service, activeSession, installIntent, installFlags
+                ).intentSender
+
+                installProgressStatus.invoke(InstallProgressStatus.Installing)
+                session.commit(intentSender)
+            } finally {
+                try { session.close() } catch (_: Throwable) {}
             }
-
-            val installFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_MUTABLE
-            } else {
-                0
-            }
-
-            val intentSender = PendingIntent.getBroadcast(
-                service, activeSession, installIntent, installFlags
-            ).intentSender
-
-            installProgressStatus.invoke(InstallProgressStatus.Installing)
-            session.commit(intentSender)
         } catch (e: Exception) {
             logError(e)
 

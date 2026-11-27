@@ -594,7 +594,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
         } catch (_: Throwable) {
         }
         (activity as? ComponentActivity)?.detachBackPressedCallback("HomeFragment_BackPress")
-        bottomSheetDialog?.ownHide()
+        bottomSheetDialog?.dismissSafe(activity)
+        bottomSheetDialog = null
         super.onDestroyView()
     }
 

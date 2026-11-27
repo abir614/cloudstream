@@ -1637,7 +1637,7 @@ constructor(
         id: Int? = null,
         quality: SearchQuality? = null,
         posterHeaders: Map<String, String>? = null
-    ) : this(name, url, apiName, type, posterUrl, id, year, quality, posterHeaders, null)
+    ) : this(name, url, apiName, type, posterUrl, year, id, quality, posterHeaders, null)
 }
 
 /** Data class of [SearchResponse] interface for Live streams.

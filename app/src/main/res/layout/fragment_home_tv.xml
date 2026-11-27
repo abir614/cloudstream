@@ -353,7 +353,7 @@
             android:contentDescription="@string/search"
             android:focusable="true"
             android:nextFocusLeft="@id/home_preview_reload_provider"
-            android:nextFocusRight="@id/home_preview_search_button"
+            android:nextFocusRight="@id/home_random_button_tv"
             android:nextFocusDown="@id/home_preview_info_btt"
             android:padding="10dp"
             android:src="@drawable/search_icon"

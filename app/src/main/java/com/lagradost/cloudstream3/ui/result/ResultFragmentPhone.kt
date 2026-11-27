@@ -1430,7 +1430,7 @@ open class ResultFragmentPhone : BaseFragment<FragmentResultSwipeBinding>(
         playerHostView?.releaseKeyEventListener()
         super.onPause()
         PanelsChildGestureRegionObserver.Provider.get()
-            .addGestureRegionsUpdateListener(gestureRegionsListener)
+            .removeGestureRegionsUpdateListener(gestureRegionsListener)
     }
 
     private fun setRecommendations(rec: List<SearchResponse>?, validApiName: String?) {

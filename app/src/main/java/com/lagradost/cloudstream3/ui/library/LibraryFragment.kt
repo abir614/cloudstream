@@ -553,6 +553,7 @@ class LibraryFragment : BaseFragment<FragmentLibraryBinding>(
             searchCallback = null
             binding?.libraryLoadingShimmer?.stopShimmer()
             binding?.gridview?.adapter = null
+            binding?.viewpager?.adapter = null
         } catch (_: Throwable) {
         }
         super.onDestroyView()

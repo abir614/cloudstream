@@ -195,7 +195,9 @@ object SubtitlesScreen : SearchableSettings {
                     localFile.delete()
                     localFile.createNewFile()
                     context.contentResolver?.openInputStream(uri)?.use { stream ->
-                        stream.copyTo(localFile.outputStream())
+                        localFile.outputStream().use { out ->
+                            stream.copyTo(out)
+                        }
                     }
                     store.state.value = store.state.value.copy(
                         font = SubtitleFont.Custom,

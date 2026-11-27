@@ -62,7 +62,12 @@ object ImageLoader {
         }
 
     internal fun resetImageClient() {
+        val old = imageHttpClient
         imageHttpClient = null
+        try {
+            old?.connectionPool?.evictAll()
+        } catch (_: Throwable) {
+        }
     }
 
     internal fun evictConnections() {

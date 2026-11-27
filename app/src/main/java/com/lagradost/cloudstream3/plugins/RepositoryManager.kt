@@ -183,17 +183,19 @@ object RepositoryManager {
         } else if (fixedUrl.matches("^[a-zA-Z0-9!_-]+$".toRegex())) {
             safeAsync {
                 if (fixedUrl.startsWith("!")) {
-                    val response = app.get("https://py.md/${fixedUrl.removePrefix("!")}", allowRedirects = false)
-                    val loc = response.headers["Location"] ?: return@safeAsync null
-                    if (loc.startsWith("https://py.md/404")) return@safeAsync null
-                    if (loc.removeSuffix("/") == "https://py.md") return@safeAsync null
-                    return@safeAsync loc
+                    app.get("https://py.md/${fixedUrl.removePrefix("!")}", allowRedirects = false).okhttpResponse.use { response ->
+                        val loc = response.headers["Location"] ?: return@safeAsync null
+                        if (loc.startsWith("https://py.md/404")) return@safeAsync null
+                        if (loc.removeSuffix("/") == "https://py.md") return@safeAsync null
+                        return@safeAsync loc
+                    }
                 } else {
-                    val response = app.get("https://cutt.ly/${fixedUrl}", allowRedirects = false)
-                    val loc = response.headers["Location"] ?: return@safeAsync null
-                    if (loc.startsWith("https://cutt.ly/404")) return@safeAsync null
-                    if (loc.removeSuffix("/") == "https://cutt.ly") return@safeAsync null
-                    return@safeAsync loc
+                    app.get("https://cutt.ly/${fixedUrl}", allowRedirects = false).okhttpResponse.use { response ->
+                        val loc = response.headers["Location"] ?: return@safeAsync null
+                        if (loc.startsWith("https://cutt.ly/404")) return@safeAsync null
+                        if (loc.removeSuffix("/") == "https://cutt.ly") return@safeAsync null
+                        return@safeAsync loc
+                    }
                 }
             }
         } else null

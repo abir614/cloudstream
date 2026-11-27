@@ -88,7 +88,7 @@ object FillerEpisodeCheck {
         
         /** The entire "database" is stored as a json file we can parse */
         val stream: InputStream = com.lagradost.AnimeDB.getDatabaseStream()!!
-        val text = stream.reader().readText()
+        val text = stream.bufferedReader().use { it.readText() }
 
         val allMedia = parseJson<Array<CombinedMedia>>(text)
         val pending = Database()

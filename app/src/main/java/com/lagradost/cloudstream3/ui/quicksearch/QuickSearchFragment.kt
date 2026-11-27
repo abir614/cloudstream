@@ -42,10 +42,10 @@ import com.lagradost.cloudstream3.utils.AppContextUtils.filterSearchResultByFilm
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
 import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.isRecyclerScrollable
-import com.lagradost.cloudstream3.utils.AppContextUtils.ownHide
 import com.lagradost.cloudstream3.utils.AppContextUtils.ownShow
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.DeviceProfile
+import com.lagradost.cloudstream3.utils.UIHelper.dismissSafe
 import com.lagradost.cloudstream3.utils.UIHelper.fixSystemBarsPadding
 import com.lagradost.cloudstream3.utils.UIHelper.getSpanCount
 import com.lagradost.cloudstream3.utils.UIHelper.hideKeyboard
@@ -120,7 +120,7 @@ class QuickSearchFragment : BaseFragment<QuickSearchBinding>(
     }
 
     override fun onDestroyView() {
-        bottomSheetDialog?.ownHide()
+        bottomSheetDialog?.dismissSafe(activity)
         bottomSheetDialog = null
         super.onDestroyView()
     }
