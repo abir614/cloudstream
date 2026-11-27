@@ -441,5 +441,30 @@ class NsfwFilterEngineTest {
         assertFalse(NsfwFilterEngine.isNsfwUrl("https://image.tmdb.org/t/p/w500/8UlWHLM29295Q9CzENR9Z.jpg"))
         assertFalse(NsfwFilterEngine.isNsfwUrl("https://m.media-amazon.com/images/M/MV5BMDFkYTc0MGEt.jpg"))
     }
+
+    @Suppress("DEPRECATION_ERROR")
+    @Test
+    fun `test benign stem titles are not false positives and clean titles cannot mask adult urls`() {
+        val benignTitles = listOf(
+            MovieSearchResponse("From Up on Poppy Hill", "https://site.to/poppy-hill", "AnimeProvider", TvType.AnimeMovie),
+            MovieSearchResponse("Brothers in Arms", "https://site.to/brothers-in-arms", "MovieProvider", TvType.TvSeries),
+            MovieSearchResponse("Milky Way Railroad", "https://site.to/milky-way", "AnimeProvider", TvType.Anime),
+            MovieSearchResponse("Spider-Man: Mary Jane", "https://site.to/maryjane", "MovieProvider", TvType.Movie)
+        )
+        for (item in benignTitles) {
+            assertFalse("${item.name} should not trigger LOW filter", NsfwFilterEngine.isNsfw(item, NsfwFilterLevel.LOW))
+            assertFalse("${item.name} should not trigger MODERATE filter", NsfwFilterEngine.isNsfw(item, NsfwFilterLevel.MODERATE))
+            assertFalse("${item.name} should not trigger EXTREME filter", NsfwFilterEngine.isNsfw(item, NsfwFilterLevel.EXTREME))
+        }
+
+        // Clean allowlisted title must NEVER mask explicit adult URL, poster URL, or tags
+        val spoofedUrlItem = AnimeSearchResponse("Naruto", "https://nhentai.net/g/999999", "Provider", TvType.Anime)
+        assertTrue(NsfwFilterEngine.isNsfw(spoofedUrlItem, NsfwFilterLevel.LOW))
+
+        val spoofedPosterItem = AnimeSearchResponse("Demon Slayer", "https://site.to/ds", "Provider", TvType.Anime, posterUrl = "https://pornhub.com/thumb.jpg")
+        assertTrue(NsfwFilterEngine.isNsfw(spoofedPosterItem, NsfwFilterLevel.LOW))
+
+        assertTrue(NsfwFilterEngine.isNsfwText("Attack on Titan", "https://site.to/watch", "Action, Hentai, Fantasy", NsfwFilterLevel.LOW))
+    }
 }
 

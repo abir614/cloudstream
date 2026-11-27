@@ -18,7 +18,6 @@ pub enum SandboxError {
 
 /// Host context provided to the sandboxed WASM instance.
 pub struct HostContext {
-    #[allow(dead_code)]
     limits: StoreLimits,
     pub logs: Vec<String>,
 }
@@ -66,22 +65,28 @@ impl WasmSandbox {
                         .and_then(|ext| ext.into_memory())
                         .ok_or_else(|| wasmi::Error::new("Failed to get linear memory"))?;
 
-                    let maybe_msg = {
+                    let maybe_msg = if ptr >= 0 && len >= 0 && len <= 16_384 {
                         let data = memory.data(&caller);
                         let start = ptr as usize;
-                        let end = start + len as usize;
-
-                        if end <= data.len() {
-                            std::str::from_utf8(&data[start..end])
-                                .ok()
-                                .map(|s| s.to_string())
+                        if let Some(end) = start.checked_add(len as usize) {
+                            if end <= data.len() {
+                                std::str::from_utf8(&data[start..end])
+                                    .ok()
+                                    .map(|s| s.to_string())
+                            } else {
+                                None
+                            }
                         } else {
                             None
                         }
+                    } else {
+                        None
                     };
 
                     if let Some(msg) = maybe_msg {
-                        caller.data_mut().logs.push(msg);
+                        if caller.data().logs.len() < 256 {
+                            caller.data_mut().logs.push(msg);
+                        }
                     }
                     Ok(())
                 },
@@ -105,16 +110,18 @@ impl WasmSandbox {
                         None => return Ok(0),
                     };
 
-                    let data = memory.data(&caller);
-                    let start = ptr as usize;
-                    let end = start + len as usize;
-
-                    if end <= data.len() {
-                        if let Ok(url_str) = std::str::from_utf8(&data[start..end]) {
-                            return match validate_url_safety(url_str) {
-                                Ok(_) => Ok(1),  // URL is safe
-                                Err(_) => Ok(0), // Blocked
-                            };
+                    if ptr >= 0 && len >= 0 && len <= 8_192 {
+                        let data = memory.data(&caller);
+                        let start = ptr as usize;
+                        if let Some(end) = start.checked_add(len as usize) {
+                            if end <= data.len() {
+                                if let Ok(url_str) = std::str::from_utf8(&data[start..end]) {
+                                    return match validate_url_safety(url_str) {
+                                        Ok(_) => Ok(1),  // URL is safe
+                                        Err(_) => Ok(0), // Blocked
+                                    };
+                                }
+                            }
                         }
                     }
                     Ok(0)
@@ -137,6 +144,7 @@ impl WasmSandbox {
 
         let context = HostContext::new(max_memory_bytes);
         let mut store = Store::new(&self.engine, context);
+        store.limiter(|ctx| &mut ctx.limits);
         store
             .set_fuel(initial_fuel)
             .map_err(|e| SandboxError::Instantiation(e.to_string()))?;

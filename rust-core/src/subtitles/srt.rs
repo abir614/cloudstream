@@ -50,18 +50,23 @@ pub fn parse_timecode(s: &str) -> Option<i64> {
             if m_str.is_empty() {
                 0
             } else {
-                match m_str.len() {
-                    1 => m_str.parse::<i64>().ok()? * 100,
-                    2 => m_str.parse::<i64>().ok()? * 10,
-                    3 => m_str.parse::<i64>().ok()?,
-                    _ => m_str[..3].parse::<i64>().ok()?,
+                let first_three: String = m_str.chars().take(3).collect();
+                match first_three.chars().count() {
+                    1 => first_three.parse::<i64>().ok()? * 100,
+                    2 => first_three.parse::<i64>().ok()? * 10,
+                    _ => first_three.parse::<i64>().ok()?,
                 }
             }
         }
     };
 
-    let total_ms = (hours * 3600 + mins * 60 + secs) * 1000 + millis;
-    Some(total_ms * 1000) // Convert to microseconds
+    let total_ms = hours
+        .checked_mul(3600)?
+        .checked_add(mins.checked_mul(60)?)?
+        .checked_add(secs)?
+        .checked_mul(1000)?
+        .checked_add(millis)?;
+    total_ms.checked_mul(1000) // Convert to microseconds
 }
 
 /// Process a single subtitle line: extracts alignment tags and strips formatting tags like `{\\...}`
@@ -78,7 +83,8 @@ fn process_line(line: &str, alignment_tag: &mut Option<String>) -> String {
         if c == '{' && line[idx..].starts_with("{\\") {
             // Find closing '}'
             if let Some(end_rel) = line[idx..].find('}') {
-                let tag = &line[idx..=idx + end_rel];
+                let end_byte = idx + end_rel;
+                let tag = &line[idx..=end_byte];
                 // Check if alignment tag like {\an1} .. {\an9}
                 if alignment_tag.is_none() && tag.len() == 6 && tag.starts_with("{\\an") {
                     let d = tag.as_bytes()[4];
@@ -86,9 +92,12 @@ fn process_line(line: &str, alignment_tag: &mut Option<String>) -> String {
                         *alignment_tag = Some(tag.to_string());
                     }
                 }
-                // Skip past closing '}'
-                for _ in 0..end_rel {
+                // Advance iterator strictly by byte index (safe for multi-byte UTF-8 inside tags)
+                while let Some(&(next_idx, _)) = chars.peek() {
                     chars.next();
+                    if next_idx >= end_byte {
+                        break;
+                    }
                 }
                 continue;
             }

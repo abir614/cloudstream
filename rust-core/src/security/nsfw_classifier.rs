@@ -106,8 +106,6 @@ const HARDCORE_ADULT_TOKENS: &[&str] = &[
     "javstream",
     "hentaicity",
     "erocool",
-    "maryjane",
-    "milky",
     "shoikaku",
 ];
 
@@ -496,8 +494,6 @@ const HARDCORE_STEMS: &[&str] = &[
     "javstream",
     "hentaicity",
     "erocool",
-    "maryjane",
-    "milky",
     "shoikaku",
 ];
 
@@ -806,12 +802,6 @@ pub fn is_benign_scunthorpe_allowed(title: &str) -> bool {
 
 /// Classifies title, url, and optional tags with a specific sensitivity level.
 pub fn is_nsfw_text_with_level(title: &str, url: &str, tags: Option<&str>, level: u8) -> bool {
-    if is_benign_scunthorpe_allowed(title) {
-        return false;
-    }
-    if is_text_nsfw_single(title, level) {
-        return true;
-    }
     if is_text_nsfw_single(url, level) {
         return true;
     }
@@ -820,7 +810,10 @@ pub fn is_nsfw_text_with_level(title: &str, url: &str, tags: Option<&str>, level
             return true;
         }
     }
-    false
+    if is_benign_scunthorpe_allowed(title) {
+        return false;
+    }
+    is_text_nsfw_single(title, level)
 }
 
 /// Default classification (Moderate - Family Level).

@@ -56,35 +56,40 @@ pub fn validate_url_safety(raw_url: &str) -> Result<Url, NetworkSecurityError> {
 pub fn validate_ip_safety(ip: &IpAddr) -> Result<(), NetworkSecurityError> {
     match ip {
         IpAddr::V4(ipv4) => {
-            // Loopback (127.0.0.0/8)
-            if ipv4.is_loopback() {
+            // Loopback (127.0.0.0/8) & "This host" / unspecified range (0.0.0.0/8)
+            let octets = ipv4.octets();
+            if ipv4.is_loopback() || ipv4.is_unspecified() || octets[0] == 0 {
                 return Err(NetworkSecurityError::PrivateNetworkBlocked(ip.to_string()));
             }
             // Private RFC-1918: 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
             if ipv4.is_private() {
                 return Err(NetworkSecurityError::PrivateNetworkBlocked(ip.to_string()));
             }
+            // Carrier-Grade NAT (RFC 6598): 100.64.0.0/10
+            if octets[0] == 100 && (octets[1] & 0xC0) == 64 {
+                return Err(NetworkSecurityError::PrivateNetworkBlocked(ip.to_string()));
+            }
             // Link-local: 169.254.0.0/16 (includes AWS/GCP/Azure metadata 169.254.169.254)
             if ipv4.is_link_local() {
                 return Err(NetworkSecurityError::CloudMetadataBlocked(ip.to_string()));
             }
-            // Broadcast (255.255.255.255) & Unspecified (0.0.0.0)
-            if ipv4.is_broadcast() || ipv4.is_unspecified() {
+            // Multicast (224.0.0.0/4), Reserved/Class E (240.0.0.0/4), and Broadcast (255.255.255.255)
+            if ipv4.is_broadcast() || ipv4.is_multicast() || octets[0] >= 240 {
                 return Err(NetworkSecurityError::PrivateNetworkBlocked(ip.to_string()));
             }
         }
         IpAddr::V6(ipv6) => {
-            if ipv6.is_loopback() || ipv6.is_unspecified() {
+            if ipv6.is_loopback() || ipv6.is_unspecified() || ipv6.is_multicast() {
                 return Err(NetworkSecurityError::PrivateNetworkBlocked(ip.to_string()));
             }
             let segments = ipv6.segments();
-            // Check IPv4-mapped IPv6 (::ffff:w.x.y.z)
+            // Check IPv4-mapped (::ffff:w.x.y.z) & IPv4-compatible IPv6 (::w.x.y.z)
             if segments[0] == 0
                 && segments[1] == 0
                 && segments[2] == 0
                 && segments[3] == 0
                 && segments[4] == 0
-                && segments[5] == 0xffff
+                && (segments[5] == 0xffff || segments[5] == 0)
             {
                 let octets = ipv6.octets();
                 let v4 = std::net::Ipv4Addr::new(octets[12], octets[13], octets[14], octets[15]);

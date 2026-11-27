@@ -18,7 +18,9 @@ import com.lagradost.cloudstream3.plugins.PluginManager
 import com.lagradost.cloudstream3.plugins.PluginManager.getPluginPath
 import com.lagradost.cloudstream3.plugins.PluginWrapper
 import com.lagradost.cloudstream3.plugins.RepositoryManager
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwEnabled
+import com.lagradost.cloudstream3.utils.AppContextUtils.isNsfwGloballyEnabled
 import com.lagradost.cloudstream3.utils.txt
 import com.lagradost.cloudstream3.utils.Coroutines.ioSafe
 import com.lagradost.cloudstream3.utils.Coroutines.main
@@ -319,9 +321,13 @@ class PluginsViewModel : ViewModel() {
      * */
     fun updatePluginListLocal() = viewModelScope.launchSafe {
         Log.i(TAG, "updatePluginList = local")
+        val nsfwEnabled = isNsfwGloballyEnabled()
 
         val downloadedPlugins = (PluginManager.getPluginsOnline() + PluginManager.getPluginsLocal())
             .distinctBy { it.filePath }
+            .filter { sitePlugin ->
+                nsfwEnabled || !NsfwFilterEngine.isNsfwText(sitePlugin.name, sitePlugin.url)
+            }
             .map {
                 PluginViewData(PluginWrapper.getLocalPluginWrapper(it.toSitePlugin()), true)
             }

@@ -558,14 +558,14 @@ object NsfwFilterEngine {
         "incest", "uncensored", "decensored", "nude", "nudity", "naked", "topless", "fella", "cunnilingus",
         "pegging", "stepmom", "stepmother", "stepsister", "stepdaughter", "stepson", "stepbrother", "taboo",
         "voyeur", "upskirt", "onlyfans", "fansly", "striptease", "stripper", "camgirl", "playboy", "playmate",
-        "penthouse", "orgy", "rance", "kuroinu", "taimanin", "mankitsu", "overflow", "euphoria", "futabu",
+        "penthouse", "orgy", "rance", "kuroinu", "taimanin", "mankitsu", "euphoria", "futabu",
         "shoujoramune", "otomedori", "resortboin", "onichichi", "seikatsushuukan", "bunnywalker", "pinkpineapple",
-        "queenbee", "poros", "greenbunny", "whitebear", "naturalhigh", "nhentai", "tsumino", "fakku", "pornhub",
+        "queenbee", "poros", "greenbunny", "naturalhigh", "nhentai", "tsumino", "fakku", "pornhub",
         "xvideos", "xnxx", "spankbang", "eporner", "missav", "supjav", "javhd", "rule34", "hitomi",
         "doujindesu", "hentaimama", "manhwa18", "18comic", "simply-hentai", "hentaihaven", "asmhentai",
         "pururin", "hentaifox", "e-hentai", "exhentai", "luscious", "hentai2read", "imhentai", "toonily",
         "readhentai", "manga18fx", "javdoe", "javmost", "javlibrary", "javfinder", "javstream", "hentaicity",
-        "erocool", "maryjane", "milky", "shoikaku", "poppy", "arms"
+        "erocool", "shoikaku"
     )
 
     private val SUGGESTIVE_KEYWORDS = hashSetOf(
@@ -605,7 +605,7 @@ object NsfwFilterEngine {
         "doujindesu", "hentaimama", "manhwa18", "18comic", "simply-hentai", "hentaihaven", "asmhentai",
         "pururin", "hentaifox", "e-hentai", "exhentai", "luscious", "hentai2read", "imhentai", "toonily",
         "readhentai", "manga18fx", "javdoe", "javmost", "javlibrary", "javfinder", "javstream", "hentaicity",
-        "erocool", "maryjane", "milky", "shoikaku", "poppy", "arms"
+        "erocool", "shoikaku"
     )
 
     private val SUGGESTIVE_STEMS = arrayOf(
@@ -708,7 +708,20 @@ object NsfwFilterEngine {
         tags: String? = null,
         level: NsfwFilterLevel = getFilterLevel()
     ): Boolean {
-        if (isCleanTitleAllowed(title)) return false
+        val checkHardcoreOnly = isCleanTitleAllowed(title)
+        val effectiveLevel = if (checkHardcoreOnly) NsfwFilterLevel.LOW else level
+        val hasAdultUrlOrTags = if (com.lagradost.cloudstream3.services.NativeCoreBridge.isNativeReady()) {
+            val lvlInt = when (effectiveLevel) {
+                NsfwFilterLevel.LOW -> 0
+                NsfwFilterLevel.MODERATE -> 1
+                NsfwFilterLevel.EXTREME -> 2
+            }
+            com.lagradost.cloudstream3.services.NativeCoreBridge.isNsfwText("", url, tags, lvlInt)
+        } else {
+            isTextNsfwSingle(url, effectiveLevel) || (tags != null && isTextNsfwSingle(tags, effectiveLevel))
+        }
+        if (hasAdultUrlOrTags) return true
+        if (checkHardcoreOnly) return false
 
         if (com.lagradost.cloudstream3.services.NativeCoreBridge.isNativeReady()) {
             val lvlInt = when (level) {
@@ -718,9 +731,7 @@ object NsfwFilterEngine {
             }
             return com.lagradost.cloudstream3.services.NativeCoreBridge.isNsfwText(title, url, tags, lvlInt)
         }
-        return isTextNsfwSingle(title, level) ||
-               isTextNsfwSingle(url, level) ||
-               (tags != null && isTextNsfwSingle(tags, level))
+        return isTextNsfwSingle(title, level)
     }
 
     private fun isTextNsfwSingle(text: String, level: NsfwFilterLevel): Boolean {
@@ -841,7 +852,6 @@ object NsfwFilterEngine {
 
     fun isNsfw(item: SearchResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
-        if (isCleanTitleAllowed(item.name)) return false
         if (hasInvalidExtremePoster(item.posterUrl, level)) return true
         if (isProviderOrNameNsfw(item.apiName, level)) return true
 
@@ -850,7 +860,15 @@ object NsfwFilterEngine {
             if (OnDeviceNsfwClassifier.isCachedNsfw(url, null, level)) return true
         }
 
-        // Multi-vector text check on title, item URL, and poster URL across all levels
+        // URL/poster adult markers must never be bypassed by clean-title allowlist
+        if (isTextNsfwSingle(item.url, level) ||
+            (!item.posterUrl.isNullOrBlank() && isTextNsfwSingle(item.posterUrl!!, level))
+        ) {
+            return true
+        }
+        if (isCleanTitleAllowed(item.name)) return false
+
+        // Multi-vector text check on title across all levels
         return isNsfwText(item.name, item.url, item.posterUrl, level)
     }
 
@@ -859,7 +877,6 @@ object NsfwFilterEngine {
      */
     fun isNsfw(item: LoadResponse, level: NsfwFilterLevel = getFilterLevel()): Boolean {
         if (item.type == TvType.NSFW) return true
-        if (isCleanTitleAllowed(item.name)) return false
         if (hasInvalidExtremePoster(item.posterUrl ?: item.backgroundPosterUrl, level)) return true
         if (isProviderOrNameNsfw(item.apiName, level)) return true
 
@@ -882,21 +899,22 @@ object NsfwFilterEngine {
         }
 
         val tagsStr = item.tags?.joinToString(" ")
-        if (isNsfwText(item.name, item.url, tagsStr, level)) {
+        if (isTextNsfwSingle(item.url, level) || (!tagsStr.isNullOrBlank() && isTextNsfwSingle(tagsStr, level))) {
             return true
         }
 
         item.posterUrl?.let { if (isNsfwUrl(it, level)) return true }
         item.backgroundPosterUrl?.let { if (isNsfwUrl(it, level)) return true }
 
-        // In MODERATE and EXTREME, inspect synopsis/plot
+        // In MODERATE and EXTREME, inspect synopsis/plot before clean title exemption
         if (level >= NsfwFilterLevel.MODERATE) {
             item.plot?.let { plotText ->
                 if (isTextNsfwSingle(plotText, level)) return true
             }
         }
 
-        return false
+        if (isCleanTitleAllowed(item.name)) return false
+        return isTextNsfwSingle(item.name, level)
     }
 
     /**

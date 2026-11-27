@@ -108,7 +108,52 @@ object OnDeviceNsfwClassifier {
     @Volatile private var isModelPermanentlyUnavailable = false
     private val modelBufferLock = Any()
     private val sessionPool = ConcurrentLinkedQueue<InferenceSession>()
+    private val sessionPoolLock = java.lang.Object()
     private val activeSessionCount = AtomicInteger(0)
+
+    private data class StaticHwCapabilities(
+        val tier: DeviceTier,
+        val isPotatoStatic: Boolean,
+        val isLowRamDevice: Boolean,
+        val totalMb: Long,
+        val isLowEnd: Boolean,
+        val cores: Int,
+        val has64Bit: Boolean,
+        val useXnnpack: Boolean
+    )
+
+    @Volatile
+    private var cachedStaticCaps: StaticHwCapabilities? = null
+    @Volatile
+    private var cachedExecConfigTimestampMs: Long = 0L
+    @Volatile
+    private var cachedExecConfig: NsfwExecutionConfig? = null
+
+    private fun getStaticCapabilities(ctx: Context): StaticHwCapabilities {
+        cachedStaticCaps?.let { return it }
+        val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+        val tier = DeviceProfile.tier(ctx)
+        val isPotatoStatic = DeviceProfile.isLowEnd(ctx) || DeviceProfile.isUltraPotato(ctx)
+        val isLowRamDevice = am?.isLowRamDevice == true
+        val totalMb = DeviceProfile.getTotalRamMb(ctx)
+        val isLowEnd = isPotatoStatic || tier == DeviceTier.LOW || isLowRamDevice || totalMb <= 2500L
+        val cores = Runtime.getRuntime().availableProcessors()
+        val has64Bit = try { Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() == true } catch (_: Throwable) { false }
+        val hasNeon = try {
+            val cpu = DeviceProfile.getCpuInfoString().lowercase()
+            has64Bit || cpu.contains("neon") || cpu.contains("asimd")
+        } catch (_: Throwable) { has64Bit }
+        return StaticHwCapabilities(
+            tier = tier,
+            isPotatoStatic = isPotatoStatic,
+            isLowRamDevice = isLowRamDevice,
+            totalMb = totalMb,
+            isLowEnd = isLowEnd,
+            cores = cores,
+            has64Bit = has64Bit,
+            useXnnpack = hasNeon || has64Bit
+        ).also { cachedStaticCaps = it }
+    }
 
     data class NsfwExecutionConfig(
         val preloaderConcurrency: Int,
@@ -125,8 +170,15 @@ object OnDeviceNsfwClassifier {
      * concurrency, thread count, and hardware acceleration tier without triggering out-of-memory or thermal throttling.
      */
     fun getNsfwExecutionConfig(ctx: Context): NsfwExecutionConfig {
-        val tier = DeviceProfile.tier(ctx)
-        val isPotato = isPotatoDevice(ctx) || DeviceProfile.isUltraPotato(ctx)
+        val now = System.currentTimeMillis()
+        val last = cachedExecConfig
+        if (last != null && (now - cachedExecConfigTimestampMs) in 0L..499L) {
+            return last
+        }
+
+        val caps = getStaticCapabilities(ctx)
+        val tier = caps.tier
+        val isLowEnd = caps.isLowEnd || isPotatoDevice(ctx)
         val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
         val mi = ActivityManager.MemoryInfo()
         am?.getMemoryInfo(mi)
@@ -134,20 +186,10 @@ object OnDeviceNsfwClassifier {
         val isLowMem = mi.lowMemory
         val rt = Runtime.getRuntime()
         val freeHeapMb = (rt.maxMemory() - (rt.totalMemory() - rt.freeMemory())) / (1024 * 1024)
-        val cores = rt.availableProcessors()
-        val has64Bit = try { Build.SUPPORTED_64_BIT_ABIS?.isNotEmpty() == true } catch (_: Throwable) { false }
-        val isLowRamDevice = am?.isLowRamDevice == true
-        val totalMb = DeviceProfile.getTotalRamMb(ctx)
-        val isLowEnd = isPotato || tier == DeviceTier.LOW || isLowRamDevice || totalMb <= 2500L
+        val cores = caps.cores
+        val useXnnpack = caps.useXnnpack
 
-        // Hardware SIMD vectorization: Enable XNNPACK across 64-bit and 32-bit ARM with NEON support
-        val hasNeon = try {
-            val cpu = DeviceProfile.getCpuInfoString().lowercase()
-            has64Bit || cpu.contains("neon") || cpu.contains("asimd")
-        } catch (_: Throwable) { has64Bit }
-        val useXnnpack = hasNeon || has64Bit
-
-        return when {
+        val resolved = when {
             // Tier 1: Severe resource starvation (critical low memory < 180MB, tight heap < 20MB, or <= 2 cores)
             // Keep concurrency=1, XNNPACK off (avoids extra workspace RAM), and gentle 30ms pacing.
             isLowMem || availMb < 180L || freeHeapMb < 20L || cores <= 2 -> {
@@ -208,6 +250,9 @@ object OnDeviceNsfwClassifier {
                 )
             }
         }
+        cachedExecConfig = resolved
+        cachedExecConfigTimestampMs = now
+        return resolved
     }
 
     fun getMaxSessions(ctx: Context? = null): Int {
@@ -414,26 +459,29 @@ object OnDeviceNsfwClassifier {
             // Combine AI predictions
             var combinedScore = maxOf(explicitScore, sexyScore)
 
-            // If neutral or drawing confidence is dominant and both porn and sexy are low, dampen score
-            if (safeConfidence > 0.75f && pPorn < 0.10f && pHentai < 0.10f && pSexy < 0.15f) {
-                combinedScore *= 0.60f
+            // If neutral or drawing confidence is strongly dominant and explicit/sexy are low, dampen score
+            val isSafeDominant = safeConfidence >= 0.78f && pPorn < 0.06f && pHentai < 0.06f && pSexy < 0.14f
+            if (isSafeDominant) {
+                combinedScore *= 0.55f
             }
 
             // 3. Physical body skin exposure calibration
+            // Skip moderate/mild skin boosts when neural classifier is strongly neutral/safe so close-up portraits
+            // and warm movie posters do not trigger false positives, while never exempting near-total nudity.
             val finalScore = when {
-                // Near-total nudity (>60% torso bare skin): push to explicit territory (blocks in Low >= 0.40)
-                bodySkinRatio >= 0.60f && combinedScore >= 0.20f -> {
-                    val nukeBoost = 0.45f + ((bodySkinRatio - 0.60f) * 1.2f).coerceIn(0.0f, 0.45f)
+                // Near-total nudity (>62% torso bare skin): push to explicit territory (blocks in Low >= 0.40)
+                bodySkinRatio >= 0.62f && combinedScore >= 0.20f -> {
+                    val nukeBoost = 0.45f + ((bodySkinRatio - 0.62f) * 1.2f).coerceIn(0.0f, 0.45f)
                     maxOf(combinedScore, nukeBoost)
                 }
-                // High skin exposure (>35% bare skin, e.g. bikini, lingerie, shirtless): guarantee blocking in Moderate (>= 0.22)
-                bodySkinRatio >= 0.35f && combinedScore >= 0.12f -> {
-                    val modBoost = 0.22f + ((bodySkinRatio - 0.35f) * 0.60f).coerceIn(0.0f, 0.18f)
+                // High skin exposure (>38% bare skin, e.g. bikini, lingerie, shirtless): guarantee blocking in Moderate (>= 0.22)
+                !isSafeDominant && bodySkinRatio >= 0.38f && combinedScore >= 0.12f -> {
+                    val modBoost = 0.22f + ((bodySkinRatio - 0.38f) * 0.60f).coerceIn(0.0f, 0.18f)
                     maxOf(combinedScore, modBoost)
                 }
-                // Mild skin exposure (>20% bare skin, e.g. beach scene, summer): guarantee Extreme strict shield (>= 0.11)
-                bodySkinRatio >= 0.20f && combinedScore >= 0.06f -> {
-                    val extremeBoost = 0.11f + ((bodySkinRatio - 0.20f) * 0.40f).coerceIn(0.0f, 0.10f)
+                // Mild skin exposure (>22% bare skin, e.g. beach scene, summer): guarantee Extreme strict shield (>= 0.11)
+                !isSafeDominant && bodySkinRatio >= 0.22f && combinedScore >= 0.06f -> {
+                    val extremeBoost = 0.11f + ((bodySkinRatio - 0.22f) * 0.40f).coerceIn(0.0f, 0.10f)
                     maxOf(combinedScore, extremeBoost)
                 }
                 else -> combinedScore
@@ -463,12 +511,14 @@ object OnDeviceNsfwClassifier {
     }
 
     private val threadLocalPotato = ThreadLocal<PotatoScratch>()
+    private val activePotatoScratches = ConcurrentLinkedQueue<WeakReference<PotatoScratch>>()
 
     private fun getPotatoScratch(): PotatoScratch {
         var scratch = threadLocalPotato.get()
         if (scratch == null || scratch.bitmap == null || scratch.bitmap?.isRecycled == true) {
             scratch = PotatoScratch()
             threadLocalPotato.set(scratch)
+            activePotatoScratches.offer(WeakReference(scratch))
         }
         return scratch
     }
@@ -611,9 +661,10 @@ object OnDeviceNsfwClassifier {
                 // 1. Compute 64-bit dHash (<0.002ms)
                 val dHash = computeDHash64(potatoPixels, POTATO_DIM)
 
-                // 2. Compute skin distribution and monochrome check
+                // 2. Compute skin distribution (torso zone starting row 18 ~37.5% down to avoid face closeups) and monochrome check
                 var upperSkinPixels = 0
-                val upperTotalPixels = 14 * POTATO_DIM // 672 pixels
+                val torsoStartRow = 18
+                val upperTotalPixels = torsoStartRow * POTATO_DIM // 864 pixels
                 for (i in 0 until upperTotalPixels) {
                     val pixel = potatoPixels[i]
                     val r = (pixel shr 16) and 0xFF
@@ -627,12 +678,12 @@ object OnDeviceNsfwClassifier {
 
                 var bodySkinPixels = 0
                 val totalPixels = POTATO_DIM * POTATO_DIM // 2304
-                val bodyStartPixel = 14 * POTATO_DIM // row 14 (~29% down)
-                val bodyTotalPixels = totalPixels - bodyStartPixel // 1632 pixels
+                val bodyStartPixel = torsoStartRow * POTATO_DIM // row 18 (~37.5% down)
+                val bodyTotalPixels = totalPixels - bodyStartPixel // 1440 pixels
                 var maxRowSkinCount = 0
                 var totalColorDiff = 0
 
-                for (row in 14 until POTATO_DIM) {
+                for (row in torsoStartRow until POTATO_DIM) {
                     var rowSkin = 0
                     val rowStart = row * POTATO_DIM
                     for (col in 0 until POTATO_DIM) {
@@ -665,19 +716,21 @@ object OnDeviceNsfwClassifier {
                 val bodySkinRatio = bodySkinPixels.toFloat() / bodyTotalPixels.toFloat()
                 val maxRowSkinRatio = maxRowSkinCount.toFloat() / POTATO_DIM.toFloat()
 
-                // False-positive rejection: uniform colored backdrop (e.g. solid yellow, beige, or gold poster)
-                val potatoScore = if (upperSkinRatio > 0.70f && bodySkinRatio > 0.70f) {
-                    0.0f
-                } else if (bodySkinRatio > 0.40f && maxRowSkinRatio >= 0.35f) {
-                    ((bodySkinRatio - 0.40f) * 2.0f + 0.45f).coerceIn(0.0f, 1.0f)
-                } else if (bodySkinRatio > 0.28f && maxRowSkinRatio >= 0.28f) {
-                    0.35f
-                } else if (bodySkinRatio > 0.18f && maxRowSkinRatio >= 0.18f) {
-                    0.25f
-                } else if (bodySkinRatio > 0.12f && maxRowSkinRatio >= 0.12f) {
-                    0.15f
-                } else {
-                    0.0f
+                // False-positive rejection:
+                // 1. Uniform colored backdrop (e.g. solid yellow, beige, or gold poster)
+                // 2. Monochrome / sepia warm noir posters unless overwhelming nudity
+                // 3. Close-up head/portrait posters (heavy face skin in upper frame with moderate collar/shoulder below)
+                val isPortraitCloseUp = upperSkinRatio >= 0.42f && bodySkinRatio < 0.50f
+                val potatoScore = when {
+                    upperSkinRatio > 0.70f && bodySkinRatio > 0.70f -> 0.0f
+                    isMonochrome && bodySkinRatio < 0.55f -> 0.0f
+                    isPortraitCloseUp && bodySkinRatio < 0.48f -> 0.0f
+                    bodySkinRatio > 0.44f && maxRowSkinRatio >= 0.38f ->
+                        ((bodySkinRatio - 0.44f) * 2.0f + 0.45f).coerceIn(0.0f, 1.0f)
+                    bodySkinRatio > 0.30f && maxRowSkinRatio >= 0.30f -> 0.35f
+                    bodySkinRatio > 0.20f && maxRowSkinRatio >= 0.20f -> 0.25f
+                    bodySkinRatio > 0.14f && maxRowSkinRatio >= 0.14f -> 0.15f
+                    else -> 0.0f
                 }
 
                 FastAnalysisResult(
@@ -706,6 +759,22 @@ object OnDeviceNsfwClassifier {
         }
         val appCtx = ctx ?: CloudStreamApp.context
         return if (appCtx?.let { shouldCensorPosters(it) || !it.isNsfwEnabled() } == true) 1.0f else 0.0f
+    }
+
+    private fun evaluateFastFallbackScore(
+        drawable: Drawable,
+        ctx: Context,
+        precomputed: FastAnalysisResult? = null
+    ): Pair<Float, Boolean> {
+        val fast = precomputed ?: analyzeFastMetrics(drawable, ctx)
+        return if (fast != null) {
+            dHashCache.put(fast.dHash, fast.potatoScore)
+            fast.potatoScore to true
+        } else {
+            // Sampling failed: fail closed visually in memory without poisoning persistent disk/memory caches
+            val displayScore = if (!ctx.isNsfwEnabled() || shouldCensorPosters(ctx)) 1.0f else 0.0f
+            displayScore to false
+        }
     }
 
     /**
@@ -744,14 +813,15 @@ object OnDeviceNsfwClassifier {
         }
 
         fun onEvicted() {
-            // Task was evicted from queue during rapid scrolling.
+            // Task was evicted from queue during rapid scrolling: run fast zero-allocation skin scoring on background
+            // instead of poisoning persistent cache with synthetic 1.0f values for safe posters.
             if (isKeyStillBound(weakImageView.get())) {
-                postWhenBound { activeView ->
-                    val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(targetDrawable, appContext) else 1.0f
+                val (score, canPersist) = evaluateFastFallbackScore(targetDrawable, appContext)
+                if (canPersist) {
                     recordScore(imageKey, score, appContext, dHash)
-                    val threshold = NsfwFilterEngine.getVisualThreshold(appContext)
-                    applyVisualFilterResult(activeView, imageKey, targetDrawable, score, threshold, appContext, false)
                 }
+                val threshold = NsfwFilterEngine.getVisualThreshold(appContext)
+                postScoreResult(score, threshold, animate = false)
             }
         }
 
@@ -769,7 +839,8 @@ object OnDeviceNsfwClassifier {
                 }
 
                 val drawable = targetDrawable
-                val resolvedHash = dHash ?: analyzeFastMetrics(drawable, appContext)?.dHash
+                val fast = analyzeFastMetrics(drawable, appContext)
+                val resolvedHash = dHash ?: fast?.dHash
 
                 if (resolvedHash != null) {
                     val dHashHit = dHashCache.get(resolvedHash)
@@ -784,10 +855,12 @@ object OnDeviceNsfwClassifier {
                     }
                 }
 
-                // If device is under active severe memory pressure or model unavailable, use safe fallback
+                // If device is under active severe memory pressure or model unavailable, use fast visual fallback without poisoning disk cache with 1.0f
                 if (isDeviceUnderMemoryPressure(appContext) || isModelPermanentlyUnavailable) {
-                    val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(drawable, appContext) else maxOf(classifyPotatoFastScore(drawable, appContext), 1.0f)
-                    recordScore(imageKey, score, appContext, resolvedHash)
+                    val (score, canPersist) = evaluateFastFallbackScore(drawable, appContext, fast)
+                    if (canPersist) {
+                        recordScore(imageKey, score, appContext, resolvedHash)
+                    }
                     val activeThreshold = NsfwFilterEngine.getVisualThreshold(appContext)
                     postScoreResult(score, activeThreshold, animate = false)
                     return
@@ -967,8 +1040,10 @@ object OnDeviceNsfwClassifier {
                     dos.flush()
                 }
                 if (tmpFile.exists()) {
-                    if (file.exists()) file.delete()
-                    tmpFile.renameTo(file)
+                    if (!tmpFile.renameTo(file)) {
+                        file.delete()
+                        tmpFile.renameTo(file)
+                    }
                 }
                 isScoresDirty = false
             } catch (t: Throwable) {
@@ -1039,25 +1114,26 @@ object OnDeviceNsfwClassifier {
         synchronized(modelBufferLock) {
             sharedModelBuffer?.let { return it }
             return try {
-                val assetFd: AssetFileDescriptor = ctx.assets.openFd(MODEL_ASSET_PATH)
-                val inputStream = FileInputStream(assetFd.fileDescriptor)
-                val fileChannel = inputStream.channel
-                val startOffset = assetFd.startOffset
-                val declaredLength = assetFd.declaredLength
-                val buffer = fileChannel.map(
-                    FileChannel.MapMode.READ_ONLY,
-                    startOffset,
-                    declaredLength
-                )
-                // Linux Kernel Acceleration:
-                // Advise Linux kernel to pre-fault pages into read-only page cache (MADV_WILLNEED).
-                // Eliminates demand page faults during inference and ensures model weights are served at DRAM bus speeds.
-                try {
-                    buffer.load()
-                } catch (_: Throwable) {
+                ctx.assets.openFd(MODEL_ASSET_PATH).use { assetFd ->
+                    FileInputStream(assetFd.fileDescriptor).use { inputStream ->
+                        inputStream.channel.use { fileChannel ->
+                            val buffer = fileChannel.map(
+                                FileChannel.MapMode.READ_ONLY,
+                                assetFd.startOffset,
+                                assetFd.declaredLength
+                            )
+                            // Linux Kernel Acceleration:
+                            // Advise Linux kernel to pre-fault pages into read-only page cache (MADV_WILLNEED).
+                            // Eliminates demand page faults during inference and ensures model weights are served at DRAM bus speeds.
+                            try {
+                                buffer.load()
+                            } catch (_: Throwable) {
+                            }
+                            sharedModelBuffer = buffer
+                            buffer
+                        }
+                    }
                 }
-                sharedModelBuffer = buffer
-                buffer
             } catch (t: Throwable) {
                 Log.e(TAG, "Failed to memory map TFLite model: ${t.message}")
                 isModelPermanentlyUnavailable = true
@@ -1145,14 +1221,18 @@ object OnDeviceNsfwClassifier {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             return sessionPool.poll()
         }
-        // If all sessions are currently checked out, wait for one to be returned (up to 1500ms on background threads)
+        // If all sessions are currently checked out, wait on sessionPoolLock until one returns (up to 1500ms)
         val deadline = System.currentTimeMillis() + 1500L
-        while (System.currentTimeMillis() < deadline) {
-            sessionPool.poll()?.let { return it }
-            try {
-                Thread.sleep(5L)
-            } catch (_: InterruptedException) {
-                break
+        synchronized(sessionPoolLock) {
+            while (true) {
+                sessionPool.poll()?.let { return it }
+                val remaining = deadline - System.currentTimeMillis()
+                if (remaining <= 0L) break
+                try {
+                    sessionPoolLock.wait(remaining)
+                } catch (_: InterruptedException) {
+                    break
+                }
             }
         }
         return sessionPool.poll()
@@ -1167,6 +1247,9 @@ object OnDeviceNsfwClassifier {
             activeSessionCount.decrementAndGet()
         } else {
             sessionPool.offer(session)
+            synchronized(sessionPoolLock) {
+                sessionPoolLock.notify()
+            }
         }
     }
 
@@ -1184,19 +1267,18 @@ object OnDeviceNsfwClassifier {
                 return cachedDHashScore
             }
 
-            // 2. Active memory pressure guard: if OS is critically low on RAM (<20MB), fall back to safe score
+            // 2. Active memory pressure guard: if OS is critically low on RAM (<25MB), fall back to fast score
             if (isDeviceUnderMemoryPressure(ctx) || isModelPermanentlyUnavailable) {
-                val fallback = if (ctx.isNsfwEnabled()) fast.potatoScore else maxOf(fast.potatoScore, 1.0f)
-                dHashCache.put(fast.dHash, fallback)
-                return fallback
+                dHashCache.put(fast.dHash, fast.potatoScore)
+                return fast.potatoScore
             }
         } else {
             if (isDeviceUnderMemoryPressure(ctx) || isModelPermanentlyUnavailable) {
-                return if (ctx.isNsfwEnabled()) classifyPotatoFastScore(drawable, ctx) else 1.0f
+                return evaluateFastFallbackScore(drawable, ctx).first
             }
         }
 
-        val session = borrowSession(ctx) ?: return if (ctx.isNsfwEnabled()) (fast?.potatoScore ?: classifyPotatoFastScore(drawable, ctx)) else 1.0f
+        val session = borrowSession(ctx) ?: return evaluateFastFallbackScore(drawable, ctx, fast).first
         val score = try {
             session.execute(drawable, ctx)
         } finally {
@@ -1411,12 +1493,10 @@ object OnDeviceNsfwClassifier {
         // 2. Active critical memory pressure or model unavailable -> run lightweight fallback immediately
         if (isDeviceUnderMemoryPressure(appContext) || isModelPermanentlyUnavailable) {
             val fast = analyzeFastMetrics(drawable, appContext)
-            val score = if (appContext.isNsfwEnabled()) {
-                fast?.potatoScore ?: classifyPotatoFastScore(drawable, appContext)
-            } else {
-                maxOf(fast?.potatoScore ?: classifyPotatoFastScore(drawable, appContext), 1.0f)
+            val (score, canPersist) = evaluateFastFallbackScore(drawable, appContext, fast)
+            if (canPersist) {
+                recordScore(imageKey, score, appContext, fast?.dHash)
             }
-            recordScore(imageKey, score, appContext, fast?.dHash)
             applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
             return
         }
@@ -1435,8 +1515,10 @@ object OnDeviceNsfwClassifier {
             )
         } catch (_: Throwable) {
             // If submission fails due to executor rejection, safely run lightweight fallback immediately
-            val score = if (appContext.isNsfwEnabled()) classifyPotatoFastScore(drawable, appContext) else 1.0f
-            recordScore(imageKey, score, appContext)
+            val (score, canPersist) = evaluateFastFallbackScore(drawable, appContext)
+            if (canPersist) {
+                recordScore(imageKey, score, appContext)
+            }
             applyVisualFilterResult(imageView, imageKey, drawable, score, threshold, appContext, false)
         }
     }
@@ -1642,6 +1724,10 @@ object OnDeviceNsfwClassifier {
                 activeSessionCount.decrementAndGet()
             }
             sharedModelBuffer = null
+            while (true) {
+                val ref = activePotatoScratches.poll() ?: break
+                ref.get()?.release()
+            }
             threadLocalPotato.get()?.release()
             threadLocalPotato.remove()
         } catch (_: Throwable) {

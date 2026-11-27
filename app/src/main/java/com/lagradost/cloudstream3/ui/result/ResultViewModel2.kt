@@ -2452,6 +2452,19 @@ class ResultViewModel2 : ViewModel() {
             APIHolder.getApiFromNameNull(searchResponse.apiName) ?: APIHolder.getApiFromUrlNull(
                 searchResponse.url
             ) ?: APIRepository.noneApi
+
+        val nsfwEnabled = isNsfwGloballyEnabled()
+        val filterLevel = NsfwFilterEngine.getFilterLevel(context)
+        if (!nsfwEnabled && (NsfwFilterEngine.isNsfwProvider(api) || NsfwFilterEngine.isNsfw(searchResponse, filterLevel))) {
+            _page.postValue(
+                Resource.Failure(
+                    false,
+                    "Adult content is disabled in settings"
+                )
+            )
+            return@ioSafe
+        }
+
         val repo = APIRepository(api)
         val response = LoadResponseFromSearch(
             name = searchResponse.name,
