@@ -9,8 +9,6 @@ class ShieldedClassLoaderTest {
     @Test
     fun `test ShieldedClassLoader blocks sensitive internal singletons`() {
         val blockedClasses = listOf(
-            "com.lagradost.cloudstream3.syncproviders.AccountManager",
-            "com.lagradost.cloudstream3.syncproviders.AccountManager\$Companion",
             "com.lagradost.cloudstream3.syncproviders.AuthStore",
             "com.lagradost.cloudstream3.syncproviders.SecureAuthStore",
             "com.lagradost.cloudstream3.utils.UpdateSecurityGate",
@@ -41,6 +39,8 @@ class ShieldedClassLoaderTest {
             "com.lagradost.cloudstream3.utils.ExtractorApi",
             "com.lagradost.cloudstream3.plugins.Plugin",
             "com.lagradost.cloudstream3.plugins.BasePlugin",
+            "com.lagradost.cloudstream3.syncproviders.AccountManager",
+            "com.lagradost.cloudstream3.syncproviders.AccountManager\$Companion",
             "com.lagradost.cloudstream3.plugins.RepositoryManager",
             "com.lagradost.cloudstream3.plugins.RepositoryManager\$Companion",
             "com.lagradost.cloudstream3.ui.settings.extensions.RepositoryData",
