@@ -584,7 +584,7 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                             searchExitIcon?.alpha = 1f
                             binding.searchLoadingBar.alpha = 0f
                             val q = binding.mainSearch.query?.toString()?.trim().orEmpty()
-                            if (q.length > 1 && list.isEmpty() && res.value.page > 0) {
+                            if (q.length > 1 && list.isEmpty() && res.value.currentPage > 0) {
                                 showToast(R.string.no_data, Toast.LENGTH_SHORT)
                             }
                         }
