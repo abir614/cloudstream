@@ -94,14 +94,14 @@ CloudStream incorporates an industry-first, **On-Device Artificial Intelligence 
 - **Hardware-Adaptive Buffering (ExoPlayer / Media3)**:
   - Tiers buffers dynamically: Low-end (10s min / 25s max / 12 MB target), Mid-range (20s / 45s / 48 MB), and High-end (30s / 60s / 128 MB).
 
-### 5. Resilient Local & Sync Library
+### 5. Privacy-First Resilient Local Library
 - **Bottom Navigation "Library" Menu ([`LibraryFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/library/LibraryFragment.kt))**:
-  - Full local library lists: **Watching**, **Plan to Watch**, **Completed**, **On Hold**, **Dropped**, **Favorites**, and **Subscriptions**.
+  - Full local library lists stored strictly on-device: **Watching**, **Plan to Watch**, **Completed**, **On Hold**, **Dropped**, **Favorites**, and **Subscriptions**.
   - Null-safe initialization in [`LocalList.kt`](app/src/main/java/com/lagradost/cloudstream3/syncproviders/providers/LocalList.kt) ensures all category tabs render properly even before any items are bookmarked.
   - Focus-safe ViewPager page switching preventing focus traps on Android TV and phone interfaces.
-- **Multi-Account Sync & Subtitle Providers ([`AccountManager.kt`](app/src/main/java/com/lagradost/cloudstream3/syncproviders/AccountManager.kt))**:
-  - Integrated support for MyAnimeList (MAL), AniList, Kitsu, Simkl, and LocalList.
-  - Subtitle integration with OpenSubtitles, SubDL, Addic7ed, SubSource, and AnimeSkip.
+- **No-Account Privacy Enforcement & Extension Compatibility ([`CloudStreamApp.kt`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt), [`AccountManager.kt`](app/src/main/java/com/lagradost/cloudstream3/syncproviders/AccountManager.kt))**:
+  - Multi-account switching and cloud tracker sync logins are disabled/removed from app flows, with stored auth/account token prefixes actively wiped at boot for 100% local privacy.
+  - Core `AccountManager` / `SettingsAccount` symbols remain intact purely to maintain extension binary compatibility and subtitle provider access.
 
 ### 6. Privacy-First Resilient DNS & Network Security
 - **Strict Control Plane vs. Data Plane ([`network_security_config.xml`](app/src/main/res/xml/network_security_config.xml))**:
@@ -111,14 +111,14 @@ CloudStream incorporates an industry-first, **On-Device Artificial Intelligence 
   - Enforces address validation at the DNS resolution layer for all network calls and HTTP redirect hops.
   - Blocks loopback (`127.0.0.0/8`, `::1`), RFC-1918 private subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), Carrier-Grade NAT (`100.64.0.0/10`), link-local / cloud metadata (`169.254.169.254`), and IPv6 ULA (`fc00::/7`).
   - Opt-in LAN toggle available for local media servers (Jellyfin, Kodi, local NAS).
-- **Privacy-First Multi-Tier DNS Fallback & Subnet Transfer Maze ([`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt))**:
-  - **Tier 1 (Privacy DoH)**: Queries zero-logging encrypted resolvers **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) $\rightarrow$ **Quad9 DoH** (`https://dns10.quad9.net/dns-query`) with dual-stack IPv4/IPv6 bootstrap hosts and cache-uncoupled fast-fail (`2500ms` connect/read, `3000ms` call).
+- **Privacy-First Multi-Tier DNS Fallback, Shared DoH Pooling & Subnet Transfer Maze ([`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt))**:
+  - **Tier 1 (Privacy DoH)**: Queries zero-logging encrypted resolvers **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) $\rightarrow$ **Quad9 DoH** (`https://dns10.quad9.net/dns-query`) with dual-stack IPv4/IPv6 bootstrap hosts, a shared lightweight bootstrap `OkHttpClient` pool, and cache-uncoupled fast-fail timeouts (`1500ms` connect/read/write, `2000ms` call).
   - **Tier 2 (High-Speed Edge DoH)**: Queries **Cloudflare DoH** $\rightarrow$ **Google DoH** within the remaining cascade budget.
   - **Tier 3 (Primary Plain DNS)**: Direct UDP 53 Anycast to Quad9 (`9.9.9.10`, `149.112.112.10`) & Cloudflare (`1.1.1.1`, `1.0.0.1`) if DoH is blocked by hostile firewalls.
   - **Tier 4 (Edge Plain DNS)**: Direct UDP 53 Anycast to Google & AdGuard.
   - **Tier 5 (System Fallback)**: Transparent Android `Dns.SYSTEM` fallback.
-  - Bounded by `3000ms` cascade deadlines, `CachedDns` (5-minute TTL / 512-host LRU cache), and **Subnet Data Transfer Maze (`SafeDns.mazeSubnetRotate`)** which interleaves `/24` IPv4 and `/48` IPv6 edge IPs across connections.
-  - **ExoPlayer / Media3 & Coil Alignment**: When DoH is enabled (`dns != 0`), Cronet is automatically bypassed in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt) and Coil uses the same resolver in [`ImageModuleCoil.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/ImageModuleCoil.kt) so streams and artwork avoid ISP DNS surveillance leaks.
+  - Bounded by `4000ms` cascade deadlines, shared cross-client `CachedDns` resolver instances (5-minute TTL / 512-host LRU cache shared across API, Coil, and playback clients), and **Subnet Data Transfer Maze (`SafeDns.mazeSubnetRotate`)** which interleaves `/24` IPv4 and `/48` IPv6 edge IPs across connections.
+  - **ExoPlayer / Media3 & Coil Alignment**: When DoH is enabled (`dns != 0`) or on ultra-potato hardware, Cronet is bypassed in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt) so streams route via `OkHttpDataSource(app.baseClient)` (honoring DoH and avoiding native Cronet memory overhead on low-RAM boxes), while Coil shares the same DNS resolver cache via [`ImageModuleCoil.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/ImageModuleCoil.kt).
 - **Transparent Network-Level Travel Compression ([`RequestsHelper.kt`](app/src/main/java/com/lagradost/cloudstream3/network/RequestsHelper.kt))**:
   - Automatically negotiates and decompresses HTTP payloads (`gzip`, `deflate`) for scraper manifests, repository indexes, JSON APIs, and subtitle files via a zero-allocation streaming interceptor.
   - Media bitstream preservation: Video segments (`.ts`, `.m4s`, `.mp4`, images) and HTTP Range requests strictly bypass compression negotiation, eliminating CPU/battery waste on low-power devices.
@@ -175,7 +175,7 @@ CloudStream incorporates an industry-first, **On-Device Artificial Intelligence 
 - **CPU-Bound Proof-of-Work (PoW) Anti-Spam Barrier**: Dynamically solves difficulty 3 challenges in ~15ms via an allocation-free streaming SHA-256 loop, neutralizing automated bot spam and edge flooding.
 - **High-Efficiency 10x Event Batching**: Consolidates up to 10 diagnostic logs into a single encrypted dispatch envelope, cutting edge request consumption by up to 90% and preventing quota exhaustion.
 - **CGNAT-Safe Dual-Tier Rate Limiting**: Independent per-device limits (`dev:${clientIp}:${deviceId}`, 10 reports / 5 min) protect mobile users sharing carrier-grade NAT IPs without cross-device interference.
-- **App-Wide Error & Warning Ingestion**: Real-time logcat streaming ([`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt)) on standard/high-end devices, with automatic subprocess deactivation on ultra-potato devices to save CPU/RAM.
+- **App-Level Precision Filtering & Error/Warning Ingestion ([`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt), [`RemoteCrashReporter.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/RemoteCrashReporter.kt))**: Drops non-fatal third-party scraper HTML/JSON parse chatter, transient upstream CDN HTTP rejections, and OEM background noise strictly inside the app before queueing—using exact matching for short HAL tags (`QT`, `LB`, `ion`) so first-party tags like `Extension*`/`Connection*` are never masked, while preserving `FATAL` crashes, `PluginManager`, `RepositoryManager`, `SandboxClient`, `OutOfMemoryError`, `NoClassDefFoundError`, and `SecurityException` diagnostics. Automatic logcat subprocess stays disabled on ultra-potato devices to save CPU/RAM.
 - **High-Ratio Transparent Payload Compression (85–92% Bandwidth Savings)**: Automatically compresses telemetry reports exceeding 256 bytes with Gzip prior to AES-256-GCM encryption, slashing batch dump sizes from ~80 KB to ~6 KB before edge dispatch, where the Cloudflare Worker decompresses it via native `DecompressionStream("gzip")`.
 
 ### 10. Modern Android TV UI & Visual Focus Experience

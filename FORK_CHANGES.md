@@ -43,8 +43,8 @@ This document catalogues all intentional architectural deviations, security hard
   3. **Tier 3 (Primary Plain DNS)**: Direct UDP 53 Anycast to Quad9 (`9.9.9.10`, `149.112.112.10`) and Cloudflare (`1.1.1.1`, `1.0.0.1`).
   4. **Tier 4 (Edge Plain DNS)**: Direct UDP 53 Anycast to Google (`8.8.8.8`, `8.8.4.4`) and AdGuard (`94.140.14.140`, `94.140.14.141`).
   5. **Tier 5 (System Fallback)**: Transparent Android `Dns.SYSTEM` fallback.
-- **Bounded Total Budget**: Enforces a 3000ms cascading deadline (2500ms connect/read fast-fail client timeout, 1000ms UDP fallback timeout, IPv4/IPv6 bootstrap hosts) per lookup to prevent sequential fallbacks from stacking latency on blackholed networks.
-- **ExoPlayer / Media3 DNS Alignment**: When DoH is enabled (`dns != 0`), Cronet is automatically bypassed in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt) so video chunks are retrieved via OkHttp `app.baseClient`, guaranteeing video segment downloads never leak to unencrypted ISP DNS.
+- **Bounded Total Budget & Shared DoH Pool**: Enforces a `4000ms` cascading deadline (`1500ms` connect/read/write fast-fail client timeout, `2000ms` call timeout, `1000ms` UDP fallback timeout) per lookup while sharing one lightweight `sharedDohBootstrapClient` and cross-client `CachedDns` instances across API, Coil, and player clients without duplicating `OkHttpClient` thread pools.
+- **ExoPlayer / Media3 DNS & Low-RAM Alignment**: When DoH is enabled (`dns != 0`) or on `DeviceProfile.isUltraPotato` hardware, Cronet is bypassed in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt) so video chunks route through `OkHttpDataSource(app.baseClient)` (honoring DoH and avoiding native Cronet memory/cache overhead on low-RAM boxes).
 - **Cronet Thread Pool Lifecycle Management**: Replaced ad-hoc `Executors.newSingleThreadExecutor()` with a shared daemon-backed executor in [`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt), preventing unmanaged thread accumulation across stream/quality changes.
 - **Hardware-Adaptive HTTP Disk Cache Scaling**: Scaled OkHttp disk cache dynamically in [`DeviceProfile.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/DeviceProfile.kt) and [`RequestsHelper.kt`](app/src/main/java/com/lagradost/cloudstream3/network/RequestsHelper.kt) (15MB on ultra-potato, 30MB on low, 50MB on mid, 100MB on high), safeguarding eMMC storage on low-end TV sticks.
 - **Ultra-Potato Coil Concurrency Bounds**: Scaled image network dispatcher (`maxRequests = 16`, `maxRequestsPerHost = 6`) and connection pool (`maxIdle = 3`, `keepAlive = 2m`) on low-RAM devices (<= 768MB) in [`ImageModuleCoil.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/ImageModuleCoil.kt) to prevent file descriptor exhaustion during fast poster scrolling.
@@ -204,12 +204,11 @@ This document catalogues all intentional architectural deviations, security hard
 
 ---
 
-## 6. Full Local & Sync Account Providers
+## 6. Privacy-First Local Library & Extension Compatibility
 
-All primary third-party sync and subtitle accounts are wired and hardened with crash-resilient null-safe state stores:
-- **Account Sync Providers**: MyAnimeList (MAL), Kitsu, AniList, Simkl, and LocalList.
-- **Subtitle Providers**: OpenSubtitles, SubDL, Addic7ed, SubSource, AnimeSkip.
-- **Null-Safe Local Library**: `LocalList` and `DataStoreHelper` guarantee non-null list returns, allowing the library tabs (Watching, Plan to Watch, Completed, On Hold, Dropped, Favorites, Subscriptions) to render properly even before any items are saved.
+Cloud/multi-account profile switching is removed from launcher/home flows and stored account/sync token keys are scrubbed at startup in [`CloudStreamApp.kt`](app/src/main/java/com/lagradost/cloudstream3/CloudStreamApp.kt) for 100% local privacy, while retaining binary compatibility for extensions and subtitle APIs:
+- **Local-First Library (`LocalList`)**: `LocalList` and `DataStoreHelper` guarantee non-null list returns, allowing library tabs (Watching, Plan to Watch, Completed, On Hold, Dropped, Favorites, Subscriptions) to run 100% locally offline without cloud accounts.
+- **Subtitle & Extension Binary Compatibility**: `AccountManager`, `SettingsAccount`, and subtitle APIs (OpenSubtitles, SubDL, Addic7ed, SubSource) preserve public extension APIs safely without persisting personal sync credentials.
 
 ---
 
@@ -958,6 +957,20 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Bumped `org.jetbrains.dokka:dokka-gradle-plugin` from `2.2.0` to `2.3.0` (PR #45).
   - Bumped `androidGradlePlugin` from `9.5.0` to `9.5.2` (PR #44).
   - Bumped `wasmi` from `0.36.0` to `1.1.0` in `/rust-core` (PR #43).
+
+### 16.47 App-Level Telemetry Precision, Shared DoH Pooling, Acceleration & Privacy Cleanup
+- **App-Level Telemetry Noise Suppression ([`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt), [`RemoteCrashReporter.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/RemoteCrashReporter.kt))**:
+  - Fixed over-broad substring matches in `isNoiseTag()` by separating short HAL tags (`QT`, `LB`, `ion`) into exact case-insensitive matches so first-party tags (`Extension*`, `Connection*`, `Session*`, `Exception*`) are never suppressed.
+  - Restored visibility for `RepositoryManager`, `SandboxClient`, non-HTTP `ExoPlayerImplInternal` failures, and `Failed downloading plugin from` errors.
+  - Added `RemoteCrashReporter.shouldSuppressNonFatalDiagnostic()` (invoked by both `AutoLogcatMonitor` and `dispatchDiagnosticLogAsync`) to drop external third-party `.cs3` scraper HTML/JSON parse chatter, transient CDN HTTP 4xx/5xx rejections in ExoPlayer, and OEM background noise (`BillingClient`, `DictionaryFacilitatorImpl`, `LOG_FLOWCTRL`, `ExifInterface`) strictly at the app boundary while never suppressing `FATAL`, `OutOfMemoryError`, `NoClassDefFoundError`, `ClassNotFoundException`, `SecurityException`, or `PluginManager` failures.
+- **Shared DoH Bootstrap Pool & Cross-Client DNS Caching ([`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt))**:
+  - Eliminated redundant per-builder `OkHttpClient` constructions in `addGenericDns()` and `addResilientMultiTierDns()` by sharing a lightweight `sharedDohBootstrapClient` and keyed `CachedDns` resolver instances across API, Coil, and media clients.
+  - Tuned `ResilientFallbackDns` per-tier fast-fail client timeouts (`1500ms` connect/read/write, `2000ms` call) inside a `4000ms` cascading budget so fallback DoH and UDP resolvers execute cleanly when primary endpoints stall.
+- **Player Hardware Acceleration & Low-RAM Optimization ([`CS3IPlayer.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/player/CS3IPlayer.kt))**:
+  - Bypassed native `CronetEngine` allocation and disk cache on `DeviceProfile.isUltraPotato` hardware so playback routes through lightweight `OkHttpDataSource(app.baseClient)`.
+  - Deduplicated ExoPlayer `DefaultRenderersFactory` decoder fallback, 5s video joining, async MediaCodec queueing, and extension renderer wiring into a shared helper.
+- **Orphaned Multi-Account UI & Resource Cleanup ([`AccountSelectActivity.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/account/AccountSelectActivity.kt), [`HomeFragment.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeFragment.kt), [`HomeParentItemAdapterPreview.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/home/HomeParentItemAdapterPreview.kt))**:
+  - Removed orphaned `AccountViewModel`, `AccountHelper`, `AccountAdapter`, `AccountSelectLinearItemDecoration`, and 7 unused account XML layouts/resources along with unused `HomeFragment` / `HomeParentItemAdapterPreview` / `MainActivity` / `SettingsAccountScreen` / `mobile_navigation.xml` references while keeping `AccountSelectActivity` as a zero-overhead launcher trampoline and preserving plugin binary compatibility.
 
 
 

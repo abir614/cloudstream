@@ -32,9 +32,6 @@ import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.mvvm.observe
 import com.lagradost.cloudstream3.ui.ViewHolderState
 import com.lagradost.cloudstream3.ui.WatchType
-import com.lagradost.cloudstream3.ui.account.AccountHelper.showAccountEditDialog
-import com.lagradost.cloudstream3.ui.account.AccountHelper.showAccountSelectLinear
-import com.lagradost.cloudstream3.ui.account.AccountViewModel
 import com.lagradost.cloudstream3.ui.result.FOCUS_SELF
 import com.lagradost.cloudstream3.ui.result.ResultFragment.bindLogo
 import com.lagradost.cloudstream3.ui.result.ResultViewModel2
@@ -61,8 +58,7 @@ import androidx.core.graphics.toColorInt
 import com.lagradost.cloudstream3.ui.setRecycledViewPool
 
 class HomeParentItemAdapterPreview(
-    private val viewModel: HomeViewModel,
-    private val accountViewModel: AccountViewModel
+    private val viewModel: HomeViewModel
 ) : ParentItemAdapter(
     id = "HomeParentItemAdapterPreview".hashCode(),
     clickCallback = {
@@ -102,7 +98,7 @@ class HomeParentItemAdapterPreview(
             )
         }
 
-        return HeaderViewHolder(binding, viewModel, accountViewModel)
+        return HeaderViewHolder(binding, viewModel)
     }
 
     override fun onBindHeader(holder: ViewHolderState<Bundle>) {
@@ -128,7 +124,6 @@ class HomeParentItemAdapterPreview(
     private class HeaderViewHolder(
         val binding: ViewBinding,
         val viewModel: HomeViewModel,
-        accountViewModel: AccountViewModel,
     ) :
         ViewHolderState<Bundle>(binding) {
 

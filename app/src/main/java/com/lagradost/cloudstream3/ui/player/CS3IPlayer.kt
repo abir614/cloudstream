@@ -789,14 +789,12 @@ class CS3IPlayer : IPlayer {
         }
 
         fun tryCreateEngine(context: Context, diskCacheSize: Long): CronetEngine? {
-            // When custom DNS (DoH) is selected, bypass Cronet.
-            // Cronet relies on OS-level DNS resolution and does not support in-app DoH,
-            // which can leak video stream DNS queries to the ISP or cause ISP blocking.
-            // Returning null forces ExoPlayer to route through OkHttpDataSource(app.baseClient),
-            // strictly honoring the user's configured DoH provider.
+            // Bypass Cronet when custom DNS (DoH) is active (Cronet uses OS DNS and would bypass
+            // in-app DoH) or on ultra-potato devices (saves native Cronet RAM and disk-cache overhead
+            // by routing directly through lightweight OkHttpDataSource(app.baseClient)).
             val settingsManager = PreferenceManager.getDefaultSharedPreferences(context)
             val dns = settingsManager.getInt(context.getString(R.string.dns_key), 10)
-            if (dns != 0) {
+            if (dns != 0 || DeviceProfile.isUltraPotato(context)) {
                 if (cronetEngine != null) {
                     try {
                         cronetEngine?.shutdown()
@@ -1207,40 +1205,35 @@ class CS3IPlayer : IPlayer {
                     )
                     compressor = if (isCompressorEnabled) DynamicRangeCompressor() else null
 
+                    fun <T : DefaultRenderersFactory> T.configurePlaybackFactory(
+                        extensionRendererMode: Int? = null
+                    ): T = apply {
+                        setEnableDecoderFallback(true)
+                        setAllowedVideoJoiningTimeMs(5000L)
+                        forceEnableMediaCodecAsynchronousQueueing()
+                        if (extensionRendererMode != null) {
+                            setExtensionRendererMode(extensionRendererMode)
+                        }
+                    }
+
+                    val extensionRendererMode = if (isSoftwareDecodingPreferred) {
+                        DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
+                    } else {
+                        DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+                    }
+
                     val factory = if (isAudioOnly || (isSoftwareDecodingEnabled && !allowSoftwareVideo)) {
                         // HW+ (audio-only software decoding) or fallback when hardware cannot safely handle software video
-                        FixedNextRenderersFactoryWithoutVideo(context, compressor).apply {
-                            setEnableDecoderFallback(true)
-                            setAllowedVideoJoiningTimeMs(5000L)
-                            forceEnableMediaCodecAsynchronousQueueing()
-                            setExtensionRendererMode(
-                                if (isSoftwareDecodingPreferred)
-                                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                                else
-                                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
-                            )
-                        }
+                        FixedNextRenderersFactoryWithoutVideo(context, compressor)
+                            .configurePlaybackFactory(extensionRendererMode)
                     } else if (isSoftwareDecodingEnabled) {
-                        FixedNextRenderersFactory(context, compressor).apply {
-                            setEnableDecoderFallback(true)
-                            setAllowedVideoJoiningTimeMs(5000L)
-                            forceEnableMediaCodecAsynchronousQueueing()
-                            setExtensionRendererMode(
-                                if (isSoftwareDecodingPreferred)
-                                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
-                                else
-                                    DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
-                            )
-                        }
+                        FixedNextRenderersFactory(context, compressor)
+                            .configurePlaybackFactory(extensionRendererMode)
                     } else {
                         val activeCompressor = compressor
                         if (activeCompressor == null) {
                             // no nextlib = EXTENSION_RENDERER_MODE_OFF, no compressor = fully default sink
-                            DefaultRenderersFactory(context).apply {
-                                setEnableDecoderFallback(true)
-                                setAllowedVideoJoiningTimeMs(5000L)
-                                forceEnableMediaCodecAsynchronousQueueing()
-                            }
+                            DefaultRenderersFactory(context).configurePlaybackFactory()
                         } else {
                             object : DefaultRenderersFactory(context) {
                                 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -1253,11 +1246,7 @@ class CS3IPlayer : IPlayer {
                                     .setEnableAudioOutputPlaybackParameters(enableAudioTrackPlaybackParams)
                                     .setAudioProcessors(arrayOf<AudioProcessor>(activeCompressor))
                                     .build()
-                            }.apply {
-                                setEnableDecoderFallback(true)
-                                setAllowedVideoJoiningTimeMs(5000L)
-                                forceEnableMediaCodecAsynchronousQueueing()
-                            }
+                            }.configurePlaybackFactory()
                         }
                     }
 

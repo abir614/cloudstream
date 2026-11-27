@@ -179,4 +179,76 @@ class RemoteCrashReporterTest {
         assertTrue(payload.getString("stackTrace").contains("Fatal memory allocation failure in player"))
         assertEquals(fullForensicDump, payload.getString("fullLog"))
     }
+
+    @Test
+    fun `test app-level telemetry filters external scraper and CDN noise without dropping real failures`() {
+        assertTrue(
+            RemoteCrashReporter.shouldSuppressNonFatalDiagnostic(
+                level = "ERROR",
+                tag = "safeAmap",
+                message = "org.json.JSONException: Value <!DOCTYPE html> of type java.lang.String cannot be converted to JSONArray"
+            )
+        )
+        assertTrue(
+            RemoteCrashReporter.shouldSuppressNonFatalDiagnostic(
+                level = "WARN",
+                tag = "runLimitedAsync",
+                message = "Failed request: Expected URL scheme 'http' or 'https' but no scheme was found"
+            )
+        )
+        assertTrue(
+            RemoteCrashReporter.shouldSuppressNonFatalDiagnostic(
+                level = "ERROR",
+                tag = "CS3ExoPlayer",
+                message = "Playback HTTP error: androidx.media3.datasource.HttpDataSource\$InvalidResponseCodeException: Response code: 403"
+            )
+        )
+        assertTrue(
+            RemoteCrashReporter.shouldSuppressNonFatalDiagnostic(
+                level = "WARN",
+                tag = "BillingClient",
+                message = "Billing service unavailable on device."
+            )
+        )
+
+        // Critical failures must NEVER be suppressed
+        assertFalse(
+            RemoteCrashReporter.shouldSuppressNonFatalDiagnostic(
+                level = "FATAL",
+                tag = "runLimitedAsync",
+                message = "Value <!DOCTYPE crash"
+            )
+        )
+        assertFalse(
+            RemoteCrashReporter.shouldSuppressNonFatalDiagnostic(
+                level = "ERROR",
+                tag = "safeAmap",
+                message = "Failed to load provider class",
+                throwable = NoClassDefFoundError("com.lagradost.cloudstream3.MissingClass")
+            )
+        )
+        assertFalse(
+            RemoteCrashReporter.shouldSuppressNonFatalDiagnostic(
+                level = "ERROR",
+                tag = "CS3ExoPlayer",
+                message = "MediaCodecVideoRenderer error: Decoder init failed: c2.qti.hevc.decoder"
+            )
+        )
+        assertFalse(
+            RemoteCrashReporter.shouldSuppressNonFatalDiagnostic(
+                level = "ERROR",
+                tag = "PluginManager",
+                message = "Failed downloading plugin from https://example.com/plugin.cs3"
+            )
+        )
+
+        // Exact short tag matching must not swallow first-party tags containing "ion"
+        assertTrue(AutoLogcatMonitor.isNoiseTag("ion"))
+        assertTrue(AutoLogcatMonitor.isNoiseTag("QT"))
+        assertTrue(AutoLogcatMonitor.isNoiseTag("LB"))
+        assertFalse(AutoLogcatMonitor.isNoiseTag("ExtensionManager"))
+        assertFalse(AutoLogcatMonitor.isNoiseTag("ConnectionPool"))
+        assertFalse(AutoLogcatMonitor.isNoiseTag("RepositoryManager"))
+        assertFalse(AutoLogcatMonitor.isNoiseTag("SandboxClient"))
+    }
 }

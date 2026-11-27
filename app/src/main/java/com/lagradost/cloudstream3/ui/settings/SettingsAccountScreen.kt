@@ -21,8 +21,6 @@ import com.lagradost.cloudstream3.syncproviders.AccountManager.Companion.subDlAp
 import com.lagradost.cloudstream3.syncproviders.PlainAuthRepo
 import com.lagradost.cloudstream3.syncproviders.SubtitleRepo
 import com.lagradost.cloudstream3.syncproviders.SyncRepo
-import com.lagradost.cloudstream3.ui.settings.SettingsAccount.Companion.addAccount
-import com.lagradost.cloudstream3.ui.settings.SettingsAccount.Companion.showLoginInfo
 import com.lagradost.cloudstream3.utils.AppContextUtils.html
 import com.lagradost.cloudstream3.utils.BackupUtils
 import com.lagradost.cloudstream3.utils.BiometricAuthenticator

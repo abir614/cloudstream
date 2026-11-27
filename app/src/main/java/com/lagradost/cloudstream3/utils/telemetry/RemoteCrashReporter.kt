@@ -735,6 +735,138 @@ object RemoteCrashReporter {
      * Dispatches non-fatal warnings and errors asynchronously with debouncing and rate limiting.
      * Prevents alert storms while ensuring important diagnostic issues reach Telegram.
      */
+    private val criticalErrorTokens = listOf(
+        "OutOfMemoryError",
+        "StackOverflowError",
+        "NoClassDefFoundError",
+        "ClassNotFoundException",
+        "NoSuchMethodError",
+        "NoSuchFieldError",
+        "VerifyError",
+        "UnsatisfiedLinkError",
+        "LinkageError",
+        "SecurityException",
+        "SQLiteException",
+        "PluginManager"
+    )
+
+    private val protectedDiagnosticTags = setOf(
+        "PluginManager",
+        "SandboxClient",
+        "UpdateSecurityGate",
+        "ShieldedClassLoader",
+        "SafeDns",
+        "RepositoryManager"
+    )
+
+    private val externalScraperTags = setOf(
+        "runLimitedAsync",
+        "safeAmap"
+    )
+
+    private val scraperNoisePatterns = listOf(
+        "Value <!DOCTYPE",
+        "<!doctype html",
+        "Expected URL scheme 'http' or 'https'",
+        "cannot be converted to JSONArray",
+        "cannot be converted to JSONObject",
+        "Value error of type java.lang.String",
+        "End of input at character 0 of"
+    )
+
+    private val scraperTransientNetworkTokens = listOf(
+        "JSONException",
+        "ErrorLoadingException",
+        "UnknownHostException",
+        "SocketTimeoutException",
+        "ConnectException",
+        "SSLHandshakeException",
+        "CertPathValidatorException",
+        "HttpDataSource",
+        "Response code:",
+        "HTTP error"
+    )
+
+    private val oemNoiseTags = setOf(
+        "BillingClient",
+        "DictionaryFacilitatorImpl",
+        "AccessibilityNodeInfoDumper",
+        "LOG_FLOWCTRL"
+    )
+
+    private val oemNoiseMessages = listOf(
+        "ExifInterface: Invalid byte order",
+        "LOGS OVER PROC QUOTA",
+        "Billing service unavailable on device"
+    )
+
+    /**
+     * Filters non-fatal third-party scraper parse failures, transient upstream CDN HTTP rejections,
+     * and noisy OEM background chatter at the app boundary while preserving fatal crashes and
+     * first-party linkage, memory, security, and plugin-loader errors.
+     */
+    internal fun shouldSuppressNonFatalDiagnostic(
+        level: String,
+        tag: String,
+        message: String,
+        throwable: Throwable? = null
+    ): Boolean {
+        if (level.equals("FATAL", ignoreCase = true)) return false
+
+        val traceText = buildString {
+            append(message)
+            var current = throwable
+            var depth = 0
+            while (current != null && depth < 6) {
+                append('\n')
+                append(current.javaClass.name)
+                append(": ")
+                append(current.message.orEmpty())
+                for (frame in current.stackTrace.take(8)) {
+                    append('\n')
+                    append(frame.toString())
+                }
+                current = current.cause
+                depth++
+            }
+        }
+
+        if (criticalErrorTokens.any { traceText.contains(it, ignoreCase = false) }) {
+            return false
+        }
+        if (protectedDiagnosticTags.any { tag.equals(it, ignoreCase = true) }) {
+            return false
+        }
+
+        if (oemNoiseTags.any { tag.contains(it, ignoreCase = true) } ||
+            oemNoiseMessages.any { traceText.contains(it, ignoreCase = true) }
+        ) {
+            return true
+        }
+
+        if (scraperNoisePatterns.any { traceText.contains(it, ignoreCase = true) }) {
+            return true
+        }
+
+        if (externalScraperTags.any { tag.equals(it, ignoreCase = true) } &&
+            scraperTransientNetworkTokens.any { traceText.contains(it, ignoreCase = true) }
+        ) {
+            return true
+        }
+
+        // Transient upstream CDN rejections (403/404/410/429/5xx) in ExoPlayer;
+        // preserve codec, MediaCodec, AudioTrack, and internal renderer failures.
+        if ((tag.contains("CS3ExoPlayer", ignoreCase = true) ||
+                tag.contains("ExoPlayer", ignoreCase = true)) &&
+            (traceText.contains("HttpDataSource\$InvalidResponseCodeException", ignoreCase = true) ||
+                Regex("Response code:\\s*(403|404|410|429|500|502|503|504)\\b").containsMatchIn(traceText))
+        ) {
+            return true
+        }
+
+        return false
+    }
+
     fun dispatchDiagnosticLogAsync(
         level: String,
         tag: String,
@@ -744,6 +876,7 @@ object RemoteCrashReporter {
         force: Boolean = false
     ) {
         if (!force && !isTelemetryEnabled()) return
+        if (!force && shouldSuppressNonFatalDiagnostic(level, tag, message, throwable)) return
         val now = System.currentTimeMillis()
 
         if (force) {

@@ -27,6 +27,13 @@ object AutoLogcatMonitor {
     private val isRunning = AtomicBoolean(false)
     private var monitorThread: Thread? = null
 
+    // Short system/HAL tags that must match exactly to avoid swallowing first-party tags like Extension/Connection
+    private val exactNoiseTags = setOf(
+        "QT",
+        "LB",
+        "ion"
+    )
+
     // Benign or noisy system framework tags that should not trigger remote telemetry alerts
     private val noiseTagDenylist = setOf(
         "Choreographer",
@@ -82,27 +89,19 @@ object AutoLogcatMonitor {
         "androidtc",
         "VelocityTracker",
         "ColorUtils",
-        "ExoPlayerImplInternal",
-        "SandboxClient",
-        "Gralloc3",
-        "Gralloc4",
-        "Gralloc",
         "AudioCapabilities",
         "ashmem",
-        "QT",
         "CCodec",
         "DisplayEventDispatcher",
         "Bundle",
         "SpellCheckerSession",
         "cr_media",
         "RefClass",
-        "RepositoryManager",
         "AconfigFlags",
         "aconfig",
         "DRM/DcfDecoder",
         "DcfDecoder",
         "linker",
-        "ion",
         "SchedAssist",
         "IJankManager",
         "UAH_CLIENT",
@@ -192,7 +191,6 @@ object AutoLogcatMonitor {
             message.contains("Vsync time out", ignoreCase = true) ||
             message.contains("SPAN_EXCLUSIVE_EXCLUSIVE", ignoreCase = true) ||
             message.contains("Support!!", ignoreCase = true) ||
-            message.contains("Failed downloading plugin from", ignoreCase = true) ||
             message.contains("Deferring native library unloading", ignoreCase = true) ||
             message.contains("DeadObjectException", ignoreCase = true) ||
             message.contains("Failed to get suggestions", ignoreCase = true) ||
@@ -231,7 +229,8 @@ object AutoLogcatMonitor {
             message.contains("LOGS OVER PROC QUOTA", ignoreCase = true)
     }
 
-    private fun isNoiseTag(tag: String): Boolean {
+    internal fun isNoiseTag(tag: String): Boolean {
+        if (exactNoiseTags.any { tag.equals(it, ignoreCase = true) }) return true
         if (tag in noiseTagDenylist) return true
         for (entry in noiseTagDenylist) {
             if (tag.contains(entry, ignoreCase = true)) {
@@ -321,9 +320,17 @@ object AutoLogcatMonitor {
                             return
                         }
 
-                        // Strict noise rejection: system framework, OS runtime, and known benign messages
-                        // are ALWAYS filtered out, even if the OS logcat line quotes the application package name.
-                        if (isNoiseTag(currentTag) || isNoiseMessage(fullMessage)) {
+                        // Strict noise rejection: system framework, OS runtime, benign messages,
+                        // and non-fatal third-party scraper/CDN/OEM noise are dropped before breadcrumbs or queue.
+                        if (isNoiseTag(currentTag) ||
+                            isNoiseMessage(fullMessage) ||
+                            RemoteCrashReporter.shouldSuppressNonFatalDiagnostic(
+                                level = currentLevel.name,
+                                tag = currentTag,
+                                message = fullMessage,
+                                throwable = null
+                            )
+                        ) {
                             return
                         }
 

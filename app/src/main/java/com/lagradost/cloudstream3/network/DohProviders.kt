@@ -163,13 +163,13 @@ private fun parseNumericAddress(hostname: String): List<InetAddress>? {
 class ResilientFallbackDns(
     bootstrapClient: OkHttpClient
 ) : Dns {
-    // Fast-fail timeouts prevent blackholed DoH servers from stalling the 2s cascade budget.
+    // Fast-fail timeouts prevent blackholed DoH servers from stalling the 4s cascade budget.
     private val fastDohClient = bootstrapClient.newBuilder()
         .cache(null)
-        .connectTimeout(2500L, TimeUnit.MILLISECONDS)
-        .readTimeout(2500L, TimeUnit.MILLISECONDS)
-        .writeTimeout(2500L, TimeUnit.MILLISECONDS)
-        .callTimeout(3000L, TimeUnit.MILLISECONDS)
+        .connectTimeout(1500L, TimeUnit.MILLISECONDS)
+        .readTimeout(1500L, TimeUnit.MILLISECONDS)
+        .writeTimeout(1500L, TimeUnit.MILLISECONDS)
+        .callTimeout(2000L, TimeUnit.MILLISECONDS)
         .build()
 
     private val mozillaCloudflareDoh by lazy {
@@ -230,7 +230,7 @@ class ResilientFallbackDns(
     override fun lookup(hostname: String): List<InetAddress> {
         parseNumericAddress(hostname)?.let { return it }
 
-        val deadline = System.currentTimeMillis() + 3000L
+        val deadline = System.currentTimeMillis() + 4000L
 
         // 1. Primary Privacy DoH: Mozilla Cloudflare -> Quad9 (Zero-logging, strictly confidential)
         try {
@@ -318,54 +318,75 @@ class CachedDns(
     }
 }
 
-fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>) = dns(
-    SafeDns(
-        CachedDns(
-            object : Dns {
-                private val doh by lazy {
-                    val client = this@addGenericDns.build().newBuilder()
-                        .cache(null)
-                        .connectTimeout(2500L, TimeUnit.MILLISECONDS)
-                        .readTimeout(2500L, TimeUnit.MILLISECONDS)
-                        .writeTimeout(2500L, TimeUnit.MILLISECONDS)
-                        .callTimeout(3000L, TimeUnit.MILLISECONDS)
-                        .build()
-                    DnsOverHttps
-                        .Builder()
-                        .client(client)
-                        .url(url.toHttpUrl())
-                        .bootstrapDnsHosts(ips.map { InetAddress.getByName(it) })
-                        .build()
-                }
+/**
+ * Shared lightweight bootstrap OkHttpClient for DoH endpoints so multiple callers
+ * (main API client, Coil image client, player fallback) reuse a single Dispatcher and ConnectionPool
+ * without building duplicate OkHttpClient stacks during client initialization.
+ */
+private val sharedDohBootstrapClient: OkHttpClient by lazy {
+    OkHttpClient.Builder()
+        .cache(null)
+        .connectTimeout(1500L, TimeUnit.MILLISECONDS)
+        .readTimeout(1500L, TimeUnit.MILLISECONDS)
+        .writeTimeout(1500L, TimeUnit.MILLISECONDS)
+        .callTimeout(2000L, TimeUnit.MILLISECONDS)
+        .build()
+}
 
-                override fun lookup(hostname: String): List<InetAddress> {
-                    parseNumericAddress(hostname)?.let { return it }
+/**
+ * Shared DNS resolver cache keyed by DoH endpoint + bootstrap IPs so API requests,
+ * Coil image loads, and media playback reuse resolved records across clients.
+ */
+private val sharedDnsResolvers = ConcurrentHashMap<String, Dns>()
 
-                    val deadline = System.currentTimeMillis() + 3000L
-                    try {
-                        return doh.lookup(hostname)
-                    } catch (_: Throwable) {}
-
-                    if (System.currentTimeMillis() < deadline) {
-                        // Plain DNS fallback using the provider's bootstrap IPs (IPv4 only for UDP port 53 A-record queries)
-                        for (ip in ips.filterNot { it.contains(':') }) {
-                            val res = queryUdpDns(hostname, ip, timeoutMs = 1000)
-                            if (!res.isNullOrEmpty()) return res
-                            if (System.currentTimeMillis() >= deadline) break
-                        }
+fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>): OkHttpClient.Builder {
+    val cacheKey = "$url|${ips.joinToString(",")}"
+    val sharedDns = sharedDnsResolvers.computeIfAbsent(cacheKey) {
+        SafeDns(
+            CachedDns(
+                object : Dns {
+                    private val doh by lazy {
+                        DnsOverHttps
+                            .Builder()
+                            .client(sharedDohBootstrapClient)
+                            .url(url.toHttpUrl())
+                            .bootstrapDnsHosts(ips.map { InetAddress.getByName(it) })
+                            .build()
                     }
 
-                    // Final fallback to System DNS
-                    return Dns.SYSTEM.lookup(hostname)
-                }
-            }
-        )
-    )
-)
+                    override fun lookup(hostname: String): List<InetAddress> {
+                        parseNumericAddress(hostname)?.let { return it }
 
-fun OkHttpClient.Builder.addResilientMultiTierDns() = dns(
-    SafeDns(CachedDns(ResilientFallbackDns(build().newBuilder().cache(null).build())))
-)
+                        val deadline = System.currentTimeMillis() + 3000L
+                        try {
+                            return doh.lookup(hostname)
+                        } catch (_: Throwable) {}
+
+                        if (System.currentTimeMillis() < deadline) {
+                            // Plain DNS fallback using the provider's bootstrap IPs (IPv4 only for UDP port 53 A-record queries)
+                            for (ip in ips.filterNot { it.contains(':') }) {
+                                val res = queryUdpDns(hostname, ip, timeoutMs = 1000)
+                                if (!res.isNullOrEmpty()) return res
+                                if (System.currentTimeMillis() >= deadline) break
+                            }
+                        }
+
+                        // Final fallback to System DNS
+                        return Dns.SYSTEM.lookup(hostname)
+                    }
+                }
+            )
+        )
+    }
+    return dns(sharedDns)
+}
+
+fun OkHttpClient.Builder.addResilientMultiTierDns(): OkHttpClient.Builder {
+    val sharedDns = sharedDnsResolvers.computeIfAbsent("__resilient_multi_tier__") {
+        SafeDns(CachedDns(ResilientFallbackDns(sharedDohBootstrapClient)))
+    }
+    return dns(sharedDns)
+}
 
 
 fun OkHttpClient.Builder.addMozillaCloudflareDns() = (

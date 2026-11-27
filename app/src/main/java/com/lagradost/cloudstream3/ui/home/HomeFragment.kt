@@ -51,8 +51,6 @@ import com.lagradost.cloudstream3.plugins.Plugin
 import com.lagradost.cloudstream3.ui.APIRepository.Companion.noneApi
 import com.lagradost.cloudstream3.ui.APIRepository.Companion.randomApi
 import com.lagradost.cloudstream3.ui.BaseFragment
-import com.lagradost.cloudstream3.ui.account.AccountHelper.showAccountSelectLinear
-import com.lagradost.cloudstream3.ui.account.AccountViewModel
 import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_LOAD
 import com.lagradost.cloudstream3.ui.search.SEARCH_ACTION_PLAY_FILE
 import com.lagradost.cloudstream3.ui.search.SearchAdapter
@@ -516,7 +514,6 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
     }
 
     private val homeViewModel: HomeViewModel by activityViewModels()
-    private val accountViewModel: AccountViewModel by activityViewModels()
 
     fun addMovies(cards: List<SearchResponse>) {
         val ctx = context ?: run {
@@ -667,7 +664,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             homeSwitchAccount.isClickable = false
 
             homeMasterAdapter = HomeParentItemAdapterPreview(
-                homeViewModel, accountViewModel
+                homeViewModel
             )
             homeMasterRecycler.setRecycledViewPool(ParentItemAdapter.sharedPool)
             homeMasterRecycler.setHasFixedSize(true)
