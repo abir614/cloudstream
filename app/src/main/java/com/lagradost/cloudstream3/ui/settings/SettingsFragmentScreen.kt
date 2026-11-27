@@ -251,10 +251,9 @@ object SettingsFragmentScreen : Screen {
                                 .nestedScroll(parentFirstScrollConnection)
                         ) {
                             screens.forEach { settingsTab ->
-                                if (settingsTab.screen === SettingsAccountScreen && !showSecurityTab) {
-                                    return@forEach
+                                if (settingsTab.screen !== SettingsAccountScreen || showSecurityTab) {
+                                    SettingsTab(settingsTab)
                                 }
-                                SettingsTab(settingsTab)
                             }
                             BuildStamp()
                         }
@@ -282,14 +281,16 @@ object SettingsFragmentScreen : Screen {
         val showSecurityTab = shouldShowSecurityTab()
         return screens.mapNotNull { item ->
             if (item.screen === SettingsAccountScreen && !showSecurityTab) {
-                return@mapNotNull null
+                null
+            } else {
+                item.screen?.getPreferences()?.let { contents ->
+                    SettingsData(
+                        title = stringResource(item.title),
+                        navigation = item.navigation,
+                        contents = contents
+                    )
+                }
             }
-            val contents = item.screen?.getPreferences() ?: return@mapNotNull null
-            SettingsData(
-                title = stringResource(item.title),
-                navigation = item.navigation,
-                contents = contents
-            )
         }.toPersistentList()
     }
 
