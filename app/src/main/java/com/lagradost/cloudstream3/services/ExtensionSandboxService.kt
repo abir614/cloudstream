@@ -72,6 +72,17 @@ class ExtensionSandboxService : Service() {
                     }
                 }
 
+                CMD_SHUTDOWN -> {
+                    Log.i(TAG, "Shutdown requested by host; stopping isolated sandbox process")
+                    postDelayed({
+                        try {
+                            Process.killProcess(Process.myPid())
+                        } catch (_: Throwable) {
+                        }
+                    }, 50L)
+                    return
+                }
+
                 else -> {
                     reply.what = RESP_UNKNOWN_CMD
                 }
@@ -114,6 +125,7 @@ class ExtensionSandboxService : Service() {
         const val CMD_PING = 1
         const val CMD_VALIDATE_URL = 2
         const val CMD_EXECUTE_WASM = 3
+        const val CMD_SHUTDOWN = 4
 
         // Response Codes
         const val RESP_PING_OK = 100

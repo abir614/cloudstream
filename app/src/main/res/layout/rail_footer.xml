@@ -16,10 +16,11 @@
         android:layout_width="36dp"
         android:layout_height="36dp"
         android:background="@color/transparent"
-        android:focusable="true"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:clickable="false"
+        android:visibility="gone"
         android:foreground="@drawable/outline_drawable_round_20"
-        android:nextFocusUp="@id/navigation_settings"
-        android:nextFocusDown="@id/nav_footer_profile_card"
         app:cardCornerRadius="18dp">
 
         <ImageView

@@ -118,7 +118,8 @@ object AutoLogcatMonitor {
         "OplusDisplayModeManager",
         "AudioTrackExtImpl",
         "FrameInsert",
-        "LB"
+        "LB",
+        "LOG_FLOWCTRL"
     )
 
     private fun isNoiseMessage(message: String): Boolean {
@@ -226,7 +227,8 @@ object AutoLogcatMonitor {
             message.contains("init cloud whiteList failed", ignoreCase = true) ||
             message.contains("get fade type, but return null", ignoreCase = true) ||
             message.contains("FrameInsert open fail", ignoreCase = true) ||
-            message.contains("setSchedAffinity method", ignoreCase = true)
+            message.contains("setSchedAffinity method", ignoreCase = true) ||
+            message.contains("LOGS OVER PROC QUOTA", ignoreCase = true)
     }
 
     private fun isNoiseTag(tag: String): Boolean {

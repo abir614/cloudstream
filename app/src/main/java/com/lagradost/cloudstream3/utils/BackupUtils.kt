@@ -112,7 +112,14 @@ object BackupUtils {
         QUEUE_KEY,
 
         // Prevent automatic plugin download after restoring backup
-        "auto_download_plugins_key2"
+        "auto_download_plugins_key2",
+
+        // Privacy-focused build: never back up or restore account/auth credentials
+        "auth_tokens",
+        "auth_ids",
+        "accounts_key",
+        "skip_startup_account_select",
+        "last_sync_api"
     )
 
     /** false if key should not be contained in backup */

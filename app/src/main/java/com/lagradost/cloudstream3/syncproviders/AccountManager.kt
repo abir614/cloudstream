@@ -39,95 +39,36 @@ abstract class AccountManager {
 
         fun accounts(prefix: String): Array<AuthData> {
             require(prefix != "NONE")
-            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
-            return if (ctx != null) {
-                SecureAuthStore.getAccounts(ctx, prefix, DataStoreHelper.currentAccount)
-            } else {
-                getKey<Array<AuthData>>(
-                    ACCOUNT_TOKEN,
-                    "${prefix}/${DataStoreHelper.currentAccount}"
-                ) ?: arrayOf()
-            }
+            return emptyArray()
         }
 
         fun updateAccounts(prefix: String, array: Array<AuthData>) {
             require(prefix != "NONE")
-            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
-            if (ctx != null) {
-                SecureAuthStore.saveAccounts(ctx, prefix, array, DataStoreHelper.currentAccount)
-            } else {
-                setKey(ACCOUNT_TOKEN, "${prefix}/${DataStoreHelper.currentAccount}", array)
-            }
             synchronized(cachedAccounts) {
-                cachedAccounts[prefix] = array
+                cachedAccounts.clear()
             }
         }
 
         fun updateAccountsId(prefix: String, id: Int) {
             require(prefix != "NONE")
-            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
-            if (ctx != null) {
-                SecureAuthStore.saveAccountId(ctx, prefix, id, DataStoreHelper.currentAccount)
-            } else {
-                setKey(ACCOUNT_IDS, "${prefix}/${DataStoreHelper.currentAccount}", id)
-            }
             synchronized(cachedAccountIds) {
-                cachedAccountIds[prefix] = id
+                cachedAccountIds[prefix] = NONE_ID
             }
         }
 
         val allApis: Array<AuthRepo> = arrayOf(
-            SyncRepo(malApi),
-            SyncRepo(kitsuApi),
-            SyncRepo(aniListApi),
-            SyncRepo(simklApi),
-            SyncRepo(localListApi),
-            SubtitleRepo(openSubtitlesApi),
-            SubtitleRepo(addic7ed),
-            SubtitleRepo(subDlApi),
-            PlainAuthRepo(animeSkipApi),
-            SubtitleRepo(subSourceApi)
+            SyncRepo(localListApi)
         )
 
         fun updateAccountIds() {
-            val ids = mutableMapOf<String, Int>()
-            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
-            for (api in allApis) {
-                val id = if (ctx != null) {
-                    SecureAuthStore.getAccountId(ctx, api.idPrefix, NONE_ID, DataStoreHelper.currentAccount)
-                } else {
-                    getKey<Int>(
-                        ACCOUNT_IDS,
-                        "${api.idPrefix}/${DataStoreHelper.currentAccount}",
-                        NONE_ID
-                    ) ?: NONE_ID
-                }
-                ids.put(api.idPrefix, id)
-            }
             synchronized(cachedAccountIds) {
-                cachedAccountIds = ids
+                cachedAccountIds = mutableMapOf(localListApi.idPrefix to NONE_ID)
             }
         }
 
         init {
-            val data = mutableMapOf<String, Array<AuthData>>()
-            val ids = mutableMapOf<String, Int>()
-            val ctx = com.lagradost.cloudstream3.CloudStreamApp.context
-            for (api in allApis) {
-                data.put(api.idPrefix, accounts(api.idPrefix))
-                val id = if (ctx != null) {
-                    SecureAuthStore.getAccountId(ctx, api.idPrefix, NONE_ID, DataStoreHelper.currentAccount)
-                } else {
-                    getKey<Int>(
-                        ACCOUNT_IDS,
-                        "${api.idPrefix}/${DataStoreHelper.currentAccount}",
-                        NONE_ID
-                    ) ?: NONE_ID
-                }
-                ids.put(api.idPrefix, id)
-            }
-            cachedAccounts = data
-            cachedAccountIds = ids
+            cachedAccounts = mutableMapOf()
+            cachedAccountIds = mutableMapOf(localListApi.idPrefix to NONE_ID)
         }
 
         // I do not want to place this in the init block as JVM initialization order is weird, and it may cause exceptions
@@ -139,17 +80,8 @@ abstract class AccountManager {
             LoadResponse.simklIdPrefix = simklApi.idPrefix
         }
 
-        val subtitleProviders = arrayOf(
-            SubtitleRepo(openSubtitlesApi),
-            SubtitleRepo(addic7ed),
-            SubtitleRepo(subDlApi),
-            SubtitleRepo(subSourceApi)
-        )
+        val subtitleProviders = arrayOf<SubtitleRepo>()
         val syncApis = arrayOf(
-            SyncRepo(malApi),
-            SyncRepo(kitsuApi),
-            SyncRepo(aniListApi),
-            SyncRepo(simklApi),
             SyncRepo(localListApi)
         )
 

@@ -152,12 +152,11 @@ object SettingsFragmentScreen : Screen {
             )
         ),
         SettingsNavigation(
-            title = R.string.category_account,
+            title = R.string.pref_category_security,
             navigation = R.id.action_navigation_global_to_navigation_settings_account,
             screen = SettingsAccountScreen,
             icon = R.drawable.encrypted_24px,
             subtitle = persistentListOf(
-                R.string.pref_category_accounts,
                 R.string.pref_category_security
             )
         ),
@@ -218,50 +217,18 @@ object SettingsFragmentScreen : Screen {
             Column(modifier = Modifier.verticalScroll(outerListState)) {
                 Spacer(modifier = Modifier.height(MaterialTheme.padding.small))
 
-                val default = DataStoreHelper.getDefaultAccount(
-                    LocalContext.current
-                )
-                val flow by DataStoreHelper.selectedAccountNumberFlow.collectAsState()
-                val account = remember(flow) {
-                    DataStoreHelper.getCurrentAccount() ?: default
-                }
-
                 Row(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .focusOutline()
-                        .clickable {
-                            activity?.navigate(
-                                R.id.accountSelectActivity,
-                                Bundle().apply { putBoolean("isFromMainActivity", true) }
-                            )
-                        }
+                        .fillMaxWidth()
                         .padding(
                             vertical = MaterialTheme.padding.large,
                             horizontal = MaterialTheme.padding.medium
                         )
                 ) {
-                    val image =
-                        account.customImage ?: profileImages.getOrNull(account.defaultImageIndex)
-                        ?: profileImages.first()
-
-                    AsyncImage(
-                        contentScale = ContentScale.Crop,
-                        model = image,
-                        modifier = Modifier.circleBorder(50.dp),
-                        contentDescription = null,
+                    Text(
+                        text = stringResource(R.string.title_settings),
+                        style = MaterialTheme.typography.titleLarge,
                     )
-                    Spacer(modifier = Modifier.width(MaterialTheme.padding.medium))
-                    Column {
-                        Text(
-                            text = account.name,
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                        Text(
-                            text = stringResource(R.string.title_settings),
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
                 }
 
                 Spacer(modifier = Modifier.height(MaterialTheme.padding.small))

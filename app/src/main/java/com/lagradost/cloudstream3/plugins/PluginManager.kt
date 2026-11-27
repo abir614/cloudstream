@@ -266,6 +266,28 @@ object PluginManager {
      * DO NOT USE THIS IN A PLUGIN! It may case an infinite recursive loop lagging or crashing everyone's devices.
      * If you use it from a plugin, do not expect a stable jvmName, SO DO NOT USE IT!
      */
+    private suspend fun fetchPluginsForInstalled(installedPlugins: List<PluginData>): List<PluginWrapper> {
+        if (installedPlugins.isEmpty()) return emptyList()
+
+        val allRepos = (getKey<Array<RepositoryData>>(REPOSITORIES_KEY)
+            ?: emptyArray()) + PREBUILT_REPOSITORIES
+
+        // Only query repositories owning at least one installed plugin to prevent cold-start HTTP/Jackson storms
+        val matchedRepos = allRepos.filter { repoData ->
+            val sanitizedRepoDir = getPluginSanitizedFileName(repoData.url)
+            val repoPrefix = repoData.url.substringBeforeLast('/')
+            installedPlugins.any { saved ->
+                saved.filePath.contains(sanitizedRepoDir) ||
+                    (saved.url?.startsWith(repoPrefix) == true)
+            }
+        }
+        val targetRepos = if (matchedRepos.isNotEmpty()) matchedRepos else allRepos.toList()
+        val fetchSem = Semaphore(3)
+        return targetRepos.amap { repo ->
+            fetchSem.withPermit { getRepoPlugins(repo) ?: emptyList() }
+        }.flatten().distinctBy { it.plugin.url }
+    }
+
     @Suppress("FunctionName")
     @InternalAPI
     @Throws
@@ -276,15 +298,11 @@ object PluginManager {
         ___DO_NOT_CALL_FROM_A_PLUGIN_loadAllOnlinePlugins(activity)
         afterPluginsLoadedEvent.invoke(false)
 
-        val urls = (getKey<Array<RepositoryData>>(REPOSITORIES_KEY)
-            ?: emptyArray()) + PREBUILT_REPOSITORIES
-
-        val onlinePlugins = urls.toList().amap {
-            getRepoPlugins(it) ?: emptyList()
-        }.flatten().distinctBy { it.plugin.url }
+        val installedPlugins = getPluginsOnline()
+        val onlinePlugins = fetchPluginsForInstalled(installedPlugins.toList())
 
         // Iterates over all offline plugins, compares to remote repo and returns the plugins which are outdated
-        val outdatedPlugins = getPluginsOnline().map { savedData ->
+        val outdatedPlugins = installedPlugins.map { savedData ->
             onlinePlugins
                 .filter { onlineData -> savedData.internalName == onlineData.plugin.internalName }
                 .map { onlineData ->
@@ -893,13 +911,10 @@ object PluginManager {
         ___DO_NOT_CALL_FROM_A_PLUGIN_loadAllOnlinePlugins(activity)
         afterPluginsLoadedEvent.invoke(false)
 
-        val urls = (getKey<Array<RepositoryData>>(REPOSITORIES_KEY)
-            ?: emptyArray()) + PREBUILT_REPOSITORIES
-        val onlinePlugins = urls.toList().amap {
-            getRepoPlugins(it) ?: emptyList()
-        }.flatten().distinctBy { it.plugin.url }
+        val installedPlugins = getPluginsOnline()
+        val onlinePlugins = fetchPluginsForInstalled(installedPlugins.toList())
 
-        val allPlugins = getPluginsOnline().flatMap { savedData ->
+        val allPlugins = installedPlugins.flatMap { savedData ->
             onlinePlugins
                 .filter { it.plugin.internalName == savedData.internalName }
                 .mapNotNull { onlineData ->

@@ -699,9 +699,9 @@ object UIHelper {
         if (!isLayout(com.lagradost.cloudstream3.ui.settings.Globals.TV)) return
 
         val lowEndGpu = DeviceProfile.hasBrokenHardwareGpu() || DeviceProfile.isUltraPotato(this.context)
-        val effectiveScale = if (lowEndGpu) scale.coerceAtMost(1.12f) else scale
-        val effectiveElevation = if (lowEndGpu) elevation.coerceAtMost(8f) else elevation
-        val effectiveDuration = if (lowEndGpu) duration.coerceAtMost(120L) else duration
+        val effectiveScale = if (lowEndGpu) scale.coerceAtMost(1.08f) else scale
+        val effectiveElevation = if (lowEndGpu) 0f else elevation
+        val effectiveDuration = if (lowEndGpu) duration.coerceAtMost(80L) else duration
         val maxParentDepth = if (lowEndGpu) 3 else 8
 
         // Prevent all ancestor containers from clipping the enlarged/hovering card,
@@ -736,32 +736,34 @@ object UIHelper {
             depth++
         }
 
-        // Hoist the entire parent row and horizontal rail above adjacent rows so that
-        // vertical jumps (upper <-> down) never paint the adjacent line over the zoomed card.
-        if (hasFocus) {
-            val rowTargetZ = if (lowEndGpu) effectiveElevation else (effectiveElevation * 0.7f).coerceAtLeast(16f)
-            horizontalContainer?.animate()?.cancel()
-            horizontalContainer?.translationZ = rowTargetZ
+        // Hoist the entire parent row and horizontal rail above adjacent rows on capable GPUs;
+        // skip costly RenderNode elevation/shadow recomputations on low-end/software-fallback GPUs.
+        if (!lowEndGpu) {
+            if (hasFocus) {
+                val rowTargetZ = (effectiveElevation * 0.7f).coerceAtLeast(16f)
+                horizontalContainer?.animate()?.cancel()
+                horizontalContainer?.translationZ = rowTargetZ
 
-            rowContainer?.animate()?.cancel()
-            rowContainer?.translationZ = rowTargetZ
-        } else {
-            val targetContainer = rowContainer
-            val targetHorizontal = horizontalContainer
-            val anchorView = targetContainer ?: targetHorizontal ?: this
-            anchorView.post {
-                val hasAnyFocus = targetContainer?.hasFocus() == true || targetHorizontal?.hasFocus() == true
-                if (!hasAnyFocus) {
-                    targetContainer?.animate()
-                        ?.translationZ(0f)
-                        ?.setDuration(effectiveDuration)
-                        ?.setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
-                        ?.start()
-                    targetHorizontal?.animate()
-                        ?.translationZ(0f)
-                        ?.setDuration(effectiveDuration)
-                        ?.setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
-                        ?.start()
+                rowContainer?.animate()?.cancel()
+                rowContainer?.translationZ = rowTargetZ
+            } else {
+                val targetContainer = rowContainer
+                val targetHorizontal = horizontalContainer
+                val anchorView = targetContainer ?: targetHorizontal ?: this
+                anchorView.post {
+                    val hasAnyFocus = targetContainer?.hasFocus() == true || targetHorizontal?.hasFocus() == true
+                    if (!hasAnyFocus) {
+                        targetContainer?.animate()
+                            ?.translationZ(0f)
+                            ?.setDuration(effectiveDuration)
+                            ?.setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
+                            ?.start()
+                        targetHorizontal?.animate()
+                            ?.translationZ(0f)
+                            ?.setDuration(effectiveDuration)
+                            ?.setInterpolator(android.view.animation.DecelerateInterpolator(2.0f))
+                            ?.start()
+                    }
                 }
             }
         }

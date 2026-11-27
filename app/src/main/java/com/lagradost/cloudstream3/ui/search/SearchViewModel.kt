@@ -151,7 +151,7 @@ class SearchViewModel : ViewModel() {
         }
         
         suggestionJob = ioSafe {
-            delay(300) // Debounce
+            delay(450) // Debounce rapid / TV IME keystrokes to reduce canceled HTTP requests
             val suggestions = SearchSuggestionApi.getSuggestions(query)
             _searchSuggestions.postValue(suggestions)
         }

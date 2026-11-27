@@ -206,7 +206,7 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
             val sqliteRepo = com.lagradost.cloudstream3.utils.persistence.SqliteDataRepository(this)
             com.lagradost.cloudstream3.di.ServiceLocator.register<com.lagradost.cloudstream3.utils.persistence.DataRepository>(sqliteRepo)
             com.lagradost.cloudstream3.di.ServiceLocator.register(com.lagradost.cloudstream3.domain.usecase.ResumePlaybackUseCase(sqliteRepo))
-            com.lagradost.cloudstream3.services.ExtensionSandboxClient.bind(this)
+            // Defer sandbox process spawn off critical cold-start path and skip eager bind on LOW/Potato tiers
 
             // Wire native high-performance accelerators into core library hooks
             com.lagradost.cloudstream3.utils.Levenshtein.nativeFuzzyRatioProvider = { s1: String, s2: String ->
@@ -250,13 +250,26 @@ class CloudStreamApp : Application(), SingletonImageLoader.Factory {
 
         try {
             thread(start = true, isDaemon = true, name = "StartupHardwareProfile") {
-                com.lagradost.cloudstream3.utils.DeviceProfile.getDeviceCapabilities(this)
+                val caps = com.lagradost.cloudstream3.utils.DeviceProfile.getDeviceCapabilities(this)
+                if (!caps.isUltraPotato && caps.tier != com.lagradost.cloudstream3.utils.DeviceTier.LOW) {
+                    com.lagradost.cloudstream3.services.ExtensionSandboxClient.bind(this)
+                }
+                // Warm Jackson DeserializerCache sequentially once to avoid multi-worker lock contention
+                try {
+                    mapper.readerFor(com.lagradost.cloudstream3.plugins.Repository::class.java)
+                    mapper.readerFor(Array<com.lagradost.cloudstream3.plugins.SitePlugin>::class.java)
+                } catch (_: Throwable) {
+                }
             }
         } catch (_: Throwable) {
         }
 
         try {
             thread(start = true, isDaemon = true, name = "StartupScoreCacheWarmup") {
+                com.lagradost.cloudstream3.syncproviders.SecureAuthStore.wipeAllCredentials(this)
+                removeKeys("auth_tokens")
+                removeKeys("auth_ids")
+                removeKey("accounts_key")
                 com.lagradost.cloudstream3.domain.engine.OnDeviceNsfwClassifier.ensureScoresLoaded(this)
             }
         } catch (_: Throwable) {

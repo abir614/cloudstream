@@ -34,7 +34,6 @@ class ShieldedClassLoader(
          * Core internal classes strictly forbidden from third-party extension access.
          */
         private val BLOCKED_CLASS_PREFIXES = listOf(
-            "com.lagradost.cloudstream3.syncproviders.AccountManager",
             "com.lagradost.cloudstream3.syncproviders.AuthStore",
             "com.lagradost.cloudstream3.syncproviders.AuthRepo",
             "com.lagradost.cloudstream3.syncproviders.SecureAuthStore",

@@ -15,6 +15,7 @@ import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.isVisible
@@ -582,6 +583,10 @@ class SearchFragment : BaseFragment<FragmentSearchBinding>(
                             )
                             searchExitIcon?.alpha = 1f
                             binding.searchLoadingBar.alpha = 0f
+                            val q = binding.mainSearch.query?.toString()?.trim().orEmpty()
+                            if (q.length > 1 && list.isEmpty() && res.value.page > 0) {
+                                showToast(R.string.no_data, Toast.LENGTH_SHORT)
+                            }
                         }
                     }
                 }

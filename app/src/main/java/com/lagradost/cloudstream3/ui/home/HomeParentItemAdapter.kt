@@ -97,7 +97,7 @@ open class ParentItemAdapter(
         if (binding !is HomepageParentBinding) return
         val info = item.list
         binding.apply {
-            if (homeChildRecyclerview.layoutManager == null) {
+            if (homeChildRecyclerview.layoutManager !is com.lagradost.cloudstream3.ui.result.LinearListLayout) {
                 homeChildRecyclerview.setLinearListLayout(
                     isHorizontal = true,
                     nextLeft = startFocus,

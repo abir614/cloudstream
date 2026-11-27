@@ -637,23 +637,31 @@ object AppContextUtils {
         return currentAudioFocusChangeListener
     }
 
-    fun Context.isCastApiAvailable(): Boolean {
-        val isCastApiAvailable =
-            GoogleApiAvailability.getInstance()
-                .isGooglePlayServicesAvailable(applicationContext) == ConnectionResult.SUCCESS
+    @Volatile
+    private var cachedCastAvailable: Boolean? = null
 
-        try {
-            applicationContext?.let {
-                val task = CastContext.getSharedInstance(it) { it.run() }
-                task.result
-            }
-        } catch (e: Exception) {
-            println(e)
-            // Track non-fatal
+    fun Context.isCastApiAvailable(): Boolean {
+        cachedCastAvailable?.let { return it }
+        val appCtx = applicationContext ?: this
+        val hasGms = try {
+            GoogleApiAvailability.getInstance()
+                .isGooglePlayServicesAvailable(appCtx) == ConnectionResult.SUCCESS
+        } catch (_: Throwable) {
+            false
+        }
+        if (!hasGms) {
+            cachedCastAvailable = false
             return false
         }
 
-        return isCastApiAvailable
+        val available = try {
+            val task = CastContext.getSharedInstance(appCtx) { it.run() }
+            task.result != null
+        } catch (_: Throwable) {
+            false
+        }
+        cachedCastAvailable = available
+        return available
     }
 
     fun Context.isConnectedToChromecast(): Boolean {

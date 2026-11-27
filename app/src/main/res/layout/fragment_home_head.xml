@@ -46,7 +46,7 @@
                 android:editTextColor="@color/white"
                 android:gravity="center_vertical"
                 android:iconifiedByDefault="true"
-                android:nextFocusRight="@id/home_head_profile_padding"
+                android:nextFocusRight="@id/home_search"
                 android:padding="0dp"
                 android:textColor="@color/white"
                 android:textColorHint="@color/white"
@@ -59,32 +59,26 @@
 
             <LinearLayout
                 android:id="@+id/home_head_profile_padding"
-                android:layout_width="50dp"
-                android:layout_height="50dp"
-                android:clickable="true"
-                android:focusable="true"
-                android:foreground="@drawable/rounded_select_ripple"
-                android:gravity="center"
-                android:nextFocusLeft="@id/home_search"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:clickable="false"
+                android:focusable="false"
+                android:visibility="gone"
                 android:orientation="horizontal">
 
                 <androidx.cardview.widget.CardView
                     android:id="@+id/home_head_profile_card"
-                    android:layout_width="30dp"
-                    android:layout_height="30dp"
-                    android:layout_gravity="center"
-                    android:background="@color/transparent"
-                    android:focusable="true"
-                    android:foreground="@drawable/outline_big_15_gray"
-                    app:cardCornerRadius="20dp">
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:focusable="false"
+                    android:visibility="gone">
 
                     <ImageView
                         android:id="@+id/home_head_profile_pic"
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
                         android:contentDescription="@string/account"
-                        android:scaleType="centerCrop"
-                        tools:src="@drawable/profile_bg_orange" />
+                        android:scaleType="centerCrop" />
                 </androidx.cardview.widget.CardView>
             </LinearLayout>
         </LinearLayout>
@@ -159,40 +153,33 @@
 
     <LinearLayout
         android:id="@+id/alternative_account_padding"
-        android:layout_width="match_parent"
-        android:layout_height="50dp"
-        android:gravity="end"
-        android:orientation="horizontal"
-        android:paddingHorizontal="0dp">
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        android:orientation="horizontal">
 
         <LinearLayout
             android:id="@+id/alternate_home_head_profile_padding"
-            android:layout_width="50dp"
-            android:layout_height="50dp"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="@drawable/rounded_select_ripple"
-            android:gravity="center"
-            android:nextFocusLeft="@id/home_search"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone"
             android:orientation="horizontal">
 
             <androidx.cardview.widget.CardView
                 android:id="@+id/alternate_home_head_profile_card"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:layout_gravity="center"
-                android:background="@color/transparent"
-                android:focusable="true"
-                android:foreground="@drawable/outline_big_15_gray"
-                app:cardCornerRadius="20dp">
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:focusable="false"
+                android:visibility="gone">
 
                 <ImageView
                     android:id="@+id/alternate_home_head_profile_pic"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:contentDescription="@string/account"
-                    android:scaleType="centerCrop"
-                    tools:src="@drawable/profile_bg_orange" />
+                    android:scaleType="centerCrop" />
             </androidx.cardview.widget.CardView>
         </LinearLayout>
     </LinearLayout>

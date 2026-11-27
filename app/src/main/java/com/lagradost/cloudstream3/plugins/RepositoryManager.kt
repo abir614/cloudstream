@@ -20,7 +20,9 @@ import com.lagradost.cloudstream3.ui.settings.extensions.RepositoryData
 import com.lagradost.cloudstream3.MainActivity
 import com.lagradost.cloudstream3.utils.Coroutines.main
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -213,7 +215,11 @@ object RepositoryManager {
                 Log.w("RepositoryManager", "Repository response from $url is not JSON object (starts with '${text.take(20)}')")
                 return@safeAsync null
             }
-            val repo = res.parsedSafe<Repository>()
+            val repo = try {
+                com.lagradost.cloudstream3.mapper.readValue(text, Repository::class.java)
+            } catch (_: Throwable) {
+                res.parsedSafe<Repository>()
+            }
             if (repo == null || (repo.name.isBlank() && repo.pluginLists.isEmpty() && repo.repositories.isEmpty() && repo.subRepositories.isEmpty())) {
                 Log.w("RepositoryManager", "Repository from $url is invalid or has empty plugin list")
                 return@safeAsync null
@@ -251,7 +257,11 @@ object RepositoryManager {
                     }
                 }
             } else if (text.startsWith("{")) {
-                val repo = res.parsedSafe<Repository>()
+                val repo = try {
+                com.lagradost.cloudstream3.mapper.readValue(text, Repository::class.java)
+            } catch (_: Throwable) {
+                res.parsedSafe<Repository>()
+            }
                 if (repo != null) {
                     val result = mutableListOf<RepositoryData>()
                     result.addAll(repo.repositories.filter { isSafeRepositoryUrl(it.url) })
@@ -285,7 +295,7 @@ object RepositoryManager {
                 Log.w("RepositoryManager", "Plugin list response from $pluginUrls is not JSON array (starts with '${text.take(20)}')")
                 return emptyList()
             }
-            res.parsed<Array<SitePlugin>>().toList()
+            com.lagradost.cloudstream3.mapper.readValue(text, Array<SitePlugin>::class.java).toList()
         } catch (t: Throwable) {
             logError(t)
             emptyList()
@@ -311,17 +321,20 @@ object RepositoryManager {
         }
 
         val repo = parseRepository(repositoryData.url) ?: return null
+        val sem = kotlinx.coroutines.sync.Semaphore(3)
         val list = repo.pluginLists.amap { url ->
             if (!isSafeRepositoryUrl(url)) return@amap emptyList()
-            try {
-                withTimeout(12000L) {
-                    parsePlugins(url).map {
-                        PluginWrapper(repo, repositoryData, it)
+            sem.withPermit {
+                try {
+                    withTimeout(12000L) {
+                        parsePlugins(url).map {
+                            PluginWrapper(repo, repositoryData, it)
+                        }
                     }
+                } catch (t: Throwable) {
+                    Log.w("RepositoryManager", "Timeout or failure fetching plugin list from $url: $t")
+                    emptyList()
                 }
-            } catch (t: Throwable) {
-                Log.w("RepositoryManager", "Timeout or failure fetching plugin list from $url: $t")
-                emptyList()
             }
         }.flatten()
 

@@ -311,34 +311,6 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                         loadRepository(realUrl)
                         return true
                     } else if (str.contains(APP_STRING)) {
-                        for (api in AccountManager.allApis) {
-                            if (api.isValidRedirectUrl(str)) {
-                                ioSafe {
-                                    Log.i(TAG, "handleAppIntent $str")
-                                    try {
-                                        val isSuccessful = api.login(str)
-                                        if (isSuccessful) {
-                                            Log.i(TAG, "authenticated ${api.name}")
-                                        } else {
-                                            Log.i(TAG, "failed to authenticate ${api.name}")
-                                        }
-                                        showToast(
-                                            if (isSuccessful) {
-                                                txt(R.string.authenticated_user, api.name)
-                                            } else {
-                                                txt(R.string.authenticated_user_fail, api.name)
-                                            }
-                                        )
-                                    } catch (t: Throwable) {
-                                        logError(t)
-                                        showToast(
-                                            txt(R.string.authenticated_user_fail, api.name)
-                                        )
-                                    }
-                                }
-                                return true
-                            }
-                        }
                         // This specific intent is used for the gradle deployWithAdb
                         // https://github.com/recloudstream/gradle/blob/master/src/main/kotlin/com/lagradost/cloudstream3/gradle/tasks/DeployWithAdbTask.kt#L46
                         if (str == "$APP_STRING:") {
@@ -348,6 +320,7 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
                                 )
                             }
                         }
+                        return true
                     } else if (safeURI(str)?.scheme == APP_STRING_REPO) {
                         val url = str.replaceFirst(APP_STRING_REPO, "https")
                         loadRepository(url)
@@ -439,16 +412,30 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
         fun centerView(view: View?) {
             if (view == null) return
             try {
-                Log.v(TAG, "centerView: $view")
+                // Skip expensive requestRectangleOnScreen relayout when focused card is already comfortably inside viewport (e.g., horizontal D-Pad scroll)
+                val loc = IntArray(2)
+                view.getLocationOnScreen(loc)
+                val viewLeft = loc[0]
+                val viewTop = loc[1]
+                val viewRight = viewLeft + view.width
+                val viewBottom = viewTop + view.height
+                val screenW = view.resources.displayMetrics.widthPixels
+                val screenH = view.resources.displayMetrics.heightPixels.coerceAtLeast(1)
+                val centerY = viewTop + view.height / 2
+                val alreadyCenteredY = centerY in (screenH * 20 / 100)..(screenH * 80 / 100)
+                val alreadyVisibleX = viewLeft >= 0 && viewRight <= screenW
+                if (alreadyCenteredY && alreadyVisibleX && viewBottom <= screenH) {
+                    return
+                }
+
                 val r = Rect(0, 0, 0, 0)
                 view.getDrawingRect(r)
                 val x = r.centerX()
                 val y = r.centerY()
-                val dx = r.width() / 2 //screenWidth / 2
+                val dx = r.width() / 2
                 val dy = screenHeight / 2
                 val r2 = Rect(x - dx, y - dy, x + dx, y + dy)
                 view.requestRectangleOnScreen(r2, false)
-                // TvFocus.current =TvFocus.current.copy(y=y.toFloat())
             } catch (_: Throwable) {
             }
         }
@@ -1323,13 +1310,8 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
 
         changeStatusBarState(isLayout(EMULATOR))
 
-        /** Biometric stuff for users without accounts **/
-        val noAccounts = settingsManager.getBoolean(
-            getString(R.string.skip_startup_account_select_key),
-            false
-        ) || accounts.count() <= 1
-
-        if (isLayout(PHONE) && isAuthEnabled(this) && noAccounts) {
+        /** Biometric screen lock on phone **/
+        if (isLayout(PHONE) && isAuthEnabled(this)) {
             if (deviceHasPasswordPinLock(this)) {
                 startBiometricAuthentication(this, R.string.biometric_authentication_title, false)
 
@@ -1761,31 +1743,11 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             }
 
 
-            val navProfileRoot = findViewById<LinearLayout>(R.id.nav_footer_root)
-
-            if (isLayout(TV or EMULATOR)) {
-                val navProfilePic = findViewById<ImageView>(R.id.nav_footer_profile_pic)
-                val navProfileCard = findViewById<CardView>(R.id.nav_footer_profile_card)
-
-                navProfileCard?.setOnClickListener {
-                    showAccountSelectLinear()
-                }
-
-                val homeViewModel =
-                    ViewModelProvider(this@MainActivity)[HomeViewModel::class.java]
-
-                observe(homeViewModel.currentAccount) { currentAccount ->
-                    if (currentAccount != null) {
-                        navProfilePic?.loadImage(
-                            currentAccount.image
-                        )
-                        navProfileRoot.isVisible = true
-                    } else {
-                        navProfileRoot.isGone = true
-                    }
-                }
-            } else {
-                navProfileRoot.isGone = true
+            findViewById<LinearLayout>(R.id.nav_footer_root)?.isGone = true
+            findViewById<View>(R.id.nav_footer_profile_card)?.apply {
+                isFocusable = false
+                isFocusableInTouchMode = false
+                isClickable = false
             }
         }
 
@@ -1797,10 +1759,9 @@ class MainActivity : AppCompatActivity(), ColorPickerDialogListener, BiometricCa
             var prevId: Int? = null
             var prevView: View? = null
 
-            // The genius engineers at google did not actually 
-            // write a nextFocus for the navrail
+            // Do not target hidden profile footer below Settings on TV D-Pad navigation
             rail.findViewById<View?>(R.id.navigation_settings)?.nextFocusDownId =
-                R.id.nav_footer_profile_card
+                R.id.navigation_settings
             for (id in arrayOf(
                 R.id.navigation_home,
                 R.id.navigation_search,

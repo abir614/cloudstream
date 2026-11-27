@@ -661,9 +661,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                 true
             }
             homeChangeApi.setOnClickListener(apiChangeClickListener)
-            homeSwitchAccount.setOnClickListener {
-                activity?.showAccountSelectLinear()
-            }
+            homeSwitchAccount.isGone = true
+            homeSwitchAccount.isFocusable = false
+            homeSwitchAccount.isClickable = false
 
             homeMasterAdapter = HomeParentItemAdapterPreview(
                 homeViewModel, accountViewModel
@@ -1049,16 +1049,10 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
 
     private fun updateTvRailFocus() {
         if (!isLayout(TV or EMULATOR)) return
-        // home_api_holder is glued to the header row's top by the mirror logic in
-        // the scroll listener above. Only target the provider button while the
-        // holder is actually on screen; once the header scrolls off (y < 0) let
-        // the rail fall back to default focus search so RIGHT enters content rows
-        val holder = binding?.homeApiHolder
-        val target =
-            if (holder != null && holder.isVisible && holder.y >= 0f) R.id.home_change_api
-            else View.NO_ID
+        // Enter the hero preview or first content rail directly on DPAD_RIGHT from the nav rail;
+        // DPAD_UP from the hero banner already targets R.id.home_change_api.
         val rail = activity?.findViewById<View>(R.id.nav_rail_view) ?: return
-        rail.nextFocusRightId = target
+        rail.nextFocusRightId = View.NO_ID
         for (focusView in arrayOf(
             R.id.navigation_downloads,
             R.id.navigation_home,
@@ -1066,7 +1060,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             R.id.navigation_library,
             R.id.navigation_settings,
         )) {
-            rail.findViewById<View>(focusView)?.nextFocusRightId = target
+            rail.findViewById<View>(focusView)?.nextFocusRightId = View.NO_ID
         }
     }
 

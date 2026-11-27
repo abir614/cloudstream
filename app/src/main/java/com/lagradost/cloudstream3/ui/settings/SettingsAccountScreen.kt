@@ -77,7 +77,7 @@ object SettingsAccountScreen : SearchableSettings, BiometricAuthenticator.Biomet
     }
 
     @Composable
-    override fun getTitleRes(): String = stringResource(R.string.category_account)
+    override fun getTitleRes(): String = stringResource(R.string.pref_category_security)
 
     @Composable
     override fun getPreferences(): List<Preference> {
@@ -95,28 +95,6 @@ object SettingsAccountScreen : SearchableSettings, BiometricAuthenticator.Biomet
 
         return persistentListOf(
             Preference.PreferenceGroup(
-                title = stringResource(R.string.pref_category_accounts),
-                preferenceItems = syncApis.map { api ->
-                    Preference.PreferenceItem.TextPreference(
-                        title = api.name,
-                        icon = api.icon?.let { painterResource(it) },
-                        onClick = {
-                            val activity = activity ?: return@TextPreference
-                            val info = api.authUser()
-                            val index =
-                                api.accounts.indexOfFirst { account -> account.user.id == info?.id }
-                            if (api.accounts.isNotEmpty()) {
-                                showLoginInfo(activity, api, info, index)
-                            } else {
-                                addAccount(activity, api)
-                            }
-                        })
-                } + Preference.PreferenceItem.SwitchPreference(
-                    preference = settings.security.skipAccountSelection,
-                    title = stringResource(R.string.skip_startup_account_select_pref),
-                    icon = painterResource(R.drawable.ic_outline_account_circle_24)
-                ),
-            ), Preference.PreferenceGroup(
                 enabled = hasSecurity && isLayout(PHONE),
                 title = stringResource(R.string.pref_category_security),
                 preferenceItems = persistentListOf(

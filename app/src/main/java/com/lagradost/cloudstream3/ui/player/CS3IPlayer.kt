@@ -634,6 +634,18 @@ class CS3IPlayer : IPlayer {
 
         exoPlayer = null
         event(PlayerAttachedEvent(null))
+        // On low-RAM / potato TV boxes, gently trim cached poster bitmaps & idle sockets on exit
+        try {
+            val appCtx = com.lagradost.cloudstream3.CloudStreamApp.context ?: com.lagradost.cloudstream3.CloudStreamApp.appContext
+            if (appCtx != null && (DeviceProfile.isLowEnd(appCtx) || DeviceProfile.isUltraPotato(appCtx))) {
+                com.lagradost.cloudstream3.utils.SystemMemoryOptimizer.reclaimBackgroundMemory(
+                    appCtx,
+                    force = false,
+                    trimImageCache = true
+                )
+            }
+        } catch (_: Throwable) {
+        }
         //simpleCache = null
     }
 

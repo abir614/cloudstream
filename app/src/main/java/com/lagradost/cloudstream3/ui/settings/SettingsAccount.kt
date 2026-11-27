@@ -461,32 +461,18 @@ class SettingsAccount : BasePreferenceFragmentCompat(), BiometricCallback {
             false
         }
 
-        val syncApis =
-            listOf(
-                R.string.mal_key to SyncRepo(malApi),
-                R.string.kitsu_key to SyncRepo(kitsuApi),
-                R.string.anilist_key to SyncRepo(aniListApi),
-                R.string.simkl_key to SyncRepo(simklApi),
-                R.string.opensubtitles_key to SubtitleRepo(openSubtitlesApi),
-                R.string.subdl_key to SubtitleRepo(subDlApi),
-                R.string.animeskip_key to PlainAuthRepo(animeSkipApi),
-            )
-
-        for ((key, api) in syncApis) {
-            getPref(key)?.apply {
-                title = api.name
-                setOnPreferenceClickListener {
-                    val activity = activity ?: return@setOnPreferenceClickListener false
-                    val info = api.authUser()
-                    val index = api.accounts.indexOfFirst { account -> account.user.id == info?.id }
-                    if (api.accounts.isNotEmpty()) {
-                        showLoginInfo(activity, api, info, index)
-                    } else {
-                        addAccount(activity, api)
-                    }
-                    return@setOnPreferenceClickListener true
-                }
-            }
+        // Privacy-focused build: third-party account logins disabled
+        for (key in listOf(
+            R.string.mal_key,
+            R.string.kitsu_key,
+            R.string.anilist_key,
+            R.string.simkl_key,
+            R.string.opensubtitles_key,
+            R.string.subdl_key,
+            R.string.animeskip_key,
+            R.string.skip_startup_account_select_key,
+        )) {
+            getPref(key)?.isVisible = false
         }
     }
 }

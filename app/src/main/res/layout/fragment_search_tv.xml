@@ -142,7 +142,7 @@
         android:id="@+id/search_master_recycler"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-
+        android:layout_marginStart="@dimen/navbar_width"
         android:background="?attr/primaryBlackBackground"
         android:descendantFocusability="afterDescendants"
         android:nextFocusLeft="@id/navigation_search"

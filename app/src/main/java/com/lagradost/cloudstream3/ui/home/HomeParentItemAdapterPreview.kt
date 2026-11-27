@@ -56,6 +56,7 @@ import com.lagradost.cloudstream3.utils.SingleSelectionHelper.showOptionSelectSt
 import com.lagradost.cloudstream3.utils.UIHelper.fixPaddingStatusbarMargin
 import com.lagradost.cloudstream3.utils.UIHelper.fixPaddingStatusbarView
 import com.lagradost.cloudstream3.utils.UIHelper.populateChips
+import com.lagradost.cloudstream3.utils.UIHelper.toPx
 import androidx.core.graphics.toColorInt
 import com.lagradost.cloudstream3.ui.setRecycledViewPool
 
@@ -457,6 +458,14 @@ class HomeParentItemAdapterPreview(
         fun bind() = Unit
 
         init {
+            (binding as? FragmentHomeHeadTvBinding)?.apply {
+                val screenH = itemView.resources.displayMetrics.heightPixels
+                if (screenH in 1..760) {
+                    homePreviewInfoBtt.layoutParams = homePreviewInfoBtt.layoutParams.apply {
+                        height = 290.toPx
+                    }
+                }
+            }
             previewViewpager.setPageTransformer(HomeScrollTransformer())
 
             val cacheSize = com.lagradost.cloudstream3.utils.DeviceProfile.getItemViewCacheSize(itemView.context)
@@ -495,46 +504,29 @@ class HomeParentItemAdapterPreview(
                 }
             }
 
-            headProfilePicCard?.isGone = isLayout(TV or EMULATOR)
-            alternateHeadProfilePicCard?.isGone = isLayout(TV or EMULATOR)
-
-            (headProfilePic ?: alternateHeadProfilePic)?.observe(viewModel.currentAccount) { currentAccount ->
-                headProfilePic?.loadImage(currentAccount?.image)
-                alternateHeadProfilePic?.loadImage(currentAccount?.image)
+            headProfilePicCard?.apply {
+                isGone = true
+                isFocusable = false
+                isFocusableInTouchMode = false
+                isClickable = false
             }
-
-            headProfilePicCard?.setOnClickListener {
-                activity?.showAccountSelectLinear()
+            alternateHeadProfilePicCard?.apply {
+                isGone = true
+                isFocusable = false
+                isFocusableInTouchMode = false
+                isClickable = false
             }
-
-            fun showAccountEditBox(context: Context): Boolean {
-                val currentAccount = DataStoreHelper.getCurrentAccount()
-                return if (currentAccount != null) {
-                    showAccountEditDialog(
-                        context = context,
-                        account = currentAccount,
-                        isNewAccount = false,
-                        accountEditCallback = { accountViewModel.handleAccountUpdate(it, context) },
-                        accountDeleteCallback = {
-                            accountViewModel.handleAccountDelete(
-                                it,
-                                context
-                            )
-                        }
-                    )
-                    true
-                } else false
+            (binding as? FragmentHomeHeadBinding)?.homeHeadProfilePadding?.apply {
+                isGone = true
+                isFocusable = false
+                isFocusableInTouchMode = false
+                isClickable = false
             }
-
-            alternateHeadProfilePicCard?.setOnLongClickListener {
-                showAccountEditBox(it.context)
-            }
-            headProfilePicCard?.setOnLongClickListener {
-                showAccountEditBox(it.context)
-            }
-
-            alternateHeadProfilePicCard?.setOnClickListener {
-                activity?.showAccountSelectLinear()
+            (binding as? FragmentHomeHeadBinding)?.alternateHomeHeadProfilePadding?.apply {
+                isGone = true
+                isFocusable = false
+                isFocusableInTouchMode = false
+                isClickable = false
             }
 
             (binding as? FragmentHomeHeadTvBinding)?.apply {

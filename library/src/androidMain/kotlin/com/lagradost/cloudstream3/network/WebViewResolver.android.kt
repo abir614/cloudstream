@@ -148,7 +148,7 @@ actual class WebViewResolver actual constructor(
                         view: WebView,
                         request: WebResourceRequest
                     ): WebResourceResponse? = runBlocking {
-                        val webViewUrl = request.url.toString()
+                        val webViewUrl = request.url?.toString() ?: return@runBlocking null
                         Log.i(TAG, "Loading WebView URL: $webViewUrl")
 
                         if (script != null) {
@@ -167,10 +167,15 @@ actual class WebViewResolver actual constructor(
                             return@runBlocking null
                         }
 
-                        if (additionalUrls.any { it.containsMatchIn(webViewUrl) }) {
-                            request.toRequest()?.also {
-                                if (requestCallBack(it)) destroyWebView()
-                            }?.let(extraRequestList::add)
+                        try {
+                            val safeAdditional: List<Regex>? = additionalUrls
+                            if (safeAdditional != null && safeAdditional.any { it.containsMatchIn(webViewUrl) }) {
+                                request.toRequest()?.also {
+                                    if (requestCallBack(it)) destroyWebView()
+                                }?.let(extraRequestList::add)
+                            }
+                        } catch (_: Throwable) {
+                            // Defensive against null Java/plugin interop lists or destroyed state
                         }
 
                         // Suppress image requests as we don't display them anywhere

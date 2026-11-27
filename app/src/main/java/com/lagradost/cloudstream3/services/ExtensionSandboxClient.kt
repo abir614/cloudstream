@@ -86,8 +86,15 @@ object ExtensionSandboxClient {
      * can be trimmed or collected by Android LMK, granting full hardware buffer headroom to ExoPlayer.
      */
     fun releaseForPlayback(context: Context) {
-        if (isPotatoDevice(context)) {
-            Log.i(TAG, "Potato device detected: unbinding ExtensionSandboxService to reclaim playback RAM")
+        if (isPotatoDevice(context) || com.lagradost.cloudstream3.utils.DeviceProfile.isUltraPotato(context)) {
+            val messenger = serviceMessenger
+            if (messenger != null) {
+                Log.i(TAG, "Low-RAM device detected: stopping ExtensionSandboxService to reclaim playback RAM")
+                try {
+                    messenger.send(Message.obtain().apply { what = ExtensionSandboxService.CMD_SHUTDOWN })
+                } catch (_: Throwable) {
+                }
+            }
             unbind(context)
         }
     }

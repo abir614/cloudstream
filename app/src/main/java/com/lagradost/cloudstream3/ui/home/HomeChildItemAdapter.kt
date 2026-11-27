@@ -24,6 +24,7 @@ import com.lagradost.cloudstream3.ui.search.SearchResultBuilder
 import com.lagradost.cloudstream3.ui.settings.Globals.EMULATOR
 import com.lagradost.cloudstream3.ui.settings.Globals.TV
 import com.lagradost.cloudstream3.ui.settings.Globals.isLayout
+import com.lagradost.cloudstream3.utils.DeviceProfile
 import com.lagradost.cloudstream3.utils.UIHelper.applyTvCardFocusHover
 import com.lagradost.cloudstream3.utils.UIHelper.isBottomLayout
 import com.lagradost.cloudstream3.utils.UIHelper.resetTvCardHover
@@ -167,6 +168,15 @@ open class HomeChildItemAdapter(
             parent,
             false
         ) else HomeResultGridBinding.inflate(inflater, parent, false)
+        if (DeviceProfile.hasBrokenHardwareGpu() || DeviceProfile.isUltraPotato(parent.context)) {
+            val card = when (binding) {
+                is HomeResultGridBinding -> binding.backgroundCard
+                is HomeResultGridExpandedBinding -> binding.backgroundCard
+                else -> null
+            }
+            card?.cardElevation = 0f
+            card?.elevation = 0f
+        }
         return HomeScrollViewHolderState(binding)
     }
 
@@ -220,6 +230,11 @@ open class HomeChildItemAdapter(
         when (val binding = holder.view) {
             is HomeResultGridBinding -> {
                 updateLayoutParms(binding.backgroundCard, setWidth, setHeight)
+                if (isFirstItem) { // keep TV D-Pad left exit cleanly wired to nav rail
+                    binding.backgroundCard.nextFocusLeftId = R.id.nav_rail_view
+                } else {
+                    binding.backgroundCard.nextFocusLeftId = View.NO_ID
+                }
             }
 
             is HomeResultGridExpandedBinding -> {
@@ -227,6 +242,8 @@ open class HomeChildItemAdapter(
 
                 if (isFirstItem) { // to fix tv
                     binding.backgroundCard.nextFocusLeftId = R.id.nav_rail_view
+                } else {
+                    binding.backgroundCard.nextFocusLeftId = View.NO_ID
                 }
             }
         }

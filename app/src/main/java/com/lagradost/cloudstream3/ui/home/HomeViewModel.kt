@@ -534,7 +534,7 @@ class HomeViewModel : ViewModel() {
                 // Only preload the initial visible viewport (banners + first 4-8 rail posters) across ALL
                 // device tiers so Home opens quickly without blocking 40-180s on 512MB/H313 devices.
                 // Remaining offscreen posters are already metadata-checked above and classify lazily on scroll.
-                val initialLimit = budget.viewportPreloadCount.coerceIn(4, 8)
+                val initialLimit = budget.viewportPreloadCount.coerceIn(6, 10)
                 val initialVisibleTargets = (bannerItems + allRailItems.take(initialLimit)).distinctBy { it.posterUrl }
 
                 val itemsToLoad = initialVisibleTargets.filter { target ->
