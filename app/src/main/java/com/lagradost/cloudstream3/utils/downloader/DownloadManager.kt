@@ -930,13 +930,11 @@ object VideoDownloadManager {
         require(chuckSize > 1000)
 
         val headRequest = app.head(url = url, headers = headers, referer = referer, verify = false)
-        var contentLength: Long?
-        val hasRangeSupport: Boolean
-        headRequest.okhttpResponse.use {
-            contentLength = headRequest.size
-            if (contentLength != null && contentLength!! <= 0) contentLength = null
+        var contentLength: Long? = null
+        val hasRangeSupport: Boolean = headRequest.okhttpResponse.use {
+            contentLength = headRequest.size?.takeIf { it > 0 }
 
-            hasRangeSupport = when (headRequest.headers["Accept-Ranges"]?.lowercase()?.trim()) {
+            when (headRequest.headers["Accept-Ranges"]?.lowercase()?.trim()) {
                 // server has stated it has no support
                 "none" -> false
                 // server has stated it has support
