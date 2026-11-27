@@ -446,10 +446,10 @@ class NsfwFilterEngineTest {
     @Test
     fun `test benign stem titles are not false positives and clean titles cannot mask adult urls`() {
         val benignTitles = listOf(
-            MovieSearchResponse("From Up on Poppy Hill", "https://site.to/poppy-hill", "AnimeProvider", TvType.AnimeMovie),
-            MovieSearchResponse("Brothers in Arms", "https://site.to/brothers-in-arms", "MovieProvider", TvType.TvSeries),
-            MovieSearchResponse("Milky Way Railroad", "https://site.to/milky-way", "AnimeProvider", TvType.Anime),
-            MovieSearchResponse("Spider-Man: Mary Jane", "https://site.to/maryjane", "MovieProvider", TvType.Movie)
+            MovieSearchResponse("From Up on Poppy Hill", "https://site.to/poppy-hill", "AnimeProvider", TvType.AnimeMovie, posterUrl = "https://cdn.net/poster1.jpg"),
+            MovieSearchResponse("Brothers in Arms", "https://site.to/brothers-in-arms", "MovieProvider", TvType.TvSeries, posterUrl = "https://cdn.net/poster2.jpg"),
+            MovieSearchResponse("Milky Way Railroad", "https://site.to/milky-way", "AnimeProvider", TvType.Anime, posterUrl = "https://cdn.net/poster3.jpg"),
+            MovieSearchResponse("Spider-Man: Mary Jane", "https://site.to/maryjane", "MovieProvider", TvType.Movie, posterUrl = "https://cdn.net/poster4.jpg")
         )
         for (item in benignTitles) {
             assertFalse("${item.name} should not trigger LOW filter", NsfwFilterEngine.isNsfw(item, NsfwFilterLevel.LOW))
