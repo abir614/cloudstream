@@ -813,7 +813,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
         }
 
         fun showMasterRecyclerContent() {
-            binding.apply {
+            this@HomeFragment.binding?.apply {
                 homeLoading.animate().cancel()
                 homeMasterRecycler.animate().cancel()
                 homeMasterRecycler.alpha = 1f

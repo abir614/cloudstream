@@ -297,7 +297,6 @@ object SettingsGeneralScreen : SearchableSettings {
                     ),
                     Preference.PreferenceItem.CustomPreference(
                         title = stringResource(R.string.nsfw_filter_level_title),
-                        subtitle = stringResource(R.string.nsfw_filter_level_summary),
                         content = {
                             NsfwSensitivityPreferenceCard(
                                 activeLevel = activeLevel,
