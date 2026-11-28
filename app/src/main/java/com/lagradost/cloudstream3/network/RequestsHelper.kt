@@ -102,7 +102,11 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
         ).apply {
             when (dns) {
                 0 -> dns(SafeDns(Dns.SYSTEM))
-                else -> applyDnsPreference(dns)
+                else -> applyDnsPreference(
+                    dns = dns,
+                    enableDualThreadPrimary = !com.lagradost.cloudstream3.utils.DeviceProfile.isLowEnd(context) &&
+                        !com.lagradost.cloudstream3.utils.DeviceProfile.isUltraPotato(context)
+                )
             }
         }
 
@@ -114,7 +118,10 @@ fun buildDefaultClient(context: Context, ignoreSSL: Boolean = false): OkHttpClie
 /**
  * Configures DoH / SafeDns resolver on an [OkHttpClient.Builder] matching [R.string.dns_key] preference.
  */
-fun OkHttpClient.Builder.applyDnsPreference(dns: Int): OkHttpClient.Builder = apply {
+fun OkHttpClient.Builder.applyDnsPreference(
+    dns: Int,
+    enableDualThreadPrimary: Boolean = false
+): OkHttpClient.Builder = apply {
     when (dns) {
         0 -> dns(SafeDns(Dns.SYSTEM))
         1 -> addGoogleDns()
@@ -125,7 +132,7 @@ fun OkHttpClient.Builder.applyDnsPreference(dns: Int): OkHttpClient.Builder = ap
         7 -> addDnsSbDns()
         8 -> addCanadianShieldDns()
         9 -> addMozillaCloudflareDns()
-        10 -> addResilientMultiTierDns()
+        10 -> addResilientMultiTierDns(enableDualThreadPrimary)
         else -> dns(SafeDns(Dns.SYSTEM))
     }
 }

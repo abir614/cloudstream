@@ -13,7 +13,13 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.security.SecureRandom
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.SynchronousQueue
+import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 private val DNS_TXID_RANDOM = SecureRandom()
 
@@ -152,104 +158,204 @@ private fun parseNumericAddress(hostname: String): List<InetAddress>? {
     return null
 }
 
+private val dnsRaceThreadCounter = AtomicInteger(0)
+
+/**
+ * Bounded shared daemon executor for dual-thread primary DoH lookups on MID/HIGH devices.
+ * Capped at 8 short-lived daemon threads (30s keep-alive) to bound tail latency without leaking.
+ */
+private val dnsRaceExecutor: ThreadPoolExecutor by lazy {
+    ThreadPoolExecutor(
+        0,
+        8,
+        30L,
+        TimeUnit.SECONDS,
+        SynchronousQueue(),
+        { runnable ->
+            Thread(runnable, "CloudStream-DNS-Race-${dnsRaceThreadCounter.incrementAndGet()}").apply {
+                isDaemon = true
+            }
+        },
+        ThreadPoolExecutor.AbortPolicy()
+    )
+}
+
 /**
  * Multi-Tier Resilient DNS Resolver with cascading fallbacks:
- * 1. Primary DoH: Mozilla Cloudflare DoH -> Quad9 DoH (dns10)
- * 2. Secondary DoH: Cloudflare DoH -> Google DoH
- * 3. Primary Plain DNS (UDP 53): Quad9 (dns10) -> Cloudflare
+ * 1. Primary DoH: Quad9 Unfiltered (`dns10.quad9.net`) + Mozilla Cloudflare (`mozilla.cloudflare-dns.com`)
+ *    - On MID/HIGH devices (`enableDualThreadPrimary = true`), both primary DoH endpoints race
+ *      concurrently across two threads and the fastest valid response wins immediately.
+ *    - On LOW / UltraPotato devices (`enableDualThreadPrimary = false`), queries execute sequentially
+ *      to avoid duplicate TLS handshakes, extra sockets, and CPU/RAM pressure.
+ * 2. Secondary DoH: Google (`dns.google`) -> AdGuard Unfiltered (`unfiltered.adguard-dns.com`)
+ * 3. Primary Plain DNS (UDP 53): Quad9 (`dns10`) -> Cloudflare
  * 4. Secondary Plain DNS (UDP 53): Google -> AdGuard
- * 5. Final Fallback: Android System DNS (Dns.SYSTEM)
+ * 5. Final Fallback: Android System DNS (`Dns.SYSTEM`)
  */
-class ResilientFallbackDns(
-    bootstrapClient: OkHttpClient
+class ResilientFallbackDns internal constructor(
+    private val quad9DohLazy: Lazy<Dns>,
+    private val mozillaCloudflareDohLazy: Lazy<Dns>,
+    private val googleDohLazy: Lazy<Dns>,
+    private val adguardDohLazy: Lazy<Dns>,
+    private val enableDualThreadPrimary: Boolean = false
 ) : Dns {
-    // Fast-fail timeouts prevent blackholed DoH servers from stalling the 4s cascade budget.
-    private val fastDohClient = bootstrapClient.newBuilder()
-        .cache(null)
-        .connectTimeout(1500L, TimeUnit.MILLISECONDS)
-        .readTimeout(1500L, TimeUnit.MILLISECONDS)
-        .writeTimeout(1500L, TimeUnit.MILLISECONDS)
-        .callTimeout(2000L, TimeUnit.MILLISECONDS)
-        .build()
+    constructor(
+        bootstrapClient: OkHttpClient,
+        enableDualThreadPrimary: Boolean = false
+    ) : this(
+        quad9DohLazy = lazy {
+            DnsOverHttps.Builder()
+                .client(fastDohClient(bootstrapClient))
+                .url("https://dns10.quad9.net/dns-query".toHttpUrl())
+                .bootstrapDnsHosts(listOf(
+                    InetAddress.getByName("9.9.9.10"),
+                    InetAddress.getByName("149.112.112.10"),
+                    InetAddress.getByName("2620:fe::10"),
+                    InetAddress.getByName("2620:fe::fe:10")
+                ))
+                .build()
+        },
+        mozillaCloudflareDohLazy = lazy {
+            DnsOverHttps.Builder()
+                .client(fastDohClient(bootstrapClient))
+                .url("https://mozilla.cloudflare-dns.com/dns-query".toHttpUrl())
+                .bootstrapDnsHosts(listOf(
+                    InetAddress.getByName("1.1.1.1"),
+                    InetAddress.getByName("1.0.0.1"),
+                    InetAddress.getByName("2606:4700:4700::1111"),
+                    InetAddress.getByName("2606:4700:4700::1001")
+                ))
+                .build()
+        },
+        googleDohLazy = lazy {
+            DnsOverHttps.Builder()
+                .client(fastDohClient(bootstrapClient))
+                .url("https://dns.google/dns-query".toHttpUrl())
+                .bootstrapDnsHosts(listOf(
+                    InetAddress.getByName("8.8.8.8"),
+                    InetAddress.getByName("8.8.4.4"),
+                    InetAddress.getByName("2001:4860:4860::8888"),
+                    InetAddress.getByName("2001:4860:4860::8844")
+                ))
+                .build()
+        },
+        adguardDohLazy = lazy {
+            DnsOverHttps.Builder()
+                .client(fastDohClient(bootstrapClient))
+                .url("https://unfiltered.adguard-dns.com/dns-query".toHttpUrl())
+                .bootstrapDnsHosts(listOf(
+                    InetAddress.getByName("94.140.14.140"),
+                    InetAddress.getByName("94.140.14.141"),
+                    InetAddress.getByName("2a10:50c0::1:ff"),
+                    InetAddress.getByName("2a10:50c0::2:ff")
+                ))
+                .build()
+        },
+        enableDualThreadPrimary = enableDualThreadPrimary
+    )
 
-    private val mozillaCloudflareDoh by lazy {
-        DnsOverHttps.Builder()
-            .client(fastDohClient)
-            .url("https://mozilla.cloudflare-dns.com/dns-query".toHttpUrl())
-            .bootstrapDnsHosts(listOf(
-                InetAddress.getByName("1.1.1.1"),
-                InetAddress.getByName("1.0.0.1"),
-                InetAddress.getByName("2606:4700:4700::1111"),
-                InetAddress.getByName("2606:4700:4700::1001")
-            ))
-            .build()
-    }
-
-    private val quad9Doh by lazy {
-        DnsOverHttps.Builder()
-            .client(fastDohClient)
-            .url("https://dns10.quad9.net/dns-query".toHttpUrl())
-            .bootstrapDnsHosts(listOf(
-                InetAddress.getByName("9.9.9.10"),
-                InetAddress.getByName("149.112.112.10"),
-                InetAddress.getByName("2620:fe::10"),
-                InetAddress.getByName("2620:fe::fe:10")
-            ))
-            .build()
-    }
-
-    private val cloudflareDoh by lazy {
-        DnsOverHttps.Builder()
-            .client(fastDohClient)
-            .url("https://cloudflare-dns.com/dns-query".toHttpUrl())
-            .bootstrapDnsHosts(listOf(
-                InetAddress.getByName("1.1.1.1"),
-                InetAddress.getByName("1.0.0.1"),
-                InetAddress.getByName("2606:4700:4700::1111"),
-                InetAddress.getByName("2606:4700:4700::1001")
-            ))
-            .build()
-    }
-
-    private val googleDoh by lazy {
-        DnsOverHttps.Builder()
-            .client(fastDohClient)
-            .url("https://dns.google/dns-query".toHttpUrl())
-            .bootstrapDnsHosts(listOf(
-                InetAddress.getByName("8.8.8.8"),
-                InetAddress.getByName("8.8.4.4"),
-                InetAddress.getByName("2001:4860:4860::8888"),
-                InetAddress.getByName("2001:4860:4860::8844")
-            ))
-            .build()
+    companion object {
+        // Fast-fail timeouts prevent blackholed DoH servers from stalling the 4s cascade budget.
+        private fun fastDohClient(bootstrapClient: OkHttpClient): OkHttpClient =
+            bootstrapClient.newBuilder()
+                .cache(null)
+                .connectTimeout(1500L, TimeUnit.MILLISECONDS)
+                .readTimeout(1500L, TimeUnit.MILLISECONDS)
+                .writeTimeout(1500L, TimeUnit.MILLISECONDS)
+                .callTimeout(2000L, TimeUnit.MILLISECONDS)
+                .build()
     }
 
     private val primaryPlainIps = listOf("9.9.9.10", "149.112.112.10", "1.1.1.1", "1.0.0.1")
     private val secondaryPlainIps = listOf("8.8.8.8", "8.8.4.4", "94.140.14.140", "94.140.14.141")
+
+    private fun lookupPrimarySequential(hostname: String, deadline: Long): List<InetAddress>? {
+        try {
+            val q9 = quad9DohLazy.value.lookup(hostname)
+            if (q9.isNotEmpty()) return q9
+        } catch (_: Throwable) {}
+        if (System.currentTimeMillis() < deadline) {
+            try {
+                val moz = mozillaCloudflareDohLazy.value.lookup(hostname)
+                if (moz.isNotEmpty()) return moz
+            } catch (_: Throwable) {}
+        }
+        return null
+    }
+
+    private fun lookupPrimaryDualThread(hostname: String, deadline: Long): List<InetAddress>? {
+        val winner = AtomicReference<List<InetAddress>?>(null)
+        val remaining = AtomicInteger(2)
+        val latch = CountDownLatch(1)
+
+        fun runResolver(resolver: Dns) {
+            try {
+                val resolved = resolver.lookup(hostname)
+                if (resolved.isNotEmpty() && winner.compareAndSet(null, resolved)) {
+                    latch.countDown()
+                }
+            } catch (_: Throwable) {
+            } finally {
+                if (remaining.decrementAndGet() == 0) {
+                    latch.countDown()
+                }
+            }
+        }
+
+        val quad9Queued = try {
+            dnsRaceExecutor.execute { runResolver(quad9DohLazy.value) }
+            true
+        } catch (_: RejectedExecutionException) {
+            false
+        }
+
+        if (!quad9Queued) {
+            return lookupPrimarySequential(hostname, deadline)
+        }
+
+        val mozillaQueued = try {
+            dnsRaceExecutor.execute { runResolver(mozillaCloudflareDohLazy.value) }
+            true
+        } catch (_: RejectedExecutionException) {
+            false
+        }
+
+        if (!mozillaQueued) {
+            runResolver(mozillaCloudflareDohLazy.value)
+        }
+
+        val waitMs = (deadline - System.currentTimeMillis()).coerceIn(1L, 2000L)
+        try {
+            latch.await(waitMs, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
+        return winner.get()
+    }
 
     override fun lookup(hostname: String): List<InetAddress> {
         parseNumericAddress(hostname)?.let { return it }
 
         val deadline = System.currentTimeMillis() + 4000L
 
-        // 1. Primary Privacy DoH: Mozilla Cloudflare -> Quad9 (Zero-logging, strictly confidential)
-        try {
-            return mozillaCloudflareDoh.lookup(hostname)
-        } catch (_: Throwable) {}
-        if (System.currentTimeMillis() < deadline) {
-            try {
-                return quad9Doh.lookup(hostname)
-            } catch (_: Throwable) {}
+        // 1. Primary DoH: Quad9 (Unfiltered) + Mozilla Cloudflare
+        val primaryResult = if (enableDualThreadPrimary) {
+            lookupPrimaryDualThread(hostname, deadline)
+        } else {
+            lookupPrimarySequential(hostname, deadline)
         }
+        if (!primaryResult.isNullOrEmpty()) return primaryResult
 
         if (System.currentTimeMillis() < deadline) {
-            // 2. Secondary High-Speed Edge DoH: Cloudflare -> Google
+            // 2. Secondary DoH: Google -> AdGuard (Unfiltered)
             try {
-                return cloudflareDoh.lookup(hostname)
+                val googleRes = googleDohLazy.value.lookup(hostname)
+                if (googleRes.isNotEmpty()) return googleRes
             } catch (_: Throwable) {}
             if (System.currentTimeMillis() < deadline) {
                 try {
-                    return googleDoh.lookup(hostname)
+                    val adguardRes = adguardDohLazy.value.lookup(hostname)
+                    if (adguardRes.isNotEmpty()) return adguardRes
                 } catch (_: Throwable) {}
             }
         }
@@ -381,9 +487,16 @@ fun OkHttpClient.Builder.addGenericDns(url: String, ips: List<String>): OkHttpCl
     return dns(sharedDns)
 }
 
-fun OkHttpClient.Builder.addResilientMultiTierDns(): OkHttpClient.Builder {
-    val sharedDns = sharedDnsResolvers.computeIfAbsent("__resilient_multi_tier__") {
-        SafeDns(CachedDns(ResilientFallbackDns(sharedDohBootstrapClient)))
+fun OkHttpClient.Builder.addResilientMultiTierDns(
+    enableDualThreadPrimary: Boolean = false
+): OkHttpClient.Builder {
+    val resolverKey = if (enableDualThreadPrimary) {
+        "__resilient_multi_tier_dual__"
+    } else {
+        "__resilient_multi_tier_seq__"
+    }
+    val sharedDns = sharedDnsResolvers.computeIfAbsent(resolverKey) {
+        SafeDns(CachedDns(ResilientFallbackDns(sharedDohBootstrapClient, enableDualThreadPrimary)))
     }
     return dns(sharedDns)
 }

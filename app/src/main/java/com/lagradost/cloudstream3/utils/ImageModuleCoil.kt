@@ -154,7 +154,10 @@ object ImageLoader {
                     response
                 }
             }
-            .applyDnsPreference(dns)
+            .applyDnsPreference(
+                dns = dns,
+                enableDualThreadPrimary = tier != DeviceTier.LOW && !isPotato
+            )
             .build()
     }
 

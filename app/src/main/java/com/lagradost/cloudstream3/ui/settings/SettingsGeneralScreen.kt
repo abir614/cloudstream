@@ -4,10 +4,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,17 +16,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,9 +33,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.integerArrayResource
@@ -50,7 +50,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.APIHolder
 import com.lagradost.cloudstream3.AllLanguagesName
 import com.lagradost.cloudstream3.CloudStreamApp
@@ -74,13 +73,17 @@ import com.lagradost.cloudstream3.utils.SubtitleHelper.getNameNextToFlagEmoji
 import com.lagradost.cloudstream4.AppSettings
 import com.lagradost.cloudstream4.compose.ActionDialog
 import com.lagradost.cloudstream4.compose.PHONE
+import com.lagradost.cloudstream4.compose.focusOutline
 import com.lagradost.cloudstream4.compose.isLayout
 import com.lagradost.cloudstream4.rememberAppSettings
 import com.lagradost.cloudstream4.theme.CloudStreamPreviewTheme
 import com.lagradost.safefile.SafeFile
+import com.mihon.presentation.secondaryItemAlpha
 import com.mihon.presentation.settings.Preference
 import com.mihon.presentation.settings.SearchableSettings
 import com.mihon.presentation.settings.collectAsState
+import com.mihon.presentation.settings.widget.BasePreferenceWidget
+import com.mihon.presentation.settings.widget.PrefsHorizontalPadding
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentMap
 
@@ -534,188 +537,231 @@ private fun NsfwSensitivityPreferenceCard(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
+    BasePreferenceWidget(
+        title = stringResource(R.string.nsfw_filter_level_title),
+        icon = {
             Icon(
                 painter = painterResource(R.drawable.ic_baseline_tune_24),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.size(24.dp)
             )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.nsfw_filter_level_title),
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 16.sp),
-                    color = MaterialTheme.colorScheme.onBackground
-                )
+        },
+        subcomponent = {
+            val minVal = activeLevel.minVisualThreshold
+            val maxVal = activeLevel.maxVisualThreshold
+            val stepCount = (Math.round((maxVal - minVal) * 100f) - 1).coerceAtLeast(0)
+            val canDecrement = activeThreshold > minVal + 0.001f
+            val canIncrement = activeThreshold < maxVal - 0.001f
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = PrefsHorizontalPadding)
+            ) {
                 Text(
                     text = tierDesc,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Single-line mutually exclusive switch: Extreme | Moderate | Low
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            tierOptions.forEach { (level, labelRes) ->
-                val isSelected = level == activeLevel
-                Surface(
-                    onClick = { onSelectLevel(level) },
+                    style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier
-                        .weight(1f)
-                        .height(38.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    border = if (isSelected) {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f))
-                    } else null
+                        .secondaryItemAlpha()
+                        .padding(top = 2.dp),
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Single-line mutually exclusive pill switch: Extreme | Moderate | Low
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(3.dp),
+                        horizontalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
-                        Text(
-                            text = stringResource(labelRes),
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            ),
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.onPrimary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                            maxLines = 1
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Locked Threshold Header + Reset directly below switch
-        val minVal = activeLevel.minVisualThreshold
-        val maxVal = activeLevel.maxVisualThreshold
-        val stepCount = (Math.round((maxVal - minVal) * 100f) - 1).coerceAtLeast(0)
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = "${stringResource(R.string.nsfw_threshold_input_label)} $rangeHint",
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(onClick = onResetDefaults) {
-                Text(stringResource(R.string.nsfw_threshold_reset))
-            }
-        }
-
-        Slider(
-            value = activeThreshold.coerceIn(minVal, maxVal),
-            onValueChange = { next ->
-                val clamped = NsfwFilterEngine.clampThresholdForLevel(next, activeLevel)
-                inputText = String.format(java.util.Locale.ROOT, "%.2f", clamped)
-                onThresholdChanged(activeLevel, clamped)
-            },
-            valueRange = minVal..maxVal,
-            steps = stepCount,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OutlinedButton(
-                onClick = { onThresholdChanged(activeLevel, activeThreshold - 0.01f) },
-                enabled = activeThreshold > minVal + 0.001f,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                modifier = Modifier.height(40.dp)
-            ) {
-                Text("-", fontWeight = FontWeight.Bold)
-            }
-
-            OutlinedTextField(
-                value = inputText,
-                onValueChange = { typed ->
-                    if (typed.length <= 5) {
-                        inputText = typed
-                        if (typed.length >= 4) {
-                            val parsed = typed.trim().replace(',', '.').toFloatOrNull()
-                            if (parsed != null) {
-                                val clamped = NsfwFilterEngine.clampThresholdForLevel(parsed, activeLevel)
-                                val clampedStr = String.format(java.util.Locale.ROOT, "%.2f", clamped)
-                                if (Math.abs(parsed - clamped) > 0.001f) {
-                                    inputText = clampedStr
+                        tierOptions.forEach { (level, labelRes) ->
+                            val isSelected = level == activeLevel
+                            Surface(
+                                onClick = { onSelectLevel(level) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(34.dp)
+                                    .focusOutline(shape = CircleShape),
+                                shape = CircleShape,
+                                color = if (isSelected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    Color.Transparent
+                                },
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Text(
+                                        text = stringResource(labelRes),
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium
+                                        ),
+                                        color = if (isSelected) {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        maxLines = 1,
+                                    )
                                 }
-                                onThresholdChanged(activeLevel, clamped)
                             }
                         }
                     }
-                },
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                ),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Decimal,
-                    imeAction = ImeAction.Done
-                ),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        commitInput(inputText)
-                        focusManager.clearFocus()
-                    }
-                ),
-                modifier = Modifier
-                    .width(96.dp)
-                    .onFocusChanged { focusState ->
-                        if (!focusState.isFocused) {
-                            commitInput(inputText)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Visual Threshold header + compact inline stepper/numeric Pill matching BaseSliderItem
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.nsfw_threshold_input_label).trimEnd(':'),
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                    )
+
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .focusOutline(shape = CircleShape)
+                                    .clickable(enabled = canDecrement) {
+                                        onThresholdChanged(activeLevel, activeThreshold - 0.01f)
+                                    }
+                                    .alpha(if (canDecrement) 1f else 0.35f),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "-",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
+
+                            BasicTextField(
+                                value = inputText,
+                                onValueChange = { typed ->
+                                    if (typed.length <= 5) {
+                                        inputText = typed
+                                        if (typed.length >= 4) {
+                                            val parsed = typed.trim().replace(',', '.').toFloatOrNull()
+                                            if (parsed != null) {
+                                                val clamped = NsfwFilterEngine.clampThresholdForLevel(parsed, activeLevel)
+                                                val clampedStr = String.format(java.util.Locale.ROOT, "%.2f", clamped)
+                                                if (Math.abs(parsed - clamped) > 0.001f) {
+                                                    inputText = clampedStr
+                                                }
+                                                onThresholdChanged(activeLevel, clamped)
+                                            }
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFeatureSettings = "tnum",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center,
+                                ),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Decimal,
+                                    imeAction = ImeAction.Done,
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onDone = {
+                                        commitInput(inputText)
+                                        focusManager.clearFocus()
+                                    }
+                                ),
+                                modifier = Modifier
+                                    .width(44.dp)
+                                    .onFocusChanged { focusState ->
+                                        if (!focusState.isFocused) {
+                                            commitInput(inputText)
+                                        }
+                                    },
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .focusOutline(shape = CircleShape)
+                                    .clickable(enabled = canIncrement) {
+                                        onThresholdChanged(activeLevel, activeThreshold + 0.01f)
+                                    }
+                                    .alpha(if (canIncrement) 1f else 0.35f),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = "+",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
                         }
                     }
-            )
+                }
 
-            OutlinedButton(
-                onClick = { onThresholdChanged(activeLevel, activeThreshold + 0.01f) },
-                enabled = activeThreshold < maxVal - 0.001f,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                modifier = Modifier.height(40.dp)
-            ) {
-                Text("+", fontWeight = FontWeight.Bold)
+                Slider(
+                    value = activeThreshold.coerceIn(minVal, maxVal),
+                    onValueChange = { next ->
+                        val clamped = NsfwFilterEngine.clampThresholdForLevel(next, activeLevel)
+                        inputText = String.format(java.util.Locale.ROOT, "%.2f", clamped)
+                        onThresholdChanged(activeLevel, clamped)
+                    },
+                    valueRange = minVal..maxVal,
+                    steps = stepCount,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusOutline(),
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = rangeHint,
+                        style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+                        modifier = Modifier.secondaryItemAlpha(),
+                    )
+                    Text(
+                        text = stringResource(R.string.nsfw_threshold_reset),
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .focusOutline(shape = CircleShape)
+                            .clickable(onClick = onResetDefaults)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
+                }
             }
         }
-    }
+    )
 }
 
 @PreviewLightDark

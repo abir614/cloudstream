@@ -25,7 +25,7 @@
         <item>DNS.SB</item>
         <item>Canadian Shield</item>
         <item>Cloudflare (Mozilla)</item>
-        <item>Resilient Multi-Tier (Mozilla+Quad9 -> CF+Google)</item>
+        <item>Resilient Multi-Tier</item>
     </array>
     <array name="dns_pref_values">
         <item>0</item>

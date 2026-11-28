@@ -38,8 +38,8 @@ This document catalogues all intentional architectural deviations, security hard
 
 ### 2.4 Privacy-First Resilient Multi-Tier DNS with Hard Budget
 - **Privacy-First Fallback Chain in [`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt)**:
-  1. **Tier 1 (Privacy DoH)**: Queries zero-logging **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) $\rightarrow$ **Quad9 DoH** (`https://dns10.quad9.net/dns-query`) first.
-  2. **Tier 2 (High-Speed Edge DoH)**: Queries **Cloudflare DoH** $\rightarrow$ **Google DoH** within remaining budget.
+  1. **Tier 1 (Primary DoH)**: Queries **Quad9 Unfiltered DoH** (`https://dns10.quad9.net/dns-query`) + **Mozilla Cloudflare DoH** (`https://mozilla.cloudflare-dns.com/dns-query`) first. On `MID` / `HIGH` hardware tiers, both primary DoH endpoints race concurrently across two threads (fastest valid response wins); on `LOW` / `UltraPotato` devices, queries run sequentially to eliminate duplicate TLS handshakes, extra sockets, and memory pressure.
+  2. **Tier 2 (Secondary DoH)**: Queries **Google DoH** (`https://dns.google/dns-query`) $\rightarrow$ **AdGuard Unfiltered DoH** (`https://unfiltered.adguard-dns.com/dns-query`) within remaining budget.
   3. **Tier 3 (Primary Plain DNS)**: Direct UDP 53 Anycast to Quad9 (`9.9.9.10`, `149.112.112.10`) and Cloudflare (`1.1.1.1`, `1.0.0.1`).
   4. **Tier 4 (Edge Plain DNS)**: Direct UDP 53 Anycast to Google (`8.8.8.8`, `8.8.4.4`) and AdGuard (`94.140.14.140`, `94.140.14.141`).
   5. **Tier 5 (System Fallback)**: Transparent Android `Dns.SYSTEM` fallback.
@@ -1006,6 +1006,13 @@ For full transparency, developers and users can inspect live, real-time diagnost
   - Scoped `compose-ui-tooling` strictly to `debugImplementation` and removed `PreviewActivity` from release/prerelease merged manifests ([`gradle/libs.versions.toml`](gradle/libs.versions.toml), [`app/build.gradle.kts`](app/build.gradle.kts), [`shared/build.gradle.kts`](shared/build.gradle.kts), [`AndroidManifest.xml`](app/src/main/AndroidManifest.xml)).
   - Added `ContentCatcherManager`, `MobStoreFlagStore`, and `GoogleApiActivity` noise suppression in [`AutoLogcatMonitor.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/AutoLogcatMonitor.kt) and [`RemoteCrashReporter.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/telemetry/RemoteCrashReporter.kt).
   - Merged open Dependabot PRs #47, #48, and #49 (`instancio-core` `6.2.2`, `androidGradlePlugin` `9.5.3`, `kotlinx-serialization-json` `1.13.0`) and synced `rust-core/Cargo.lock` to `wasmi` `1.1.0` from PR #43.
+
+### 16.51 Native Settings UI Alignment & Hardware-Adaptive Multi-Tier DoH Reordering
+- **Unified Filter Sensitivity & Visual Threshold UI ([`SettingsGeneralScreen.kt`](app/src/main/java/com/lagradost/cloudstream3/ui/settings/SettingsGeneralScreen.kt))**:
+  - Refactored `NsfwSensitivityPreferenceCard` onto `BasePreferenceWidget` with shared `PrefsHorizontalPadding` (`16.dp`) icon/column margins, `secondaryItemAlpha()` descriptions, a sleek pill-shaped segmented selector (`Extreme | Moderate | Low`), and a compact `surfaceContainerHigh` inline `-` / numeric input / `+` pill matching `BaseSliderItem` with full D-pad `focusOutline()` support.
+- **Resilient Multi-Tier DoH Reordering & Adaptive Dual-Thread Primary ([`DohProviders.kt`](app/src/main/java/com/lagradost/cloudstream3/network/DohProviders.kt), [`RequestsHelper.kt`](app/src/main/java/com/lagradost/cloudstream3/network/RequestsHelper.kt), [`ImageModuleCoil.kt`](app/src/main/java/com/lagradost/cloudstream3/utils/ImageModuleCoil.kt), [`array.xml`](app/src/main/res/values/array.xml))**:
+  - Updated Primary DoH tier to **Quad9** (`dns10.quad9.net`) + **Mozilla Cloudflare** (`mozilla.cloudflare-dns.com`), and Secondary DoH tier to **Google** (`dns.google`) $\rightarrow$ **AdGuard** (`unfiltered.adguard-dns.com`), simplifying the settings entry label to `Resilient Multi-Tier`.
+  - Added hardware-adaptive dual-thread concurrent primary DoH racing (`Quad9 + Mozilla` on a bounded 8-thread daemon pool) for `MID` / `HIGH` devices while keeping `LOW` / `UltraPotato` devices single-thread sequential to protect memory, sockets, and CPU budget.
 
 
 

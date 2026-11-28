@@ -80,6 +80,80 @@ class DohProvidersTest {
     }
 
     @Test
+    fun `test ResilientFallbackDns dual-thread primary returns faster resolver result`() {
+        val slowQuad9 = Dns {
+            Thread.sleep(600L)
+            listOf(InetAddress.getByName("9.9.9.10"))
+        }
+        val fastMozilla = Dns {
+            listOf(InetAddress.getByName("1.1.1.1"))
+        }
+        val unusedDns = Dns { emptyList() }
+
+        val dualDns = ResilientFallbackDns(
+            quad9DohLazy = lazyOf(slowQuad9),
+            mozillaCloudflareDohLazy = lazyOf(fastMozilla),
+            googleDohLazy = lazyOf(unusedDns),
+            adguardDohLazy = lazyOf(unusedDns),
+            enableDualThreadPrimary = true
+        )
+
+        val startMs = System.currentTimeMillis()
+        val result = dualDns.lookup("example.org")
+        val elapsedMs = System.currentTimeMillis() - startMs
+
+        assertEquals(1, result.size)
+        assertEquals("1.1.1.1", result[0].hostAddress)
+        assertTrue("Expected dual-thread race to return before slow resolver (took ${elapsedMs}ms)", elapsedMs < 400L)
+    }
+
+    @Test
+    fun `test ResilientFallbackDns dual-thread primary falls back cleanly to secondary DoH when primaries fail`() {
+        val failingDns = Dns { throw java.net.UnknownHostException("primary unreachable") }
+        val adguardCalls = AtomicInteger(0)
+        val googleDns = Dns { throw java.net.UnknownHostException("google unreachable") }
+        val adguardDns = Dns {
+            adguardCalls.incrementAndGet()
+            listOf(InetAddress.getByName("94.140.14.140"))
+        }
+
+        val dualDns = ResilientFallbackDns(
+            quad9DohLazy = lazyOf(failingDns),
+            mozillaCloudflareDohLazy = lazyOf(failingDns),
+            googleDohLazy = lazyOf(googleDns),
+            adguardDohLazy = lazyOf(adguardDns),
+            enableDualThreadPrimary = true
+        )
+
+        val result = dualDns.lookup("fallback.example")
+        assertEquals(1, adguardCalls.get())
+        assertEquals("94.140.14.140", result[0].hostAddress)
+    }
+
+    @Test
+    fun `test ResilientFallbackDns sequential mode avoids invoking secondary primary when Quad9 succeeds`() {
+        val mozillaCalls = AtomicInteger(0)
+        val quad9Dns = Dns { listOf(InetAddress.getByName("9.9.9.10")) }
+        val mozillaDns = Dns {
+            mozillaCalls.incrementAndGet()
+            listOf(InetAddress.getByName("1.1.1.1"))
+        }
+        val unusedDns = Dns { emptyList() }
+
+        val seqDns = ResilientFallbackDns(
+            quad9DohLazy = lazyOf(quad9Dns),
+            mozillaCloudflareDohLazy = lazyOf(mozillaDns),
+            googleDohLazy = lazyOf(unusedDns),
+            adguardDohLazy = lazyOf(unusedDns),
+            enableDualThreadPrimary = false
+        )
+
+        val result = seqDns.lookup("seq.example")
+        assertEquals("9.9.9.10", result[0].hostAddress)
+        assertEquals(0, mozillaCalls.get())
+    }
+
+    @Test
     fun `test CachedDns respects max capacity limit`() {
         val mockDelegate = Dns { hostname ->
             listOf(InetAddress.getByName("127.0.0.1"))
