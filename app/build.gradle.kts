@@ -432,6 +432,7 @@ dependencies {
     implementation(libs.nicehttp) // HTTP Lib
 
     implementation(libs.bundles.compose)
+    debugImplementation(libs.compose.ui.tooling)
     implementation(libs.activity.compose)
     implementation(libs.kotlinx.io.core) // Logcat parser
 

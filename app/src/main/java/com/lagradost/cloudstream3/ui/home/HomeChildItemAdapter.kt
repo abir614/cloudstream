@@ -14,6 +14,7 @@ import com.lagradost.cloudstream3.databinding.HomeRemoveGridBinding
 import com.lagradost.cloudstream3.databinding.HomeRemoveGridExpandedBinding
 import com.lagradost.cloudstream3.databinding.HomeResultGridBinding
 import com.lagradost.cloudstream3.databinding.HomeResultGridExpandedBinding
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.ui.BaseAdapter
 import com.lagradost.cloudstream3.ui.BaseDiffCallback
 import com.lagradost.cloudstream3.ui.ViewHolderState
@@ -134,6 +135,22 @@ open class HomeChildItemAdapter(
             })
     ) {
     var hasNext: Boolean = false
+    private var boundFilterVersion: Int = NsfwFilterEngine.configVersion.value
+
+    override fun submitList(list: Collection<SearchResponse>?, commitCallback: Runnable?) {
+        val current = NsfwFilterEngine.configVersion.value
+        val changed = boundFilterVersion != current
+        if (changed) {
+            boundFilterVersion = current
+            notifyDataSetChanged()
+        }
+        super.submitList(list, Runnable {
+            if (changed) {
+                notifyDataSetChanged()
+            }
+            commitCallback?.run()
+        })
+    }
     var isHorizontal: Boolean = false
         set(value) {
             field = value

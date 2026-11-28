@@ -235,6 +235,7 @@ object ImageLoader {
         val key = targetUrl ?: "censored_poster"
         imageView.setTag(R.id.coil_image_url_tag, key)
         imageView.setTag(R.id.coil_image_loaded_tag, key)
+        imageView.setTag(R.id.coil_image_filter_version_tag, NsfwFilterEngine.configVersion.value)
         val d = getCensoredDrawable(imageView.context)
         try {
             imageView.scaleType = ImageView.ScaleType.CENTER_CROP
@@ -258,6 +259,7 @@ object ImageLoader {
             this.setImageDrawable(null)
             this.setTag(R.id.coil_image_url_tag, null)
             this.setTag(R.id.coil_image_loaded_tag, null)
+            this.setTag(R.id.coil_image_filter_version_tag, null)
             return
         }
         // setImageResource is better than coil3 on resources due to attr
@@ -266,10 +268,12 @@ object ImageLoader {
             this.setImageResource(imageData)
             this.setTag(R.id.coil_image_url_tag, null)
             this.setTag(R.id.coil_image_loaded_tag, null)
+            this.setTag(R.id.coil_image_filter_version_tag, null)
             return
         }
 
         val imageKey = (imageData as? String) ?: imageData.toString()
+        val currentFilterVersion = NsfwFilterEngine.configVersion.value
         val isAdultAllowed = context.isNsfwEnabled()
         val shouldCensor = isAdultAllowed && shouldCensorPosters(context)
 
@@ -290,6 +294,7 @@ object ImageLoader {
                     this.setImageDrawable(null)
                     this.setTag(R.id.coil_image_url_tag, imageKey)
                     this.setTag(R.id.coil_image_loaded_tag, null)
+                    this.setTag(R.id.coil_image_filter_version_tag, null)
                     OnDeviceNsfwClassifier.hideParentItem(this)
                     return
                 }
@@ -301,18 +306,21 @@ object ImageLoader {
                 this.setImageDrawable(null)
                 this.setTag(R.id.coil_image_url_tag, imageKey)
                 this.setTag(R.id.coil_image_loaded_tag, null)
+                this.setTag(R.id.coil_image_filter_version_tag, null)
                 OnDeviceNsfwClassifier.hideParentItem(this)
                 return
             }
         }
 
         val loadedKey = this.getTag(R.id.coil_image_loaded_tag)
-        if (loadedKey == imageKey && this.drawable != null) {
+        val loadedFilterVersion = this.getTag(R.id.coil_image_filter_version_tag) as? Int
+        if (loadedKey == imageKey && loadedFilterVersion == currentFilterVersion && this.drawable != null) {
             return
         }
 
         this.setTag(R.id.coil_image_url_tag, imageKey)
         this.setTag(R.id.coil_image_loaded_tag, null)
+        this.setTag(R.id.coil_image_filter_version_tag, null)
 
         val isAlreadyCachedSafe = OnDeviceNsfwClassifier.isCachedSafe(imageKey, context)
         val needsInspection = (!isAdultAllowed || shouldCensor) && !isAlreadyCachedSafe
@@ -404,6 +412,7 @@ object ImageLoader {
                 listener(
                     onSuccess = { _, _ ->
                         this@loadImageInternal.setTag(R.id.coil_image_loaded_tag, imageKey)
+                        this@loadImageInternal.setTag(R.id.coil_image_filter_version_tag, NsfwFilterEngine.configVersion.value)
                     }
                 )
             }

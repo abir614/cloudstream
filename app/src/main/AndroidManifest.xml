@@ -97,6 +97,14 @@
             tools:targetApi="q" />
 
         <activity
+            android:name="org.jetbrains.androidx.compose.ui.tooling.PreviewActivity"
+            tools:node="remove" />
+
+        <activity
+            android:name="androidx.compose.ui.tooling.PreviewActivity"
+            tools:node="remove" />
+
+        <activity
             android:name=".ui.player.DownloadedPlayerActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
             android:exported="true"

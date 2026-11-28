@@ -2,6 +2,7 @@
 <resources>
     <item name="coil_image_url_tag" type="id" />
     <item name="coil_image_loaded_tag" type="id" />
+    <item name="coil_image_filter_version_tag" type="id" />
     <item name="parent_view_tag" type="id" />
     <item name="card_view_holder_tag" type="id" />
     <item name="tv_card_scale_tag" type="id" />

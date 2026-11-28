@@ -51,10 +51,6 @@ kotlin {
     }
 }
 
-dependencies {
-    androidRuntimeClasspath(libs.compose.ui.tooling)
-}
-
 compose.resources {
     publicResClass = true
     packageOfResClass = "com.lagradost.cloudstream4.generated.resources"

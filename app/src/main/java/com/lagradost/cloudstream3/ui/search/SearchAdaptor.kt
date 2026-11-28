@@ -7,6 +7,7 @@ import android.widget.FrameLayout
 import com.lagradost.cloudstream3.SearchResponse
 import com.lagradost.cloudstream3.databinding.SearchResultGridBinding
 import com.lagradost.cloudstream3.databinding.SearchResultGridExpandedBinding
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.ui.AutofitRecyclerView
 import com.lagradost.cloudstream3.ui.BaseDiffCallback
 import com.lagradost.cloudstream3.ui.NoStateAdapter
@@ -47,6 +48,22 @@ class SearchAdapter(
     }
 
     var hasNext: Boolean = false
+    private var boundFilterVersion: Int = NsfwFilterEngine.configVersion.value
+
+    override fun submitList(list: Collection<SearchResponse>?, commitCallback: Runnable?) {
+        val current = NsfwFilterEngine.configVersion.value
+        val changed = boundFilterVersion != current
+        if (changed) {
+            boundFilterVersion = current
+            notifyDataSetChanged()
+        }
+        super.submitList(list, Runnable {
+            if (changed) {
+                notifyDataSetChanged()
+            }
+            commitCallback?.run()
+        })
+    }
 
     private val coverRatio = if(isHorizontal) 1.8 else 0.68
 

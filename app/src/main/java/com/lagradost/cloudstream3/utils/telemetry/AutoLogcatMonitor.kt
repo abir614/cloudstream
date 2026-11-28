@@ -118,7 +118,10 @@ object AutoLogcatMonitor {
         "AudioTrackExtImpl",
         "FrameInsert",
         "LB",
-        "LOG_FLOWCTRL"
+        "LOG_FLOWCTRL",
+        "ContentCatcherManager",
+        "MobStoreFlagStore",
+        "GoogleApiActivity"
     )
 
     private fun isNoiseMessage(message: String): Boolean {
@@ -226,7 +229,11 @@ object AutoLogcatMonitor {
             message.contains("get fade type, but return null", ignoreCase = true) ||
             message.contains("FrameInsert open fail", ignoreCase = true) ||
             message.contains("setSchedAffinity method", ignoreCase = true) ||
-            message.contains("LOGS OVER PROC QUOTA", ignoreCase = true)
+            message.contains("LOGS OVER PROC QUOTA", ignoreCase = true) ||
+            message.contains("failed to get ContentCatcherService", ignoreCase = true) ||
+            message.contains("GoogleCertificatesRslt", ignoreCase = true) ||
+            message.contains("cast_dynamite", ignoreCase = true) ||
+            message.contains("Activity started without extras", ignoreCase = true)
     }
 
     internal fun isNoiseTag(tag: String): Boolean {

@@ -74,6 +74,7 @@ class SearchViewModel : ViewModel() {
     /** Save which providers can searched again and which search result page they are on.
      * Maps provider name to search list.
      * @see [HomeViewModel.expandable] */
+    private val rawExpandableSearches: MutableMap<String, ExpandableSearchList> = ConcurrentHashMap()
     private val expandableSearches: MutableMap<String, ExpandableSearchList> = ConcurrentHashMap()
 
     private var currentSearchIndex = 0
@@ -94,10 +95,10 @@ class SearchViewModel : ViewModel() {
 
     fun rescanSearchFilters() {
         val nsfwEnabled = isNsfwGloballyEnabled()
-        val current = expandableSearches.toMap()
-        if (current.isEmpty()) return
+        val source = rawExpandableSearches.ifEmpty { expandableSearches }.toMap()
+        if (source.isEmpty()) return
 
-        val updatedMap = current.mapValues { (_, expandableList) ->
+        val updatedMap = source.mapValues { (_, expandableList) ->
             expandableList.copy(
                 list = NsfwFilterEngine.filterSearchResults(expandableList.list, nsfwEnabled)
             )
@@ -185,6 +186,11 @@ class SearchViewModel : ViewModel() {
             if (next is Resource.Success) {
                 val nextValue = next.value
                 val nsfwEnabled = isNsfwGloballyEnabled()
+                rawExpandableSearches[name]?.apply {
+                    this.hasNext = nextValue.hasNext
+                    this.currentPage = nextPage
+                    this.list = (this.list + nextValue.items).distinctBy { it.url }
+                }
                 val filteredNextItems = NsfwFilterEngine.filterSearchResults(nextValue.items, nsfwEnabled)
                 expandableSearches[name]?.apply {
                     this.hasNext = nextValue.hasNext
@@ -321,6 +327,7 @@ class SearchViewModel : ViewModel() {
 
             _searchResponse.postValue(Resource.Loading())
             _currentSearch.postValue(emptyMap())
+            rawExpandableSearches.clear()
             expandableSearches.clear()
 
             lastQuery = query
@@ -348,6 +355,8 @@ class SearchViewModel : ViewModel() {
                                 if (currentSearchIndex != currentIndex || !isActive) return@async
                                 if (search is Resource.Success) {
                                     val searchValue = search.value
+                                    rawExpandableSearches[a.name] =
+                                        ExpandableSearchList(searchValue.items, 1, searchValue.hasNext)
                                     val filteredItems = NsfwFilterEngine.filterSearchResults(searchValue.items, nsfwEnabled)
                                     if (filteredItems.isNotEmpty()) {
                                         expandableSearches[a.name] =

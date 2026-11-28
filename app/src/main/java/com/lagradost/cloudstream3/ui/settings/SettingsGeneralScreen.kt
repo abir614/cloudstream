@@ -1,23 +1,56 @@
 package com.lagradost.cloudstream3.ui.settings
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.integerArrayResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.PreviewLightDark
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.lagradost.cloudstream3.APIHolder
 import com.lagradost.cloudstream3.AllLanguagesName
 import com.lagradost.cloudstream3.CloudStreamApp
@@ -27,6 +60,8 @@ import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.TvType
 import com.lagradost.cloudstream3.UnsafeSSL
 import com.lagradost.cloudstream3.app
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterLevel
 import com.lagradost.cloudstream3.insecureApp
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.network.initClient
@@ -93,21 +128,13 @@ object SettingsGeneralScreen : SearchableSettings {
         val thresholdModerate by settings.general.visualThresholdModerate.collectAsState()
         val thresholdLow by settings.general.visualThresholdLow.collectAsState()
 
-        val activeThreshold = when (nsfwLevel) {
-            "extreme" -> thresholdExtreme
-            "low" -> thresholdLow
-            else -> thresholdModerate
+        val activeLevel = NsfwFilterLevel.fromString(nsfwLevel)
+        val rawActiveThreshold = when (activeLevel) {
+            NsfwFilterLevel.EXTREME -> thresholdExtreme
+            NsfwFilterLevel.LOW -> thresholdLow
+            NsfwFilterLevel.MODERATE -> thresholdModerate
         }
-        val levelLabel = when (nsfwLevel) {
-            "extreme" -> "Extreme"
-            "low" -> "Low"
-            else -> "Moderate"
-        }
-        val sensitivitySummary = String.format(
-            java.util.Locale.ROOT,
-            "%s (Visual Threshold: %.2f | E: %.2f, M: %.2f, L: %.2f)",
-            levelLabel, activeThreshold, thresholdExtreme, thresholdModerate, thresholdLow
-        )
+        val activeThreshold = NsfwFilterEngine.clampThresholdForLevel(rawActiveThreshold, activeLevel)
 
         var isBatteryShown by remember { mutableStateOf(false) }
         val context = LocalContext.current
@@ -268,27 +295,33 @@ object SettingsGeneralScreen : SearchableSettings {
                             true
                         }
                     ),
-                    Preference.PreferenceItem.TextPreference(
+                    Preference.PreferenceItem.CustomPreference(
                         title = stringResource(R.string.nsfw_filter_level_title),
-                        subtitle = sensitivitySummary,
-                        icon = painterResource(R.drawable.ic_baseline_tune_24),
-                        enabled = true,
-                        onClick = {
-                            val act = (context as? Activity)
-                                ?: com.lagradost.cloudstream3.CommonActivity.activity
-                                ?: run {
-                                    var c: Context? = context
-                                    while (c is ContextWrapper) {
-                                        if (c is Activity) return@run c
-                                        val next = c.baseContext
-                                        if (next === c) break
-                                        c = next
+                        subtitle = stringResource(R.string.nsfw_filter_level_summary),
+                        content = {
+                            NsfwSensitivityPreferenceCard(
+                                activeLevel = activeLevel,
+                                activeThreshold = activeThreshold,
+                                onSelectLevel = { level ->
+                                    settings.general.nsfwFilterLevel.set(level.key)
+                                    NsfwFilterEngine.onFilterConfigChanged()
+                                },
+                                onThresholdChanged = { level, value ->
+                                    val clamped = NsfwFilterEngine.clampThresholdForLevel(value, level)
+                                    when (level) {
+                                        NsfwFilterLevel.EXTREME -> settings.general.visualThresholdExtreme.set(clamped)
+                                        NsfwFilterLevel.MODERATE -> settings.general.visualThresholdModerate.set(clamped)
+                                        NsfwFilterLevel.LOW -> settings.general.visualThresholdLow.set(clamped)
                                     }
-                                    null
+                                    NsfwFilterEngine.onFilterConfigChanged()
+                                },
+                                onResetDefaults = {
+                                    settings.general.visualThresholdExtreme.set(NsfwFilterEngine.DEFAULT_THRESHOLD_EXTREME)
+                                    settings.general.visualThresholdModerate.set(NsfwFilterEngine.DEFAULT_THRESHOLD_MODERATE)
+                                    settings.general.visualThresholdLow.set(NsfwFilterEngine.DEFAULT_THRESHOLD_LOW)
+                                    NsfwFilterEngine.onFilterConfigChanged()
                                 }
-                            act?.let {
-                                com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine.showSensitivityThresholdsDialog(it)
-                            }
+                            )
                         }
                     ),
                     Preference.PreferenceItem.SwitchPreference(
@@ -450,6 +483,241 @@ object SettingsGeneralScreen : SearchableSettings {
     }
 }
 
+
+@Composable
+private fun NsfwSensitivityPreferenceCard(
+    activeLevel: NsfwFilterLevel,
+    activeThreshold: Float,
+    onSelectLevel: (NsfwFilterLevel) -> Unit,
+    onThresholdChanged: (NsfwFilterLevel, Float) -> Unit,
+    onResetDefaults: () -> Unit,
+) {
+    val focusManager = LocalFocusManager.current
+    val formattedValue = remember(activeLevel, activeThreshold) {
+        String.format(java.util.Locale.ROOT, "%.2f", activeThreshold)
+    }
+    var inputText by remember(activeLevel, formattedValue) { mutableStateOf(formattedValue) }
+
+    LaunchedEffect(activeLevel, formattedValue) {
+        inputText = formattedValue
+    }
+
+    fun commitInput(raw: String) {
+        val parsed = raw.trim().replace(',', '.').toFloatOrNull()
+        if (parsed != null) {
+            val clamped = NsfwFilterEngine.clampThresholdForLevel(parsed, activeLevel)
+            inputText = String.format(java.util.Locale.ROOT, "%.2f", clamped)
+            onThresholdChanged(activeLevel, clamped)
+        } else {
+            inputText = formattedValue
+        }
+    }
+
+    val tierOptions = remember {
+        listOf(
+            NsfwFilterLevel.EXTREME to R.string.nsfw_threshold_extreme_label,
+            NsfwFilterLevel.MODERATE to R.string.nsfw_threshold_moderate_label,
+            NsfwFilterLevel.LOW to R.string.nsfw_threshold_low_label,
+        )
+    }
+
+    val tierDesc = when (activeLevel) {
+        NsfwFilterLevel.EXTREME -> stringResource(R.string.nsfw_threshold_extreme_desc)
+        NsfwFilterLevel.MODERATE -> stringResource(R.string.nsfw_threshold_moderate_desc)
+        NsfwFilterLevel.LOW -> stringResource(R.string.nsfw_threshold_low_desc)
+    }
+    val rangeHint = remember(activeLevel) {
+        String.format(
+            java.util.Locale.ROOT,
+            "(%.2f - %.2f)",
+            activeLevel.minVisualThreshold,
+            activeLevel.maxVisualThreshold
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_baseline_tune_24),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.nsfw_filter_level_title),
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 16.sp),
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Text(
+                    text = tierDesc,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Single-line mutually exclusive switch: Extreme | Moderate | Low
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            tierOptions.forEach { (level, labelRes) ->
+                val isSelected = level == activeLevel
+                Surface(
+                    onClick = { onSelectLevel(level) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    border = if (isSelected) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f))
+                    } else null
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Text(
+                            text = stringResource(labelRes),
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            ),
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            maxLines = 1
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Locked Threshold Header + Reset directly below switch
+        val minVal = activeLevel.minVisualThreshold
+        val maxVal = activeLevel.maxVisualThreshold
+        val stepCount = (Math.round((maxVal - minVal) * 100f) - 1).coerceAtLeast(0)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "${stringResource(R.string.nsfw_threshold_input_label)} $rangeHint",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(onClick = onResetDefaults) {
+                Text(stringResource(R.string.nsfw_threshold_reset))
+            }
+        }
+
+        Slider(
+            value = activeThreshold.coerceIn(minVal, maxVal),
+            onValueChange = { next ->
+                val clamped = NsfwFilterEngine.clampThresholdForLevel(next, activeLevel)
+                inputText = String.format(java.util.Locale.ROOT, "%.2f", clamped)
+                onThresholdChanged(activeLevel, clamped)
+            },
+            valueRange = minVal..maxVal,
+            steps = stepCount,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = { onThresholdChanged(activeLevel, activeThreshold - 0.01f) },
+                enabled = activeThreshold > minVal + 0.001f,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                modifier = Modifier.height(40.dp)
+            ) {
+                Text("-", fontWeight = FontWeight.Bold)
+            }
+
+            OutlinedTextField(
+                value = inputText,
+                onValueChange = { typed ->
+                    if (typed.length <= 5) {
+                        inputText = typed
+                        if (typed.length >= 4) {
+                            val parsed = typed.trim().replace(',', '.').toFloatOrNull()
+                            if (parsed != null) {
+                                val clamped = NsfwFilterEngine.clampThresholdForLevel(parsed, activeLevel)
+                                val clampedStr = String.format(java.util.Locale.ROOT, "%.2f", clamped)
+                                if (Math.abs(parsed - clamped) > 0.001f) {
+                                    inputText = clampedStr
+                                }
+                                onThresholdChanged(activeLevel, clamped)
+                            }
+                        }
+                    }
+                },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                ),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Decimal,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = {
+                        commitInput(inputText)
+                        focusManager.clearFocus()
+                    }
+                ),
+                modifier = Modifier
+                    .width(96.dp)
+                    .onFocusChanged { focusState ->
+                        if (!focusState.isFocused) {
+                            commitInput(inputText)
+                        }
+                    }
+            )
+
+            OutlinedButton(
+                onClick = { onThresholdChanged(activeLevel, activeThreshold + 0.01f) },
+                enabled = activeThreshold < maxVal - 0.001f,
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+                modifier = Modifier.height(40.dp)
+            ) {
+                Text("+", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
 
 @PreviewLightDark
 @Composable

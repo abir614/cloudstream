@@ -1557,6 +1557,11 @@ object OnDeviceNsfwClassifier {
         }
     }
 
+    private fun markPosterLoaded(view: ImageView, imageKey: String) {
+        view.setTag(R.id.coil_image_loaded_tag, imageKey)
+        view.setTag(R.id.coil_image_filter_version_tag, NsfwFilterEngine.configVersion.value)
+    }
+
     private fun setSmoothPosterDrawable(view: ImageView, imageKey: String, newDrawable: Drawable, animate: Boolean) {
         if (newDrawable is BitmapDrawable) {
             val b = newDrawable.bitmap
@@ -1576,7 +1581,7 @@ object OnDeviceNsfwClassifier {
             val b = actualOld.bitmap
             if (b != null && b.isRecycled) {
                 view.setImageDrawable(newDrawable)
-                view.setTag(R.id.coil_image_loaded_tag, imageKey)
+                markPosterLoaded(view, imageKey)
                 return
             }
         }
@@ -1587,15 +1592,15 @@ object OnDeviceNsfwClassifier {
                     isCrossFadeEnabled = true
                 }
                 view.setImageDrawable(transition)
-                view.setTag(R.id.coil_image_loaded_tag, imageKey)
+                markPosterLoaded(view, imageKey)
                 transition.startTransition(150)
             } catch (_: Throwable) {
                 view.setImageDrawable(newDrawable)
-                view.setTag(R.id.coil_image_loaded_tag, imageKey)
+                markPosterLoaded(view, imageKey)
             }
         } else {
             view.setImageDrawable(newDrawable)
-            view.setTag(R.id.coil_image_loaded_tag, imageKey)
+            markPosterLoaded(view, imageKey)
         }
     }
 

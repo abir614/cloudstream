@@ -11,6 +11,7 @@ import androidx.viewbinding.ViewBinding
 import com.lagradost.cloudstream3.LoadResponse
 import com.lagradost.cloudstream3.R
 import com.lagradost.cloudstream3.databinding.HomepageParentBinding
+import com.lagradost.cloudstream3.domain.engine.NsfwFilterEngine
 import com.lagradost.cloudstream3.mvvm.logError
 import com.lagradost.cloudstream3.ui.BaseAdapter
 import com.lagradost.cloudstream3.ui.BaseDiffCallback
@@ -69,11 +70,29 @@ open class ParentItemAdapter(
         }
     }
 
+    private var boundFilterVersion: Int = NsfwFilterEngine.configVersion.value
+
+    fun syncFilterVersion(): Boolean {
+        val current = NsfwFilterEngine.configVersion.value
+        if (boundFilterVersion != current) {
+            boundFilterVersion = current
+            notifyDataSetChanged()
+            return true
+        }
+        return false
+    }
+
     override fun submitList(
         list: Collection<HomeViewModel.ExpandableHomepageList>?,
         commitCallback: Runnable?
     ) {
-        super.submitList(list?.sortedBy { it.list.list.isEmpty() }, commitCallback)
+        val filterChanged = syncFilterVersion()
+        super.submitList(list?.sortedBy { it.list.list.isEmpty() }, Runnable {
+            if (filterChanged) {
+                notifyDataSetChanged()
+            }
+            commitCallback?.run()
+        })
     }
 
     override fun onUpdateContent(

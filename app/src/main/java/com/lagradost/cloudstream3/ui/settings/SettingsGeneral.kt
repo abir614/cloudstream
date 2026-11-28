@@ -582,10 +582,15 @@ class SettingsGeneral : BasePreferenceFragmentCompat() {
                 "low" -> l
                 else -> m
             }
+            val rangeLabel = when (currentLevel) {
+                "extreme" -> "0.01–0.10"
+                "low" -> "0.21–0.50"
+                else -> "0.11–0.20"
+            }
             val summary = String.format(
                 java.util.Locale.ROOT,
-                "%s (Visual Threshold: %.2f | E: %.2f, M: %.2f, L: %.2f)",
-                label, activeThreshold, e, m, l
+                "%s • Visual Threshold: %.2f (%s)",
+                label, activeThreshold, rangeLabel
             )
             getPref(R.string.nsfw_filter_level_key)?.summary = summary
         }

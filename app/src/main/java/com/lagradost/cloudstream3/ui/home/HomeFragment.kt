@@ -580,7 +580,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
         val currentVersion = NsfwFilterEngine.configVersion.value
         if (lastObservedFilterVersion != currentVersion) {
             lastObservedFilterVersion = currentVersion
-            homeViewModel.rescanLoadedSources()
+            homeMasterAdapter?.syncFilterVersion()
+            homeViewModel.rescanIfConfigChanged()
         }
     }
 
@@ -811,6 +812,22 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             }
         }
 
+        fun showMasterRecyclerContent() {
+            binding.apply {
+                homeLoading.animate().cancel()
+                homeMasterRecycler.animate().cancel()
+                homeMasterRecycler.alpha = 1f
+                homeMasterRecycler.isVisible = true
+                homeLoading.isVisible = false
+                homeLoading.alpha = 1f
+                homeLoadingShimmer.stopShimmer()
+                homeLoadingShimmer.isGone = true
+                homeAmbientGlow.isGone = true
+                homeLoadingError.isVisible = false
+                homeViewModel.clearFilterProgress()
+            }
+        }
+
         observe(homeViewModel.contentFilterProgress) { progress ->
             binding.apply {
                 val ctx = context
@@ -828,6 +845,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                         homeLoadingBrandTitle.text = pluginTitle
                     }
 
+                    homeLoading.animate().cancel()
+                    homeMasterRecycler.animate().cancel()
                     homeLoading.isVisible = true
                     homeLoading.alpha = 1f
                     homeLoadingCard.isVisible = true
@@ -862,6 +881,8 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                     homeLoadingPercentBadge.setTextColor(primaryColor)
 
                     homeLoadingText.text = progress.message
+                } else if (homeViewModel.page.value is Resource.Success) {
+                    showMasterRecyclerContent()
                 } else {
                     homeFilteringProgressBar.isGone = true
                     homeLoadingPercentBadge.isGone = true
@@ -897,44 +918,35 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                 when (data) {
                     is Resource.Success -> {
                         val d = data.value
-                        (homeMasterRecycler.adapter as? ParentItemAdapter)?.submitList(d.values.map {
+                        val adapter = homeMasterRecycler.adapter as? ParentItemAdapter
+                        adapter?.submitList(d.values.map {
                             it.copy(
                                 list = it.list.copy(list = it.list.list.toMutableList())
                             )
                         }) {
                             // Wait until RecyclerView layout pass is complete and child ViewHolders are drawn before dismissing loading screen
                             homeMasterRecycler.post {
+                                if (this@HomeFragment.binding == null) return@post
+                                (homeMasterRecycler.adapter as? ParentItemAdapter)?.syncFilterVersion()
                                 if (homeLoading.isVisible) {
+                                    homeLoading.animate().cancel()
+                                    homeMasterRecycler.animate().cancel()
                                     homeMasterRecycler.alpha = 0f
                                     homeMasterRecycler.isVisible = true
                                     homeMasterRecycler.animate().alpha(1f).setDuration(220L).start()
                                     homeLoading.animate().alpha(0f).setDuration(200L).withEndAction {
-                                        homeLoading.isVisible = false
-                                        homeLoading.alpha = 1f
-                                        homeLoadingShimmer.stopShimmer()
-                                        homeLoadingShimmer.isGone = true
-                                        homeAmbientGlow.isGone = true
-                                        homeViewModel.clearFilterProgress()
+                                        if (this@HomeFragment.binding != null && homeViewModel.page.value is Resource.Success) {
+                                            showMasterRecyclerContent()
+                                        }
                                     }.start()
                                 } else {
-                                    homeLoading.isVisible = false
-                                    homeLoadingShimmer.stopShimmer()
-                                    homeLoadingShimmer.isGone = true
-                                    homeAmbientGlow.isGone = true
-                                    homeViewModel.clearFilterProgress()
+                                    showMasterRecyclerContent()
                                 }
-                                homeLoadingError.isVisible = false
                             }
                         }
 
                         if (d.isEmpty()) {
-                            homeLoading.isVisible = false
-                            homeLoadingError.isVisible = false
-                            homeMasterRecycler.isVisible = true
-                            homeLoadingShimmer.stopShimmer()
-                            homeLoadingShimmer.isGone = true
-                            homeAmbientGlow.isGone = true
-                            homeViewModel.clearFilterProgress()
+                            showMasterRecyclerContent()
                         }
 
                         saveHomepageToTV(d)
@@ -1006,6 +1018,9 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
                     is Resource.Loading -> {
                         val currentItemCount = (homeMasterRecycler.adapter as? ParentItemAdapter)?.itemCount ?: 0
                         if (currentItemCount <= 1) {
+                            homeLoading.animate().cancel()
+                            homeMasterRecycler.animate().cancel()
+                            homeLoading.alpha = 1f
                             homeLoadingShimmer.startShimmer()
                             homeLoading.isVisible = true
                             homeLoadingError.isVisible = false

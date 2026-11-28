@@ -407,8 +407,8 @@
     <string name="enable_nsfw_summary">Allow adult content in searches, categories, and filters (disabled by default for family safety)</string>
     <string name="content_filtering_in_progress">Content Filtering in Progress</string>
     <string name="loading_posters">Loading Posters</string>
-    <string name="nsfw_filter_level_title">Filter Sensitivity &amp; Visual Thresholds</string>
-    <string name="nsfw_filter_level_summary">Configure adult content detection sensitivity and visual thresholds</string>
+    <string name="nsfw_filter_level_title">Filter Sensitivity</string>
+    <string name="nsfw_filter_level_summary">Select Extreme (0.01–0.10), Moderate (0.11–0.20), or Low (0.21–0.50)</string>
     <string-array name="nsfw_filter_level_entries">
         <item>Extreme</item>
         <item>Moderate</item>
@@ -422,18 +422,18 @@
     <string name="censor_nsfw_posters_title">Censor Adult Posters</string>
     <string name="censor_nsfw_posters_summary">Display NSFW warning badge on adult posters instead of unfiltered images</string>
     <string name="apply">Apply</string>
-    <string name="nsfw_threshold_dialog_title">Filter Sensitivity &amp; Visual Thresholds</string>
-    <string name="nsfw_threshold_dialog_description">Calibrate detection thresholds (0.01 – 1.00). Constraints: Extreme &lt; Moderate &lt; Low.</string>
+    <string name="nsfw_threshold_dialog_title">Filter Sensitivity &amp; Visual Threshold</string>
+    <string name="nsfw_threshold_dialog_description">Select a single sensitivity level and tune its locked visual detection threshold.</string>
     <string name="nsfw_threshold_reset">Reset Defaults</string>
     <string name="nsfw_threshold_extreme_label">Extreme</string>
-    <string name="nsfw_threshold_extreme_desc">Peak shield (Borderline &amp; exposure)</string>
+    <string name="nsfw_threshold_extreme_desc">Peak shield (Borderline &amp; exposure) • Range 0.01 – 0.10</string>
     <string name="nsfw_threshold_moderate_label">Moderate</string>
-    <string name="nsfw_threshold_moderate_desc">Family level (Default protection)</string>
+    <string name="nsfw_threshold_moderate_desc">Family level (Default protection) • Range 0.11 – 0.20</string>
     <string name="nsfw_threshold_low_label">Low</string>
-    <string name="nsfw_threshold_low_desc">Hardcore only (Strict explicit filter)</string>
-    <string name="nsfw_threshold_input_label">Threshold Input Box:</string>
+    <string name="nsfw_threshold_low_desc">Hardcore only (Strict explicit filter) • Range 0.21 – 0.50</string>
+    <string name="nsfw_threshold_input_label">Visual Threshold:</string>
     <string name="nsfw_visual_thresholds_title">Visual Detection Thresholds</string>
-    <string name="nsfw_visual_thresholds_summary">Configure AI numeric threshold input boxes and scales (0.01 – 1.00)</string>
+    <string name="nsfw_visual_thresholds_summary">Configure locked visual threshold per sensitivity tier</string>
     <string name="subtitles_encoding">Subtitle encoding</string>
     <string name="category_providers">Providers</string>
     <string name="category_provider_test">Provider test</string>

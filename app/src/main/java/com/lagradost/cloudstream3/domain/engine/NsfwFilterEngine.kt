@@ -27,20 +27,22 @@ import java.util.Locale
 
 /**
  * Configurable Content Safety Sensitivity Levels:
- * - EXTREME (default 0.10f): Super Extreme peak shield (strictly blocks all adult, ecchi, beach, summer, swim, bikini, exposure, empty posters, provocative tropes).
- * - MODERATE (default 0.20f): Family Level sensitivity (strictly blocks explicit adult, ecchi, lewd, smut, sexy tropes; zero-leakage default setting).
- * - LOW (default 0.40f): Hardcore sensitivity (strictly blocks explicit adult, pornography, hentai; tolerable soft ecchi/beach allowed).
+ * - EXTREME (default 0.10f, locked 0.01f..0.10f): Super Extreme peak shield (strictly blocks all adult, ecchi, beach, summer, swim, bikini, exposure, empty posters, provocative tropes).
+ * - MODERATE (default 0.20f, locked 0.11f..0.20f): Family Level sensitivity (strictly blocks explicit adult, ecchi, lewd, smut, sexy tropes; zero-leakage default setting).
+ * - LOW (default 0.40f, locked 0.21f..0.50f): Hardcore sensitivity (strictly blocks explicit adult, pornography, hentai; tolerable soft ecchi/beach allowed).
  *
- * Each sensitivity level has a configurable Visual Detection Threshold (0.01f – 1.00f).
+ * Each sensitivity level has a strictly locked Visual Detection Threshold range.
  * Invariant constraint: Extreme < Moderate < Low.
  */
 enum class NsfwFilterLevel(
     val key: String,
-    val defaultVisualThreshold: Float
+    val defaultVisualThreshold: Float,
+    val minVisualThreshold: Float,
+    val maxVisualThreshold: Float
 ) {
-    LOW("low", 0.40f),
-    MODERATE("moderate", 0.20f),
-    EXTREME("extreme", 0.10f);
+    LOW("low", 0.40f, 0.21f, 0.50f),
+    MODERATE("moderate", 0.20f, 0.11f, 0.20f),
+    EXTREME("extreme", 0.10f, 0.01f, 0.10f);
 
     val visualThreshold: Float
         get() = NsfwFilterEngine.getVisualThreshold(null, this)
@@ -93,9 +95,14 @@ object NsfwFilterEngine {
         _configVersion.value += 1
     }
 
+    fun clampThresholdForLevel(value: Float, level: NsfwFilterLevel): Float {
+        val rounded = Math.round(value * 100f) / 100f
+        return rounded.coerceIn(level.minVisualThreshold, level.maxVisualThreshold)
+    }
+
     /**
-     * Resolves the configured visual threshold for a sensitivity level.
-     * Guaranteed bounds: 0.01f <= threshold <= 1.00f.
+     * Resolves the configured visual threshold for a sensitivity level,
+     * strictly locked to that level's allowed bounds.
      */
     fun getVisualThreshold(context: Context? = null, level: NsfwFilterLevel = getFilterLevel(context)): Float {
         when (level) {
@@ -119,7 +126,7 @@ object NsfwFilterEngine {
                 level == NsfwFilterLevel.LOW && Math.abs(raw - 0.55f) < 0.001f -> level.defaultVisualThreshold
                 else -> raw
             }
-            upgraded.coerceIn(0.01f, 1.00f)
+            clampThresholdForLevel(upgraded, level)
         } catch (_: Throwable) {
             level.defaultVisualThreshold
         }
@@ -129,6 +136,21 @@ object NsfwFilterEngine {
             NsfwFilterLevel.LOW -> cachedThresholdLow = resolved
         }
         return resolved
+    }
+
+    fun setThresholdForLevel(context: Context, level: NsfwFilterLevel, value: Float): Float {
+        val clamped = clampThresholdForLevel(value, level)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+        val key = when (level) {
+            NsfwFilterLevel.EXTREME -> context.getString(R.string.nsfw_visual_threshold_extreme_key)
+            NsfwFilterLevel.MODERATE -> context.getString(R.string.nsfw_visual_threshold_moderate_key)
+            NsfwFilterLevel.LOW -> context.getString(R.string.nsfw_visual_threshold_low_key)
+        }
+        prefs.edit {
+            putFloat(key, clamped)
+        }
+        onFilterConfigChanged()
+        return clamped
     }
 
     /**
@@ -177,47 +199,27 @@ object NsfwFilterEngine {
     }
 
     /**
-     * Mathematically enforces:
-     * 0.01 <= Extreme < Moderate < Low <= 1.00
-     * Dynamically shifts neighboring thresholds when one is adjusted.
+     * Enforces locked disjoint ranges per tier:
+     * Extreme:  0.01 .. 0.10
+     * Moderate: 0.11 .. 0.20
+     * Low:      0.21 .. 0.50
+     * guaranteeing 0.01 <= Extreme < Moderate < Low <= 0.50.
      */
     fun enforceThresholdConstraints(
         extremeIn: Float,
         moderateIn: Float,
         lowIn: Float,
-        modifiedTier: NsfwFilterLevel? = null
+        @Suppress("UNUSED_PARAMETER") modifiedTier: NsfwFilterLevel? = null
     ): Triple<Float, Float, Float> {
-        var e = (Math.round(extremeIn * 100f) / 100f).coerceIn(0.01f, 0.98f)
-        var m = (Math.round(moderateIn * 100f) / 100f).coerceIn(0.02f, 0.99f)
-        var l = (Math.round(lowIn * 100f) / 100f).coerceIn(0.03f, 1.00f)
-
-        when (modifiedTier) {
-            NsfwFilterLevel.EXTREME -> {
-                if (m <= e) m = (e + 0.01f).coerceAtMost(0.99f)
-                if (l <= m) l = (m + 0.01f).coerceAtMost(1.00f)
-            }
-            NsfwFilterLevel.LOW -> {
-                if (m >= l) m = (l - 0.01f).coerceAtLeast(0.02f)
-                if (e >= m) e = (m - 0.01f).coerceAtLeast(0.01f)
-            }
-            NsfwFilterLevel.MODERATE, null -> {
-                if (e >= m) e = (m - 0.01f).coerceAtLeast(0.01f)
-                if (l <= m) l = (m + 0.01f).coerceAtMost(1.00f)
-            }
-        }
-
-        if (e >= m) e = (m - 0.01f).coerceAtLeast(0.01f)
-        if (l <= m) l = (m + 0.01f).coerceAtMost(1.00f)
-
-        return Triple(
-            Math.round(e * 100f) / 100f,
-            Math.round(m * 100f) / 100f,
-            Math.round(l * 100f) / 100f
-        )
+        val e = clampThresholdForLevel(extremeIn, NsfwFilterLevel.EXTREME)
+        val m = clampThresholdForLevel(moderateIn, NsfwFilterLevel.MODERATE)
+        val l = clampThresholdForLevel(lowIn, NsfwFilterLevel.LOW)
+        return Triple(e, m, l)
     }
 
     /**
-     * Displays an interactive dialog with live scales for Extreme, Moderate, and Low sensitivities.
+     * Displays a compact dialog with a single-line [Extreme | Moderate | Low] mode switch
+     * and one locked threshold slider + numeric input directly underneath.
      */
     fun showSensitivityThresholdsDialog(activity: Activity, onDismissCallback: () -> Unit = {}) {
         if (activity.isFinishing || (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed)) return
@@ -238,202 +240,156 @@ object NsfwFilterEngine {
         val builder = AlertDialog.Builder(context, R.style.AlertDialogCustom).setView(binding.root)
         val dialog = builder.create()
 
-        fun updateText(et: EditText, value: Float) {
-            val formatted = String.format(Locale.ROOT, "%.2f", value)
-            if (et.text.toString() != formatted && !et.hasFocus()) {
-                et.setText(formatted)
+        fun activeValue(): Float = when (selectedLevel) {
+            NsfwFilterLevel.EXTREME -> curE
+            NsfwFilterLevel.MODERATE -> curM
+            NsfwFilterLevel.LOW -> curL
+        }
+
+        fun setActiveValue(value: Float) {
+            val clamped = clampThresholdForLevel(value, selectedLevel)
+            when (selectedLevel) {
+                NsfwFilterLevel.EXTREME -> curE = clamped
+                NsfwFilterLevel.MODERATE -> curM = clamped
+                NsfwFilterLevel.LOW -> curL = clamped
             }
         }
 
-        fun updateUI() {
-            binding.radioExtreme.isChecked = (selectedLevel == NsfwFilterLevel.EXTREME)
-            binding.radioModerate.isChecked = (selectedLevel == NsfwFilterLevel.MODERATE)
-            binding.radioLow.isChecked = (selectedLevel == NsfwFilterLevel.LOW)
-
-            updateText(binding.inputExtreme, curE)
-            updateText(binding.inputModerate, curM)
-            updateText(binding.inputLow, curL)
-
-            val pE = Math.round(curE * 100f).coerceIn(1, 100)
-            val pM = Math.round(curM * 100f).coerceIn(1, 100)
-            val pL = Math.round(curL * 100f).coerceIn(1, 100)
-
-            if (binding.seekbarExtreme.progress != pE) binding.seekbarExtreme.progress = pE
-            if (binding.seekbarModerate.progress != pM) binding.seekbarModerate.progress = pM
-            if (binding.seekbarLow.progress != pL) binding.seekbarLow.progress = pL
+        fun applySegmentStyle(btn: android.widget.TextView, selected: Boolean) {
+            btn.isSelected = selected
+            btn.setBackgroundResource(
+                if (selected) R.drawable.bg_sensitivity_segment_selected
+                else R.drawable.bg_sensitivity_segment_unselected
+            )
+            btn.alpha = if (selected) 1.0f else 0.78f
         }
-
-        val selectExtreme = {
-            selectedLevel = NsfwFilterLevel.EXTREME
-            updateUI()
-        }
-        val selectModerate = {
-            selectedLevel = NsfwFilterLevel.MODERATE
-            updateUI()
-        }
-        val selectLow = {
-            selectedLevel = NsfwFilterLevel.LOW
-            updateUI()
-        }
-
-        binding.containerExtreme.setOnClickListener { selectExtreme() }
-        binding.radioExtreme.setOnClickListener { selectExtreme() }
-        binding.labelExtreme.setOnClickListener { selectExtreme() }
-
-        binding.containerModerate.setOnClickListener { selectModerate() }
-        binding.radioModerate.setOnClickListener { selectModerate() }
-        binding.labelModerate.setOnClickListener { selectModerate() }
-
-        binding.containerLow.setOnClickListener { selectLow() }
-        binding.radioLow.setOnClickListener { selectLow() }
-        binding.labelLow.setOnClickListener { selectLow() }
 
         var isUpdating = false
-        fun handleSeekChange(tier: NsfwFilterLevel) {
-            if (isUpdating) return
+        fun updateUI(forceUpdateInput: Boolean = true) {
             isUpdating = true
             try {
-                val rawE = binding.seekbarExtreme.progress.coerceAtLeast(1) / 100f
-                val rawM = binding.seekbarModerate.progress.coerceAtLeast(1) / 100f
-                val rawL = binding.seekbarLow.progress.coerceAtLeast(1) / 100f
+                applySegmentStyle(binding.btnModeExtreme, selectedLevel == NsfwFilterLevel.EXTREME)
+                applySegmentStyle(binding.btnModeModerate, selectedLevel == NsfwFilterLevel.MODERATE)
+                applySegmentStyle(binding.btnModeLow, selectedLevel == NsfwFilterLevel.LOW)
 
-                val (adjE, adjM, adjL) = enforceThresholdConstraints(rawE, rawM, rawL, tier)
-                curE = adjE
-                curM = adjM
-                curL = adjL
-                updateUI()
+                val minV = selectedLevel.minVisualThreshold
+                val maxV = selectedLevel.maxVisualThreshold
+                val valF = activeValue()
+                val steps = Math.round((maxV - minV) * 100f).coerceAtLeast(1)
+                val progress = Math.round((valF - minV) * 100f).coerceIn(0, steps)
+
+                binding.textActiveTierDesc.text = when (selectedLevel) {
+                    NsfwFilterLevel.EXTREME -> context.getString(R.string.nsfw_threshold_extreme_desc)
+                    NsfwFilterLevel.MODERATE -> context.getString(R.string.nsfw_threshold_moderate_desc)
+                    NsfwFilterLevel.LOW -> context.getString(R.string.nsfw_threshold_low_desc)
+                }
+                binding.textLockedRangeHint.text = String.format(Locale.ROOT, "(%.2f - %.2f)", minV, maxV)
+
+                if (binding.seekbarActive.max != steps) binding.seekbarActive.max = steps
+                if (binding.seekbarActive.progress != progress) binding.seekbarActive.progress = progress
+
+                val formatted = String.format(Locale.ROOT, "%.2f", valF)
+                if ((forceUpdateInput || !binding.inputActiveThreshold.hasFocus()) &&
+                    binding.inputActiveThreshold.text.toString() != formatted
+                ) {
+                    binding.inputActiveThreshold.setText(formatted)
+                    binding.inputActiveThreshold.setSelection(formatted.length)
+                }
             } finally {
                 isUpdating = false
             }
         }
 
-        fun handleInputChange(tier: NsfwFilterLevel) {
-            if (isUpdating) return
-            isUpdating = true
-            try {
-                val inputView = when (tier) {
-                    NsfwFilterLevel.EXTREME -> binding.inputExtreme
-                    NsfwFilterLevel.MODERATE -> binding.inputModerate
-                    NsfwFilterLevel.LOW -> binding.inputLow
-                }
-                val rawVal = inputView.text.toString().trim().replace(',', '.').toFloatOrNull()
-                if (rawVal != null) {
-                    val (adjE, adjM, adjL) = when (tier) {
-                        NsfwFilterLevel.EXTREME -> enforceThresholdConstraints(rawVal, curM, curL, tier)
-                        NsfwFilterLevel.MODERATE -> enforceThresholdConstraints(curE, rawVal, curL, tier)
-                        NsfwFilterLevel.LOW -> enforceThresholdConstraints(curE, curM, rawVal, tier)
-                    }
-                    curE = adjE
-                    curM = adjM
-                    curL = adjL
-                }
-                updateUI()
-            } finally {
-                isUpdating = false
+        fun commitCurrentInput(forceUpdateInput: Boolean = true) {
+            val rawVal = binding.inputActiveThreshold.text.toString().trim().replace(',', '.').toFloatOrNull()
+            if (rawVal != null) {
+                setActiveValue(rawVal)
             }
+            updateUI(forceUpdateInput = forceUpdateInput)
         }
 
-        fun setupInputBox(tier: NsfwFilterLevel, et: EditText) {
-            et.setOnEditorActionListener { _, actionId, _ ->
-                if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_NEXT) {
-                    handleInputChange(tier)
-                    et.clearFocus()
-                    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-                    imm?.hideSoftInputFromWindow(et.windowToken, 0)
-                    true
-                } else {
-                    false
-                }
-            }
-            et.setOnFocusChangeListener { _, hasFocus ->
-                if (hasFocus) {
-                    selectedLevel = tier
-                    binding.radioExtreme.isChecked = (selectedLevel == NsfwFilterLevel.EXTREME)
-                    binding.radioModerate.isChecked = (selectedLevel == NsfwFilterLevel.MODERATE)
-                    binding.radioLow.isChecked = (selectedLevel == NsfwFilterLevel.LOW)
-                } else {
-                    handleInputChange(tier)
-                    et.setText(String.format(Locale.ROOT, "%.2f", when (tier) {
-                        NsfwFilterLevel.EXTREME -> curE
-                        NsfwFilterLevel.MODERATE -> curM
-                        NsfwFilterLevel.LOW -> curL
-                    }))
-                }
-            }
-            et.addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-                override fun afterTextChanged(s: Editable?) {
-                    if (isUpdating) return
-                    val str = s?.toString()?.trim()?.replace(',', '.') ?: return
-                    if (str.length >= 4 || str == "1" || str == "1.0" || str == "1.00") {
-                        val parsed = str.toFloatOrNull()
-                        if (parsed != null && parsed in 0.01f..1.00f) {
-                            handleInputChange(tier)
-                        }
-                    }
-                }
-            })
+        fun selectMode(level: NsfwFilterLevel) {
+            commitCurrentInput(forceUpdateInput = false)
+            selectedLevel = level
+            updateUI(forceUpdateInput = true)
         }
 
-        setupInputBox(NsfwFilterLevel.EXTREME, binding.inputExtreme)
-        setupInputBox(NsfwFilterLevel.MODERATE, binding.inputModerate)
-        setupInputBox(NsfwFilterLevel.LOW, binding.inputLow)
+        binding.btnModeExtreme.setOnClickListener { selectMode(NsfwFilterLevel.EXTREME) }
+        binding.btnModeModerate.setOnClickListener { selectMode(NsfwFilterLevel.MODERATE) }
+        binding.btnModeLow.setOnClickListener { selectMode(NsfwFilterLevel.LOW) }
 
         fun dismissKeyboard() {
-            binding.inputExtreme.clearFocus()
-            binding.inputModerate.clearFocus()
-            binding.inputLow.clearFocus()
+            binding.inputActiveThreshold.clearFocus()
             val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             imm?.hideSoftInputFromWindow(binding.root.windowToken, 0)
         }
 
-        binding.seekbarExtreme.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+        binding.seekbarActive.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) handleSeekChange(NsfwFilterLevel.EXTREME)
+                if (!fromUser || isUpdating) return
+                val newVal = selectedLevel.minVisualThreshold + (progress / 100f)
+                setActiveValue(newVal)
+                updateUI(forceUpdateInput = true)
             }
+
             override fun onStartTrackingTouch(sb: SeekBar?) {
                 dismissKeyboard()
             }
+
             override fun onStopTrackingTouch(sb: SeekBar?) {}
         })
 
-        binding.seekbarModerate.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) handleSeekChange(NsfwFilterLevel.MODERATE)
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {
+        binding.inputActiveThreshold.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE || actionId == EditorInfo.IME_ACTION_NEXT) {
+                commitCurrentInput(forceUpdateInput = true)
                 dismissKeyboard()
+                true
+            } else {
+                false
             }
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
-
-        binding.seekbarLow.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) handleSeekChange(NsfwFilterLevel.LOW)
-            }
-            override fun onStartTrackingTouch(sb: SeekBar?) {
-                dismissKeyboard()
-            }
-            override fun onStopTrackingTouch(sb: SeekBar?) {}
-        })
-
-        fun commitAllInputs() {
-            val eVal = binding.inputExtreme.text.toString().trim().replace(',', '.').toFloatOrNull() ?: curE
-            val mVal = binding.inputModerate.text.toString().trim().replace(',', '.').toFloatOrNull() ?: curM
-            val lVal = binding.inputLow.text.toString().trim().replace(',', '.').toFloatOrNull() ?: curL
-            val (adjE, adjM, adjL) = enforceThresholdConstraints(eVal, mVal, lVal, selectedLevel)
-            curE = adjE
-            curM = adjM
-            curL = adjL
         }
+        binding.inputActiveThreshold.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) {
+                commitCurrentInput(forceUpdateInput = true)
+            }
+        }
+        binding.inputActiveThreshold.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (isUpdating) return
+                val str = s?.toString()?.trim()?.replace(',', '.') ?: return
+                if (str.length >= 4) {
+                    val parsed = str.toFloatOrNull()
+                    if (parsed != null) {
+                        val clamped = clampThresholdForLevel(parsed, selectedLevel)
+                        setActiveValue(clamped)
+                        isUpdating = true
+                        try {
+                            val progress = Math.round((clamped - selectedLevel.minVisualThreshold) * 100f)
+                                .coerceIn(0, binding.seekbarActive.max)
+                            if (binding.seekbarActive.progress != progress) {
+                                binding.seekbarActive.progress = progress
+                            }
+                            val formatted = String.format(Locale.ROOT, "%.2f", clamped)
+                            if (formatted != str) {
+                                binding.inputActiveThreshold.setText(formatted)
+                                binding.inputActiveThreshold.setSelection(formatted.length)
+                            }
+                        } finally {
+                            isUpdating = false
+                        }
+                    }
+                }
+            }
+        })
 
         binding.btnReset.setOnClickListener {
             dismissKeyboard()
             curE = DEFAULT_THRESHOLD_EXTREME
             curM = DEFAULT_THRESHOLD_MODERATE
             curL = DEFAULT_THRESHOLD_LOW
-            updateUI()
+            updateUI(forceUpdateInput = true)
         }
 
         binding.btnCancel.setOnClickListener {
@@ -442,12 +398,12 @@ object NsfwFilterEngine {
         }
 
         binding.btnApply.setOnClickListener {
-            commitAllInputs()
+            commitCurrentInput(forceUpdateInput = true)
             dismissKeyboard()
             settingsManager.edit {
                 putString(context.getString(R.string.nsfw_filter_level_key), selectedLevel.key)
             }
-            setVisualThresholds(context, curE, curM, curL)
+            setVisualThresholds(context, curE, curM, curL, selectedLevel)
             dialog.dismiss()
         }
 
@@ -455,7 +411,7 @@ object NsfwFilterEngine {
             onDismissCallback()
         }
 
-        updateUI()
+        updateUI(forceUpdateInput = true)
         try {
             if (!activity.isFinishing && !(android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed)) {
                 dialog.show()

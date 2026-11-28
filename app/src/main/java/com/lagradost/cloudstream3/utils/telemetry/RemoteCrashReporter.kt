@@ -791,13 +791,20 @@ object RemoteCrashReporter {
         "BillingClient",
         "DictionaryFacilitatorImpl",
         "AccessibilityNodeInfoDumper",
-        "LOG_FLOWCTRL"
+        "LOG_FLOWCTRL",
+        "ContentCatcherManager",
+        "MobStoreFlagStore",
+        "GoogleApiActivity"
     )
 
     private val oemNoiseMessages = listOf(
         "ExifInterface: Invalid byte order",
         "LOGS OVER PROC QUOTA",
-        "Billing service unavailable on device"
+        "Billing service unavailable on device",
+        "failed to get ContentCatcherService",
+        "GoogleCertificatesRslt",
+        "cast_dynamite",
+        "Activity started without extras"
     )
 
     /**

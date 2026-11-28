@@ -176,41 +176,27 @@ class NsfwFilterEngineTest {
         assertEquals(0.20f, defM, 0.001f)
         assertEquals(0.40f, defL, 0.001f)
 
-        // When Extreme is increased above Moderate
-        val (adjE1, adjM1, adjL1) = NsfwFilterEngine.enforceThresholdConstraints(0.40f, 0.30f, 0.55f, NsfwFilterLevel.EXTREME)
-        assertEquals(0.40f, adjE1, 0.001f)
-        assertTrue(adjM1 > adjE1)
-        assertTrue(adjL1 > adjM1)
+        // Extreme is locked strictly to 0.01 .. 0.10
+        assertEquals(0.01f, NsfwFilterEngine.clampThresholdForLevel(0.00f, NsfwFilterLevel.EXTREME), 0.001f)
+        assertEquals(0.06f, NsfwFilterEngine.clampThresholdForLevel(0.06f, NsfwFilterLevel.EXTREME), 0.001f)
+        assertEquals(0.10f, NsfwFilterEngine.clampThresholdForLevel(0.40f, NsfwFilterLevel.EXTREME), 0.001f)
 
-        // When Extreme is pushed near the top
-        val (adjE2, adjM2, adjL2) = NsfwFilterEngine.enforceThresholdConstraints(0.99f, 0.30f, 0.55f, NsfwFilterLevel.EXTREME)
-        assertEquals(0.98f, adjE2, 0.001f) // Capped at 0.98 to allow M=0.99, L=1.00
-        assertEquals(0.99f, adjM2, 0.001f)
-        assertEquals(1.00f, adjL2, 0.001f)
+        // Moderate is locked strictly to 0.11 .. 0.20
+        assertEquals(0.11f, NsfwFilterEngine.clampThresholdForLevel(0.05f, NsfwFilterLevel.MODERATE), 0.001f)
+        assertEquals(0.16f, NsfwFilterEngine.clampThresholdForLevel(0.16f, NsfwFilterLevel.MODERATE), 0.001f)
+        assertEquals(0.20f, NsfwFilterEngine.clampThresholdForLevel(0.60f, NsfwFilterLevel.MODERATE), 0.001f)
 
-        // When Low is decreased below Moderate and pushes both Moderate and Extreme down
-        val (adjE3, adjM3, adjL3) = NsfwFilterEngine.enforceThresholdConstraints(0.25f, 0.30f, 0.20f, NsfwFilterLevel.LOW)
-        assertEquals(0.20f, adjL3, 0.001f)
-        assertEquals(0.19f, adjM3, 0.001f)
-        assertEquals(0.18f, adjE3, 0.001f)
+        // Low is locked strictly to 0.21 .. 0.50
+        assertEquals(0.21f, NsfwFilterEngine.clampThresholdForLevel(0.01f, NsfwFilterLevel.LOW), 0.001f)
+        assertEquals(0.35f, NsfwFilterEngine.clampThresholdForLevel(0.35f, NsfwFilterLevel.LOW), 0.001f)
+        assertEquals(0.50f, NsfwFilterEngine.clampThresholdForLevel(0.99f, NsfwFilterLevel.LOW), 0.001f)
 
-        // When Low is decreased below Moderate but Extreme is already lower
-        val (adjE3b, adjM3b, adjL3b) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.30f, 0.20f, NsfwFilterLevel.LOW)
-        assertEquals(0.20f, adjL3b, 0.001f)
-        assertEquals(0.19f, adjM3b, 0.001f)
-        assertEquals(0.15f, adjE3b, 0.001f)
-
-        // When Low is pushed near the bottom
-        val (adjE4, adjM4, adjL4) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.30f, 0.01f, NsfwFilterLevel.LOW)
-        assertEquals(0.03f, adjL4, 0.001f) // Capped at 0.03 to allow M=0.02, E=0.01
-        assertEquals(0.02f, adjM4, 0.001f)
-        assertEquals(0.01f, adjE4, 0.001f)
-
-        // When Moderate is shifted up and down
-        val (adjE5, adjM5, adjL5) = NsfwFilterEngine.enforceThresholdConstraints(0.15f, 0.60f, 0.55f, NsfwFilterLevel.MODERATE)
-        assertEquals(0.60f, adjM5, 0.001f)
-        assertTrue(adjE5 < adjM5)
-        assertTrue(adjL5 > adjM5)
+        // Strict disjoint ordering invariant holds regardless of inputs
+        val (adjE, adjM, adjL) = NsfwFilterEngine.enforceThresholdConstraints(0.99f, 0.01f, 0.99f)
+        assertEquals(0.10f, adjE, 0.001f)
+        assertEquals(0.11f, adjM, 0.001f)
+        assertEquals(0.50f, adjL, 0.001f)
+        assertTrue(adjE < adjM && adjM < adjL)
     }
 
     @Suppress("DEPRECATION_ERROR")

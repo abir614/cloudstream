@@ -383,10 +383,21 @@ class HomeViewModel : ViewModel() {
 
     private var rawHomeData: List<HomePageResponse?>? = null
     private var rescanJob: Job? = null
+    @Volatile
+    private var lastScannedFilterVersion: Int = NsfwFilterEngine.configVersion.value
+
+    fun rescanIfConfigChanged() {
+        val current = NsfwFilterEngine.configVersion.value
+        if (lastScannedFilterVersion != current) {
+            rescanLoadedSources()
+        }
+    }
 
     fun rescanLoadedSources() {
+        lastScannedFilterVersion = NsfwFilterEngine.configVersion.value
         rescanJob?.cancel()
         rescanJob = ioSafe {
+            reloadStored()
             val data = rawHomeData
             if (data != null && data.isNotEmpty()) {
                 // Smooth in-memory re-filtering without flashing the loading screen or thrashing
@@ -900,7 +911,7 @@ class HomeViewModel : ViewModel() {
                 NsfwFilterEngine.configVersion
                     .debounce(250L)
                     .collect { version ->
-                        if (version > 0) {
+                        if (version > 0 && lastScannedFilterVersion != version) {
                             rescanLoadedSources()
                         }
                     }
